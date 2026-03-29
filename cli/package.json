@@ -1,0 +1,30 @@
+{
+  "name": "globalize-skills",
+  "version": "0.1.0",
+  "description": "Install globalization skills for AI coding agents",
+  "type": "module",
+  "bin": {
+    "globalize-skills": "./bin.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.mjs test/**/**/*.test.mjs"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7"
+  },
+  "files": [
+    "bin.mjs",
+    "lib/",
+    "converters/",
+    "commands/"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Globalize-now/globalize-skills.git",
+    "directory": "cli"
+  }
+}

@@ -2,7 +2,34 @@
 
 Agent skills for localizing software projects. Each skill is a self-contained set of instructions that an AI coding agent can follow to set up or modify i18n in a target project.
 
-## Quick Start
+## Installation
+
+### Interactive (recommended)
+
+```bash
+npx globalize-skills
+```
+
+### Direct install
+
+```bash
+# Install a single skill (auto-detects Claude Code, Codex, Cursor)
+npx globalize-skills add lingui-setup
+
+# Install all LinguiJS skills
+npx globalize-skills add --preset lingui
+
+# Target a specific agent
+npx globalize-skills add lingui-setup --agent cursor
+
+# List available skills
+npx globalize-skills list
+
+# Update to latest version
+npx globalize-skills update lingui-setup
+```
+
+### Manual install
 
 Copy a skill into your project:
 

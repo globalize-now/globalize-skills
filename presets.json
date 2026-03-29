@@ -1,0 +1,6 @@
+{
+  "lingui": {
+    "description": "All LinguiJS skills (setup, translate, code)",
+    "skills": ["lingui-setup", "lingui-translate", "lingui-code"]
+  }
+}
