@@ -37,7 +37,7 @@ Based on the detection, pick the right variant reference file:
 - **Vite + SWC** (including TanStack Router, React Router, plain Vite) → read `references/vite-swc.md`
 - **Vite + Babel** → read `references/vite-babel.md`
 
-Then continue with Steps 2-6 below, using the variant-specific instructions from the reference file for Steps 4 and 5.
+Then continue with Steps 2-7 below, using the variant-specific instructions from the reference file for Steps 4 and 5.
 
 ---
 
@@ -120,7 +120,50 @@ The goal is to wrap the entire component tree once, at the highest level.
 
 ---
 
-## Step 6: Scaffold and Verify
+## Step 6: Set Up ESLint Plugin
+
+The `eslint-plugin-lingui` package catches unwrapped strings and incorrect macro usage at lint time — it's the primary safety net against shipping untranslated text.
+
+**First, check if ESLint is already configured** — look for `.eslintrc.*`, `eslint.config.*`, or an `"eslintConfig"` key in `package.json`. If ESLint is not set up at all, ask the user if they'd like you to add it. If they decline, skip this step.
+
+If ESLint is present (or the user agreed to add it):
+
+1. Install the plugin:
+
+| Package | Type | Purpose |
+|---------|------|---------|
+| `eslint-plugin-lingui` | dev | Lint rules for Lingui macro usage |
+
+2. Add the recommended preset to the ESLint config:
+
+**Flat config (`eslint.config.*`):**
+```js
+import linguiPlugin from 'eslint-plugin-lingui'
+
+export default [
+  // ...existing config
+  linguiPlugin.configs['flat/recommended'],
+]
+```
+
+**Legacy config (`.eslintrc.*`):**
+```json
+{
+  "extends": ["plugin:lingui/recommended"]
+}
+```
+
+The `recommended` preset enables:
+- `lingui/no-unlocalized-strings` — flags raw string literals that should be wrapped in `<Trans>` or `` t`...` ``
+- `lingui/t-call-in-function` — ensures `` t`...` `` is only used inside functions (not at module scope)
+- `lingui/no-single-variables-to-translate` — prevents wrapping lone variables in translation macros
+- `lingui/no-expression-in-message` — flags complex expressions inside translation macros
+- `lingui/no-single-tag-to-translate` — prevents wrapping a single component in `<Trans>`
+- `lingui/no-trans-inside-trans` — prevents nesting `<Trans>` inside `<Trans>`
+
+---
+
+## Step 7: Scaffold and Verify
 
 Run extraction to generate the initial catalog files:
 
