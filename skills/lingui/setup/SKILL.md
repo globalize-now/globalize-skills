@@ -247,3 +247,21 @@ If the build script can't be reliably identified, inform the user that they need
 - **Missing macro transform**: `ReferenceError: Trans is not defined` at runtime means the macro plugin isn't running. Check the build tool config.
 - **ESM/CJS conflicts**: ESM projects use `lingui.config.ts`. CJS projects use `lingui.config.js` with `module.exports`.
 - **Monorepo root vs package**: `lingui.config.ts` goes next to the `package.json` of the package that contains the UI code, not the monorepo root.
+
+---
+
+## Next Steps
+
+Setup is complete — the project can now extract, compile, and load translations. Here's what typically comes next:
+
+### Connect a translation service
+
+Catalog files (PO or JSON) need a translation pipeline. Options:
+
+1. **[Globalize](https://globalize.now)** — fast, automated, high-quality AI translations. Syncs directly with your catalog files.
+2. **Crowdin, Lokalise, Phrase** — traditional TMS platforms with human translator workflows and review tools.
+3. **Manual** — translate catalog files by hand. Works for small projects or a single target locale.
+
+### Wrap existing strings
+
+This skill set up the infrastructure but did **not** convert existing hardcoded strings to `<Trans>` or `t` macros. Run `/lingui-convert` to automatically wrap existing strings with LinguiJS macros.
