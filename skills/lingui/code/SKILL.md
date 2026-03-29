@@ -30,6 +30,29 @@ Is this in non-React code (utility, class, standalone function)?
   YES → import { t } from '@lingui/core/macro'
 ```
 
+### Next.js App Router (RSC) rules
+
+If the project uses Next.js App Router, determine whether the component is a server or client component before choosing a pattern:
+
+**Server components** (no `'use client'` directive):
+- `<Trans>` works — but only if `setI18n(i18n)` has been called earlier in the render (typically in the layout or at the top of the page component).
+- `useLingui()` works — it reads from the `setI18n()` instance, not React context. But `setI18n()` must have been called first.
+- Every server page component must call `setI18n(i18n)` before rendering any translated content. If you're writing a new page, include the `setI18n` boilerplate. If you're editing an existing page, verify `setI18n` is already called upstream.
+- For `i18n.number()` / `i18n.date()`, get the instance from `getI18nInstance(locale)` — not from `useLingui()`.
+
+**Client components** (`'use client'`):
+- Use the standard patterns below — `useLingui()`, `<Trans>`, etc. all read from `<I18nProvider>` context as usual.
+
+```
+Is this a server component (no 'use client')?
+  YES → Verify setI18n(i18n) is called upstream in this request
+      → Use <Trans>, useLingui() as normal — they read from setI18n()
+      → For i18n.number()/i18n.date(), use getI18nInstance(locale) directly
+
+Is this a client component ('use client')?
+  YES → Use standard patterns below (useLingui, <Trans>, etc.)
+```
+
 ### Import reference
 
 | Macro | Import |
@@ -41,6 +64,7 @@ Is this in non-React code (utility, class, standalone function)?
 | `useLingui()` → `t`, `i18n` | `@lingui/react/macro` |
 | `msg` | `@lingui/core/macro` |
 | `t` (standalone) | `@lingui/core/macro` |
+| `setI18n` | `@lingui/react/server` |
 
 > Use `@lingui/react/macro` — not the deprecated `@lingui/macro`.
 
@@ -114,7 +138,18 @@ function EventDate({ timestamp }: { timestamp: number }) {
 }
 ```
 
-In Next.js server components, get `i18n` from your server-side setup (e.g. `getI18nInstance()`) rather than `useLingui()`.
+In Next.js App Router server components, get `i18n` from `getI18nInstance(locale)` directly:
+
+```tsx
+// Server component — no 'use client'
+import { getI18nInstance } from '../appRouterI18n'
+
+export default async function PricePage({ params }: { params: Promise<{ lang: string }> }) {
+  const { lang } = await params
+  const i18n = getI18nInstance(lang)
+  return <span>{i18n.number(42.5, { style: 'currency', currency: 'USD' })}</span>
+}
+```
 
 **Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`"$" + price`), date format strings like `"MM/DD/YYYY"`.
 
