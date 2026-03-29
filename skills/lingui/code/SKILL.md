@@ -35,7 +35,10 @@ Is this in non-React code (utility, class, standalone function)?
 | Macro | Import |
 |-------|--------|
 | `<Trans>` | `@lingui/react/macro` |
-| `useLingui()` → `t` | `@lingui/react/macro` |
+| `<Plural>` | `@lingui/react/macro` |
+| `<Select>` | `@lingui/react/macro` |
+| `<SelectOrdinal>` | `@lingui/react/macro` |
+| `useLingui()` → `t`, `i18n` | `@lingui/react/macro` |
 | `msg` | `@lingui/core/macro` |
 | `t` (standalone) | `@lingui/core/macro` |
 
@@ -87,40 +90,44 @@ function Nav() {
 
 ## Numbers, currencies, dates
 
-Do not hardcode formatted numbers, currency symbols, or date strings. Use `Intl` APIs with the locale from `useLingui()`.
+Do not hardcode formatted numbers, currency symbols, or date strings. Use Lingui's `i18n.number()` and `i18n.date()` helpers — they wrap `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale automatically.
 
 ```tsx
 import { useLingui } from '@lingui/react/macro'
 
 function Price({ amount }: { amount: number }) {
   const { i18n } = useLingui()
-  return <span>{new Intl.NumberFormat(i18n.locale, {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)}</span>
+  return <span>{i18n.number(amount, { style: 'currency', currency: 'USD' })}</span>
 }
 
 function EventDate({ timestamp }: { timestamp: number }) {
   const { i18n } = useLingui()
-  return <time>{new Intl.DateTimeFormat(i18n.locale, {
-    dateStyle: 'medium',
-  }).format(new Date(timestamp))}</time>
+  return <time>{i18n.date(new Date(timestamp), { dateStyle: 'medium' })}</time>
 }
 ```
 
-In Next.js server components, use `lang` from route params instead of `i18n.locale`.
+In Next.js server components, get `i18n` from your server-side setup (e.g. `getI18nInstance()`) rather than `useLingui()`.
 
 **Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`"$" + price`), date format strings like `"MM/DD/YYYY"`.
 
 ---
 
-## Plurals and ICU MessageFormat
+## Plurals, select, and ICU MessageFormat
 
-Use ICU syntax inside `<Trans>` or `t`. Never use ternaries to pick between two separate translation strings.
+In JSX, prefer the `<Plural>` and `<Select>` macros — they are more readable and compile to `<Trans>` with ICU syntax automatically. In non-JSX contexts (template literals), use ICU syntax inside `t`.
+
+Never use ternaries to pick between two separate translation strings.
 
 ```tsx
-// Correct — one message with plural logic
-<Trans>{count, plural, one {# item} other {# items}}</Trans>
+import { Plural, Select } from '@lingui/react/macro'
+
+// JSX — use Plural macro (preferred)
+<Plural value={count} one="# item" other="# items" />
+
+// JSX — exact match for zero
+<Plural value={count} _0="No items" one="# item" other="# items" />
+
+// Non-JSX — use ICU syntax in t
 t`{count, plural, one {# result} other {# results}}`
 
 // Wrong — two messages, broken in many languages
@@ -129,7 +136,11 @@ count === 1 ? t`item` : t`items`
 
 **Select (gender, status):**
 ```tsx
-<Trans>{gender, select, male {He liked it} female {She liked it} other {They liked it}}</Trans>
+// JSX — use Select macro (preferred)
+<Select value={gender} male="He liked it" female="She liked it" other="They liked it" />
+
+// Non-JSX — use ICU syntax in t
+t`{gender, select, male {He liked it} female {She liked it} other {They liked it}}`
 ```
 
 ### Rules

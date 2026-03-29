@@ -71,7 +71,10 @@ Is this a string in non-JSX code (utility function, class method)?
 | Macro | Import | Use case |
 |-------|--------|----------|
 | `<Trans>` | `@lingui/react/macro` | JSX text content |
-| `useLingui()` → `t` | `@lingui/react/macro` | Attributes/props inside components |
+| `<Plural>` | `@lingui/react/macro` | JSX plural expressions |
+| `<Select>` | `@lingui/react/macro` | JSX gender/enum selection |
+| `<SelectOrdinal>` | `@lingui/react/macro` | JSX ordinal numbers (1st, 2nd, 3rd) |
+| `useLingui()` → `t`, `i18n` | `@lingui/react/macro` | Attributes/props, number/date formatting |
 | `msg` | `@lingui/core/macro` | Define messages outside components |
 | `t` (standalone) | `@lingui/core/macro` | Non-React code, utility functions |
 
@@ -175,8 +178,8 @@ Scan files systematically for these patterns. Apply the confidence tiers to deci
 
 Review these and translate only if they appear in the actual UI:
 
-- **`toFixed()` and number formatting**: Raw `toFixed()` won't respect locale decimal separators. Consider `Intl.NumberFormat` or a locale-aware utility.
-- **Currency symbols hardcoded near numbers**: `"$" + price` or `price + " USD"` — use `Intl.NumberFormat` with `style: 'currency'`.
+- **`toFixed()` and number formatting**: Raw `toFixed()` won't respect locale decimal separators. Use `i18n.number()` instead.
+- **Currency symbols hardcoded near numbers**: `"$" + price` or `price + " USD"` — use `i18n.number(price, { style: 'currency', currency: 'USD' })`.
 - **Date formatting without locale**: `date.toLocaleDateString()` without a locale argument uses the runtime locale, which may be fine. Explicit format strings like `"MM/DD/YYYY"` are not locale-aware.
 - **Toast and notification messages**: Often user-visible strings passed to a `toast()` or `notify()` call.
 - **Error messages shown to users**: Strings in `throw new Error(...)` that surface in the UI.
@@ -195,24 +198,27 @@ Review these and translate only if they appear in the actual UI:
 
 ---
 
-## Step 5: ICU MessageFormat and Plurals
+## Step 5: Plurals, Select, and ICU MessageFormat
 
 ICU MessageFormat handles plurals, gender selection, and other locale-sensitive patterns. This is the most commonly misused feature — get it right the first time.
 
+In JSX, prefer the `<Plural>` and `<Select>` macros — they are more readable and compile to `<Trans>` with ICU syntax automatically. In non-JSX contexts, use ICU syntax inside `t`.
+
 ### Plurals
 
-Use `{count, plural, ...}` inside a `<Trans>` or `t` template:
-
 ```tsx
-import { Trans } from '@lingui/react/macro'
+import { Plural } from '@lingui/react/macro'
 
-// Simple plural
-<Trans>{count, plural, one {# item} other {# items}}</Trans>
+// JSX — use Plural macro (preferred)
+<Plural value={count} one="# item" other="# items" />
 
-// With additional text
-<Trans>You have {count, plural, one {# unread message} other {# unread messages}}.</Trans>
+// With additional surrounding text, use Trans + Plural together
+<Trans>You have <Plural value={count} one="# unread message" other="# unread messages" />.</Trans>
 
-// With template literal (t)
+// Exact match for zero
+<Plural value={count} _0="No items" one="# item" other="# items" />
+
+// Non-JSX — use ICU syntax in t
 const { t } = useLingui()
 const label = t`{count, plural, one {# result} other {# results}}`
 ```
@@ -235,17 +241,23 @@ Different languages have different plural forms. English only uses `one` and `ot
 ### Select (gender and enumerated values)
 
 ```tsx
-// Gender selection
-<Trans>{gender, select, male {He liked your post} female {She liked your post} other {They liked your post}}</Trans>
+import { Select } from '@lingui/react/macro'
+
+// JSX — use Select macro (preferred)
+<Select value={gender} male="He liked your post" female="She liked your post" other="They liked your post" />
 
 // Status selection
-<Trans>{status, select, active {Active} inactive {Inactive} other {Unknown}}</Trans>
+<Select value={status} active="Active" inactive="Inactive" other="Unknown" />
+
+// Non-JSX — use ICU syntax in t
+t`{gender, select, male {He liked your post} female {She liked your post} other {They liked your post}}`
 ```
 
-### Nested ICU
+### Nested plurals (complex cases)
+
+For nested ICU (e.g. plural inside select), use ICU syntax in `<Trans>` — the macro components don't support nesting:
 
 ```tsx
-// Plural inside select
 <Trans>
   {gender, select,
     male {{count, plural, one {He has # message} other {He has # messages}}}
@@ -288,7 +300,10 @@ Different languages have different plural forms. English only uses `one` and `ot
    // Wrong — two separate messages, broken grammar in many languages
    const label = count === 1 ? t`item` : t`items`
 
-   // Right — one message with plural logic
+   // Right (JSX) — Plural macro
+   <Plural value={count} one="# item" other="# items" />
+
+   // Right (non-JSX) — one message with plural logic
    const label = t`{count, plural, one {# item} other {# items}}`
    ```
 
@@ -307,7 +322,7 @@ Within each file, handle in this order:
 1. JSX text content → wrap with `<Trans>`
 2. User-visible attributes → add `useLingui()` and wrap with `t`
 3. Non-JSX strings in functions → use `t` from appropriate import
-4. Numbers, currencies, dates → apply `Intl` APIs or locale-aware utilities
+4. Numbers, currencies, dates → use `i18n.number()` and `i18n.date()`
 
 After wrapping all strings:
 
