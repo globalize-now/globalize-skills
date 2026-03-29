@@ -219,9 +219,13 @@ export default async function AboutPage({
 
 Each page must call `loadPageCatalog` and `setI18n` before rendering any translated content. This is more per-page boilerplate than the single-catalog approach, but ensures each page only loads the translations it needs. For layouts that contain translatable strings, the same pattern applies — the layout loads its own catalog.
 
+> **Error handling note:** Unlike the Vite client-side setup, the `require()` call here runs on the server and resolves at build time. If a catalog file is missing, the build fails rather than producing a runtime error. Since `lang` comes from a `[lang]` route segment constrained by `generateStaticParams`, invalid locales cannot reach this code in production. A missing catalog indicates a build or deployment problem that should be fixed, not silently recovered from — so try/catch is not needed here.
+
 ### 4. Locale Middleware
 
-Create middleware to redirect bare paths to locale-prefixed paths:
+Create middleware to redirect bare paths to locale-prefixed paths. The middleware parses the `Accept-Language` header with quality values and tries regional fallback (e.g., `es-MX` → `es`) before falling back to the default locale. A `lang` cookie persists the user's explicit language choice (e.g., from a language picker) so it takes priority over browser settings.
+
+Note: `@lingui/detect-locale` is a client-side library — it's not used in middleware since this runs on the server. The cookie serves the same persistence purpose as `localStorage` in the Vite setup.
 
 ```ts
 // src/middleware.ts
@@ -229,6 +233,25 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const locales = ['en', 'fr']  // adjust to match lingui.config.ts
 const defaultLocale = 'en'
+
+function resolveAcceptLanguage(header: string): string {
+  const entries = header
+    .split(',')
+    .map((part) => {
+      const [tag, q] = part.trim().split(';q=')
+      return { tag: tag.trim(), quality: q ? parseFloat(q) : 1.0 }
+    })
+    .sort((a, b) => b.quality - a.quality)
+
+  for (const { tag } of entries) {
+    if (locales.includes(tag)) return tag
+    // Regional fallback: es-MX → es
+    const base = tag.split('-')[0]
+    if (locales.includes(base)) return base
+  }
+
+  return defaultLocale
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -239,10 +262,12 @@ export function middleware(request: NextRequest) {
 
   if (pathnameHasLocale) return
 
-  // Detect locale from Accept-Language header, fallback to default
-  const acceptLanguage = request.headers.get('accept-language') ?? ''
+  // Cookie from explicit user choice takes priority over browser settings
+  const cookieLocale = request.cookies.get('lang')?.value
   const detectedLocale =
-    locales.find((locale) => acceptLanguage.includes(locale)) ?? defaultLocale
+    cookieLocale && locales.includes(cookieLocale)
+      ? cookieLocale
+      : resolveAcceptLanguage(request.headers.get('accept-language') ?? '')
 
   request.nextUrl.pathname = `/${detectedLocale}${pathname}`
   return NextResponse.redirect(request.nextUrl)
@@ -252,6 +277,8 @@ export const config = {
   matcher: ['/((?!_next|api|favicon.ico).*)'],
 }
 ```
+
+To persist the user's language choice, set the `lang` cookie from a client component when the user switches locale (e.g., via a language picker): `document.cookie = 'lang=' + locale + ';path=/;max-age=31536000'`.
 
 ### Using translations in components
 

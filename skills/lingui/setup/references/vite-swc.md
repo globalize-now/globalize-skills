@@ -72,7 +72,9 @@ Create a minimal i18n setup file — catalog loading happens at the route level,
 import { i18n } from '@lingui/core'
 import { detect, fromUrl, fromStorage, fromNavigator } from '@lingui/detect-locale'
 
-const DEFAULT_LOCALE = 'en'
+// Must match the `locales` array in lingui.config.ts
+const LOCALES = ['en'] as const
+export const DEFAULT_LOCALE = 'en'
 const RTL_LOCALES = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'yi'])
 
 function getDirection(locale: string): 'ltr' | 'rtl' {
@@ -80,7 +82,14 @@ function getDirection(locale: string): 'ltr' | 'rtl' {
 }
 
 export function detectLocale(): string {
-  return detect(fromUrl('lang'), fromStorage('lang'), fromNavigator(), DEFAULT_LOCALE) ?? DEFAULT_LOCALE
+  const detected = detect(fromUrl('lang'), fromStorage('lang'), fromNavigator())
+  if (detected) {
+    if (LOCALES.includes(detected)) return detected
+    // Regional fallback: es-MX → es
+    const base = detected.split('-')[0]
+    if (LOCALES.includes(base)) return base
+  }
+  return DEFAULT_LOCALE
 }
 
 export function activateLocale(locale: string, messages: Record<string, string>) {
@@ -96,7 +105,7 @@ export function saveLocale(locale: string) {
 export { i18n }
 ```
 
-The `detectLocale()` function tries sources in order: `?lang=` URL parameter, `lang` key in localStorage, browser language settings, then falls back to the default. Call `saveLocale()` when the user explicitly switches locale (e.g., via a language picker) so the choice persists across visits.
+The `detectLocale()` function tries sources in order: `?lang=` URL parameter, `lang` key in localStorage, browser language settings. The detected locale is validated against `LOCALES` — if there's no exact match, it tries the base language tag (e.g., `es-MX` → `es`) before falling back to `DEFAULT_LOCALE`. Keep `LOCALES` in sync with the `locales` array in `lingui.config.ts`. Call `saveLocale()` when the user explicitly switches locale (e.g., via a language picker) so the choice persists across visits.
 
 Wrap the app with `I18nProvider` at the root (same as single catalog — only the loading location changes).
 
@@ -121,13 +130,19 @@ export const Route = createRootRoute({
 // src/routes/about.tsx
 import { createFileRoute } from '@tanstack/react-router'
 import { Trans } from '@lingui/react/macro'
-import { activateLocale, detectLocale } from '../i18n'
+import { activateLocale, detectLocale, DEFAULT_LOCALE } from '../i18n'
 
 export const Route = createFileRoute('/about')({
   beforeLoad: async () => {
     const locale = detectLocale()
-    const { messages } = await import('./locales/about/' + locale + '.ts')
-    activateLocale(locale, messages)
+    try {
+      const { messages } = await import('./locales/about/' + locale + '.ts')
+      activateLocale(locale, messages)
+    } catch (e) {
+      console.error(`Failed to load "${locale}" catalog, falling back to "${DEFAULT_LOCALE}"`, e)
+      const { messages } = await import('./locales/about/' + DEFAULT_LOCALE + '.ts')
+      activateLocale(DEFAULT_LOCALE, messages)
+    }
   },
   component: AboutPage,
 })
@@ -157,12 +172,18 @@ export default function RootLayout() {
 ```tsx
 // app/routes/about.tsx
 import { Trans } from '@lingui/react/macro'
-import { activateLocale, detectLocale } from '../i18n'
+import { activateLocale, detectLocale, DEFAULT_LOCALE } from '../i18n'
 
 export async function loader() {
   const locale = detectLocale()
-  const { messages } = await import('./locales/about/' + locale + '.ts')
-  activateLocale(locale, messages)
+  try {
+    const { messages } = await import('./locales/about/' + locale + '.ts')
+    activateLocale(locale, messages)
+  } catch (e) {
+    console.error(`Failed to load "${locale}" catalog, falling back to "${DEFAULT_LOCALE}"`, e)
+    const { messages } = await import('./locales/about/' + DEFAULT_LOCALE + '.ts')
+    activateLocale(DEFAULT_LOCALE, messages)
+  }
   return null
 }
 
@@ -182,6 +203,8 @@ Create an i18n setup file that loads the global catalog:
 import { i18n } from '@lingui/core'
 import { detect, fromUrl, fromStorage, fromNavigator } from '@lingui/detect-locale'
 
+// Must match the `locales` array in lingui.config.ts
+const LOCALES = ['en'] as const
 const DEFAULT_LOCALE = 'en'
 const RTL_LOCALES = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'yi'])
 
@@ -190,14 +213,27 @@ function getDirection(locale: string): 'ltr' | 'rtl' {
 }
 
 export function detectLocale(): string {
-  return detect(fromUrl('lang'), fromStorage('lang'), fromNavigator(), DEFAULT_LOCALE) ?? DEFAULT_LOCALE
+  const detected = detect(fromUrl('lang'), fromStorage('lang'), fromNavigator())
+  if (detected) {
+    if (LOCALES.includes(detected)) return detected
+    // Regional fallback: es-MX → es
+    const base = detected.split('-')[0]
+    if (LOCALES.includes(base)) return base
+  }
+  return DEFAULT_LOCALE
 }
 
 export async function loadCatalog(locale: string) {
-  const { messages } = await import(`./locales/${locale}/messages.ts`)
-  i18n.loadAndActivate({ locale, messages })
-  document.documentElement.lang = locale
-  document.documentElement.dir = getDirection(locale)
+  try {
+    const { messages } = await import(`./locales/${locale}/messages.ts`)
+    i18n.loadAndActivate({ locale, messages })
+  } catch (e) {
+    console.error(`Failed to load "${locale}" catalog, falling back to "${DEFAULT_LOCALE}"`, e)
+    const { messages } = await import(`./locales/${DEFAULT_LOCALE}/messages.ts`)
+    i18n.loadAndActivate({ locale: DEFAULT_LOCALE, messages })
+  }
+  document.documentElement.lang = i18n.locale
+  document.documentElement.dir = getDirection(i18n.locale)
 }
 
 export function saveLocale(locale: string) {

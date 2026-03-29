@@ -140,6 +140,21 @@ Adjust based on context:
 - **`sourceLocale`**: The language the source code is written in. Almost always `'en'`.
 - **`locales`**: Include the source locale plus any target languages the user requested.
 - **Monorepos**: The config goes in the package that contains the UI code, not the monorepo root. Adjust `include` paths (single catalog) or `entries` paths (per-page) accordingly.
+- **`fallbackLocales`**: Controls what happens when a translation is missing for a given locale. By default, Lingui uses [CLDR parent locales](https://github.com/unicode-cldr/cldr-core/blob/master/supplemental/parentLocales.json) — so a missing `es-MX` translation automatically falls back to `es`, then to the source string. This works out of the box with no configuration. To customize the chain or set a global default:
+
+  ```ts
+  const config: LinguiConfig = {
+    // ...
+    fallbackLocales: {
+      'es-MX': 'es',
+      'pt-BR': 'pt',
+      default: 'en',
+    },
+  }
+  ```
+
+  Set `fallbackLocales: false` to disable fallback entirely (uses the source message or message ID when a translation is missing). The CLDR default is the right choice for most projects — only override if you need non-standard chains.
+
 - **Catalog format**: Lingui defaults to PO (gettext) format — the industry standard with rich metadata and broad TMS/translation tool support. This is the recommended format for most projects. If the team's translation tooling requires a different format, Lingui also supports `@lingui/format-json`, `@lingui/format-csv`, and `@lingui/format-po-gettext`. Ask the user before changing from the default. To use an alternative format, install the format package and add the `format` key to the config:
 
   ```ts
@@ -424,6 +439,7 @@ Vitest uses the same SWC or Babel plugin configured in `vite.config.ts` (Step 4)
 - **Monorepo root vs package**: `lingui.config.ts` goes next to the `package.json` of the package that contains the UI code, not the monorepo root.
 - **`extract-experimental` not finding messages**: Ensure the `entries` glob in `lingui.config.ts` actually matches the project's page files. If a shared component's strings are missing from a page catalog, verify it is imported (directly or transitively) from that page's entry point.
 - **Tests fail after adding i18n**: Components using `<Trans>` or `useLingui()` need `I18nProvider` in the test render tree. See Step 9.
+- **Regional locale mismatch (`es-MX` falls back to `en` instead of `es`)**: `@lingui/detect-locale`'s `fromNavigator()` returns the raw browser locale (e.g., `es-MX`). If that exact string isn't in the `locales` array, the catalog import fails or the app falls through to the default locale — skipping the base language `es` entirely. The variant reference files (Step 5) include locale validation in the `detectLocale()` function that tries the base language tag before falling back. Lingui's `fallbackLocales` (Step 3) handles translation-level fallback separately — it cascades missing translations through CLDR parent locales by default.
 - **Missing `dir` attribute / LTR-only CSS**: If any target locale is RTL (Arabic, Hebrew, Persian, Urdu, etc.), the `<html>` element must have `dir="rtl"`. Without it, text alignment, flexbox order, and scrollbar placement break. Equally important: CSS must use logical properties (`margin-inline-start` instead of `margin-left`, `padding-inline-end` instead of `padding-right`, `inset-inline-start` instead of `left`). Physical properties don't flip in RTL and require a full CSS audit to fix retroactively. Run the `css-i18n` skill for a full CSS audit and conversion.
 
 ---
