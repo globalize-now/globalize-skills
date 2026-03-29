@@ -139,7 +139,7 @@ Adjust based on context:
 
 - **`sourceLocale`**: The language the source code is written in. Almost always `'en'`.
 - **`locales`**: Include the source locale plus any target languages the user requested.
-- **Monorepos**: The config goes in the package that contains the UI code, not the monorepo root. Adjust `include` paths (single catalog) or `entries` paths (per-page) accordingly.
+- **Monorepos**: Each package with UI code gets its own `lingui.config.ts` next to its `package.json` — not in the monorepo root. Run extraction and compilation per-package. Shared components imported from other workspace packages are followed automatically by the extractor; their strings appear in the importing package's catalogs. Adjust `include` paths (single catalog) or `entries` paths (per-page) to be relative to the package root.
 - **`fallbackLocales`**: Controls what happens when a translation is missing for a given locale. By default, Lingui uses [CLDR parent locales](https://github.com/unicode-cldr/cldr-core/blob/master/supplemental/parentLocales.json) — so a missing `es-MX` translation automatically falls back to `es`, then to the source string. This works out of the box with no configuration. To customize the chain or set a global default:
 
   ```ts
