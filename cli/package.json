@@ -4,7 +4,7 @@
   "description": "Install globalization skills for AI coding agents",
   "type": "module",
   "bin": {
-    "globalize-skills": "./bin.mjs"
+    "globalize-skills": "bin.mjs"
   },
   "engines": {
     "node": ">=18"

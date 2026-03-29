@@ -1,0 +1,44 @@
+name: Publish CLI
+
+on:
+  push:
+    branches: [main]
+    paths: [cli/**]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+        working-directory: cli
+
+      - run: npm test
+        working-directory: cli
+
+      - name: Bump patch version
+        working-directory: cli
+        run: npm version patch --no-git-tag-version
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add cli/package.json cli/package-lock.json
+          git commit -m "chore: bump cli to $(node -p "require('./cli/package.json').version")"
+          git push
+
+      - run: npm publish
+        working-directory: cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
