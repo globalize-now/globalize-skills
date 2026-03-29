@@ -329,5 +329,6 @@ After wrapping all strings:
 1. Run `npx lingui extract --clean` — verify all new messages appear in the catalog and there are no extraction errors
 2. Run `npx lingui compile` (add `--typescript` for TypeScript projects) — verify compilation succeeds
 3. Run the dev server or build — verify the app renders correctly with the source locale
+4. Run existing tests — if tests fail with missing context errors or rendering issues, wrap test renders with a `LinguiTestWrapper` that provides `I18nProvider` with an empty catalog (see `lingui-setup` Step 9). The common fix: add `{ wrapper: LinguiTestWrapper }` to `render()` calls.
 
 If extraction finds messages you didn't intend to extract (e.g., internal strings wrapped by mistake), unwrap them and re-run.

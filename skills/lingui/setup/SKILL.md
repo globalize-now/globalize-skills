@@ -314,6 +314,80 @@ The extract command prints per-locale stats showing how many messages are missin
 
 ---
 
+## Step 9: Test Setup
+
+Components using `<Trans>` or `useLingui()` need `I18nProvider` in the render tree. Without it, `useLingui()` throws and `<Trans>` won't render correctly — this is the most common test failure after adding i18n.
+
+### Test wrapper
+
+Create a test wrapper that provides `I18nProvider` with an empty catalog. LinguiJS falls back to rendering source strings from macros (e.g., `<Trans>Save</Trans>` → "Save"), so tests stay deterministic and decoupled from translations:
+
+```tsx
+// src/test/lingui-wrapper.tsx
+import { ReactNode } from 'react'
+import { i18n } from '@lingui/core'
+import { I18nProvider } from '@lingui/react'
+
+i18n.load({ en: {} })
+i18n.activate('en')
+
+export function LinguiTestWrapper({ children }: { children: ReactNode }) {
+  return <I18nProvider i18n={i18n}>{children}</I18nProvider>
+}
+```
+
+### Usage with React Testing Library
+
+Pass the wrapper in the `render` options:
+
+```tsx
+import { render, screen } from '@testing-library/react'
+import { LinguiTestWrapper } from '../test/lingui-wrapper'
+import { SaveButton } from './SaveButton'
+
+test('renders save button', () => {
+  render(<SaveButton />, { wrapper: LinguiTestWrapper })
+  expect(screen.getByText('Save')).toBeInTheDocument()
+})
+```
+
+Optionally, create a custom render that bakes in the wrapper:
+
+```tsx
+// src/test/render.tsx
+import { render, type RenderOptions } from '@testing-library/react'
+import { LinguiTestWrapper } from './lingui-wrapper'
+
+export function renderWithi18n(ui: React.ReactElement, options?: RenderOptions) {
+  return render(ui, { wrapper: LinguiTestWrapper, ...options })
+}
+```
+
+### Testing specific translations
+
+For tests that verify a specific locale renders correctly, load that locale's compiled catalog and switch with `act()`:
+
+```tsx
+import { act } from '@testing-library/react'
+import { i18n } from '@lingui/core'
+import { messages as csMessages } from './locales/cs/messages'
+
+test('renders in Czech', () => {
+  i18n.load({ cs: csMessages })
+  act(() => { i18n.activate('cs') })
+  render(<App />, { wrapper: LinguiTestWrapper })
+  expect(screen.getByText('Uložit')).toBeInTheDocument()
+})
+```
+
+This is only needed when testing translated output. For most tests, the empty-catalog wrapper is sufficient.
+
+### Macro transform in tests
+
+Vitest uses the same SWC or Babel plugin configured in `vite.config.ts` (Step 4), so macros are already transformed in tests. If the project uses Jest, configure the same compiler plugin in `jest.config.*` — without it, macro imports like `<Trans>` won't be compiled and tests will fail with reference errors.
+
+---
+
 ## Common Gotchas
 
 - **SWC plugin version mismatch**: `@lingui/swc-plugin` must match the SWC core version used by Vite/Next.js. "Failed to load SWC plugin" means a version mismatch.
@@ -321,6 +395,7 @@ The extract command prints per-locale stats showing how many messages are missin
 - **ESM/CJS conflicts**: ESM projects use `lingui.config.ts`. CJS projects use `lingui.config.js` with `module.exports`.
 - **Monorepo root vs package**: `lingui.config.ts` goes next to the `package.json` of the package that contains the UI code, not the monorepo root.
 - **`extract-experimental` not finding messages**: Ensure the `entries` glob in `lingui.config.ts` actually matches the project's page files. If a shared component's strings are missing from a page catalog, verify it is imported (directly or transitively) from that page's entry point.
+- **Tests fail after adding i18n**: Components using `<Trans>` or `useLingui()` need `I18nProvider` in the test render tree. See Step 9.
 
 ---
 
