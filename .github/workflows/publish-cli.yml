@@ -9,13 +9,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write  # Required for OIDC
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -40,5 +41,3 @@ jobs:
 
       - run: npm publish
         working-directory: cli
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
