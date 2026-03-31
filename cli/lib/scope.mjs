@@ -1,5 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
+import { select } from '@inquirer/prompts';
 
 export const GLOBAL_SUPPORT = {
   claude: true,
@@ -22,4 +23,15 @@ export function filterAgentsForScope(agents, targetDir) {
     }
     return true;
   });
+}
+
+export async function promptScope() {
+  const choice = await select({
+    message: 'Install scope:',
+    choices: [
+      { name: `Global  — available in all projects (${os.homedir()})`, value: 'global' },
+      { name: `Local   — this project only (${process.cwd()})`, value: 'local' },
+    ],
+  });
+  return resolveTargetDir(choice);
 }
