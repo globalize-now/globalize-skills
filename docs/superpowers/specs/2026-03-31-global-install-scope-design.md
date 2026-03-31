@@ -98,8 +98,11 @@ All three converters (`claude.mjs`, `codex.mjs`, `cursor.mjs`) already accept `t
 | `cli/converters/codex.mjs` | None |
 | `cli/converters/cursor.mjs` | None |
 
+## `update` Command
+
+`update` delegates entirely to `add` (with `--no-cache` injected). It inherits `--target` support and the interactive prompt automatically — no changes needed to `update.mjs`.
+
 ## Out of Scope
 
 - Adding global support for Codex and Cursor (can be done by updating `GLOBAL_SUPPORT` and verifying paths)
 - Additional `--target` aliases beyond `global` and `local`
-- `update` command scope support (deferred)
