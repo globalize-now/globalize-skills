@@ -19,6 +19,8 @@ npm install @lingui/core @lingui/react @lingui/macro @lingui/detect-locale
 npm install -D @lingui/cli @lingui/swc-plugin @lingui/vite-plugin
 ```
 
+**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema or plugin invocation error, look up the compatible version at https://plugins.swc.rs and pin it exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. See "SWC plugin version mismatch" in Common Gotchas.
+
 ## Build Tool Integration (Step 4)
 
 Modify `vite.config.ts` to add the SWC plugin and the Lingui Vite plugin:

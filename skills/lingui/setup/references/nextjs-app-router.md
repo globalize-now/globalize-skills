@@ -19,6 +19,8 @@ npm install @lingui/core @lingui/react @lingui/macro
 npm install -D @lingui/cli @lingui/swc-plugin
 ```
 
+**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by the project's Next.js version. Installing without a version specifier grabs the latest, which may not be compatible. Look up the correct version at https://plugins.swc.rs (select "next" + the project's Next.js version), then pin it exactly — e.g. `npm install -D @lingui/swc-plugin@4.0.8`. See "SWC plugin version mismatch" in Common Gotchas if the build fails with an AST schema error.
+
 Note: No `@lingui/vite-plugin` — Next.js has its own build pipeline.
 
 ## Build Tool Integration (Step 4)

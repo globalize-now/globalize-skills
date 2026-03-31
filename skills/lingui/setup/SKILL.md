@@ -433,7 +433,15 @@ Vitest uses the same SWC or Babel plugin configured in `vite.config.ts` (Step 4)
 
 ## Common Gotchas
 
-- **SWC plugin version mismatch**: `@lingui/swc-plugin` must match the SWC core version used by Vite/Next.js. "Failed to load SWC plugin" means a version mismatch.
+- **SWC plugin version mismatch**: `@lingui/swc-plugin` is a Wasm binary compiled against a specific `swc_core` version. The host runtime (Next.js or `@vitejs/plugin-react-swc`) must ship the same `swc_core` version — otherwise the build panics with "AST schema version is not compatible", "failed to invoke plugin", or "failed to load SWC plugin".
+
+  **To resolve:**
+  1. Check the project's Next.js version (`npm ls next`) or `@swc/core` version (`npm ls @swc/core`).
+  2. Look up the compatible `@lingui/swc-plugin` version at https://plugins.swc.rs — select the runtime (e.g. "next") and enter the exact version.
+  3. Pin the plugin to that exact version **without** a range specifier: `"@lingui/swc-plugin": "4.0.8"`, not `"^4.0.8"`. Then reinstall.
+  4. If no compatible plugin version exists for the project's runtime, fall back to Babel: remove `@lingui/swc-plugin`, install `@lingui/babel-plugin-lingui-macro`, and add it to `.babelrc` (Next.js) or the Vite React plugin config.
+
+  Note: `@lingui/swc-plugin` 5.10.1+ uses a stable Wasm ABI, so projects on Next.js 16.1+ or `@swc/core` >= 1.15.0 are unlikely to hit this.
 - **Missing macro transform**: `ReferenceError: Trans is not defined` at runtime means the macro plugin isn't running. Check the build tool config.
 - **ESM/CJS conflicts**: ESM projects use `lingui.config.ts`. CJS projects use `lingui.config.js` with `module.exports`.
 - **Monorepo root vs package**: `lingui.config.ts` goes next to the `package.json` of the package that contains the UI code, not the monorepo root.
