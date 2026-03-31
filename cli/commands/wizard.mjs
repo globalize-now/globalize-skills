@@ -1,6 +1,7 @@
 import { select, checkbox, Separator } from '@inquirer/prompts';
 import { listSkills, fetchSkill, fetchPresets } from '../lib/registry.mjs';
 import { detectAgents, ALL_AGENTS } from '../lib/detect.mjs';
+import { promptScope, filterAgentsForScope } from '../lib/scope.mjs';
 import { install as installClaude } from '../converters/claude.mjs';
 import { install as installCodex } from '../converters/codex.mjs';
 import { install as installCursor } from '../converters/cursor.mjs';
@@ -83,9 +84,8 @@ export async function run() {
     }
   }
 
-  // Agent selection
-  const targetDir = process.cwd();
-  const detected = detectAgents(targetDir);
+  // Agent selection (detect based on current project, before scope is known)
+  const detected = detectAgents(process.cwd());
   const detectedLabel = detected.map((a) => AGENT_LABELS[a]).join(', ');
 
   const agentChoice = await select({
@@ -97,11 +97,20 @@ export async function run() {
     ],
   });
 
-  const agents = agentChoice === 'detected'
+  const selectedAgents = agentChoice === 'detected'
     ? detected
     : agentChoice === 'all'
       ? ALL_AGENTS
       : [agentChoice];
+
+  // Scope selection
+  const targetDir = await promptScope();
+  const agents = filterAgentsForScope(selectedAgents, targetDir);
+
+  if (agents.length === 0) {
+    console.error('\nNo supported agents for the selected scope. Aborting.');
+    return;
+  }
 
   // Install
   const skillMap = Object.fromEntries(skills.map((s) => [s.name, s]));
