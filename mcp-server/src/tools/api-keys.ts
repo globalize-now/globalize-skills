@@ -13,7 +13,7 @@ export function registerApiKeyTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.GET('/api/orgs/{orgId}/api-keys', {
       params: { path: { orgId } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -28,7 +28,7 @@ export function registerApiKeyTools(server: McpServer, client: ApiClient) {
       params: { path: { orgId } },
       body: { name },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -42,7 +42,7 @@ export function registerApiKeyTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.DELETE('/api/orgs/{orgId}/api-keys/{keyId}', {
       params: { path: { orgId, keyId } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data ?? { revoked: true });
   });
 }

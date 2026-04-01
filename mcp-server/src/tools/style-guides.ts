@@ -13,7 +13,7 @@ export function registerStyleGuideTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.GET('/api/projects/{id}/style-guides', {
       params: { path: { id } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -29,7 +29,7 @@ export function registerStyleGuideTools(server: McpServer, client: ApiClient) {
       params: { path: { id, projectLanguageId } },
       body: { instructions },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -43,7 +43,7 @@ export function registerStyleGuideTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.DELETE('/api/projects/{id}/style-guides/{projectLanguageId}', {
       params: { path: { id, projectLanguageId } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data ?? { deleted: true });
   });
 }

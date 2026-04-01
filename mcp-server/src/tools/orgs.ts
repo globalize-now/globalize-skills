@@ -9,7 +9,7 @@ export function registerOrgTools(server: McpServer, client: ApiClient) {
     inputSchema: {},
   }, async () => {
     const { data, error, response } = await client.GET('/api/orgs');
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -22,7 +22,7 @@ export function registerOrgTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.POST('/api/orgs', {
       body: { name },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -35,7 +35,7 @@ export function registerOrgTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.DELETE('/api/orgs/{orgId}', {
       params: { path: { orgId } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data ?? { deleted: true });
   });
 }
