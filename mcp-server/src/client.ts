@@ -1,4 +1,5 @@
-import createClient, { type Client } from 'openapi-fetch';
+import createClient, { type Client, type FetchResponse } from 'openapi-fetch';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { paths } from './api-types.js';
 
 export type ApiClient = Client<paths>;
@@ -10,11 +11,8 @@ export function createApiClient(apiKey: string, apiUrl: string): ApiClient {
   });
 }
 
-interface ToolResult {
-  content: Array<{ type: 'text'; text: string }>;
-}
-
-export function formatError(status: number | undefined, error: unknown): ToolResult {
+export function formatError(response: Response, error: unknown): CallToolResult {
+  const status = response.status;
   const detail = typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error);
 
   if (status === 401 || status === 403) {
@@ -26,12 +24,12 @@ export function formatError(status: number | undefined, error: unknown): ToolRes
   if (status === 422) {
     return { content: [{ type: 'text', text: `Validation error: ${detail}` }] };
   }
-  if (status && status >= 500) {
+  if (status >= 500) {
     return { content: [{ type: 'text', text: 'Server error. Try again later.' }] };
   }
   return { content: [{ type: 'text', text: `Error: ${detail}` }] };
 }
 
-export function formatSuccess(data: unknown): ToolResult {
+export function formatSuccess(data: unknown): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }

@@ -13,7 +13,7 @@ export function registerMemberTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.GET('/api/orgs/{orgId}/members', {
       params: { path: { orgId } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -21,14 +21,15 @@ export function registerMemberTools(server: McpServer, client: ApiClient) {
     description: 'Invite a user to an organisation by their user ID',
     inputSchema: {
       orgId: z.string().uuid().describe('Organisation UUID'),
-      userId: z.string().describe('Clerk user ID of the person to invite'),
+      clerkUserId: z.string().describe('Clerk user ID of the person to invite'),
+      role: z.enum(['admin', 'member']).optional().describe('Role (defaults to member)'),
     },
-  }, async ({ orgId, userId }) => {
+  }, async ({ orgId, clerkUserId, role }) => {
     const { data, error, response } = await client.POST('/api/orgs/{orgId}/members', {
       params: { path: { orgId } },
-      body: { userId },
+      body: { clerkUserId, role },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -42,7 +43,7 @@ export function registerMemberTools(server: McpServer, client: ApiClient) {
     const { data, error, response } = await client.DELETE('/api/orgs/{orgId}/members/{membershipId}', {
       params: { path: { orgId, membershipId } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data ?? { removed: true });
   });
 }

@@ -25,6 +25,7 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "openapi-typescript": "^7.6.0",
     "typescript": "^5.8.0"
   }

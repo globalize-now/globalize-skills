@@ -13,22 +13,24 @@ export function registerProjectLanguageTools(server: McpServer, client: ApiClien
     const { data, error, response } = await client.GET('/api/projects/{id}/languages', {
       params: { path: { id } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
   server.registerTool('add_project_language', {
-    description: 'Add a language to a project',
+    description: 'Add a language to a project. Provide name (display name), locale (BCP-47 code), and optionally a languageId from the global catalog.',
     inputSchema: {
       id: z.string().uuid().describe('Project UUID'),
-      languageId: z.string().uuid().describe('Language UUID from the global catalog'),
+      name: z.string().describe('Display name for the language (e.g. "French")'),
+      locale: z.string().describe('BCP-47 locale code (e.g. "fr")'),
+      languageId: z.string().uuid().optional().describe('Language UUID from the global catalog'),
     },
-  }, async ({ id, languageId }) => {
+  }, async ({ id, name, locale, languageId }) => {
     const { data, error, response } = await client.POST('/api/projects/{id}/languages', {
       params: { path: { id } },
-      body: { languageId },
+      body: { name, locale, languageId },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data);
   });
 
@@ -42,7 +44,7 @@ export function registerProjectLanguageTools(server: McpServer, client: ApiClien
     const { data, error, response } = await client.DELETE('/api/projects/{id}/languages/{languageId}', {
       params: { path: { id, languageId } },
     });
-    if (error) return formatError(response.status, error);
+    if (error) return formatError(response, error);
     return formatSuccess(data ?? { removed: true });
   });
 }
