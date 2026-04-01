@@ -1,3 +1,5 @@
 .claude/*.local.json
 node_modules
 .worktrees
+mcp-server/dist
+mcp-server/src/api-types.ts

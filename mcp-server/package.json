@@ -1,0 +1,32 @@
+{
+  "name": "@globalize-now/mcp-server",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MCP server for the Globalize translation platform",
+  "bin": {
+    "globalize-mcp": "bin/globalize-mcp.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "scripts": {
+    "generate": "openapi-typescript https://api.globalize.now/api/docs/json -o src/api-types.ts",
+    "generate:staging": "openapi-typescript https://stage-api.globalize.now/api/docs/json -o src/api-types.ts",
+    "build": "npm run generate && tsc",
+    "dev": "npm run generate:staging && tsc --watch"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "openapi-fetch": "^0.13.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "openapi-typescript": "^7.6.0",
+    "typescript": "^5.8.0"
+  }
+}
