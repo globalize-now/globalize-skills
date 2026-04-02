@@ -9,10 +9,10 @@ export function parseFrontmatter(content) {
   }
 
   const raw = match[1];
-  const body = content.slice(match[0].length).replace(/^\n+/, '');
+  const body = content.slice(match[0].length).replace(/^\n+/, "");
   const attributes = {};
 
-  const lines = raw.split('\n');
+  const lines = raw.split("\n");
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
@@ -21,7 +21,7 @@ export function parseFrontmatter(content) {
       const key = kvMatch[1];
       let value = kvMatch[2];
 
-      if (value === '>-' || value === '|' || value === '>') {
+      if (value === ">-" || value === "|" || value === ">") {
         // Collect indented continuation lines
         const parts = [];
         i++;
@@ -29,7 +29,7 @@ export function parseFrontmatter(content) {
           parts.push(lines[i].trim());
           i++;
         }
-        value = parts.join(' ');
+        value = parts.join(" ");
       } else {
         i++;
       }

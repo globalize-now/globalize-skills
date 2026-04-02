@@ -1,18 +1,18 @@
-import type { Command } from 'commander';
-import type { ApiClient } from '../client.js';
-import { extractError } from '../client.js';
-import { output, outputError, type OutputOptions } from '../format.js';
+import type { Command } from "commander";
+import type { ApiClient } from "../client.js";
+import { extractError } from "../client.js";
+import { output, outputError, type OutputOptions } from "../format.js";
 
 type ClientFactory = () => Promise<ApiClient>;
 
 export async function listLanguages(client: ApiClient) {
-  const { data, error, response } = await client.GET('/api/languages');
+  const { data, error, response } = await client.GET("/api/languages");
   if (error) throw new Error(extractError(response, error));
   return data;
 }
 
 export async function getLanguage(client: ApiClient, id: string) {
-  const { data, error, response } = await client.GET('/api/languages/{id}', {
+  const { data, error, response } = await client.GET("/api/languages/{id}", {
     params: { path: { id } },
   });
   if (error) throw new Error(extractError(response, error));
@@ -21,8 +21,8 @@ export async function getLanguage(client: ApiClient, id: string) {
 
 export function register(group: Command, getClient: ClientFactory): void {
   group
-    .command('list')
-    .description('List languages')
+    .command("list")
+    .description("List languages")
     .action(async (_opts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
@@ -34,9 +34,9 @@ export function register(group: Command, getClient: ClientFactory): void {
     });
 
   group
-    .command('get')
-    .description('Get a language')
-    .requiredOption('--id <id>', 'Language UUID')
+    .command("get")
+    .description("Get a language")
+    .requiredOption("--id <id>", "Language UUID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {

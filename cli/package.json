@@ -10,7 +10,9 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test 'test/**/*.test.mjs'"
+    "test": "node --test 'test/**/*.test.mjs'",
+    "lint": "eslint . && prettier --check .",
+    "format": "eslint --fix . && prettier --write ."
   },
   "dependencies": {
     "@inquirer/prompts": "^7"
@@ -26,5 +28,11 @@
     "type": "git",
     "url": "git+https://github.com/Globalize-now/globalize-skills.git",
     "directory": "cli"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1"
   }
 }

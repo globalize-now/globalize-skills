@@ -1,12 +1,12 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 
-const CACHE_DIR = path.join(os.tmpdir(), 'globalize-skills-cache');
+const CACHE_DIR = path.join(os.tmpdir(), "globalize-skills-cache");
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 function getCachePath(key) {
-  return path.join(CACHE_DIR, key.replace(/[^a-zA-Z0-9-]/g, '_'));
+  return path.join(CACHE_DIR, key.replace(/[^a-zA-Z0-9-]/g, "_"));
 }
 
 function readCache(key) {
@@ -14,7 +14,7 @@ function readCache(key) {
   try {
     const stat = fs.statSync(cachePath);
     if (Date.now() - stat.mtimeMs < CACHE_TTL) {
-      return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+      return JSON.parse(fs.readFileSync(cachePath, "utf8"));
     }
   } catch {
     // Cache miss
@@ -31,7 +31,7 @@ function writeCache(key, data) {
  * Fetch the full file tree of a GitHub repo at a given branch.
  * Returns an array of { path, type, url } objects.
  */
-export async function fetchTree(repo, { branch = 'main', noCache = false } = {}) {
+export async function fetchTree(repo, { branch = "main", noCache = false } = {}) {
   const cacheKey = `tree-${repo}-${branch}`;
   if (!noCache) {
     const cached = readCache(cacheKey);
@@ -40,7 +40,7 @@ export async function fetchTree(repo, { branch = 'main', noCache = false } = {})
 
   const url = `https://api.github.com/repos/${repo}/git/trees/${branch}?recursive=1`;
   const res = await fetch(url, {
-    headers: { Accept: 'application/vnd.github.v3+json' },
+    headers: { Accept: "application/vnd.github.v3+json" },
   });
 
   if (!res.ok) {
@@ -57,7 +57,7 @@ export async function fetchTree(repo, { branch = 'main', noCache = false } = {})
 /**
  * Fetch raw file content from a GitHub repo.
  */
-export async function fetchFile(repo, filePath, { branch = 'main', noCache = false } = {}) {
+export async function fetchFile(repo, filePath, { branch = "main", noCache = false } = {}) {
   const cacheKey = `file-${repo}-${branch}-${filePath}`;
   if (!noCache) {
     const cached = readCache(cacheKey);

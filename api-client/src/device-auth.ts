@@ -1,14 +1,12 @@
-import { randomBytes, createHash } from 'node:crypto';
-import { exec } from 'node:child_process';
-import { platform } from 'node:os';
+import { randomBytes, createHash } from "node:crypto";
+import { exec } from "node:child_process";
+import { platform } from "node:os";
 
 // ── PKCE ────────────────────────────────────────────────────────────────────
 
 export function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
-  const codeVerifier = randomBytes(32).toString('base64url');
-  const codeChallenge = createHash('sha256')
-    .update(codeVerifier)
-    .digest('base64url');
+  const codeVerifier = randomBytes(32).toString("base64url");
+  const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
   return { codeVerifier, codeChallenge };
 }
 
@@ -28,12 +26,12 @@ export async function requestDeviceCode(
   codeChallenge: string,
 ): Promise<DeviceCodeResponse> {
   const res = await fetch(`${apiUrl}/api/auth/device/code`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       client_id: clientId,
       code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
+      code_challenge_method: "S256",
     }),
   });
 
@@ -59,7 +57,7 @@ export class DeviceAuthError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'DeviceAuthError';
+    this.name = "DeviceAuthError";
   }
 }
 
@@ -77,12 +75,12 @@ export async function pollForToken(
     await sleep(pollInterval);
 
     if (Date.now() > deadline) {
-      throw new DeviceAuthError('expired_token', 'Device code expired. Please restart the login flow.');
+      throw new DeviceAuthError("expired_token", "Device code expired. Please restart the login flow.");
     }
 
     const res = await fetch(`${apiUrl}/api/auth/device/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         device_code: deviceCode,
         code_verifier: codeVerifier,
@@ -96,24 +94,21 @@ export async function pollForToken(
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     const error = body.error as string | undefined;
 
-    if (error === 'authorization_pending') {
+    if (error === "authorization_pending") {
       continue;
     }
-    if (error === 'slow_down') {
+    if (error === "slow_down") {
       pollInterval += 5000;
       continue;
     }
-    if (error === 'expired_token') {
-      throw new DeviceAuthError('expired_token', 'Device code expired. Please restart the login flow.');
+    if (error === "expired_token") {
+      throw new DeviceAuthError("expired_token", "Device code expired. Please restart the login flow.");
     }
-    if (error === 'access_denied') {
-      throw new DeviceAuthError('access_denied', 'Authorization request was denied.');
+    if (error === "access_denied") {
+      throw new DeviceAuthError("access_denied", "Authorization request was denied.");
     }
 
-    throw new DeviceAuthError(
-      error ?? 'unknown',
-      `Unexpected error during device auth: ${JSON.stringify(body)}`,
-    );
+    throw new DeviceAuthError(error ?? "unknown", `Unexpected error during device auth: ${JSON.stringify(body)}`);
   }
 }
 
@@ -121,10 +116,7 @@ export async function pollForToken(
 
 export function openInBrowser(url: string): void {
   const os = platform();
-  const cmd =
-    os === 'darwin' ? 'open' :
-    os === 'win32' ? 'start' :
-    'xdg-open';
+  const cmd = os === "darwin" ? "open" : os === "win32" ? "start" : "xdg-open";
 
   // Note: on Windows, `start` does not reliably handle double-quoted URLs.
   // This is non-fatal — the user can always open the URL manually.

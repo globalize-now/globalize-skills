@@ -1,15 +1,13 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import path from "node:path";
 
 const AGENT_SIGNALS = [
-  { agent: 'claude', check: (dir) => fs.existsSync(path.join(dir, '.claude')) },
+  { agent: "claude", check: (dir) => fs.existsSync(path.join(dir, ".claude")) },
   {
-    agent: 'codex',
-    check: (dir) =>
-      fs.existsSync(path.join(dir, '.codex')) ||
-      fs.existsSync(path.join(dir, 'AGENTS.md')),
+    agent: "codex",
+    check: (dir) => fs.existsSync(path.join(dir, ".codex")) || fs.existsSync(path.join(dir, "AGENTS.md")),
   },
-  { agent: 'cursor', check: (dir) => fs.existsSync(path.join(dir, '.cursor')) },
+  { agent: "cursor", check: (dir) => fs.existsSync(path.join(dir, ".cursor")) },
 ];
 
 /**
@@ -17,11 +15,9 @@ const AGENT_SIGNALS = [
  * Returns at least ['claude'] as a default.
  */
 export function detectAgents(dir) {
-  const detected = AGENT_SIGNALS
-    .filter(({ check }) => check(dir))
-    .map(({ agent }) => agent);
+  const detected = AGENT_SIGNALS.filter(({ check }) => check(dir)).map(({ agent }) => agent);
 
-  return detected.length > 0 ? detected : ['claude'];
+  return detected.length > 0 ? detected : ["claude"];
 }
 
-export const ALL_AGENTS = ['claude', 'codex', 'cursor'];
+export const ALL_AGENTS = ["claude", "codex", "cursor"];

@@ -1,12 +1,12 @@
-import type { Command } from 'commander';
-import type { ApiClient } from '../client.js';
-import { extractError } from '../client.js';
-import { output, outputError, type OutputOptions } from '../format.js';
+import type { Command } from "commander";
+import type { ApiClient } from "../client.js";
+import { extractError } from "../client.js";
+import { output, outputError, type OutputOptions } from "../format.js";
 
 type ClientFactory = () => Promise<ApiClient>;
 
 export async function listProjectLanguages(client: ApiClient, projectId: string) {
-  const { data, error, response } = await client.GET('/api/projects/{id}/languages', {
+  const { data, error, response } = await client.GET("/api/projects/{id}/languages", {
     params: { path: { id: projectId } },
   });
   if (error) throw new Error(extractError(response, error));
@@ -20,7 +20,7 @@ export async function addProjectLanguage(
   locale: string,
   languageId?: string,
 ) {
-  const { data, error, response } = await client.POST('/api/projects/{id}/languages', {
+  const { data, error, response } = await client.POST("/api/projects/{id}/languages", {
     params: { path: { id: projectId } },
     body: { name, locale, languageId },
   });
@@ -28,26 +28,19 @@ export async function addProjectLanguage(
   return data;
 }
 
-export async function removeProjectLanguage(
-  client: ApiClient,
-  projectId: string,
-  languageId: string,
-) {
-  const { data, error, response } = await client.DELETE(
-    '/api/projects/{id}/languages/{languageId}',
-    {
-      params: { path: { id: projectId, languageId } },
-    },
-  );
+export async function removeProjectLanguage(client: ApiClient, projectId: string, languageId: string) {
+  const { data, error, response } = await client.DELETE("/api/projects/{id}/languages/{languageId}", {
+    params: { path: { id: projectId, languageId } },
+  });
   if (error) throw new Error(extractError(response, error));
   return data ?? { removed: true };
 }
 
 export function register(group: Command, getClient: ClientFactory): void {
   group
-    .command('list')
-    .description('List project languages')
-    .requiredOption('--project-id <id>', 'Project UUID')
+    .command("list")
+    .description("List project languages")
+    .requiredOption("--project-id <id>", "Project UUID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
@@ -59,24 +52,18 @@ export function register(group: Command, getClient: ClientFactory): void {
     });
 
   group
-    .command('add')
-    .description('Add a language to a project')
-    .requiredOption('--project-id <id>', 'Project UUID')
-    .requiredOption('--name <name>', 'Language name')
-    .requiredOption('--locale <bcp47>', 'BCP 47 locale code')
-    .option('--language-id <id>', 'Language UUID')
+    .command("add")
+    .description("Add a language to a project")
+    .requiredOption("--project-id <id>", "Project UUID")
+    .requiredOption("--name <name>", "Language name")
+    .requiredOption("--locale <bcp47>", "BCP 47 locale code")
+    .option("--language-id <id>", "Language UUID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         output(
-          await addProjectLanguage(
-            client,
-            cmdOpts.projectId,
-            cmdOpts.name,
-            cmdOpts.locale,
-            cmdOpts.languageId,
-          ),
+          await addProjectLanguage(client, cmdOpts.projectId, cmdOpts.name, cmdOpts.locale, cmdOpts.languageId),
           opts,
         );
       } catch (e) {
@@ -85,10 +72,10 @@ export function register(group: Command, getClient: ClientFactory): void {
     });
 
   group
-    .command('remove')
-    .description('Remove a language from a project')
-    .requiredOption('--project-id <id>', 'Project UUID')
-    .requiredOption('--language-id <id>', 'Language UUID')
+    .command("remove")
+    .description("Remove a language from a project")
+    .requiredOption("--project-id <id>", "Project UUID")
+    .requiredOption("--language-id <id>", "Language UUID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {

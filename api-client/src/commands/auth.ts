@@ -1,16 +1,16 @@
-import { createInterface } from 'node:readline/promises';
-import chalk from 'chalk';
-import type { Command } from 'commander';
-import { readConfigFile, writeConfigFile, deleteConfigFile } from '../auth.js';
-import { output, type OutputOptions } from '../format.js';
+import { createInterface } from "node:readline/promises";
+import chalk from "chalk";
+import type { Command } from "commander";
+import { readConfigFile, writeConfigFile, deleteConfigFile } from "../auth.js";
+import { output, type OutputOptions } from "../format.js";
 
-const SETTINGS_URL = 'https://app.globalize.now/settings/api-keys';
-const DEFAULT_API_URL = 'https://api.globalize.now';
+const SETTINGS_URL = "https://app.globalize.now/settings/api-keys";
+const DEFAULT_API_URL = "https://api.globalize.now";
 
 export function register(group: Command) {
   group
-    .command('login')
-    .description('Authenticate with the Globalize API')
+    .command("login")
+    .description("Authenticate with the Globalize API")
     .action(async () => {
       const apiUrl = process.env.GLOBALIZE_API_URL || DEFAULT_API_URL;
 
@@ -18,22 +18,22 @@ export function register(group: Command) {
 
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       try {
-        const apiKey = (await rl.question('Paste your API key: ')).trim();
+        const apiKey = (await rl.question("Paste your API key: ")).trim();
         if (!apiKey) {
-          console.error(chalk.red('No API key provided.'));
+          console.error(chalk.red("No API key provided."));
           process.exitCode = 1;
           return;
         }
         await writeConfigFile({ apiKey, apiUrl });
-        console.log(chalk.green('API key saved to ~/.globalize/config.json'));
+        console.log(chalk.green("API key saved to ~/.globalize/config.json"));
       } finally {
         rl.close();
       }
     });
 
   group
-    .command('status')
-    .description('Show current authentication state')
+    .command("status")
+    .description("Show current authentication state")
     .action(async (_cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
 
@@ -43,17 +43,17 @@ export function register(group: Command) {
 
       if (process.env.GLOBALIZE_API_KEY) {
         const key = process.env.GLOBALIZE_API_KEY;
-        source = 'GLOBALIZE_API_KEY env var';
-        keyPrefix = key.slice(0, 8) + '...';
+        source = "GLOBALIZE_API_KEY env var";
+        keyPrefix = key.slice(0, 8) + "...";
         apiUrl = process.env.GLOBALIZE_API_URL || DEFAULT_API_URL;
       } else {
         const config = await readConfigFile();
         if (!config.apiKey) {
-          console.log(chalk.yellow('Not authenticated. Run `globalise-now-cli auth login` to set up.'));
+          console.log(chalk.yellow("Not authenticated. Run `globalise-now-cli auth login` to set up."));
           return;
         }
-        source = '~/.globalize/config.json';
-        keyPrefix = config.apiKey.slice(0, 8) + '...';
+        source = "~/.globalize/config.json";
+        keyPrefix = config.apiKey.slice(0, 8) + "...";
         apiUrl = config.apiUrl || DEFAULT_API_URL;
       }
 
@@ -61,10 +61,10 @@ export function register(group: Command) {
     });
 
   group
-    .command('logout')
-    .description('Remove stored credentials')
+    .command("logout")
+    .description("Remove stored credentials")
     .action(async () => {
       await deleteConfigFile();
-      console.log(chalk.green('Credentials removed.'));
+      console.log(chalk.green("Credentials removed."));
     });
 }

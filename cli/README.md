@@ -24,12 +24,12 @@ npx globalize-skills add lingui-setup --agent cursor
 npx globalize-skills add lingui-setup --agent all
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--preset <name>` | Install a preset bundle of skills |
-| `--agent <name>` | Target agent: `claude`, `codex`, `cursor`, or `all` (auto-detected by default) |
-| `--repo <owner/repo>` | Use a different GitHub repository |
-| `--no-cache` | Skip local cache and fetch fresh from GitHub |
+| Option                | Description                                                                    |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `--preset <name>`     | Install a preset bundle of skills                                              |
+| `--agent <name>`      | Target agent: `claude`, `codex`, `cursor`, or `all` (auto-detected by default) |
+| `--repo <owner/repo>` | Use a different GitHub repository                                              |
+| `--no-cache`          | Skip local cache and fetch fresh from GitHub                                   |
 
 ### `list`
 
@@ -39,10 +39,10 @@ Show available skills and presets.
 npx globalize-skills list
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--repo <owner/repo>` | Use a different GitHub repository |
-| `--no-cache` | Skip local cache and fetch fresh from GitHub |
+| Option                | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `--repo <owner/repo>` | Use a different GitHub repository            |
+| `--no-cache`          | Skip local cache and fetch fresh from GitHub |
 
 ### `update`
 
