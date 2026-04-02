@@ -1,16 +1,19 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ApiClient } from '../client.js';
-import { formatError, formatSuccess } from '../client.js';
+import type { ApiClient } from '@globalize-now/cli-client';
+import { listProjects, createProject, getProject, deleteProject } from '@globalize-now/cli-client';
+import { formatSuccess, formatError } from '../helpers.js';
 
 export function registerProjectTools(server: McpServer, client: ApiClient) {
   server.registerTool('list_projects', {
     description: 'List all translation projects',
     inputSchema: {},
   }, async () => {
-    const { data, error, response } = await client.GET('/api/projects');
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await listProjects(client));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('create_project', {
@@ -21,11 +24,11 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
       targetLanguages: z.array(z.string().uuid()).describe('Target language UUIDs'),
     },
   }, async ({ name, sourceLanguage, targetLanguages }) => {
-    const { data, error, response } = await client.POST('/api/projects', {
-      body: { name, sourceLanguage, targetLanguages },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await createProject(client, name, sourceLanguage, targetLanguages));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('get_project', {
@@ -34,11 +37,11 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
       id: z.string().uuid().describe('Project UUID'),
     },
   }, async ({ id }) => {
-    const { data, error, response } = await client.GET('/api/projects/{id}', {
-      params: { path: { id } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await getProject(client, id));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('delete_project', {
@@ -47,10 +50,10 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
       id: z.string().uuid().describe('Project UUID'),
     },
   }, async ({ id }) => {
-    const { data, error, response } = await client.DELETE('/api/projects/{id}', {
-      params: { path: { id } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data ?? { deleted: true });
+    try {
+      return formatSuccess(await deleteProject(client, id));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 }

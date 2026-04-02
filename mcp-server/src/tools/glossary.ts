@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ApiClient } from '../client.js';
-import { formatError, formatSuccess } from '../client.js';
+import type { ApiClient } from '@globalize-now/cli-client';
+import { listGlossary, createGlossaryEntry, deleteGlossaryEntry } from '@globalize-now/cli-client';
+import { formatSuccess, formatError } from '../helpers.js';
 
 export function registerGlossaryTools(server: McpServer, client: ApiClient) {
   server.registerTool('list_glossary', {
@@ -10,11 +11,11 @@ export function registerGlossaryTools(server: McpServer, client: ApiClient) {
       id: z.string().uuid().describe('Project UUID'),
     },
   }, async ({ id }) => {
-    const { data, error, response } = await client.GET('/api/projects/{id}/glossary', {
-      params: { path: { id } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await listGlossary(client, id));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('create_glossary_entry', {
@@ -27,12 +28,11 @@ export function registerGlossaryTools(server: McpServer, client: ApiClient) {
       targetProjectLanguageId: z.string().uuid().describe('Target project language UUID'),
     },
   }, async ({ id, sourceTerm, targetTerm, sourceProjectLanguageId, targetProjectLanguageId }) => {
-    const { data, error, response } = await client.POST('/api/projects/{id}/glossary', {
-      params: { path: { id } },
-      body: { sourceTerm, targetTerm, sourceProjectLanguageId, targetProjectLanguageId },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await createGlossaryEntry(client, id, sourceTerm, targetTerm, sourceProjectLanguageId, targetProjectLanguageId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('delete_glossary_entry', {
@@ -42,10 +42,10 @@ export function registerGlossaryTools(server: McpServer, client: ApiClient) {
       entryId: z.string().uuid().describe('Glossary entry UUID'),
     },
   }, async ({ id, entryId }) => {
-    const { data, error, response } = await client.DELETE('/api/projects/{id}/glossary/{entryId}', {
-      params: { path: { id, entryId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data ?? { deleted: true });
+    try {
+      return formatSuccess(await deleteGlossaryEntry(client, id, entryId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 }

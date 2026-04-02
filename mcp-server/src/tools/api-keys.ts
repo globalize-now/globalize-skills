@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ApiClient } from '../client.js';
-import { formatError, formatSuccess } from '../client.js';
+import type { ApiClient } from '@globalize-now/cli-client';
+import { listApiKeys, createApiKey, revokeApiKey } from '@globalize-now/cli-client';
+import { formatSuccess, formatError } from '../helpers.js';
 
 export function registerApiKeyTools(server: McpServer, client: ApiClient) {
   server.registerTool('list_api_keys', {
@@ -10,11 +11,11 @@ export function registerApiKeyTools(server: McpServer, client: ApiClient) {
       orgId: z.string().uuid().describe('Organisation UUID'),
     },
   }, async ({ orgId }) => {
-    const { data, error, response } = await client.GET('/api/orgs/{orgId}/api-keys', {
-      params: { path: { orgId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await listApiKeys(client, orgId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('create_api_key', {
@@ -24,12 +25,11 @@ export function registerApiKeyTools(server: McpServer, client: ApiClient) {
       name: z.string().describe('Key name for identification'),
     },
   }, async ({ orgId, name }) => {
-    const { data, error, response } = await client.POST('/api/orgs/{orgId}/api-keys', {
-      params: { path: { orgId } },
-      body: { name },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await createApiKey(client, orgId, name));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('revoke_api_key', {
@@ -39,10 +39,10 @@ export function registerApiKeyTools(server: McpServer, client: ApiClient) {
       keyId: z.string().uuid().describe('API key UUID'),
     },
   }, async ({ orgId, keyId }) => {
-    const { data, error, response } = await client.DELETE('/api/orgs/{orgId}/api-keys/{keyId}', {
-      params: { path: { orgId, keyId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data ?? { revoked: true });
+    try {
+      return formatSuccess(await revokeApiKey(client, orgId, keyId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 }

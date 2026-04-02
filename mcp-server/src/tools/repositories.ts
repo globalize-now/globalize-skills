@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ApiClient } from '../client.js';
-import { formatError, formatSuccess } from '../client.js';
+import type { ApiClient } from '@globalize-now/cli-client';
+import { listRepositories, createRepository, deleteRepository, detectRepository } from '@globalize-now/cli-client';
+import { formatSuccess, formatError } from '../helpers.js';
 
 export function registerRepositoryTools(server: McpServer, client: ApiClient) {
   server.registerTool('list_repositories', {
@@ -10,11 +11,11 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
       projectId: z.string().uuid().describe('Project UUID'),
     },
   }, async ({ projectId }) => {
-    const { data, error, response } = await client.GET('/api/repositories', {
-      params: { query: { projectId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await listRepositories(client, projectId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('create_repository', {
@@ -27,11 +28,11 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
       localePathPattern: z.string().optional().describe('Path pattern for locale files in the repo'),
     },
   }, async ({ projectId, gitUrl, provider, branches, localePathPattern }) => {
-    const { data, error, response } = await client.POST('/api/repositories', {
-      body: { projectId, gitUrl, provider, branches, localePathPattern },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await createRepository(client, projectId, gitUrl, provider, branches, localePathPattern));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('delete_repository', {
@@ -40,11 +41,11 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
       id: z.string().uuid().describe('Repository UUID'),
     },
   }, async ({ id }) => {
-    const { data, error, response } = await client.DELETE('/api/repositories/{id}', {
-      params: { path: { id } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data ?? { deleted: true });
+    try {
+      return formatSuccess(await deleteRepository(client, id));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('detect_repository', {
@@ -53,10 +54,10 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
       id: z.string().uuid().describe('Repository UUID'),
     },
   }, async ({ id }) => {
-    const { data, error, response } = await client.POST('/api/repositories/{id}/detect', {
-      params: { path: { id } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await detectRepository(client, id));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 }

@@ -1,16 +1,19 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ApiClient } from '../client.js';
-import { formatError, formatSuccess } from '../client.js';
+import type { ApiClient } from '@globalize-now/cli-client';
+import { listOrgs, createOrg, deleteOrg } from '@globalize-now/cli-client';
+import { formatSuccess, formatError } from '../helpers.js';
 
 export function registerOrgTools(server: McpServer, client: ApiClient) {
   server.registerTool('list_orgs', {
     description: 'List all organisations the authenticated user belongs to',
     inputSchema: {},
   }, async () => {
-    const { data, error, response } = await client.GET('/api/orgs');
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await listOrgs(client));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('create_org', {
@@ -19,11 +22,11 @@ export function registerOrgTools(server: McpServer, client: ApiClient) {
       name: z.string().describe('Organisation name'),
     },
   }, async ({ name }) => {
-    const { data, error, response } = await client.POST('/api/orgs', {
-      body: { name },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await createOrg(client, name));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('delete_org', {
@@ -32,10 +35,10 @@ export function registerOrgTools(server: McpServer, client: ApiClient) {
       orgId: z.string().uuid().describe('Organisation UUID'),
     },
   }, async ({ orgId }) => {
-    const { data, error, response } = await client.DELETE('/api/orgs/{orgId}', {
-      params: { path: { orgId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data ?? { deleted: true });
+    try {
+      return formatSuccess(await deleteOrg(client, orgId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 }

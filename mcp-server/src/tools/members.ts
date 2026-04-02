@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ApiClient } from '../client.js';
-import { formatError, formatSuccess } from '../client.js';
+import type { ApiClient } from '@globalize-now/cli-client';
+import { listMembers, inviteMember, removeMember } from '@globalize-now/cli-client';
+import { formatSuccess, formatError } from '../helpers.js';
 
 export function registerMemberTools(server: McpServer, client: ApiClient) {
   server.registerTool('list_members', {
@@ -10,11 +11,11 @@ export function registerMemberTools(server: McpServer, client: ApiClient) {
       orgId: z.string().uuid().describe('Organisation UUID'),
     },
   }, async ({ orgId }) => {
-    const { data, error, response } = await client.GET('/api/orgs/{orgId}/members', {
-      params: { path: { orgId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await listMembers(client, orgId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('invite_member', {
@@ -25,12 +26,11 @@ export function registerMemberTools(server: McpServer, client: ApiClient) {
       role: z.enum(['admin', 'member']).optional().describe('Role (defaults to member)'),
     },
   }, async ({ orgId, clerkUserId, role }) => {
-    const { data, error, response } = await client.POST('/api/orgs/{orgId}/members', {
-      params: { path: { orgId } },
-      body: { clerkUserId, role },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await inviteMember(client, orgId, clerkUserId, role));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('remove_member', {
@@ -40,10 +40,10 @@ export function registerMemberTools(server: McpServer, client: ApiClient) {
       membershipId: z.string().uuid().describe('Membership UUID'),
     },
   }, async ({ orgId, membershipId }) => {
-    const { data, error, response } = await client.DELETE('/api/orgs/{orgId}/members/{membershipId}', {
-      params: { path: { orgId, membershipId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data ?? { removed: true });
+    try {
+      return formatSuccess(await removeMember(client, orgId, membershipId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 }

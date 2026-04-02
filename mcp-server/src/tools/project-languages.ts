@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ApiClient } from '../client.js';
-import { formatError, formatSuccess } from '../client.js';
+import type { ApiClient } from '@globalize-now/cli-client';
+import { listProjectLanguages, addProjectLanguage, removeProjectLanguage } from '@globalize-now/cli-client';
+import { formatSuccess, formatError } from '../helpers.js';
 
 export function registerProjectLanguageTools(server: McpServer, client: ApiClient) {
   server.registerTool('list_project_languages', {
@@ -10,11 +11,11 @@ export function registerProjectLanguageTools(server: McpServer, client: ApiClien
       id: z.string().uuid().describe('Project UUID'),
     },
   }, async ({ id }) => {
-    const { data, error, response } = await client.GET('/api/projects/{id}/languages', {
-      params: { path: { id } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await listProjectLanguages(client, id));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('add_project_language', {
@@ -26,12 +27,11 @@ export function registerProjectLanguageTools(server: McpServer, client: ApiClien
       languageId: z.string().uuid().optional().describe('Language UUID from the global catalog'),
     },
   }, async ({ id, name, locale, languageId }) => {
-    const { data, error, response } = await client.POST('/api/projects/{id}/languages', {
-      params: { path: { id } },
-      body: { name, locale, languageId },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data);
+    try {
+      return formatSuccess(await addProjectLanguage(client, id, name, locale, languageId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 
   server.registerTool('remove_project_language', {
@@ -41,10 +41,10 @@ export function registerProjectLanguageTools(server: McpServer, client: ApiClien
       languageId: z.string().uuid().describe('Project language UUID'),
     },
   }, async ({ id, languageId }) => {
-    const { data, error, response } = await client.DELETE('/api/projects/{id}/languages/{languageId}', {
-      params: { path: { id, languageId } },
-    });
-    if (error) return formatError(response, error);
-    return formatSuccess(data ?? { removed: true });
+    try {
+      return formatSuccess(await removeProjectLanguage(client, id, languageId));
+    } catch (e) {
+      return formatError(e);
+    }
   });
 }

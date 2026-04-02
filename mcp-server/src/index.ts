@@ -1,7 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { resolveAuth } from './auth.js';
-import { createApiClient } from './client.js';
+import { resolveAuth, createApiClient } from '@globalize-now/cli-client';
 import { registerOrgTools } from './tools/orgs.js';
 import { registerProjectTools } from './tools/projects.js';
 import { registerLanguageTools } from './tools/languages.js';
