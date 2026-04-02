@@ -324,6 +324,224 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/device/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a device authorization code
+         * @description Step 1 of the device auth flow. The CLI generates a PKCE `code_verifier`, derives `code_challenge = BASE64URL(SHA256(code_verifier))`, and sends it here along with a `client_id` (e.g. `"cli"` or `"mcp"`). Returns a `device_code` (secret, held by the CLI), a `user_code` (human-readable, e.g. `ABCD-5678`), and a `verification_uri_complete` URL to open in the browser. The CLI then opens that URL and begins polling `/api/auth/device/token`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        client_id: string;
+                        code_challenge: string;
+                        /** @enum {string} */
+                        code_challenge_method: "S256";
+                        hostname?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/device/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify a user code is valid and pending
+         * @description Used by the web page on load to check that the `?code=` query parameter is a valid, pending device code. Returns the `client_id` and `expires_at` so the page can display context to the user. Returns 404 if the code is invalid or expired.
+         */
+        get: {
+            parameters: {
+                query: {
+                    code: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/device/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a device authorization request
+         * @description Called by the web page when the user clicks Approve. Requires a Clerk session (the user must be signed in). Verifies the user is a member of the selected org, creates a `glb_*` API key, stores the raw key in Redis for the token exchange endpoint, and marks the device code as approved.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        user_code: string;
+                        /** Format: uuid */
+                        org_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/device/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deny a device authorization request
+         * @description Called by the web page when the user clicks Deny. Requires a Clerk session. Marks the device code as denied so the CLI polling on `/api/auth/device/token` receives an `access_denied` error.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        user_code: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/device/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange device code for API key
+         * @description Polled by the CLI after opening the browser. Send the `device_code` from step 1 and the original `code_verifier` (PKCE). Responses follow RFC 8628: `authorization_pending` (keep polling), `slow_down` (increase interval), `expired_token` (restart flow), `access_denied` (user denied). On success, returns the `api_key`, `api_key_id`, and `org` details.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        device_code: string;
+                        code_verifier: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs": {
         parameters: {
             query?: never;
@@ -931,6 +1149,8 @@ export interface paths {
                 query?: {
                     sourceProjectLanguageId?: string;
                     targetProjectLanguageId?: string;
+                    limit?: number;
+                    cursor?: string;
                 };
                 header?: never;
                 path: {
@@ -1139,7 +1359,8 @@ export interface paths {
                     q?: string;
                     sourceProjectLanguageId?: string;
                     targetProjectLanguageId?: string;
-                    limit?: string;
+                    limit?: number;
+                    cursor?: string;
                 };
                 header?: never;
                 path: {
@@ -1213,7 +1434,10 @@ export interface paths {
         /** List project files */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    limit?: number;
+                    cursor?: string;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -1581,7 +1805,10 @@ export interface paths {
         /** List job files */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    limit?: number;
+                    cursor?: string;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -1727,7 +1954,10 @@ export interface paths {
         /** List pipeline events for a job */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    limit?: number;
+                    cursor?: string;
+                };
                 header?: never;
                 path: {
                     id: string;
