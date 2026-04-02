@@ -1,4 +1,4 @@
-import type { Command } from 'commander';
+import { Command, Option } from 'commander';
 import type { ApiClient } from '../client.js';
 import { extractError } from '../client.js';
 import { output, outputError, type OutputOptions } from '../format.js';
@@ -64,7 +64,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .description('Create a repository')
     .requiredOption('--project-id <id>', 'Project UUID')
     .requiredOption('--git-url <url>', 'Git repository URL')
-    .requiredOption('--provider <provider>', 'Git provider')
+    .addOption(new Option('--provider <provider>', 'Git provider').choices(['github', 'gitlab']).makeOptionMandatory())
     .option('--branches <branches...>', 'Branches to track')
     .option('--locale-path-pattern <pattern>', 'Locale path pattern')
     .action(async (cmdOpts, cmd) => {
@@ -76,7 +76,7 @@ export function register(group: Command, getClient: ClientFactory): void {
             client,
             cmdOpts.projectId,
             cmdOpts.gitUrl,
-            cmdOpts.provider as 'github' | 'gitlab',
+            cmdOpts.provider,
             cmdOpts.branches,
             cmdOpts.localePathPattern,
           ),

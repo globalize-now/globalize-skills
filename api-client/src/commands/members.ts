@@ -1,4 +1,4 @@
-import type { Command } from 'commander';
+import { Command, Option } from 'commander';
 import type { ApiClient } from '../client.js';
 import { extractError } from '../client.js';
 import { output, outputError, type OutputOptions } from '../format.js';
@@ -62,13 +62,13 @@ export function register(group: Command, getClient: ClientFactory): void {
     .description('Invite a member to an organisation')
     .requiredOption('--org-id <id>', 'Organisation UUID')
     .requiredOption('--clerk-user-id <uid>', 'Clerk user ID')
-    .option('--role <role>', 'Role (admin|member)')
+    .addOption(new Option('--role <role>', 'Role (default: member)').choices(['admin', 'member']))
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         output(
-          await inviteMember(client, cmdOpts.orgId, cmdOpts.clerkUserId, cmdOpts.role as 'admin' | 'member' | undefined),
+          await inviteMember(client, cmdOpts.orgId, cmdOpts.clerkUserId, cmdOpts.role),
           opts,
         );
       } catch (e) {
