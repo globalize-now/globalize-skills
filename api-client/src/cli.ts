@@ -12,13 +12,14 @@ import { register as registerStyleGuides } from "./commands/style-guides.js";
 import { register as registerApiKeys } from "./commands/api-keys.js";
 import { register as registerMembers } from "./commands/members.js";
 import { register as registerAuth } from "./commands/auth.js";
+import pkg from "../../package.json" with { type: "json" };
 
 const program = new Command();
 
 program
   .name("globalise-now-cli")
   .description("CLI client for the Globalize translation platform")
-  .version("0.1.0")
+  .version(pkg.version)
   .option("--json", "Force JSON output");
 
 // Lazy client: resolved once on first API call
