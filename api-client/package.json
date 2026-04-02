@@ -1,0 +1,34 @@
+{
+  "name": "@globalize-now/client",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CLI and library client for the Globalize translation platform",
+  "bin": {
+    "globalise-now-cli": "bin/globalise-now-cli.mjs"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "scripts": {
+    "generate": "openapi-typescript https://api.globalize.now/api/docs/json -o src/api-types.ts",
+    "build": "npm run generate && tsc",
+    "dev": "tsc --watch"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "chalk": "^5.4.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^13.1.0",
+    "openapi-fetch": "^0.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "openapi-typescript": "^7.6.0",
+    "typescript": "^5.8.0"
+  }
+}

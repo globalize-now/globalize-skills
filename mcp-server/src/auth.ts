@@ -1,6 +1,12 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import {
+  generatePKCE,
+  requestDeviceCode,
+  pollForToken,
+  openInBrowser,
+} from './device-auth.js';
 
 const CONFIG_DIR = join(homedir(), '.globalize');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
@@ -25,26 +31,37 @@ async function writeConfigFile(config: AuthConfig): Promise<void> {
   await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
 
-async function promptForApiKey(apiUrl: string): Promise<string> {
-  const settingsUrl = 'https://app.globalize.now/settings/api-keys';
-  // Log to stderr so it doesn't interfere with stdio MCP transport on stdout
-  console.error(`\nNo API key found. Create one at: ${settingsUrl}\n`);
-  console.error('Paste your API key below:');
+async function deviceAuthFlow(apiUrl: string): Promise<string> {
+  const { codeVerifier, codeChallenge } = generatePKCE();
 
-  const chunks: Buffer[] = [];
-  process.stdin.resume();
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
-    const text = Buffer.concat(chunks).toString().trim();
-    if (text.length > 0) {
-      process.stdin.pause();
-      const apiKey = text;
-      await writeConfigFile({ apiKey, apiUrl });
-      console.error('API key saved to ~/.globalize/config.json');
-      return apiKey;
-    }
-  }
-  throw new Error('No API key provided');
+  const device = await requestDeviceCode(apiUrl, 'mcp', codeChallenge);
+
+  // Log to stderr so it doesn't interfere with stdio MCP transport on stdout
+  console.error();
+  console.error(`No API key found. Approve this device to authenticate.`);
+  console.error();
+  console.error(`Your code: ${device.user_code}`);
+  console.error();
+  console.error(`If your browser doesn't open, visit:`);
+  console.error(device.verification_uri_complete);
+  console.error();
+
+  openInBrowser(device.verification_uri_complete);
+
+  console.error('Waiting for approval...');
+
+  const token = await pollForToken(
+    apiUrl,
+    device.device_code,
+    codeVerifier,
+    device.interval,
+    device.expires_in,
+  );
+
+  await writeConfigFile({ apiKey: token.api_key, apiUrl });
+  console.error(`Authenticated as org "${token.org.name}". API key saved.`);
+
+  return token.api_key;
 }
 
 export async function resolveAuth(): Promise<AuthConfig> {
@@ -61,7 +78,7 @@ export async function resolveAuth(): Promise<AuthConfig> {
     return { apiKey: config.apiKey, apiUrl: config.apiUrl || apiUrl };
   }
 
-  // 3. Interactive prompt
-  const apiKey = await promptForApiKey(apiUrl);
+  // 3. Device auth flow
+  const apiKey = await deviceAuthFlow(apiUrl);
   return { apiKey, apiUrl };
 }
