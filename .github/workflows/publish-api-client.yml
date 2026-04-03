@@ -37,6 +37,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add api-client/package.json api-client/package-lock.json
           git commit -m "chore: bump @globalize-now/cli-client to $(node -p "require('./api-client/package.json').version")"
+          git pull --rebase origin main
           git push
 
       - run: npm publish --access public
