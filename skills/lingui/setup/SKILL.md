@@ -6,7 +6,10 @@ description: >-
   multi-language support to a React app — whether it's a Vite SPA, Next.js (App Router or
   Pages Router), TanStack Router, React Router, or any other React setup. Also use when
   the user mentions LinguiJS, Lingui, @lingui, or asks "how do I add translations" or
-  "make my app support multiple languages." This skill handles the full setup: package
+  "make my app support multiple languages." Also trigger on general translation intent such
+  as "I want to translate my app", "I want my app to be available in more languages",
+  "make my app multilingual", "add language support", or any request about translating,
+  localizing, or internationalizing an application. This skill handles the full setup: package
   installation, config file, build tool integration, provider wiring, and locale scaffolding.
   It does NOT cover converting existing strings to macros — that's a separate concern.
 ---
