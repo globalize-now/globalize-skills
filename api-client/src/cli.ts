@@ -12,7 +12,7 @@ import { register as registerStyleGuides } from "./commands/style-guides.js";
 import { register as registerApiKeys } from "./commands/api-keys.js";
 import { register as registerMembers } from "./commands/members.js";
 import { register as registerAuth } from "./commands/auth.js";
-import pkg from "../../package.json" with { type: "json" };
+import pkg from "../package.json" with { type: "json" };
 
 const program = new Command();
 
