@@ -118,6 +118,31 @@ export function LinguiClientProvider({
 
 ### 3. Locale-based Routing
 
+**Before proceeding, check for existing locale routing:**
+
+- Does a `[lang]/` or `[locale]/` directory already exist under `src/app/`? If yes, use the existing structure — do not restructure.
+- Does `src/middleware.ts` or `middleware.ts` already exist? If yes, read it. Record this — the middleware section below must handle it.
+
+**If no existing locale routing exists, STOP and present this to the user:**
+
+> To support locale-based URL routing in Next.js App Router, all pages need to move under a `[lang]/` dynamic segment. This is a significant structural change:
+> - Every URL changes (e.g., `/about` becomes `/en/about`)
+> - All internal links and `<Link>` hrefs must include the locale prefix
+> - External links, bookmarks, and SEO-indexed URLs break without redirects
+> - The root layout moves from `src/app/layout.tsx` to `src/app/[lang]/layout.tsx`
+> - New middleware intercepts all requests to add locale prefixes
+>
+> Options:
+> 1. **Proceed with `[lang]` restructuring** — full locale-based URL routing
+> 2. **Skip locale routing for now** — set up LinguiJS with a hardcoded locale, no URL changes, add routing later
+> 3. **Show me the full impact first** — list every file that would be moved before deciding
+
+**You MUST wait for the user to choose before proceeding. Do NOT default to option 1.**
+
+---
+
+#### Option 1: Full `[lang]` restructuring
+
 Move pages under a `[lang]` dynamic segment:
 
 ```
@@ -194,6 +219,80 @@ export default async function RootLayout({
 
 Note: `params` is `Promise<{ lang: string }>` in Next.js 15+. For Next.js 13-14, use `params: { lang: string }` directly (no `await`).
 
+---
+
+#### Option 2: Skip locale routing (hardcoded locale)
+
+This approach adds LinguiJS without changing the URL structure. The app uses a single hardcoded locale. Locale routing can be added later by restructuring to option 1.
+
+Modify the existing `src/app/layout.tsx` in place — do not move it:
+
+```tsx
+// src/app/layout.tsx (modified — no [lang] restructuring)
+import { setI18n } from '@lingui/react/server'
+import { getI18nInstance } from './appRouterI18n'
+import { LinguiClientProvider } from './LinguiClientProvider'
+
+// To add locale-based URL routing later, restructure pages under [lang]/
+// See: https://nextjs.org/docs/app/building-your-application/routing/internationalization
+const DEFAULT_LOCALE = 'en'
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const i18n = getI18nInstance(DEFAULT_LOCALE)
+  setI18n(i18n)
+
+  return (
+    <html lang={DEFAULT_LOCALE} dir="ltr">
+      <body>
+        <LinguiClientProvider
+          initialLocale={DEFAULT_LOCALE}
+          initialMessages={i18n.messages}
+        >
+          {children}
+        </LinguiClientProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+With this approach:
+- No middleware is needed
+- No files are moved
+- No URLs change
+- Each page still loads its own catalog, but without a `lang` route param — use `DEFAULT_LOCALE` instead
+- Skip the "Locale Middleware" section (section 4 below)
+
+**Option 2 page example** — each page loads its catalog using the hardcoded locale:
+
+```tsx
+// src/app/about/page.tsx (option 2 — no [lang] segment)
+import { setI18n } from '@lingui/react/server'
+import { Trans } from '@lingui/react/macro'
+import { getI18nInstance, loadPageCatalog } from '../appRouterI18n'
+
+const DEFAULT_LOCALE = 'en'
+
+export default async function AboutPage() {
+  const i18n = getI18nInstance(DEFAULT_LOCALE)
+  const { messages } = require(`./locales/page/${DEFAULT_LOCALE}`)
+  loadPageCatalog(i18n, DEFAULT_LOCALE, messages)
+  setI18n(i18n)
+
+  return <h1><Trans>About us</Trans></h1>
+}
+```
+
+---
+
+#### Option 3: Show full impact
+
+List every file under `src/app/` that would need to move under `src/app/[lang]/`, and every file that references these paths (imports, links). Present the list and wait for the user to choose option 1 or option 2.
+
 ### Loading per-page catalogs
 
 Each page's server component must load its own co-located catalog before rendering translated content:
@@ -225,7 +324,14 @@ Each page must call `loadPageCatalog` and `setI18n` before rendering any transla
 
 ### 4. Locale Middleware
 
-Create middleware to redirect bare paths to locale-prefixed paths. The middleware parses the `Accept-Language` header with quality values and tries regional fallback (e.g., `es-MX` → `es`) before falling back to the default locale. A `lang` cookie persists the user's explicit language choice (e.g., from a language picker) so it takes priority over browser settings.
+**Only needed if the user chose option 1 (full `[lang]` restructuring).** If they chose option 2 (hardcoded locale), skip this section entirely.
+
+**If `src/middleware.ts` or `middleware.ts` already exists:** Read the existing middleware. Do NOT overwrite it. Instead:
+- If it already handles locale routing, adapt the locale detection logic to work with Lingui's locale list and move on.
+- If it handles other concerns (auth, headers, rewrites), you MUST merge the locale routing into the existing middleware rather than replacing it. Show the user the merged version and ask for confirmation before writing.
+- If the middleware is complex and you cannot safely merge, explain what it does and ask the user to review your proposed merge.
+
+**If no middleware exists**, create middleware to redirect bare paths to locale-prefixed paths. The middleware parses the `Accept-Language` header with quality values and tries regional fallback (e.g., `es-MX` → `es`) before falling back to the default locale. A `lang` cookie persists the user's explicit language choice (e.g., from a language picker) so it takes priority over browser settings.
 
 Note: `@lingui/detect-locale` is a client-side library — it's not used in middleware since this runs on the server. The cookie serves the same persistence purpose as `localStorage` in the Vite setup.
 

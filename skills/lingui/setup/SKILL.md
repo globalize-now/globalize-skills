@@ -20,6 +20,22 @@ LinguiJS is a compile-time i18n framework — macros like `<Trans>` and `` t`...
 
 Follow these steps in order. Each builds on the last.
 
+### Step Risk Classification
+
+| Step | Risk | Notes |
+|------|------|-------|
+| 1. Detect | Read-only | No changes to the project |
+| 2. Install packages | Additive | New dependencies only |
+| 3. Configure | Additive | New `lingui.config.ts` file |
+| 4. Build tool | **Modifies existing file** | Changes `vite.config` or `next.config` |
+| 5. Provider | **Modifies existing file** | Changes root layout / `main.tsx` |
+| 6. ESLint | Additive | Already asks user |
+| 7. Scaffold | Additive | New catalog files |
+| 8. CI/CD | **Modifies existing file** | Changes build script — **optional, ask first** |
+| 9. Tests | Additive | New test wrapper file — **optional, ask first** |
+
+**RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.**
+
 ---
 
 ## Step 1: Detect the Project
@@ -36,6 +52,17 @@ Read the project's `package.json`, build config (`vite.config.*`, `next.config.*
 | **Route entry points** | Next.js App Router: `src/app/**/page.tsx` exists. TanStack Router (file-based): `src/routes/` directory exists. React Router v7 framework mode: `app/routes/` exists. If none found → plain SPA (no file-based routing). |
 
 Determine whether the project uses **file-based routing** with identifiable page entry points. This decides whether to use per-page catalog splitting (Step 3) or a single global catalog.
+
+### Incompatibility Checks
+
+Before proceeding, check for blockers. **If any check below says STOP, you MUST stop and communicate the issue to the user. Do NOT proceed with Step 2 or any subsequent step. Do NOT attempt workarounds.**
+
+| Check | How to detect | Action |
+|-------|--------------|--------|
+| **Existing i18n library** | `react-intl`, `react-i18next`, `i18next`, `next-intl`, `next-translate`, `typesafe-i18n`, `@formatjs/intl` in `package.json` deps or devDeps | **STOP.** Tell the user: "{library} is already installed. Adding LinguiJS alongside it will create conflicting translation pipelines. Options: (1) migrate from {library} to LinguiJS (separate effort, not covered by this skill), or (2) remove {library} first, then re-run this setup." Do NOT proceed. |
+| **Not a React project** | No `react` in deps. Or: `vue`, `svelte`, `@angular/core`, `solid-js` in deps. | **STOP.** Tell the user: "LinguiJS requires React. This project uses {framework}. This skill cannot set up i18n for non-React projects." Do NOT proceed. |
+| **Next.js Pages Router** | `next` in deps AND `pages/` directory with `_app.tsx`/`_app.jsx`, but no `app/` directory with `layout.tsx`/`layout.jsx` | **STOP.** Tell the user: "This project uses the Next.js Pages Router. This skill only covers the App Router. The Pages Router requires a different provider approach (`_app.tsx` wrapping, no RSC, no `setI18n`). Manual setup is needed — refer to the LinguiJS docs for Pages Router guidance." Do NOT proceed. |
+| **Custom build pipeline** | No `vite.config.*`, `next.config.*`, or `react-scripts` in deps. Build uses esbuild, Rollup, Webpack (without CRA), Parcel, or another tool directly. | **STOP.** Tell the user: "This project uses {tool} as its build tool. LinguiJS requires a macro transform plugin (SWC or Babel) integrated into the build. This skill does not cover {tool} integration. To set up manually: install `@lingui/babel-plugin-lingui-macro` and add it as a Babel plugin in your build config. See https://lingui.dev/ref/babel-plugin for details." Do NOT proceed. |
 
 Based on the detection, pick the right variant reference file:
 
@@ -199,11 +226,22 @@ The `--typescript` flag generates `.ts` catalog files instead of `.js`, giving t
 
 ## Step 4: Integrate with the Build Tool
 
-Follow the variant-specific reference file for this step. It tells you exactly how to modify the build config (vite.config.ts, next.config.js, etc.) and which compiler plugin to wire in.
+**This step modifies the project's build configuration** (`vite.config.ts`, `next.config.js`, etc.). Before making changes:
+
+1. Describe the specific modification to the user (e.g., "I will add `@lingui/swc-plugin` to the `plugins` array in the `react()` call in `vite.config.ts`").
+2. If the build config has unusual structure or plugins you don't recognize, show the proposed change and ask for confirmation.
+3. Proceed only after the user confirms.
+
+Follow the variant-specific reference file for this step. It tells you exactly how to modify the build config and which compiler plugin to wire in.
 
 ---
 
 ## Step 5: Wire Up the Provider
+
+**This step modifies existing project files** (root layout, `main.tsx`, or root route component). Before making changes:
+
+1. List the specific files you will modify and describe what changes you will make.
+2. Ask the user to confirm before proceeding.
 
 Follow the variant-specific reference file for this step. The provider pattern differs significantly between standard React apps (simple `I18nProvider` wrapper) and Next.js App Router (RSC-aware setup with `setI18n` + client provider + middleware).
 
@@ -332,7 +370,9 @@ If any step fails, check the build tool integration (Step 4) first — that's wh
 
 ---
 
-## Step 8: CI/CD Integration
+## Step 8: CI/CD Integration (Optional)
+
+This step is **not required** for the initial setup to work. The app will function correctly after Step 7. Ask the user: "Would you like me to set up CI/CD integration (build script changes, catalog freshness checks)? This can also be done later." **If the user declines, skip to Step 9.**
 
 Set up catalog checks and build-time compilation so the i18n pipeline stays healthy in CI.
 
@@ -352,6 +392,8 @@ Since compiled catalogs are gitignored (Step 7), the build pipeline must compile
 | `"build": "vite build"` | `"build": "lingui compile --typescript && vite build"` | `"build": "lingui compile && vite build"` |
 | `"build": "next build"` | `"build": "lingui compile --typescript && next build"` | `"build": "lingui compile && next build"` |
 
+**Before modifying the build script:** Show the user the exact change (e.g., "I will change your build script from `vite build` to `lingui compile --typescript && vite build`"). If `lingui compile` fails for any reason, this will prevent all builds. Ask the user to confirm before making this change.
+
 If the build script can't be reliably identified, inform the user that they need to add `lingui compile` (with `--typescript` for TypeScript projects) before their existing build command.
 
 ### Translation coverage
@@ -360,7 +402,9 @@ The extract command prints per-locale stats showing how many messages are missin
 
 ---
 
-## Step 9: Test Setup
+## Step 9: Test Setup (Optional)
+
+This step is **not required** for the initial setup to work. Tests that don't render Lingui components are unaffected. Ask the user: "Would you like me to set up the test wrapper for components that use Lingui? This can also be done later." **If the user declines, skip this step.**
 
 Components using `<Trans>` or `useLingui()` need `I18nProvider` in the render tree. Without it, `useLingui()` throws and `<Trans>` won't render correctly — this is the most common test failure after adding i18n.
 

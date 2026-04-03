@@ -21,6 +21,8 @@ npm install -D @lingui/cli @lingui/babel-plugin-lingui-macro @lingui/vite-plugin
 
 ## Build Tool Integration (Step 4)
 
+**This modifies `vite.config.ts`.** Describe the changes to the user before making them: adding `@lingui/babel-plugin-lingui-macro` to the `react()` plugin's Babel config and adding `lingui()` as a top-level Vite plugin. If the config has unusual structure or unfamiliar plugins, show the proposed diff and ask for confirmation.
+
 Modify `vite.config.ts` to add the Babel plugin and the Lingui Vite plugin:
 
 ```ts
@@ -47,6 +49,8 @@ If the project already has Babel plugins configured in the `react()` call, add `
 The setup depends on whether the project uses per-page catalogs (file-based routing) or a single global catalog.
 
 ### Per-page catalogs (TanStack Router, React Router with file-based routing)
+
+**This pattern modifies the root route file** (`__root.tsx` for TanStack Router, root layout for React Router) by wrapping it with `I18nProvider`. Show the user what changes before making them.
 
 Create a minimal i18n setup file — catalog loading happens at the route level, not here:
 
@@ -178,6 +182,8 @@ export default function AboutPage() {
 Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
 
 ### Single catalog (plain SPA without file-based routing)
+
+**This pattern modifies `main.tsx`** by wrapping the existing render tree with `I18nProvider`. Show the user the modified file before making the change.
 
 Create an i18n setup file that loads the global catalog:
 
