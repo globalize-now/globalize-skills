@@ -1,6 +1,6 @@
 {
   "name": "@globalize-now/cli-client",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "description": "CLI and library client for the Globalize translation platform",
   "bin": {
