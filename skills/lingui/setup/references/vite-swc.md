@@ -375,6 +375,136 @@ export default function AboutPage() {
 
 Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
 
+#### Link handling
+
+**Only relevant for Strategy 1 and 2.** If the user chose Option 3, skip this.
+
+When locale routing is enabled, internal links must include the locale prefix.
+
+**TanStack Router** — do NOT wrap `<Link>`. TanStack Router's `<Link>` has deeply typed `to` and `params` props; wrapping it loses type safety. Instead, use the router's native API:
+
+Strategy 2 (all prefixed) — all routes are under `/$lang/`, so every `<Link>` already requires the `lang` param:
+
+```tsx
+import { Link, useParams } from '@tanstack/react-router'
+
+function Navigation() {
+  const { lang } = useParams({ strict: false })
+
+  return (
+    <nav>
+      <Link to="/$lang" params={{ lang }}>Home</Link>
+      <Link to="/$lang/about" params={{ lang }}>About</Link>
+    </nav>
+  )
+}
+```
+
+Strategy 1 (unprefixed source) — source locale routes don't have a `$lang` param, while target locale routes do. Links must point to the correct route variant:
+
+```tsx
+import { Link, useParams } from '@tanstack/react-router'
+import { SOURCE_LOCALE } from '../i18n'
+
+function Navigation() {
+  const params = useParams({ strict: false })
+  const lang = (params as { lang?: string }).lang ?? SOURCE_LOCALE
+  const isSource = lang === SOURCE_LOCALE
+
+  return (
+    <nav>
+      {isSource ? (
+        <>
+          <Link to="/">Home</Link>
+          <Link to="/about">About</Link>
+        </>
+      ) : (
+        <>
+          <Link to="/$lang" params={{ lang }}>Home</Link>
+          <Link to="/$lang/about" params={{ lang }}>About</Link>
+        </>
+      )}
+    </nav>
+  )
+}
+```
+
+This duplication is the trade-off of Strategy 1 with TanStack Router's type system — the router treats `/$lang/about` and `/about` as distinct routes with different param types. For apps with many navigation links, Strategy 2 is significantly simpler.
+
+**React Router** — `<Link to="...">` takes a plain string, so a path utility works cleanly:
+
+```ts
+// src/localePath.ts
+import { SOURCE_LOCALE } from './i18n'
+
+/** Build a locale-prefixed path. */
+export function localePath(lang: string, path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  return `/${lang}${normalized}`
+}
+```
+
+Strategy 1 variant — only prefix non-source locales:
+
+```ts
+export function localePath(lang: string, path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  if (lang === SOURCE_LOCALE) return normalized
+  return `/${lang}${normalized}`
+}
+```
+
+Write the variant that matches the user's chosen strategy.
+
+Usage:
+
+```tsx
+import { Link, useParams } from 'react-router'
+import { localePath } from '../localePath'
+import { SOURCE_LOCALE } from '../i18n'
+
+function Navigation() {
+  const { lang } = useParams()
+  const currentLang = lang ?? SOURCE_LOCALE
+
+  return (
+    <nav>
+      <Link to={localePath(currentLang, '/')}>Home</Link>
+      <Link to={localePath(currentLang, '/about')}>About</Link>
+    </nav>
+  )
+}
+```
+
+Programmatic navigation:
+
+```tsx
+import { useNavigate, useParams } from 'react-router'
+import { localePath } from '../localePath'
+import { SOURCE_LOCALE } from '../i18n'
+
+function SearchForm() {
+  const navigate = useNavigate()
+  const { lang } = useParams()
+
+  function onSubmit(query: string) {
+    navigate(localePath(lang ?? SOURCE_LOCALE, `/search?q=${encodeURIComponent(query)}`))
+  }
+  // ...
+}
+```
+
+#### Existing link migration
+
+Tell the user:
+
+> Existing internal links need updating to include the locale prefix. Search for:
+> - `<Link to="/...">` — update to use the locale-aware pattern shown above
+> - `<a href="/...">` with internal paths — convert to router `<Link>` with locale handling
+> - `navigate("/...")` — use `localePath()` or pass `params: { lang }`
+>
+> Navigation components (headers, sidebars, footers) are the highest priority since they appear on every page.
+
 ---
 
 #### Option 3: Skip locale routing (per-page catalogs)
@@ -509,6 +639,20 @@ export default function AboutPage() {
 ```
 
 Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
+
+---
+
+### `index.html` lang attribute
+
+Vite projects have an `index.html` at the project root with a static `<html lang="...">` attribute (typically `<html lang="en">`). Since `activateLocale()` sets `document.documentElement.lang` dynamically at runtime, the static value serves as the default before JavaScript executes.
+
+**Read `index.html` and check the `<html lang="...">` value.** Then update it:
+
+- Set `<html lang="...">` to the source locale value from `lingui.config.ts` (e.g., `<html lang="en">`). If it already matches, no change is needed.
+- If the existing value doesn't match `sourceLocale`, flag it to the user — the source locale config may need updating.
+- Remove any hardcoded `dir` attribute (e.g., `dir="ltr"`). The `activateLocale()` function sets `dir` dynamically, and a hardcoded value would flash incorrect direction for RTL locales.
+
+Describe the exact change to the user before making it (e.g., 'I will update `<html lang="en">` to `<html lang="es">` in `index.html` to match the source locale').
 
 ---
 

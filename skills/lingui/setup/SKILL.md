@@ -268,6 +268,29 @@ The `split('-')[0]` ensures regional variants like `ar-EG` resolve correctly. Th
 - **Next.js App Router**: Separate `getDirection.ts` file, used in the root layout to set `<html lang={lang} dir={direction}>`
 - **Vite (SWC / Babel)**: Inline in `src/i18n.ts`, sets `document.documentElement.dir` and `.lang` on locale activation
 
+### `<html lang>` attribute migration
+
+The project's HTML entry point likely has a static `<html lang="en">` (or another hardcoded language). This must be updated to reflect the active locale.
+
+**Before modifying any files, read the current `<html lang="...">` value:**
+
+- **Next.js App Router**: Check `src/app/layout.tsx` (or `app/layout.tsx`) for the `<html lang="...">` attribute
+- **Vite (SWC / Babel)**: Check `index.html` in the project root for `<html lang="...">`
+
+Tell the user what you found and what will change. If the existing `lang` value doesn't match `sourceLocale` in `lingui.config.ts`, flag it — the user may need to correct the source locale. The reference files specify the exact update for each variant.
+
+### Link handling with locale routing
+
+**Only relevant for Strategy 1 (unprefixed source) and Strategy 2 (all prefixed).** If the user chose Strategy 3 or the project is a plain SPA without file-based routing, skip this — URLs don't change, so existing links work as-is.
+
+When locale routing is enabled, internal navigation links must include the locale prefix. Without this, links navigate to the wrong locale or produce 404s. This affects:
+
+- `<Link>` components (Next.js `<Link>`, TanStack Router `<Link>`, React Router `<Link>`)
+- `<a>` tags with internal relative hrefs
+- Programmatic navigation (`router.push()`, `navigate()`, `redirect()`)
+
+The reference files provide the idiomatic pattern for each framework — a path utility or hook rather than a wrapper component, to work with each router's type system. **Tell the user** that existing links will need updating after locale routing is set up, and provide the patterns from the reference file so they can migrate.
+
 ---
 
 ## Step 6: Set Up ESLint Plugin
@@ -495,6 +518,7 @@ Vitest uses the same SWC or Babel plugin configured in `vite.config.ts` (Step 4)
 - **`extract-experimental` not finding messages**: Ensure the `entries` glob in `lingui.config.ts` actually matches the project's page files. If a shared component's strings are missing from a page catalog, verify it is imported (directly or transitively) from that page's entry point.
 - **Tests fail after adding i18n**: Components using `<Trans>` or `useLingui()` need `I18nProvider` in the test render tree. See Step 9.
 - **Regional locale mismatch (`es-MX` falls back to `en` instead of `es`)**: `@lingui/detect-locale`'s `fromNavigator()` returns the raw browser locale (e.g., `es-MX`). If that exact string isn't in the `locales` array, the catalog import fails or the app falls through to the default locale — skipping the base language `es` entirely. The variant reference files (Step 5) include locale validation in the `detectLocale()` function that tries the base language tag before falling back. Lingui's `fallbackLocales` (Step 3) handles translation-level fallback separately — it cascades missing translations through CLDR parent locales by default.
+- **Links navigate to wrong locale or 404 after adding locale routing**: With Strategy 1 or 2, all internal `<Link>` hrefs and programmatic navigation calls (`router.push()`, `navigate()`, `redirect()`) must include the locale prefix. A link to `/about` in a locale-prefixed route structure will either 404 or land on the source locale regardless of the user's current language. See the "Link Handling" section in the variant reference file for the idiomatic fix per framework.
 - **Missing `dir` attribute / LTR-only CSS**: If any target locale is RTL (Arabic, Hebrew, Persian, Urdu, etc.), the `<html>` element must have `dir="rtl"`. Without it, text alignment, flexbox order, and scrollbar placement break. Equally important: CSS must use logical properties (`margin-inline-start` instead of `margin-left`, `padding-inline-end` instead of `padding-right`, `inset-inline-start` instead of `left`). Physical properties don't flip in RTL and require a full CSS audit to fix retroactively. Run the `css-i18n` skill for a full CSS audit and conversion.
 
 ---

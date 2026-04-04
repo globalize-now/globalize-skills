@@ -176,6 +176,8 @@ export function getDirection(locale: string): 'ltr' | 'rtl' {
 }
 ```
 
+**`<html lang>` migration:** Before rewriting the layout, read the existing `src/app/layout.tsx` and note the current `<html lang="...">` value. Tell the user: "Your layout currently has `<html lang="X">`. This will become `<html lang={lang} dir={direction}>` where `lang` comes from the `[lang]` route parameter." If the existing value differs from `sourceLocale` in `lingui.config.ts`, flag it — the source locale config may need updating to match.
+
 ```tsx
 // src/app/[lang]/layout.tsx
 import { setI18n } from '@lingui/react/server'
@@ -225,6 +227,8 @@ Note: `params` is `Promise<{ lang: string }>` in Next.js 15+. For Next.js 13-14,
 This approach adds LinguiJS without changing the URL structure. The app uses a single hardcoded locale. Locale routing can be added later by restructuring to strategies 1 or 2.
 
 Modify the existing `src/app/layout.tsx` in place — do not move it:
+
+**`<html lang>` migration:** Read the existing layout's `<html lang="...">` value. Tell the user: "Your layout currently has `<html lang="X">`. This will become `<html lang={DEFAULT_LOCALE}>` (hardcoded to the source locale)." If the values differ, ask the user which is correct.
 
 ```tsx
 // src/app/layout.tsx (modified — no [lang] restructuring)
@@ -399,6 +403,123 @@ export const config = {
 ```
 
 The 301 ensures search engines and browsers cache the redirect. Since the target is deterministic (always source locale), this won't cause issues with users who prefer a different language — they navigate to their locale via a language picker that links to `/fr/about`, `/de/about`, etc.
+
+### 5. Link Handling
+
+**Only for Strategy 1 and 2.** If the user chose Option 3, skip this section.
+
+With the `[lang]` directory structure, all internal links must include the locale prefix. Next.js `<Link>` accepts a plain string `href`, so a hook that builds locale-prefixed paths is the cleanest approach — it works for `<Link>`, `<a>`, `router.push()`, and `redirect()`.
+
+#### Locale path hook
+
+Create a client-side hook that reads the current locale from the route params:
+
+```tsx
+// src/app/useLocalePath.ts
+'use client'
+
+import { useParams } from 'next/navigation'
+
+const sourceLocale = 'en'  // adjust to match lingui.config.ts
+
+/**
+ * Returns a function that prefixes paths with the current locale.
+ */
+export function useLocalePath() {
+  const params = useParams()
+  const lang = (params?.lang as string) ?? sourceLocale
+
+  return function localePath(path: string): string {
+    const normalized = path.startsWith('/') ? path : `/${path}`
+    return `/${lang}${normalized}`
+  }
+}
+```
+
+**Strategy 1 variant** — source locale paths stay bare, non-source get prefixed:
+
+```tsx
+export function useLocalePath() {
+  const params = useParams()
+  const lang = (params?.lang as string) ?? sourceLocale
+
+  return function localePath(path: string): string {
+    const normalized = path.startsWith('/') ? path : `/${path}`
+    if (lang === sourceLocale) return normalized
+    return `/${lang}${normalized}`
+  }
+}
+```
+
+Write the variant that matches the user's chosen strategy.
+
+#### Usage with `<Link>`
+
+```tsx
+'use client'
+
+import Link from 'next/link'
+import { useLocalePath } from '../useLocalePath'
+
+export function Navigation() {
+  const localePath = useLocalePath()
+
+  return (
+    <nav>
+      <Link href={localePath('/')}>Home</Link>
+      <Link href={localePath('/about')}>About</Link>
+    </nav>
+  )
+}
+```
+
+#### Programmatic navigation
+
+```tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useLocalePath } from '../useLocalePath'
+
+export function SearchForm() {
+  const router = useRouter()
+  const localePath = useLocalePath()
+
+  function onSubmit(query: string) {
+    router.push(localePath(`/search?q=${encodeURIComponent(query)}`))
+  }
+  // ...
+}
+```
+
+#### Server Components
+
+`useLocalePath()` is a client hook — it cannot be used in Server Components. In Server Components, read `lang` from `params` directly and build paths with template literals:
+
+```tsx
+// In a Server Component
+const { lang } = await params
+// ...
+<Link href={`/${lang}/about`}>About</Link>
+```
+
+For Strategy 1 in Server Components, conditionally prefix:
+
+```tsx
+const href = lang === sourceLocale ? '/about' : `/${lang}/about`
+```
+
+#### Existing link migration
+
+Tell the user:
+
+> Existing internal links need updating to include the locale prefix. Search for:
+> - `<Link href="/...">` — wrap the href with `localePath()`
+> - `<a href="/...">` with internal paths — convert to `<Link>` with `localePath()`, or apply `localePath()` to the href
+> - `router.push("/...")` / `router.replace("/...")` — wrap the path with `localePath()`
+> - `redirect("/...")` in Server Components — prefix with the `lang` param: `` redirect(`/${lang}/path`) ``
+>
+> Navigation components (headers, sidebars, footers) are the highest priority since they appear on every page.
 
 ### Using translations in components
 
