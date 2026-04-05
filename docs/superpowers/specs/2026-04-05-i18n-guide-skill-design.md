@@ -48,6 +48,15 @@ Evaluated top-to-bottom, first match wins:
 
 After presenting the recommendation with a one-paragraph rationale, immediately invoke the matching setup skill (`lingui-setup` or `next-intl-setup`). No confirmation step — the setup skill's own guided/unguided mode and incompatibility checks provide the safety net.
 
+## Setup Skill Trigger Changes
+
+Since all skills coexist, generic triggers must be moved from setup skills to this guide skill:
+
+- **`lingui-setup`**: Remove generic phrases ("add localization", "i18n", "translations", "multi-language support") from description. Keep only: "LinguiJS", "Lingui", "@lingui", and explicit library references.
+- **`next-intl-setup`**: Remove generic phrases. Keep only: "next-intl" and explicit library references.
+
+This ensures generic intent ("add i18n") routes through the guide, while library-specific intent ("set up lingui") goes directly to the setup skill.
+
 ## Skill Structure
 
 ```
