@@ -1,17 +1,13 @@
 ---
 name: lingui-setup
 description: >-
-  Set up LinguiJS internationalization (i18n) in any React-based project. Use this skill
-  whenever the user asks to add localization, internationalization, i18n, translations, or
-  multi-language support to a React app — whether it's a Vite SPA, Next.js (App Router or
-  Pages Router), TanStack Router, React Router, or any other React setup. Also use when
-  the user mentions LinguiJS, Lingui, @lingui, or asks "how do I add translations" or
-  "make my app support multiple languages." Also trigger on general translation intent such
-  as "I want to translate my app", "I want my app to be available in more languages",
-  "make my app multilingual", "add language support", or any request about translating,
-  localizing, or internationalizing an application. This skill handles the full setup: package
-  installation, config file, build tool integration, provider wiring, and locale scaffolding.
-  It does NOT cover converting existing strings to macros — that's a separate concern.
+  Set up LinguiJS internationalization in a React-based project. Use this skill when the
+  user explicitly mentions LinguiJS, Lingui, or @lingui — or when the i18n-guide skill
+  hands off to it after recommending LinguiJS. Supports Vite SPA, Next.js (App Router or
+  Pages Router), TanStack Router, React Router, or any other React setup. This skill
+  handles the full setup: package installation, config file, build tool integration,
+  provider wiring, and locale scaffolding. It does NOT cover converting existing strings
+  to macros — that's a separate concern (lingui-translate).
 ---
 
 # LinguiJS Setup

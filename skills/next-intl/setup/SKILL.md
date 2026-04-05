@@ -2,13 +2,11 @@
 name: next-intl-setup
 description: >-
   Set up next-intl internationalization in a Next.js project. Use this skill
-  when the user asks to add localization, i18n, translations, or multi-language
-  support to a Next.js app — whether App Router or Pages Router. Also trigger
-  on mentions of next-intl, or general translation intent like "translate my
-  Next.js app", "add language support", "make my app multilingual". This skill
-  handles the full setup: package installation, routing config, middleware,
-  provider wiring, and message file scaffolding. It does NOT cover converting
-  existing strings — that's next-intl-translate.
+  when the user explicitly mentions next-intl — or when the i18n-guide skill
+  hands off to it after recommending next-intl. Supports both App Router and
+  Pages Router. This skill handles the full setup: package installation,
+  routing config, middleware, provider wiring, and message file scaffolding.
+  It does NOT cover converting existing strings — that's next-intl-translate.
 ---
 
 # next-intl Setup
