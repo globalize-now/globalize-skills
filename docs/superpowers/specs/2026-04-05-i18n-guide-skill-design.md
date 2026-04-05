@@ -32,12 +32,10 @@ Evaluated top-to-bottom, first match wins:
 
 2. **Already has an i18n library installed** → STOP: "Project already uses `{library}`. If it needs configuration, run the matching setup skill."
 
-3. **Next.js App Router** → Recommend **next-intl**.
-   Rationale: "next-intl is purpose-built for Next.js App Router with first-class RSC support, middleware-based locale routing, and type-safe message keys."
+3. **Next.js (App Router or Pages Router)** → Recommend **next-intl**.
+   Rationale: "next-intl supports both App Router and Pages Router, with first-class RSC support on App Router and built-in i18n routing on Pages Router."
 
-4. **Next.js Pages Router** → STOP: "No supported skill covers Next.js Pages Router yet."
-
-5. **Vite / CRA / other React SPA** → Recommend **lingui**.
+4. **Vite / CRA / other React SPA** → Recommend **lingui**.
    Rationale: "LinguiJS is a compile-time i18n framework that extracts messages at build time, producing zero-runtime-overhead translations with ICU MessageFormat support."
 
 ### Edge cases
@@ -61,7 +59,7 @@ No `references/` directory needed — the logic is simple enough for a single fi
 
 ## Verification
 
-1. Install the skill into a Next.js App Router project → should recommend next-intl and hand off to next-intl-setup
+1. Install the skill into a Next.js project (App or Pages Router) → should recommend next-intl and hand off to next-intl-setup
 2. Install into a Vite + React project → should recommend lingui and hand off to lingui-setup
 3. Install into a project with `react-intl` already in deps → should stop with "already uses react-intl"
 4. Install into a non-React project (e.g., plain Node.js) → should stop with "not supported"
