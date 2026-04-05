@@ -34,7 +34,53 @@ Follow these steps in order. Each builds on the last.
 | 8. CI/CD | **Modifies existing file** | Changes build script — **optional, ask first** |
 | 9. Tests | Additive | New test wrapper file — **optional, ask first** |
 
-**RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.**
+**RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.** _(This rule is modified by the setup mode chosen below.)_
+
+---
+
+## Setup Mode
+
+After Step 1 (detection) completes without blockers, ask the user:
+
+> **How would you like to proceed with the setup?**
+> 1. **Guided** — I'll explain each step before and after, and you'll confirm changes to existing files.
+> 2. **Unguided** — I'll run all steps without pausing and show a full summary at the end. Optional steps (CI/CD, test setup) will be included — tell me now if you'd like to skip any.
+
+### Guided mode rules
+
+- **Before each step**: briefly explain what will happen and why.
+- **After each step**: summarize what changed (files created, files modified, commands run).
+- Consent gates for "Modifies existing file" steps still apply — describe the exact change and wait for confirmation.
+- Optional steps still prompt the user ("Would you like me to...").
+
+### Unguided mode rules
+
+- Execute all steps without pausing for per-step explanations or confirmations.
+- Consent gates for "Modifies existing file" steps are **suspended** — proceed with the modification without asking.
+- Hard stops (incompatibility checks in Step 1) still halt execution — these are never skipped.
+- Required user choices (marked with "MUST wait for the user to choose") still require input — collect these immediately after mode selection (see below).
+- Optional steps (CI/CD, test setup) are **included by default** unless the user excluded them.
+- At the end, produce a summary:
+
+```
+## Setup Complete
+
+### What was done
+- [x] Step N: {step name} — {one-line description}
+
+### Files created
+- path/to/file
+
+### Files modified
+- path/to/file — {what changed}
+
+### Next steps
+- {recommendations}
+```
+
+#### Required choices in unguided mode
+
+If the project uses file-based routing, the **locale routing strategy** choice (from the variant reference file) must be presented immediately after mode selection. Collect the answer before proceeding with Step 2.
 
 ---
 
@@ -71,6 +117,8 @@ Based on the detection, pick the right variant reference file:
 - **Vite + Babel** → read `references/vite-babel.md`
 
 Then continue with Steps 2-8 below, using the variant-specific instructions from the reference file for Steps 4 and 5.
+
+If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
 
 ---
 

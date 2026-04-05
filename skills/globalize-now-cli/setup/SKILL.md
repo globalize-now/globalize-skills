@@ -17,6 +17,42 @@ Follow these steps in order.
 
 ---
 
+## Setup Mode
+
+After Step 1 (detection) completes without blockers, ask the user:
+
+> **How would you like to proceed with the setup?**
+> 1. **Guided** — I'll explain each step before and after.
+> 2. **Unguided** — I'll run all steps without pausing and show a full summary at the end.
+
+### Guided mode rules
+
+- **Before each step**: briefly explain what will happen and why.
+- **After each step**: summarize what changed (files installed, config created, commands run).
+
+### Unguided mode rules
+
+- Execute all steps without pausing for per-step explanations.
+- Hard stops (e.g., Node.js not found) still halt execution — these are never skipped.
+- The interactive `auth login` step still requires the user to run it themselves — this cannot be automated regardless of mode.
+- At the end, produce a summary:
+
+```
+## Setup Complete
+
+### What was done
+- [x] Step N: {step name} — {one-line description}
+
+### Next steps
+- {recommendations}
+```
+
+#### Required choices in unguided mode
+
+No required choices. Proceed immediately after mode selection.
+
+---
+
 ## Step 1: Detect the Environment
 
 Check the following before proceeding:
@@ -28,6 +64,8 @@ Check the following before proceeding:
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
 
 If authentication is already configured, skip to Step 3 to verify.
+
+If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
 
 ---
 
