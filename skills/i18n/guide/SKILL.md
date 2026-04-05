@@ -21,7 +21,7 @@ This skill detects the project's stack, recommends the best-supported i18n libra
 
 ## Step 1: Detect the Project
 
-Read the nearest `package.json` (closest to the working directory) and inspect the project structure.
+Read the nearest `package.json` (closest to the working directory) and inspect the project structure. If no `package.json` is found, **STOP** — tell the user: "This guide covers JavaScript/TypeScript projects. No `package.json` found."
 
 | Signal | How to detect |
 |--------|--------------|
@@ -37,11 +37,11 @@ Read the nearest `package.json` (closest to the working directory) and inspect t
 
 Evaluate these hard stops top-to-bottom. If any applies, stop immediately — do not proceed to Step 3.
 
-1. **Not a React project** — no `react` in deps or devDeps.
+1. **Not a React project** — no `react` in deps or devDeps (or a non-React framework like `vue`, `svelte`, `@angular/core`, or `solid-js` is the primary dependency).
    **STOP.** Tell the user: "No supported i18n skill for this stack yet. This guide currently covers React-based projects."
 
 2. **Already has an i18n library installed** — any of `@lingui/core`, `@lingui/react`, `next-intl`, `react-intl`, `i18next`, `react-i18next` found in deps or devDeps.
-   **STOP.** Tell the user: "This project already uses `{library}`. If it needs configuration, run the matching setup skill directly."
+   **STOP.** Tell the user: "This project already uses `{library}`. To wrap existing strings, run the matching translate skill (e.g., `lingui-translate` or `next-intl-translate`). If setup is incomplete, run the matching setup skill directly."
 
 ---
 
@@ -73,7 +73,7 @@ Present this rationale to the user:
 
 ## Step 4: Hand Off to the Setup Skill
 
-After presenting the recommendation, immediately invoke the matching setup skill. Do not ask for confirmation — the setup skill's own guided/unguided mode provides the gate.
+After presenting the recommendation, proceed to the matching setup skill. The setup skill will offer guided or unguided mode before making any changes.
 
 | Recommendation | Skill to invoke |
 |----------------|----------------|
