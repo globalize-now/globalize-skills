@@ -50,7 +50,23 @@ Then continue with the steps below.
 
 ---
 
-## Step 3: Macro Decision Tree
+## Step 3: Detect App Domain
+
+Before wrapping strings, understand what the app does — this directly affects comment quality. A word like "Track" needs different comments in a music app vs. a shipping app.
+
+1. **Infer** the domain from signals already available:
+   - `package.json` `description` field
+   - README first paragraph
+   - Route and page names (e.g., `/checkout`, `/patients`, `/fleet`)
+   - Component names (e.g., `ParkingSpotCard`, `PatientList`)
+
+2. **Confirm** with the user: *"This looks like a [parking management app]. I'll use this to write better translator comments — for example, 'Park' will get a comment clarifying it means a parking area, not a nature park. Is that right?"*
+
+3. **Carry forward** the domain as context for the rest of the workflow. No config file — just context for this session.
+
+---
+
+## Step 4: Macro Decision Tree
 
 Choose the right macro for each situation:
 
@@ -151,7 +167,7 @@ const message = t`Hello, ${user.name}!`
 
 ---
 
-## Step 4: Localization Gap Detection
+## Step 5: Localization Gap Detection
 
 Scan files systematically for these patterns. Apply the confidence tiers to decide what to flag.
 
@@ -198,7 +214,7 @@ Review these and translate only if they appear in the actual UI:
 
 ---
 
-## Step 5: Plurals, Select, and ICU MessageFormat
+## Step 6: Plurals, Select, and ICU MessageFormat
 
 ICU MessageFormat handles plurals, gender selection, and other locale-sensitive patterns. This is the most commonly misused feature — get it right the first time.
 
@@ -329,18 +345,39 @@ For nested ICU (e.g. plural inside select), use ICU syntax in `<Trans>` — the 
 
 ---
 
-## Step 6: Translator Comments and Context
+## Step 7: Translator Comments and Context
 
 Ambiguous strings are a top source of translation quality issues. Lingui provides two mechanisms to help translators: **comments** (informational notes) and **context** (disambiguation that generates different message IDs).
 
-### When to add a comment
+### Ambiguity checklist
 
-Add a `comment` whenever a string would be ambiguous to a translator seeing it in a PO file without surrounding code:
+Run this checklist against each string during wrapping. If a string matches a "must" or "should" rule, add a `comment` in the same edit — don't plan to come back later.
 
-- Short, generic words: "Save", "Home", "Post", "Run", "Clear"
-- Strings with placeholders where the meaning isn't obvious: `Hello, {name}!` — is `name` a person's name or a project name?
-- UI-specific terms: "Toast", "Drawer", "Badge" — could be interpreted literally
-- Action labels that depend on context: "Remove" — remove what?
+**Must comment** (always add):
+
+- **Single words or two-word phrases** that could have multiple meanings in the source language. The test: *could a translator read this word differently without seeing the UI?*
+- **Action labels without a visible object**: "Remove", "Add", "Delete" — the comment should say what is being acted on (e.g., "Remove item from cart")
+- **Strings with placeholders where the placeholder meaning isn't obvious**: `{count} remaining` — remaining what? `Hello, {name}` — is name a person, a project, a pet?
+- **Domain-sensitive terms**: words whose meaning depends on the app's domain (detected in Step 3). E.g., in a music app, "Track" means a song; in a shipping app, it means package tracking.
+
+**Should comment** (add unless meaning is obvious from surrounding message):
+
+- **UI jargon** that a translator might read literally: "Toast", "Drawer", "Badge", "Chip", "Popover"
+- **Abbreviations and acronyms** shown to users that may not have universal equivalents across languages
+- **Sentence fragments**: "and {count} more", "Updated {timeAgo}" — the comment should give the full sentence context
+
+**Skip** (no comment needed):
+
+- **Full sentences with clear meaning**: a complete thought that leaves little room for misinterpretation
+- **Strings where the surrounding message makes context obvious**: `one="# item" other="# items"` inside a Plural
+- **Labels that match their form field name**: `<label>Email</label>` next to an email input
+
+### Comment quality rules
+
+- Describe **where it appears and what it refers to**, not what the word means in the source language. Bad: `"Save — means to store"`. Good: `"Save button in document editor toolbar"`.
+- Keep under 80 characters. One short sentence.
+- If the app domain is known (Step 3), reference it when relevant. Good: `"Park — a parking spot, not a nature park"`.
+- Write comments in the source language (the same language as the string being commented on).
 
 ### `comment` prop on `<Trans>`
 
@@ -419,7 +456,7 @@ You do not need to add domain prefixes (like `auth.login` or `dashboard.alerts`)
 
 ---
 
-## Step 7: Workflow
+## Step 8: Workflow
 
 Work file-by-file in this priority order:
 
@@ -434,6 +471,8 @@ Within each file, handle in this order:
 3. Non-JSX strings in functions → use `t` from appropriate import
 4. Numbers, currencies, dates → use `i18n.number()` and `i18n.date()`
 
+**For each string**, run the ambiguity checklist from Step 7 and add the `comment` prop/field in the same edit if the string matches a "must" or "should" rule. Do not wrap first and add comments later — they go in together.
+
 After wrapping all strings:
 
 1. Run `npx lingui extract --clean` — verify all new messages appear in the catalog and there are no extraction errors
@@ -442,3 +481,16 @@ After wrapping all strings:
 4. Run existing tests — if tests fail with missing context errors or rendering issues, wrap test renders with a `LinguiTestWrapper` that provides `I18nProvider` with an empty catalog (see `lingui-setup` Step 9). The common fix: add `{ wrapper: LinguiTestWrapper }` to `render()` calls.
 
 If extraction finds messages you didn't intend to extract (e.g., internal strings wrapped by mistake), unwrap them and re-run.
+
+---
+
+## Step 9: Comment Review Pass
+
+After all strings are wrapped and extraction succeeds, do a final pass to catch missed comments.
+
+1. Scan the extracted PO file(s) for entries that have **no `#.` comment line** and match any "must comment" heuristic from Step 7 (single/two-word messages, action labels without objects, domain-sensitive terms)
+2. For each flagged entry, go back to the source file and add the `comment` prop/field
+3. If a `t` template literal needs a comment, convert it to object form: `` t`Save` `` → `t({ message: `Save`, comment: "..." })`
+4. Re-run `npx lingui extract` to verify comments appear in the catalog
+
+This pass catches strings that looked clear in source code but appear ambiguous in isolation in the PO file — which is how translators actually see them. Do not add comments to every string — full sentences with clear meaning still get skipped. Do not second-guess existing comments.

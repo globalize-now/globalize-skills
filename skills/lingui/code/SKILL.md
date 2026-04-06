@@ -227,7 +227,39 @@ Skip these — wrapping them would cause false extractions:
 
 ## Translator comments
 
-Add a `comment` when the string is ambiguous out of context — short generic words ("Save", "Post", "Home"), action labels, or strings with non-obvious placeholders.
+Before finishing any string wrap, run this checklist. If the string matches a "must" or "should" rule, add the `comment` inline — don't leave it for later.
+
+If the app's domain is known from context (prior conversation, CLAUDE.md, or obvious from surrounding code), use it to inform comment decisions.
+
+### Ambiguity checklist
+
+**Must comment** (always add):
+
+- **Single words or two-word phrases** that could have multiple meanings in the source language. The test: *could a translator read this word differently without seeing the UI?*
+- **Action labels without a visible object**: "Remove", "Add", "Delete" — the comment should say what is being acted on (e.g., "Remove item from cart")
+- **Strings with placeholders where the placeholder meaning isn't obvious**: `{count} remaining` — remaining what? `Hello, {name}` — is name a person, a project, a pet?
+- **Domain-sensitive terms**: words whose meaning depends on the app's domain. E.g., in a music app, "Track" means a song; in a shipping app, it means package tracking.
+
+**Should comment** (add unless meaning is obvious from surrounding message):
+
+- **UI jargon** that a translator might read literally: "Toast", "Drawer", "Badge", "Chip", "Popover"
+- **Abbreviations and acronyms** shown to users that may not have universal equivalents across languages
+- **Sentence fragments**: "and {count} more", "Updated {timeAgo}" — the comment should give the full sentence context
+
+**Skip** (no comment needed):
+
+- **Full sentences with clear meaning**: a complete thought that leaves little room for misinterpretation
+- **Strings where the surrounding message makes context obvious**: `one="# item" other="# items"` inside a Plural
+- **Labels that match their form field name**: `<label>Email</label>` next to an email input
+
+### Comment quality rules
+
+- Describe **where it appears and what it refers to**, not what the word means in the source language. Bad: `"Save — means to store"`. Good: `"Save button in document editor toolbar"`.
+- Keep under 80 characters. One short sentence.
+- If the app domain is known, reference it when relevant. Good: `"Park — a parking spot, not a nature park"`.
+- Write comments in the source language (the same language as the string being commented on).
+
+### `comment` syntax
 
 ```tsx
 <Trans comment="Main navigation link, not the building">Home</Trans>
@@ -235,9 +267,14 @@ Add a `comment` when the string is ambiguous out of context — short generic wo
 const items = [
   { label: msg({ message: `Save`, comment: "Save document button" }), href: '/save' },
 ]
+
+const { t } = useLingui()
+const label = t({ message: `Clear`, comment: "Clear search input field" })
 ```
 
-Use `context` when the same English text needs different translations in different places:
+### `context` for disambiguation
+
+Use `context` when the same source text needs **different translations** in different places. Unlike `comment`, `context` affects the generated message ID — the same text with different contexts becomes two separate catalog entries.
 
 ```tsx
 <Trans context="direction">Right</Trans>
