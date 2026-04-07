@@ -20,9 +20,10 @@ export async function createRepository(
   provider: "github" | "gitlab",
   branches?: string[],
   localePathPattern?: string,
+  githubInstallationId?: string,
 ) {
   const { data, error, response } = await client.POST("/api/repositories", {
-    body: { projectId, gitUrl, provider, branches, localePathPattern },
+    body: { projectId, gitUrl, provider, branches, localePathPattern, githubInstallationId },
   });
   if (error) throw new Error(extractError(response, error));
   return data;
@@ -67,6 +68,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .addOption(new Option("--provider <provider>", "Git provider").choices(["github", "gitlab"]).makeOptionMandatory())
     .option("--branches <branches...>", "Branches to track")
     .option("--locale-path-pattern <pattern>", "Locale path pattern")
+    .option("--github-installation-id <id>", "GitHub App installation ID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
@@ -79,6 +81,7 @@ export function register(group: Command, getClient: ClientFactory): void {
             cmdOpts.provider,
             cmdOpts.branches,
             cmdOpts.localePathPattern,
+            cmdOpts.githubInstallationId,
           ),
           opts,
         );

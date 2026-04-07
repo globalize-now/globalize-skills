@@ -69,29 +69,99 @@ Parse the returned JSON to extract the **project ID**.
 
 ### 2c. Connect the repository
 
-First, get the git remote URL:
+First, get the git remote URL and determine the provider:
 
 ```bash
 git remote get-url origin
 ```
 
-Then create the repository connection:
+**Parse the URL** to determine the provider:
+- If the URL contains `github.com` (HTTPS or SSH), this is a **GitHub** repo. Extract `<OWNER>` and `<REPO>` from the URL:
+  - HTTPS: `https://github.com/<OWNER>/<REPO>.git`
+  - SSH: `git@github.com:<OWNER>/<REPO>.git`
+- Otherwise (e.g., `gitlab.com`), use the **non-GitHub flow** below.
+
+#### GitHub repos — GitHub App flow
+
+For GitHub repos, Globalize uses a GitHub App to access repository contents. Follow these sub-steps:
+
+**1. Check for existing GitHub App installations:**
+
+```bash
+npx @globalize-now/cli-client github installations --json
+```
+
+This returns an array of installations. Each has an `id` and an `account` with `login` (the GitHub org or user name).
+
+**2. Match installation to repo owner:**
+
+Look for an installation whose `account.login` matches `<OWNER>` (case-insensitive).
+
+- **Match found** → use its `id` as `<INSTALLATION_ID>`, skip to sub-step 4.
+- **No match** → proceed to sub-step 3.
+
+**3. Install the GitHub App (interactive):**
+
+```bash
+npx @globalize-now/cli-client github install --json
+```
+
+This opens the user's browser to install the Globalize GitHub App. The command polls for completion (up to 5 minutes) and returns the `installationId` when done.
+
+> **Note:** This step requires user interaction in the browser. Tell the user the browser will open and they need to select the correct GitHub account/org and approve the installation.
+
+After completion, run `github installations --json` again to find the `<INSTALLATION_ID>` for the target owner.
+
+**4. Verify repo access:**
+
+```bash
+npx @globalize-now/cli-client github repos --installation-id <INSTALLATION_ID> --json
+```
+
+Confirm that `<OWNER>/<REPO>` appears in the returned list. If not, the GitHub App may not have access to this specific repository — inform the user they need to adjust the installation's repository access settings on GitHub.
+
+**5. Connect the repository:**
 
 ```bash
 npx @globalize-now/cli-client repositories create \
   --project-id <PROJECT_ID> \
   --git-url <GIT_URL> \
   --provider github \
+  --github-installation-id <INSTALLATION_ID> \
   --json
 ```
 
-`--provider` must be `github` or `gitlab`. Optional flags: `--branches <branches...>` to track specific branches, `--locale-path-pattern <pattern>` to specify where locale files live.
+Parse the returned JSON to extract the **repository ID**.
+
+#### Non-GitHub repos (GitLab, etc.)
+
+```bash
+npx @globalize-now/cli-client repositories create \
+  --project-id <PROJECT_ID> \
+  --git-url <GIT_URL> \
+  --provider gitlab \
+  --json
+```
 
 Parse the returned JSON to extract the **repository ID**.
 
+#### Common options for both flows
+
+`--branches <branches...>` to track specific branches, `--locale-path-pattern <pattern>` to specify where locale files live.
+
 ### 2d. Detect repository configuration
 
-Auto-discover locale file patterns in the connected repository:
+For **GitHub repos**, you can detect i18n structure via the GitHub App (useful for pre-populating `--locale-path-pattern` on the `repositories create` call):
+
+```bash
+npx @globalize-now/cli-client github detect \
+  --installation-id <INSTALLATION_ID> \
+  --owner <OWNER> \
+  --repo <REPO> \
+  --json
+```
+
+Alternatively (or additionally), auto-discover from the connected repository:
 
 ```bash
 npx @globalize-now/cli-client repositories detect \
@@ -262,9 +332,14 @@ npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID
 | `project-languages add` | `--project-id`, `--name`, `--locale` | `--language-id` |
 | `project-languages remove` | `--project-id`, `--language-id` | |
 | `repositories list` | `--project-id` | |
-| `repositories create` | `--project-id`, `--git-url`, `--provider` | `--branches`, `--locale-path-pattern` |
+| `repositories create` | `--project-id`, `--git-url`, `--provider` | `--branches`, `--locale-path-pattern`, `--github-installation-id` |
 | `repositories delete` | `--id` | |
 | `repositories detect` | `--id` | |
+| `github install` | *(interactive)* | |
+| `github installations` | | |
+| `github repos` | `--installation-id` | |
+| `github branches` | `--installation-id`, `--owner`, `--repo` | |
+| `github detect` | `--installation-id`, `--owner`, `--repo` | |
 | `glossary list` | `--project-id` | |
 | `glossary create` | `--project-id`, `--source-term`, `--target-term`, `--source-language-id`, `--target-language-id` | |
 | `glossary delete` | `--project-id`, `--entry-id` | |
@@ -285,6 +360,7 @@ npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID
 - **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability.
 - **IDs are UUIDs**: All `--id`, `--project-id`, `--org-id`, etc. expect UUID values returned from prior create/list commands. Always capture these from JSON responses.
 - **Project language IDs vs global language IDs**: Glossary (`--source-language-id`, `--target-language-id`) and style guide (`--language-id`) commands use _project language_ UUIDs — the ID of a language within a specific project. Get these from `project-languages list`, not `languages list`.
+- **GitHub App required for GitHub repos**: When connecting a GitHub repository, use the GitHub App flow (`github installations` / `github install`) to obtain an `installationId` and pass it via `--github-installation-id` on `repositories create`. Without this, Globalize cannot access repo contents. The `github install` command opens a browser — the user must complete the approval interactively.
 - **Repository providers**: `--provider` only accepts `github` or `gitlab`.
 - **Validate languages before project creation**: Always fetch `languages list --json` and match the user's desired locales against the catalog. Use the returned UUIDs for `--source-language` and `--target-languages` — do not pass raw locale codes. Inform the user about any unsupported languages that have no catalog match.
 - **Auth in non-interactive contexts**: The CLI does not fall back to interactive login when there's no TTY. Ensure `GLOBALIZE_API_KEY` is set or `~/.globalize/config.json` exists.
