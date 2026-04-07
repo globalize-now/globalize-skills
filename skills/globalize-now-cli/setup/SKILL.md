@@ -34,7 +34,6 @@ After Step 1 (detection) completes without blockers, ask the user:
 
 - Execute all steps without pausing for per-step explanations.
 - Hard stops (e.g., Node.js not found) still halt execution — these are never skipped.
-- The interactive `auth login` step still requires the user to run it themselves — this cannot be automated regardless of mode.
 - At the end, produce a summary:
 
 ```
@@ -93,7 +92,7 @@ The CLI resolves credentials in this order:
 
 1. **`GLOBALIZE_API_KEY` environment variable** — best for CI/CD
 2. **`~/.globalize/config.json` config file** — best for local development
-3. **Interactive login** — prompts the user to paste an API key
+3. **Interactive login** — browser-based device authorization flow
 
 ### If already authenticated
 
@@ -107,13 +106,19 @@ If this returns a valid `source` and `key`, authentication is already configured
 
 ### If not authenticated
 
-The `auth login` command is interactive — it prompts the user to paste an API key from [app.globalize.now/settings/api-keys](https://app.globalize.now/settings/api-keys). Since this requires stdin input, **tell the user to run it themselves**:
+Run the login command:
 
 ```bash
 npx @globalize-now/cli-client auth login
 ```
 
-The key is saved to `~/.globalize/config.json` for future use.
+This starts a device authorization flow:
+1. The CLI prints a **user code** and a **verification URL**
+2. In an interactive terminal, it opens the URL in the browser automatically
+3. In a non-interactive terminal (e.g. agent), it prints the URL for the user to visit
+4. The user approves in the browser, and the CLI automatically saves the API key to `~/.globalize/config.json`
+
+Show the verification URL to the user and ask them to approve in the browser. Once approved, the CLI saves the key automatically.
 
 ---
 

@@ -25,10 +25,14 @@ export function register(group: Command) {
       }
 
       console.log(`\nYour code: ${chalk.bold.cyan(device.user_code)}\n`);
-      console.log(`Opening ${chalk.cyan(device.verification_uri_complete)} in your browser…`);
-      console.log(chalk.dim("If the browser didn't open, visit the URL above manually.\n"));
 
-      openInBrowser(device.verification_uri_complete);
+      if (process.stdout.isTTY) {
+        console.log(`Opening ${chalk.cyan(device.verification_uri_complete)} in your browser…`);
+        console.log(chalk.dim("If the browser didn't open, visit the URL above manually.\n"));
+        openInBrowser(device.verification_uri_complete);
+      } else {
+        console.log(`Visit ${device.verification_uri_complete} to authorize.\n`);
+      }
 
       console.log(chalk.dim("Waiting for approval…"));
 
