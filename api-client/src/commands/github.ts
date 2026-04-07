@@ -25,11 +25,17 @@ export function register(group: Command, getClient: ClientFactory): void {
   group
     .command("install")
     .description("Install the GitHub App on a GitHub account or organisation")
-    .action(async (_cmdOpts, cmd) => {
+    .option("--no-wait", "Return the install URL and nonce immediately without polling for completion")
+    .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         const result = (await startGithubInstall(client)) as unknown as { url: string; nonce: string };
+
+        if (cmdOpts.wait === false) {
+          output(result, opts);
+          return;
+        }
 
         console.log(`\nOpening ${chalk.cyan(result.url)} in your browser…`);
         console.log(chalk.dim("If the browser didn't open, visit the URL above manually.\n"));
@@ -61,6 +67,21 @@ export function register(group: Command, getClient: ClientFactory): void {
             return;
           }
         }
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("install-status")
+    .description("Check the status of a GitHub App installation (single poll)")
+    .requiredOption("--nonce <nonce>", "Nonce returned from github install --no-wait")
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        const status = await pollGithubInstallStatus(client, cmdOpts.nonce);
+        output(status, opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }
