@@ -8,7 +8,7 @@ type ClientFactory = () => Promise<ApiClient>;
 export async function listLanguages(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/languages");
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function getLanguage(client: ApiClient, id: string) {
@@ -16,7 +16,7 @@ export async function getLanguage(client: ApiClient, id: string) {
     params: { path: { id } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export function register(group: Command, getClient: ClientFactory): void {

@@ -10,7 +10,7 @@ export async function listApiKeys(client: ApiClient, orgId: string) {
     params: { path: { orgId } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function createApiKey(client: ApiClient, orgId: string, name: string) {
@@ -19,7 +19,7 @@ export async function createApiKey(client: ApiClient, orgId: string, name: strin
     body: { name },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function revokeApiKey(client: ApiClient, orgId: string, keyId: string) {

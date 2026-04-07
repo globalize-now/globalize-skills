@@ -10,7 +10,7 @@ export async function listMembers(client: ApiClient, orgId: string) {
     params: { path: { orgId } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function inviteMember(client: ApiClient, orgId: string, clerkUserId: string, role?: "admin" | "member") {
@@ -19,7 +19,7 @@ export async function inviteMember(client: ApiClient, orgId: string, clerkUserId
     body: { clerkUserId, role },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function removeMember(client: ApiClient, orgId: string, membershipId: string) {

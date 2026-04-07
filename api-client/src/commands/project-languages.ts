@@ -10,7 +10,7 @@ export async function listProjectLanguages(client: ApiClient, projectId: string)
     params: { path: { id: projectId } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function addProjectLanguage(
@@ -25,7 +25,7 @@ export async function addProjectLanguage(
     body: { name, locale, languageId },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function removeProjectLanguage(client: ApiClient, projectId: string, languageId: string) {

@@ -8,7 +8,7 @@ type ClientFactory = () => Promise<ApiClient>;
 export async function listOrgs(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/orgs");
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function createOrg(client: ApiClient, name: string) {
@@ -16,7 +16,7 @@ export async function createOrg(client: ApiClient, name: string) {
     body: { name },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function deleteOrg(client: ApiClient, orgId: string) {

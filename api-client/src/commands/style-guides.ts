@@ -10,7 +10,7 @@ export async function listStyleGuides(client: ApiClient, projectId: string) {
     params: { path: { id: projectId } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function upsertStyleGuide(client: ApiClient, projectId: string, languageId: string, instructions: string) {
@@ -19,7 +19,7 @@ export async function upsertStyleGuide(client: ApiClient, projectId: string, lan
     body: { instructions },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function deleteStyleGuide(client: ApiClient, projectId: string, languageId: string) {

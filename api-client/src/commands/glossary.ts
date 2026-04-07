@@ -10,7 +10,7 @@ export async function listGlossary(client: ApiClient, projectId: string) {
     params: { path: { id: projectId } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function createGlossaryEntry(
@@ -26,7 +26,7 @@ export async function createGlossaryEntry(
     body: { sourceTerm, targetTerm, sourceProjectLanguageId, targetProjectLanguageId },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function deleteGlossaryEntry(client: ApiClient, projectId: string, entryId: string) {

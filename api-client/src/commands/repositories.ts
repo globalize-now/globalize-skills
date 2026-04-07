@@ -10,7 +10,7 @@ export async function listRepositories(client: ApiClient, projectId: string) {
     params: { query: { projectId } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function createRepository(
@@ -26,7 +26,7 @@ export async function createRepository(
     body: { projectId, gitUrl, provider, branches, localePathPattern, githubInstallationId },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function deleteRepository(client: ApiClient, id: string) {
@@ -42,7 +42,7 @@ export async function detectRepository(client: ApiClient, id: string) {
     params: { path: { id } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export function register(group: Command, getClient: ClientFactory): void {

@@ -8,7 +8,7 @@ type ClientFactory = () => Promise<ApiClient>;
 export async function listProjects(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/projects");
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function createProject(
@@ -21,7 +21,7 @@ export async function createProject(
     body: { name, sourceLanguage, targetLanguages },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function getProject(client: ApiClient, id: string) {
@@ -29,7 +29,7 @@ export async function getProject(client: ApiClient, id: string) {
     params: { path: { id } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function deleteProject(client: ApiClient, id: string) {

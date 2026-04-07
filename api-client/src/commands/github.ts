@@ -10,7 +10,7 @@ type ClientFactory = () => Promise<ApiClient>;
 export async function startGithubInstall(client: ApiClient) {
   const { data, error, response } = await client.POST("/api/github/cli-install");
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export async function pollGithubInstallStatus(client: ApiClient, nonce: string) {
@@ -18,7 +18,7 @@ export async function pollGithubInstallStatus(client: ApiClient, nonce: string) 
     params: { query: { nonce } },
   });
   if (error) throw new Error(extractError(response, error));
-  return data;
+  return data!;
 }
 
 export function register(group: Command, getClient: ClientFactory): void {
@@ -30,17 +30,17 @@ export function register(group: Command, getClient: ClientFactory): void {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
-        const result = (await startGithubInstall(client)) as unknown as { url: string; nonce: string };
+        const result = await startGithubInstall(client);
 
         if (cmdOpts.wait === false) {
           output(result, opts);
           return;
         }
 
-        console.log(`\nOpening ${chalk.cyan(result.url)} in your browser…`);
+        console.log(`\nOpening ${chalk.cyan(result.installUrl)} in your browser…`);
         console.log(chalk.dim("If the browser didn't open, visit the URL above manually.\n"));
 
-        openInBrowser(result.url);
+        openInBrowser(result.installUrl);
 
         console.log(chalk.dim("Waiting for GitHub App installation to complete…\n"));
 
@@ -56,12 +56,9 @@ export function register(group: Command, getClient: ClientFactory): void {
             return;
           }
 
-          const status = (await pollGithubInstallStatus(client, result.nonce)) as unknown as {
-            completed: boolean;
-            installationId?: string;
-          };
+          const status = await pollGithubInstallStatus(client, result.nonce);
 
-          if (status.completed) {
+          if (status.status === "completed") {
             console.log(chalk.green("GitHub App installed successfully."));
             output(status, opts);
             return;
