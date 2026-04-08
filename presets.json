@@ -1,7 +1,7 @@
 {
   "i18n-guide": {
     "description": "Not sure where to start? Detects your stack and recommends the right i18n library — includes all skills",
-    "skills": ["i18n-guide", "lingui-setup", "lingui-translate", "lingui-code", "next-intl-setup", "next-intl-translate", "css-i18n"]
+    "skills": ["i18n-guide", "lingui-setup", "lingui-translate", "lingui-code", "next-intl-setup", "next-intl-translate", "css-i18n", "globalize-now-cli-setup", "globalize-now-cli-use"]
   },
   "lingui": {
     "description": "All LinguiJS skills (setup, translate, code) plus CSS i18n",
