@@ -46,7 +46,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - [x] Step 3: Authenticate — {auth method}
 - [x] Step 4: Verify — {org name}
 - [x] Step 5: Create Project — "{name}" (source: {source}, targets: {targets})
-- [x] Step 6: Connect Repository — {owner/repo} connected
+- [x] Step 6: Connect Repository — {owner/repo} connected, locale pattern: {pattern or "not detected"}
 
 ### Warnings (if any)
 - {e.g., Uncommitted changes detected — i18n detection used remote code only}
@@ -63,6 +63,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - **Project name**: derived from the repo name (parsed from the git remote URL, e.g. `github.com/acme/my-app` → `my-app`) or the current directory name. Never ask.
 - **Source language**: detected from existing i18n config (`sourceLocale`, `defaultLocale`, `lng`). If not detected, default to `en`.
 - **Target languages**: detected from existing i18n config (remaining locales after excluding source). If not detected, ask the user.
+- **Locale path pattern**: detected from i18n config or directory structure (e.g., `locales/{locale}/{namespace}.json`). Falls back to server-side detection via `github detect` in Step 6. Never ask the user.
 
 If no localization setup is detected at all (non-localized project), ask the user for source and target languages before proceeding to Step 5.
 
@@ -101,6 +102,25 @@ Scan for known i18n config files to auto-detect source and target languages. Use
 **Source vs target**: The source language is the `sourceLocale` / `defaultLocale` / `lng` from config. All other locales in the list are target languages.
 
 If none of the above signals are found, record "no localization setup detected."
+
+### Locale path pattern
+
+During detection, also determine the **locale file path pattern** — a path template showing where locale files live. Supported placeholders and wildcards:
+
+- `{locale}` — locale code (required)
+- `{namespace}` — namespace name (optional, for multi-namespace setups)
+- `*` and `**` — wildcards for matching multiple files/directories
+
+| Source | How to derive the pattern |
+|--------|--------------------------|
+| **LinguiJS** (single catalog) | Read `catalogs[0].path` from config. Strip `<rootDir>/` prefix. Append `.po`. Example: `src/locales/{locale}/messages.po` |
+| **LinguiJS** (per-page catalogs) | Read `catalogs[0].path`. Replace `{entryDir}`/`{entryName}` with `**/*` wildcards, keep `{locale}`. Example: `src/app/{locale}/**/*.po` |
+| **next-intl** | Check `messages/` directory. Flat JSON files per locale → `messages/{locale}.json`. Subdirectories with multiple namespace files → `messages/{locale}/{namespace}.json` |
+| **i18next** | Read `backend.loadPath` from config. Replace `{{lng}}` → `{locale}`, `{{ns}}` → `{namespace}`. Example: `locales/{locale}/{namespace}.json` |
+| **react-intl** | No standard config key. Derive from directory scanning below. |
+| **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
+
+If no pattern can be determined locally, record as absent — Step 6 will attempt server-side detection.
 
 ### Detection outcomes
 
@@ -305,7 +325,21 @@ Confirm that `<OWNER>/<REPO>` appears in the returned list. If not:
 - Inform the user they need to update the installation's repository access settings on GitHub.
 - In unguided mode, note in summary and skip the connection step.
 
-### 6e. Connect the repository
+### 6e. Detect locale path pattern (if not already known)
+
+If Step 1 did not determine a locale path pattern, use the GitHub App to detect it server-side before connecting:
+
+```bash
+npx @globalize-now/cli-client github detect \
+  --installation-id <INSTALLATION_ID> \
+  --owner <OWNER> \
+  --repo <REPO> \
+  --json
+```
+
+The response includes `localePathPattern` (string or null), `discoveredFiles`, and `framework`. Use `localePathPattern` if present. If not, proceed without it — the flag is optional.
+
+### 6f. Connect the repository
 
 ```bash
 npx @globalize-now/cli-client repositories create \
@@ -313,12 +347,17 @@ npx @globalize-now/cli-client repositories create \
   --git-url <GIT_URL> \
   --provider github \
   --github-installation-id <INSTALLATION_ID> \
+  --locale-path-pattern "<LOCALE_PATH_PATTERN>" \
   --json
 ```
 
+If no locale path pattern was detected (neither in Step 1 nor in 6e), omit the `--locale-path-pattern` flag.
+
+In guided mode: if a pattern was detected, show it to the user and ask for confirmation before proceeding.
+
 Parse the returned JSON to extract the **repository ID**.
 
-### 6f. Detect i18n configuration
+### 6g. Detect i18n configuration
 
 After connecting, run detection to discover i18n patterns in the repository:
 
