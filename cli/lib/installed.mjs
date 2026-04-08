@@ -11,10 +11,15 @@ function readdirSafe(dir) {
   }
 }
 
-function detectClaude(targetDir) {
+function matchSkillName(base, availableSkillNames) {
+  if (availableSkillNames.has(base)) return base;
+  return [...availableSkillNames].find((skill) => base.startsWith(skill + "-")) ?? null;
+}
+
+function detectClaude(targetDir, availableSkillNames) {
   const dir = path.join(targetDir, ".claude", "skills");
-  return readdirSafe(dir).filter((name) =>
-    fs.existsSync(path.join(dir, name, "SKILL.md"))
+  return readdirSafe(dir).filter(
+    (name) => availableSkillNames.has(name) && fs.existsSync(path.join(dir, name, "SKILL.md")),
   );
 }
 
@@ -23,23 +28,15 @@ function detectCodex(targetDir, availableSkillNames) {
   const names = new Set();
   for (const file of readdirSafe(dir)) {
     if (!file.endsWith(".md")) continue;
-    const fullPath = path.join(dir, file);
     let content;
     try {
-      content = fs.readFileSync(fullPath, "utf8");
+      content = fs.readFileSync(path.join(dir, file), "utf8");
     } catch {
       continue;
     }
     if (!content.startsWith(CODEX_HEADER)) continue;
-    const base = file.slice(0, -3);
-    if (availableSkillNames.has(base)) {
-      names.add(base);
-    } else {
-      const matched = [...availableSkillNames].find(
-        (skill) => base === skill || base.startsWith(skill + "-")
-      );
-      if (matched) names.add(matched);
-    }
+    const matched = matchSkillName(file.slice(0, -3), availableSkillNames);
+    if (matched) names.add(matched);
   }
   return [...names];
 }
@@ -49,15 +46,8 @@ function detectCursor(targetDir, availableSkillNames) {
   const names = new Set();
   for (const file of readdirSafe(dir)) {
     if (!file.endsWith(".mdc")) continue;
-    const base = file.slice(0, -4);
-    if (availableSkillNames.has(base)) {
-      names.add(base);
-    } else {
-      const matched = [...availableSkillNames].find(
-        (skill) => base.startsWith(skill + "-")
-      );
-      if (matched) names.add(matched);
-    }
+    const matched = matchSkillName(file.slice(0, -4), availableSkillNames);
+    if (matched) names.add(matched);
   }
   return [...names];
 }
@@ -65,7 +55,7 @@ function detectCursor(targetDir, availableSkillNames) {
 export function detectInstalledSkills(targetDir, { availableSkillNames }) {
   const skillSet = availableSkillNames instanceof Set ? availableSkillNames : new Set(availableSkillNames);
   return new Set([
-    ...detectClaude(targetDir),
+    ...detectClaude(targetDir, skillSet),
     ...detectCodex(targetDir, skillSet),
     ...detectCursor(targetDir, skillSet),
   ]);
