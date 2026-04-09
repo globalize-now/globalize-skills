@@ -1,6 +1,6 @@
 {
   "name": "globalize-skills",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Install globalization skills for AI coding agents",
   "type": "module",
   "bin": {
