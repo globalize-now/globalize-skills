@@ -370,6 +370,26 @@ Use nested objects and dot notation for related groups: `useTranslations('Auth.l
 
 ## Step 7: Workflow
 
+### 7.0 Discovery and Scale Assessment
+
+Before wrapping strings, scan the project to determine scope:
+
+1. **Glob** for all `.tsx`, `.ts`, `.jsx`, `.js` files under the source directories. Exclude `node_modules`, test files (`*.test.*`, `*.spec.*`, `__tests__/`), config files (`*.config.*`), and type declarations (`.d.ts`).
+2. **Quick-grep** each file for translatable string indicators:
+   - Bare JSX text: lines with `>Some text<` patterns (text between JSX tags not wrapped in `{`)
+   - User-visible attributes with string literals: `placeholder="`, `aria-label="`, `title="`, `alt="`
+   - String concatenation near JSX: `"text" +` or `+ "text"` patterns
+3. **Build a candidate file list** — files with at least one match, sorted by match count (descending).
+4. **Decide the processing path:**
+   - **15 files or fewer** → proceed to [7.1 Sequential Processing](#71-sequential-processing)
+   - **More than 15 files** → proceed to [7.2 Parallel Processing](#72-parallel-processing)
+
+---
+
+### 7.1 Sequential Processing
+
+Use this path for small-to-medium projects (15 files or fewer).
+
 Work file-by-file in this priority order:
 
 1. **Layout and shell components** (navbar, sidebar, footer) — highest reuse, translate first
@@ -409,6 +429,117 @@ If the Client Component needs many translations or handles dynamic content, use 
 1. **Check all locale files have the same keys** — every key in `messages/en.json` must exist in `messages/de.json`, `messages/fr.json`, etc. Missing keys will cause runtime warnings.
 2. **Run the dev server** — verify no missing key warnings in the console. next-intl logs warnings for missing messages by default.
 3. **Run existing tests** — if tests fail with missing provider errors, ensure the test setup wraps components with `NextIntlClientProvider`:
+   ```tsx
+   import {NextIntlClientProvider} from 'next-intl';
+
+   function renderWithIntl(ui: React.ReactElement, messages = {}) {
+     return render(
+       <NextIntlClientProvider locale="en" messages={messages}>
+         {ui}
+       </NextIntlClientProvider>
+     );
+   }
+   ```
+   The common fix: wrap test renders with `NextIntlClientProvider` providing `locale` and `messages` props.
+
+---
+
+### 7.2 Parallel Processing
+
+Use this path for large projects (more than 15 files). The work is partitioned across subagents that run in parallel. Subagents only edit source files — message JSON files are updated in a merge step after all subagents complete.
+
+#### Partition the files
+
+1. **Group** candidate files by directory subtree (e.g., `app/dashboard/**`, `components/shared/**`, `lib/**`).
+2. **Order within each group** by priority: layout/shell files first, then shared components, then page components, then utilities.
+3. **Balance the groups** — merge groups with fewer than 3 files into the nearest neighbor group. Split groups with more than 15 files.
+4. **Target 3–5 partitions** total.
+
+#### Pre-assign namespaces
+
+Before dispatching subagents:
+
+1. Read the existing namespace structure from the source locale message file (e.g., `messages/en.json`).
+2. Map each partition's directories to namespaces using the naming conventions from Step 6.
+3. Assign each partition a list of namespaces it owns. If a namespace doesn't exist yet, include it in the assignment for the partition whose files will use it.
+4. The `Common` namespace (shared strings) should be assigned to the partition that contains shared components. Other partitions that need a common string should create a feature-specific key instead — duplicates are resolved in the merge step.
+
+#### Dispatch subagents
+
+Use the **Agent tool** to dispatch all partitions in a **single message** (this launches them in parallel). Each subagent receives a prompt assembled from this template:
+
+```
+You are wrapping hardcoded UI strings with next-intl translation functions in a Next.js project.
+
+## Project Context
+- Router: {App Router / Pages Router}
+- TypeScript: {yes/no}
+
+## API Decision Tree
+- Server Component (no 'use client', in app/ directory) → getTranslations(namespace) from next-intl/server (async, must await)
+- Client Component ('use client' directive) → useTranslations(namespace) from next-intl (hook)
+- Pages Router → always useTranslations(namespace) from next-intl
+- Formatting: Server → getFormatter() from next-intl/server, Client → useFormatter() from next-intl
+- Locale: Server → getLocale() from next-intl/server, Client → useLocale() from next-intl
+
+## Your Namespace Assignment
+You own these namespaces: {list of namespaces}
+Existing namespace structure:
+{JSON snippet of current messages/en.json relevant to this partition's namespaces}
+
+Namespace rules:
+- PascalCase names matching the component domain (HomePage, Navigation, Common, Auth)
+- Sub-namespaces via dot notation: useTranslations('Auth.login')
+- Add keys under your assigned namespaces only
+
+## Reference File
+Read `{path to reference file — e.g., references/nextjs-app-router.md}` for framework-specific patterns before you start wrapping.
+
+## Your Files (process in this order)
+{numbered list of file paths with their category — e.g.:
+1. src/components/layout/Navbar.tsx — layout
+2. src/components/shared/Button.tsx — shared component
+3. src/app/dashboard/page.tsx — page
+...}
+
+## Instructions
+For each file:
+1. Read the file
+2. Identify all translatable strings using the gap detection rules (high confidence: bare JSX text, user-visible attributes, concatenated strings; skip: CSS classes, console logs, imports, object keys, test IDs, URLs, enum constants)
+3. Determine if it's a Server or Client Component (App Router) — check for 'use client' directive
+4. Import the correct function (getTranslations for server, useTranslations for client)
+5. Wrap each string with t('key') using an appropriate key name
+6. Handle plurals, select, and ordinals using ICU syntax in the message values. Always include `other`. Use `#` for the count placeholder.
+
+Within each file, process in this order: JSX text → user-visible attributes → non-JSX strings → numbers/currencies/dates.
+
+## IMPORTANT: Do not edit message files
+Do NOT directly edit any files in the messages/ directory.
+Instead, after processing all your files, output a JSON object listing every new key you need added:
+
+{
+  "Namespace": {
+    "key": "English value",
+    "anotherKey": "Another English value"
+  }
+}
+
+Include only keys you actually used in your t() calls. Use the same nesting structure as the message files.
+```
+
+#### After all subagents complete — merge message keys
+
+1. **Collect** the JSON key objects from all subagent outputs.
+2. **Check for collisions** — if two subagents added the same namespace + key combination with different values, resolve by keeping the more descriptive value.
+3. **Deep-merge** all keys into `messages/{locale}.json` for each locale file:
+   - Source locale (e.g., `en.json`): use the actual English values from the subagent outputs
+   - Other locales: copy the source text as a placeholder (to be translated later)
+4. **Verify** all locale files have the same key structure.
+
+#### Verification
+
+1. **Run the dev server** — verify no missing key warnings in the console. next-intl logs warnings for missing messages by default.
+2. **Run existing tests** — if tests fail with missing provider errors, ensure the test setup wraps components with `NextIntlClientProvider`:
    ```tsx
    import {NextIntlClientProvider} from 'next-intl';
 

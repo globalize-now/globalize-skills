@@ -458,6 +458,26 @@ You do not need to add domain prefixes (like `auth.login` or `dashboard.alerts`)
 
 ## Step 8: Workflow
 
+### 8.0 Discovery and Scale Assessment
+
+Before wrapping strings, scan the project to determine scope:
+
+1. **Glob** for all `.tsx`, `.ts`, `.jsx`, `.js` files under the source directories. Exclude `node_modules`, test files (`*.test.*`, `*.spec.*`, `__tests__/`), config files (`*.config.*`), and type declarations (`.d.ts`).
+2. **Quick-grep** each file for translatable string indicators:
+   - Bare JSX text: lines with `>Some text<` patterns (text between JSX tags not wrapped in `{`)
+   - User-visible attributes with string literals: `placeholder="`, `aria-label="`, `title="`, `alt="`
+   - String concatenation near JSX: `"text" +` or `+ "text"` patterns
+3. **Build a candidate file list** — files with at least one match, sorted by match count (descending).
+4. **Decide the processing path:**
+   - **15 files or fewer** → proceed to [8.1 Sequential Processing](#81-sequential-processing)
+   - **More than 15 files** → proceed to [8.2 Parallel Processing](#82-parallel-processing)
+
+---
+
+### 8.1 Sequential Processing
+
+Use this path for small-to-medium projects (15 files or fewer).
+
 Work file-by-file in this priority order:
 
 1. **Layout and shell components** (navbar, sidebar, footer) — highest reuse, translate first
@@ -481,6 +501,91 @@ After wrapping all strings:
 4. Run existing tests — if tests fail with missing context errors or rendering issues, wrap test renders with a `LinguiTestWrapper` that provides `I18nProvider` with an empty catalog (see `lingui-setup` Step 9). The common fix: add `{ wrapper: LinguiTestWrapper }` to `render()` calls.
 
 If extraction finds messages you didn't intend to extract (e.g., internal strings wrapped by mistake), unwrap them and re-run.
+
+---
+
+### 8.2 Parallel Processing
+
+Use this path for large projects (more than 15 files). The work is partitioned across subagents that run in parallel.
+
+#### Partition the files
+
+1. **Group** candidate files by directory subtree (e.g., `app/dashboard/**`, `components/shared/**`, `lib/**`).
+2. **Order within each group** by priority: layout/shell files first, then shared components, then page components, then utilities.
+3. **Balance the groups** — merge groups with fewer than 3 files into the nearest neighbor group. Split groups with more than 15 files.
+4. **Target 3–5 partitions** total.
+
+#### Dispatch subagents
+
+Use the **Agent tool** to dispatch all partitions in a **single message** (this launches them in parallel). Each subagent receives a prompt assembled from this template:
+
+```
+You are wrapping hardcoded UI strings with LinguiJS macros in a React project.
+
+## Project Context
+- Framework: {framework — e.g., Next.js, Vite}
+- Router: {router — e.g., App Router, Pages Router, React Router}
+- TypeScript: {yes/no}
+- App domain: {domain description from Step 3}
+
+## Macro Decision Tree
+- JSX text content (visible text between tags) → <Trans>text</Trans>
+- Props/attributes (placeholder, aria-label, title, alt) inside a component → useLingui() + t`text`
+- Props/attributes outside a component (constants, config objects) → msg`text` to define, t(descriptor) in component
+- Non-JSX code (utility functions, class methods) → t from @lingui/core/macro
+
+## Import Reference
+| Macro | Import |
+|-------|--------|
+| <Trans>, <Plural>, <Select>, <SelectOrdinal> | @lingui/react/macro |
+| useLingui() → t, i18n | @lingui/react/macro |
+| msg | @lingui/core/macro |
+| t (standalone) | @lingui/core/macro |
+
+Use @lingui/react/macro (not @lingui/macro) for React components.
+
+## Comment Rules
+Add a `comment` prop/field in the SAME edit as wrapping when the string matches:
+- **Must comment**: single/two-word phrases with multiple meanings, action labels without a visible object ("Remove" → what?), placeholders where meaning isn't obvious, domain-sensitive terms
+- **Should comment**: UI jargon (Toast, Drawer, Badge), abbreviations, sentence fragments
+- **Skip**: full sentences with clear meaning, labels matching their form field
+
+Comment format: describe where it appears and what it refers to, under 80 characters.
+Example: <Trans comment="Save button in document editor toolbar">Save</Trans>
+
+## Reference File
+Read `{path to reference file — e.g., references/nextjs-app-router.md}` for framework-specific patterns before you start wrapping.
+
+## Your Files (process in this order)
+{numbered list of file paths with their category — e.g.:
+1. src/components/layout/Navbar.tsx — layout
+2. src/components/shared/Button.tsx — shared component
+3. src/app/dashboard/page.tsx — page
+...}
+
+## Instructions
+For each file:
+1. Read the file
+2. Identify all translatable strings using the gap detection rules (high confidence: bare JSX text, user-visible attributes, concatenated strings; skip: CSS classes, console logs, imports, object keys, test IDs, URLs, enum constants)
+3. Wrap each string with the correct macro from the decision tree above
+4. Add translator comments inline following the comment rules above
+5. Handle plurals with <Plural>, gender/enum with <Select>, ordinals with <SelectOrdinal>. Always include `other`. Use `#` for the count placeholder.
+
+Within each file, process in this order: JSX text → user-visible attributes → non-JSX strings → numbers/currencies/dates.
+
+Do NOT run `npx lingui extract` or `npx lingui compile` — that happens after all partitions are done.
+```
+
+#### After all subagents complete
+
+1. Run `npx lingui extract --clean` — verify all new messages appear in the catalog and there are no extraction errors
+2. Run `npx lingui compile` (add `--typescript` for TypeScript projects) — verify compilation succeeds
+3. Run the dev server or build — verify the app renders correctly with the source locale
+4. Run existing tests — if tests fail with missing context errors or rendering issues, wrap test renders with a `LinguiTestWrapper` that provides `I18nProvider` with an empty catalog (see `lingui-setup` Step 9). The common fix: add `{ wrapper: LinguiTestWrapper }` to `render()` calls.
+
+If extraction finds messages you didn't intend to extract (e.g., internal strings wrapped by mistake), unwrap them and re-run.
+
+Proceed to Step 9 (Comment Review Pass).
 
 ---
 
