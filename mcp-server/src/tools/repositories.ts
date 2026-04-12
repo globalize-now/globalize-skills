@@ -7,6 +7,7 @@ import {
   updateRepository,
   deleteRepository,
   detectRepository,
+  listRepositoryBranches,
 } from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
 
@@ -37,25 +38,37 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
         gitUrl: z.string().describe("Git repository URL"),
         provider: z.enum(["github", "gitlab"]).describe("Git provider"),
         branches: z.array(z.string()).optional().describe('Branches to sync (defaults to ["main"])'),
-        localePathPattern: z.string().optional().describe("Path pattern for locale files in the repo"),
-        prTranslations: z.boolean().optional().describe("Enable PR translations"),
-        skipDraftPrs: z.boolean().optional().describe("Skip draft pull requests"),
+        patterns: z
+          .array(
+            z.object({
+              pattern: z.string().describe("Locale path pattern (e.g. locales/{locale}/*.json)"),
+              fileFormat: z
+                .enum(["json-flat", "json-nested", "xliff", "xliff-2", "xliff-1.2", "yaml", "po"])
+                .describe("File format"),
+            }),
+          )
+          .optional()
+          .describe("Locale path patterns with file formats"),
+        githubInstallationId: z.string().uuid().optional().describe("GitHub App installation UUID (from github installations)"),
+        gitlabConnectionId: z.string().uuid().optional().describe("GitLab connection UUID (from gitlab connections)"),
+        importMode: z.enum(["ignore", "reviewed", "translated"]).optional().describe("How to import existing translations (default: ignore)"),
+        importScope: z.enum(["new_keys_only", "all_keys"]).optional().describe("Which keys to import (default: new_keys_only)"),
       },
     },
-    async ({ projectId, gitUrl, provider, branches, localePathPattern, prTranslations, skipDraftPrs }) => {
+    async ({ projectId, gitUrl, provider, branches, patterns, githubInstallationId, gitlabConnectionId, importMode, importScope }) => {
       try {
         return formatSuccess(
-          await createRepository(
-            client,
+          await createRepository(client, {
             projectId,
             gitUrl,
             provider,
             branches,
-            localePathPattern,
-            undefined,
-            prTranslations,
-            skipDraftPrs,
-          ),
+            patterns,
+            githubInstallationId,
+            gitlabConnectionId,
+            importMode,
+            importScope,
+          }),
         );
       } catch (e) {
         return formatError(e);
@@ -71,13 +84,12 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
         id: z.string().uuid().describe("Repository UUID"),
         gitUrl: z.string().optional().describe("Git repository URL"),
         branches: z.array(z.string()).optional().describe("Branches to track"),
-        localePathPattern: z.string().nullable().optional().describe("Locale path pattern"),
-        githubInstallationId: z.string().optional().describe("GitHub App installation ID"),
+        githubInstallationId: z.string().uuid().optional().describe("GitHub App installation UUID"),
+        gitlabConnectionId: z.string().uuid().optional().describe("GitLab connection UUID"),
         provider: z.enum(["github", "gitlab"]).optional().describe("Git provider"),
-        fileFormat: z.string().optional().describe("File format"),
+        importMode: z.enum(["ignore", "reviewed", "translated"]).optional().describe("Import mode"),
+        importScope: z.enum(["new_keys_only", "all_keys"]).optional().describe("Import scope"),
         detectedFramework: z.string().nullable().optional().describe("Detected framework"),
-        prTranslations: z.boolean().optional().describe("Enable PR translations"),
-        skipDraftPrs: z.boolean().optional().describe("Skip draft pull requests"),
       },
     },
     async ({ id, ...updates }) => {
@@ -117,6 +129,23 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
     async ({ id }) => {
       try {
         return formatSuccess(await detectRepository(client, id));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_repository_branches",
+    {
+      description: "List branches from the connected provider for a repository",
+      inputSchema: {
+        id: z.string().uuid().describe("Repository UUID"),
+      },
+    },
+    async ({ id }) => {
+      try {
+        return formatSuccess(await listRepositoryBranches(client, id));
       } catch (e) {
         return formatError(e);
       }

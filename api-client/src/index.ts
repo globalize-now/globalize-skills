@@ -21,7 +21,17 @@ export {
   updateRepository,
   deleteRepository,
   detectRepository,
+  listRepositoryBranches,
 } from "./commands/repositories.js";
+
+// Patterns
+export {
+  listPatterns,
+  createPattern,
+  updatePattern,
+  deletePattern,
+  reorderPattern,
+} from "./commands/patterns.js";
 
 // Glossary
 export { listGlossary, createGlossaryEntry, deleteGlossaryEntry } from "./commands/glossary.js";
@@ -37,3 +47,14 @@ export { listMembers, inviteMember, removeMember } from "./commands/members.js";
 
 // GitHub
 export { startGithubInstall, pollGithubInstallStatus } from "./commands/github.js";
+
+// GitLab
+export {
+  startGitlabInstall,
+  pollGitlabInstallStatus,
+  listGitlabConnections,
+  deleteGitlabConnection,
+  listGitlabProjects,
+  listGitlabProjectBranches,
+  detectGitlabProject,
+} from "./commands/gitlab.js";

@@ -2,7 +2,7 @@
 name: globalize-now-cli-use
 description: >-
   Manage Globalize translation resources using the CLI. Use this skill when the user asks
-  to create a translation project, add or remove languages, connect a git repository,
+  to create a translation project, add or remove languages, connect a GitHub or GitLab repository,
   manage glossaries or style guides, invite team members, manage API keys, or perform any
   Globalize platform operation. Also use when the user mentions managing translations,
   translation workflow, or wants to "set up translations for this repo." This skill assumes
@@ -69,7 +69,7 @@ Parse the returned JSON to extract the **project ID**.
 
 ### 2c. Connect the repository
 
-Globalize uses a GitHub App to access repository contents. Follow these sub-steps in order.
+Globalize uses a GitHub App or GitLab OAuth connection to access repository contents. Follow these sub-steps in order.
 
 **1. Get the git remote URL:**
 
@@ -79,14 +79,18 @@ git remote get-url origin
 
 If the command fails (no remote named `origin`), **STOP.** Tell the user: "No git remote `origin` found. Please add a remote (`git remote add origin <URL>`) and try again, or provide the git URL manually." If the user provides a URL manually, use that URL and continue.
 
-**2. Parse the URL — extract owner and repo:**
+**2. Parse the URL — extract owner and repo/project:**
 
-- HTTPS: `https://github.com/<OWNER>/<REPO>.git`
-- SSH: `git@github.com:<OWNER>/<REPO>.git`
+- GitHub HTTPS: `https://github.com/<OWNER>/<REPO>.git`
+- GitHub SSH: `git@github.com:<OWNER>/<REPO>.git`
+- GitLab HTTPS: `https://gitlab.com/<OWNER>/<PROJECT>.git`
+- GitLab SSH: `git@gitlab.com:<OWNER>/<PROJECT>.git`
 
-Store the URL as `<GIT_URL>`. **Important:** The CLI only accepts HTTPS URLs for `--git-url`. If the remote is an SSH URL, convert it to HTTPS format: `https://github.com/<OWNER>/<REPO>.git`.
+Store the URL as `<GIT_URL>`. **Important:** The CLI only accepts HTTPS URLs for `--git-url`. If the remote is an SSH URL, convert it to HTTPS format.
 
-If the URL does not contain `github.com`, **STOP.** Tell the user: "Globalize currently only supports GitHub repositories. The detected remote URL (`<URL>`) does not appear to be a GitHub repo." Do NOT proceed.
+- If the URL contains `github.com`: proceed with the **GitHub flow** (sub-step 3 onward).
+- If the URL contains `gitlab.com`: proceed with the **GitLab flow** (below).
+- Otherwise: **STOP.** Tell the user: "Globalize supports GitHub and GitLab repositories. The detected remote URL (`<URL>`) does not appear to be either." Do NOT proceed.
 
 **3. CONSENT GATE — Confirm repository details with the user. You MUST complete this step before proceeding.**
 
@@ -97,12 +101,16 @@ Present the detection result and ask the user to confirm:
 > - **Owner:** `<OWNER>`
 > - **Repo:** `<REPO>`
 >
-> I'll connect this repository to your Globalize project using the GitHub App. This may open a browser window for you to approve the GitHub App installation. **Is this correct?**
+> I'll connect this repository to your Globalize project using the GitHub App (or GitLab OAuth). This may open a browser window for you to approve the installation. **Is this correct?**
 
 Wait for the user's response before proceeding.
 
-- **User confirms** → continue to sub-step 4.
+- **User confirms** → continue to sub-step 4 (GitHub) or the GitLab flow.
 - **User corrects the URL** → re-parse the corrected URL from sub-step 2.
+
+---
+
+#### GitHub Flow
 
 **4. Set up the GitHub App and connect the repository:**
 
@@ -112,11 +120,11 @@ Wait for the user's response before proceeding.
 npx @globalize-now/cli-client github installations --json
 ```
 
-This returns an array of installations. Each has an `id` (a **numeric** GitHub installation ID, e.g. `122432012`) and an `account` with `login` (the GitHub org or user name).
+This returns an array of installations. Each has `id` (a **UUID** — Globalize's internal installation record), `installationId` (the **numeric** GitHub installation ID, e.g. `122432012`), `accountLogin` (the GitHub org or user name), and `accountType`.
 
 **4b. Match installation to repo owner:**
 
-Look for an installation whose `account.login` matches `<OWNER>` (case-insensitive).
+Look for an installation whose `accountLogin` matches `<OWNER>` (case-insensitive). Use its `id` (UUID) as `<INSTALLATION_ID>`.
 
 - **Match found** → use its `id` as `<INSTALLATION_ID>`, skip to sub-step 4d.
 - **No match** → proceed to sub-step 4c.
@@ -127,7 +135,7 @@ Look for an installation whose `account.login` matches `<OWNER>` (case-insensiti
 npx @globalize-now/cli-client github install --no-wait --json
 ```
 
-This returns `{ "url": "...", "nonce": "..." }` immediately. Present the `url` to the user and ask them to open it in their browser, select the correct GitHub account/org, and approve the installation.
+This returns `{ "installUrl": "...", "nonce": "..." }` immediately. Present the `installUrl` to the user and ask them to open it in their browser, select the correct GitHub account/org, and approve the installation.
 
 After the user confirms they have completed the browser flow, check the status:
 
@@ -135,7 +143,7 @@ After the user confirms they have completed the browser flow, check the status:
 npx @globalize-now/cli-client github install-status --nonce <NONCE> --json
 ```
 
-This returns `{ "completed": true, "installationId": "..." }` when done, or `{ "completed": false }` if the user hasn't finished yet. If not completed, ask the user to confirm they finished and retry.
+This returns `{ "status": "completed", "installationId": "...", "accountLogin": "..." }` when done, `{ "status": "pending" }` if the user hasn't finished yet, or `{ "status": "expired" }` if the nonce expired. Check `status === "completed"`. If not completed, ask the user to confirm they finished and retry.
 
 After completion, run `github installations --json` again to find the `<INSTALLATION_ID>` for the target owner.
 
@@ -158,19 +166,92 @@ npx @globalize-now/cli-client repositories create \
   --json
 ```
 
-Optional flags: `--branches <branches...>` to track specific branches, `--locale-path-pattern <pattern>` to specify where locale files live, `--pr-translations` to enable PR translations, `--skip-draft-prs` to skip draft pull requests.
+Optional flags: `--branches <branches...>`, `--patterns '<JSON array>'`, `--import-mode <ignore|reviewed|translated>`, `--import-scope <new_keys_only|all_keys>`.
 
 Parse the returned JSON to extract the **repository ID**.
 
+---
+
+#### GitLab Flow
+
+**For GitLab repositories:**
+
+**4a. Check for existing GitLab connections:**
+
+```bash
+npx @globalize-now/cli-client gitlab connections --json
+```
+
+This returns an array of connections. Each has `id` (UUID), `username`, `gitlabUserId`, `status`, and `createdAt`.
+
+**4b. Match connection to repo owner:**
+
+Look for a connection whose `username` matches the GitLab owner (case-insensitive). If found, use its `id` as `<CONNECTION_ID>`.
+
+- **Match found** → use its `id` as `<CONNECTION_ID>`, skip to sub-step 4d.
+- **No match** → proceed to sub-step 4c.
+
+**4c. Install the GitLab OAuth connection (requires user interaction):**
+
+```bash
+npx @globalize-now/cli-client gitlab install --no-wait --json
+```
+
+This returns `{ "installUrl": "...", "nonce": "..." }` immediately. Present the `installUrl` to the user and ask them to open it in their browser and authorize the GitLab connection.
+
+After the user confirms they have completed the browser flow, check the status:
+
+```bash
+npx @globalize-now/cli-client gitlab install-status --nonce <NONCE> --json
+```
+
+This returns `{ "status": "completed", "connectionId": "...", "username": "..." }` when done, `{ "status": "pending" }` if the user hasn't finished yet, or `{ "status": "expired" }` if the nonce expired. Check `status === "completed"`. If not completed, ask the user to confirm they finished and retry.
+
+Once completed, use `connectionId` as `<CONNECTION_ID>`.
+
+**4d. List GitLab projects and verify access:**
+
+```bash
+npx @globalize-now/cli-client gitlab projects --connection-id <CONNECTION_ID> --json
+```
+
+Match `pathWithNamespace` against `<OWNER>/<PROJECT>`. If not found, the GitLab connection may not have access to this project — inform the user.
+
+**4e. Connect the repository:**
+
+```bash
+npx @globalize-now/cli-client repositories create \
+  --project-id <PROJECT_ID> \
+  --git-url <GIT_URL> \
+  --provider gitlab \
+  --gitlab-connection-id <CONNECTION_ID> \
+  --json
+```
+
+Optional flags: `--branches <branches...>`, `--patterns '<JSON array>'`, `--import-mode <ignore|reviewed|translated>`, `--import-scope <new_keys_only|all_keys>`.
+
+Parse the returned JSON to extract the **repository ID**.
+
+---
+
 ### 2d. Detect repository configuration
 
-For **GitHub repos**, you can detect i18n structure via the GitHub App (useful for pre-populating `--locale-path-pattern` on the `repositories create` call):
+For **GitHub repos**, you can detect i18n structure via the GitHub App:
 
 ```bash
 npx @globalize-now/cli-client github detect \
   --installation-id <INSTALLATION_ID> \
   --owner <OWNER> \
   --repo <REPO> \
+  --json
+```
+
+For **GitLab repos**, you can detect i18n structure via the GitLab connection:
+
+```bash
+npx @globalize-now/cli-client gitlab detect \
+  --connection-id <CONNECTION_ID> \
+  --project-id <GITLAB_PROJECT_ID> \
   --json
 ```
 
@@ -182,7 +263,7 @@ npx @globalize-now/cli-client repositories detect \
   --json
 ```
 
-**Note:** Both detection commands run against remote code on GitHub, not the local working copy. If the user has uncommitted or unpushed changes that affect locale files, detection will not reflect those changes. Inform the user if this applies.
+**Note:** All detection commands run against remote code, not the local working copy. If the user has uncommitted or unpushed changes that affect locale files, detection will not reflect those changes. Inform the user if this applies.
 
 ---
 
@@ -218,6 +299,59 @@ Required: `--name` and `--locale` (BCP 47 code). Optional: `--language-id` to li
 npx @globalize-now/cli-client project-languages remove \
   --project-id <PROJECT_ID> \
   --language-id <PROJECT_LANGUAGE_ID> \
+  --json
+```
+
+---
+
+## Step 3.5: Patterns Management
+
+Locale path patterns define where translation files live in the repository. Each pattern has a path template and a file format. Patterns are managed separately from repository create/update.
+
+**List** patterns:
+
+```bash
+npx @globalize-now/cli-client patterns list --repository-id <REPO_ID> --json
+```
+
+**Create** a pattern:
+
+```bash
+npx @globalize-now/cli-client patterns create \
+  --repository-id <REPO_ID> \
+  --pattern "locales/{locale}/*.json" \
+  --file-format json-nested \
+  --json
+```
+
+Supported file formats: `json-flat`, `json-nested`, `xliff`, `xliff-2`, `xliff-1.2`, `yaml`, `po`.
+
+**Update** a pattern:
+
+```bash
+npx @globalize-now/cli-client patterns update \
+  --repository-id <REPO_ID> \
+  --pattern-id <PATTERN_ID> \
+  --pattern "locales/{locale}/{namespace}.json" \
+  --json
+```
+
+**Delete** a pattern:
+
+```bash
+npx @globalize-now/cli-client patterns delete \
+  --repository-id <REPO_ID> \
+  --pattern-id <PATTERN_ID> \
+  --json
+```
+
+**Reorder** a pattern:
+
+```bash
+npx @globalize-now/cli-client patterns reorder \
+  --repository-id <REPO_ID> \
+  --pattern-id <PATTERN_ID> \
+  --position 0 \
   --json
 ```
 
@@ -325,6 +459,19 @@ npx @globalize-now/cli-client api-keys create --org-id <ORG_ID> --name "CI Key" 
 npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID> --json
 ```
 
+### GitLab
+
+```bash
+npx @globalize-now/cli-client gitlab install                    # OAuth flow (opens browser)
+npx @globalize-now/cli-client gitlab install --no-wait --json   # Returns URL and nonce
+npx @globalize-now/cli-client gitlab install-status --nonce <NONCE> --json
+npx @globalize-now/cli-client gitlab connections --json
+npx @globalize-now/cli-client gitlab connection-delete --id <ID> --json
+npx @globalize-now/cli-client gitlab projects --connection-id <ID> --json
+npx @globalize-now/cli-client gitlab branches --connection-id <ID> --project-id <PROJECT_ID> --json
+npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <PROJECT_ID> --json
+```
+
 ---
 
 ## Command Reference
@@ -347,16 +494,29 @@ npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID
 | `project-languages add` | `--project-id`, `--name`, `--locale` | `--language-id` |
 | `project-languages remove` | `--project-id`, `--language-id` | |
 | `repositories list` | `--project-id` | |
-| `repositories create` | `--project-id`, `--git-url`, `--provider` | `--branches`, `--locale-path-pattern`, `--github-installation-id`, `--pr-translations`, `--skip-draft-prs` |
-| `repositories update` | `--id` | `--git-url`, `--branches`, `--locale-path-pattern`, `--github-installation-id`, `--provider`, `--file-format`, `--detected-framework`, `--pr-translations` / `--no-pr-translations`, `--skip-draft-prs` / `--no-skip-draft-prs` |
+| `repositories create` | `--project-id`, `--git-url`, `--provider` | `--branches`, `--github-installation-id`, `--gitlab-connection-id`, `--patterns`, `--import-mode`, `--import-scope` |
+| `repositories update` | `--id` | `--git-url`, `--branches`, `--github-installation-id`, `--gitlab-connection-id`, `--provider`, `--detected-framework`, `--import-mode`, `--import-scope` |
 | `repositories delete` | `--id` | |
 | `repositories detect` | `--id` | |
+| `repositories branches` | `--id` | |
+| `patterns list` | `--repository-id` | |
+| `patterns create` | `--repository-id`, `--pattern`, `--file-format` | `--position` |
+| `patterns update` | `--repository-id`, `--pattern-id` | `--pattern`, `--file-format` |
+| `patterns delete` | `--repository-id`, `--pattern-id` | |
+| `patterns reorder` | `--repository-id`, `--pattern-id`, `--position` | |
 | `github install` | | `--no-wait` |
 | `github install-status` | `--nonce` | |
 | `github installations` | | |
 | `github repos` | `--installation-id` | |
 | `github branches` | `--installation-id`, `--owner`, `--repo` | |
 | `github detect` | `--installation-id`, `--owner`, `--repo` | |
+| `gitlab install` | | `--no-wait` |
+| `gitlab install-status` | `--nonce` | |
+| `gitlab connections` | | |
+| `gitlab connection-delete` | `--id` | |
+| `gitlab projects` | `--connection-id` | |
+| `gitlab branches` | `--connection-id`, `--project-id` | |
+| `gitlab detect` | `--connection-id`, `--project-id` | |
 | `glossary list` | `--project-id` | |
 | `glossary create` | `--project-id`, `--source-term`, `--target-term`, `--source-language-id`, `--target-language-id` | |
 | `glossary delete` | `--project-id`, `--entry-id` | |
@@ -375,9 +535,10 @@ npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID
 ## Common Gotchas
 
 - **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability.
-- **IDs are UUIDs (except installation IDs)**: All `--id`, `--project-id`, `--org-id`, etc. expect UUID values returned from prior create/list commands. The exception is `--installation-id` and `--github-installation-id`, which expect the **numeric GitHub installation ID** (e.g. `122432012`) from `github installations --json`, not a Globalize UUID. Always capture IDs from JSON responses.
+- **IDs are UUIDs**: All `--id`, `--project-id`, `--org-id`, etc. expect UUID values returned from prior create/list commands. `--github-installation-id` now expects a **UUID** (Globalize's internal installation record ID, from the `id` field in `github installations --json`). The numeric GitHub installation ID is available as `installationId` in the same response but is NOT what you pass to `repositories create`. Always capture IDs from JSON responses.
 - **Project language IDs vs global language IDs**: Glossary (`--source-language-id`, `--target-language-id`) and style guide (`--language-id`) commands use _project language_ UUIDs — the ID of a language within a specific project. Get these from `project-languages list`, not `languages list`.
-- **GitHub App required for GitHub repos**: When connecting a GitHub repository, use the GitHub App flow (`github installations` / `github install`) to obtain an `installationId` and pass it via `--github-installation-id` on `repositories create`. Without this, Globalize cannot access repo contents. Use `github install --no-wait --json` to get the install URL without blocking, present it to the user, then check completion with `github install-status --nonce <NONCE> --json`.
-- **GitHub only**: Globalize currently only supports GitHub repositories. Always use `--provider github` with `--github-installation-id` when connecting repos.
+- **GitHub App required for GitHub repos**: When connecting a GitHub repository, use the GitHub App flow (`github installations` / `github install`) to obtain an installation ID and pass it via `--github-installation-id` on `repositories create`. Without this, Globalize cannot access repo contents. Use `github install --no-wait --json` to get the install URL without blocking, present it to the user, then check completion with `github install-status --nonce <NONCE> --json`.
+- **Patterns are managed separately**: After creating a repository, manage locale path patterns via `patterns list/create/update/delete/reorder`. The `--patterns` flag on `repositories create` is only for initial setup. Pattern changes after creation require the pattern CRUD commands.
+- **GitLab uses connections, not installations**: For GitLab repos, use `gitlab connections` (not `github installations`) and pass `--gitlab-connection-id` (not `--github-installation-id`) on `repositories create`. GitLab project IDs are **numeric** (not UUIDs).
 - **Validate languages before project creation**: Always fetch `languages list --json` and match the user's desired locales against the catalog. Use the returned UUIDs for `--source-language` and `--target-languages` — do not pass raw locale codes. Inform the user about any unsupported languages that have no catalog match.
 - **Auth in non-interactive contexts**: The CLI does not fall back to interactive login when there's no TTY. Ensure `GLOBALIZE_API_KEY` is set or `~/.globalize/config.json` exists.

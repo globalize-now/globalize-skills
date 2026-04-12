@@ -10,6 +10,8 @@ import { registerGlossaryTools } from "./tools/glossary.js";
 import { registerStyleGuideTools } from "./tools/style-guides.js";
 import { registerApiKeyTools } from "./tools/api-keys.js";
 import { registerMemberTools } from "./tools/members.js";
+import { registerPatternTools } from "./tools/patterns.js";
+import { registerGitlabTools } from "./tools/gitlab.js";
 
 const server = new McpServer({
   name: "globalize",
@@ -28,6 +30,8 @@ registerGlossaryTools(server, client);
 registerStyleGuideTools(server, client);
 registerApiKeyTools(server, client);
 registerMemberTools(server, client);
+registerPatternTools(server, client);
+registerGitlabTools(server, client);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

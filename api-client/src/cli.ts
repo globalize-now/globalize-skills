@@ -15,6 +15,8 @@ import { register as registerStyleGuides } from "./commands/style-guides.js";
 import { register as registerApiKeys } from "./commands/api-keys.js";
 import { register as registerMembers } from "./commands/members.js";
 import { register as registerGithub } from "./commands/github.js";
+import { register as registerGitlab } from "./commands/gitlab.js";
+import { register as registerPatterns } from "./commands/patterns.js";
 import { register as registerAuth } from "./commands/auth.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -59,6 +61,8 @@ const groups = [
   { name: "api-keys", description: "Manage API keys", register: registerApiKeys },
   { name: "members", description: "Manage organisation members", register: registerMembers },
   { name: "github", description: "GitHub App installation and repositories", register: registerGithub },
+  { name: "gitlab", description: "GitLab connection and repositories", register: registerGitlab },
+  { name: "patterns", description: "Manage repository locale path patterns", register: registerPatterns },
 ] as const;
 
 for (const { name, description, register } of groups) {

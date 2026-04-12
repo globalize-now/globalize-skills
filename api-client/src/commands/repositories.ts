@@ -15,25 +15,31 @@ export async function listRepositories(client: ApiClient, projectId: string) {
 
 export async function createRepository(
   client: ApiClient,
-  projectId: string,
-  gitUrl: string,
-  provider: "github" | "gitlab",
-  branches?: string[],
-  localePathPattern?: string,
-  githubInstallationId?: string,
-  prTranslations?: boolean,
-  skipDraftPrs?: boolean,
+  options: {
+    projectId: string;
+    gitUrl: string;
+    provider: "github" | "gitlab";
+    branches?: string[];
+    patterns?: { pattern: string; fileFormat: "json-flat" | "json-nested" | "xliff" | "xliff-2" | "xliff-1.2" | "yaml" | "po" }[];
+    githubInstallationId?: string;
+    gitlabConnectionId?: string;
+    importMode?: "ignore" | "reviewed" | "translated";
+    importScope?: "new_keys_only" | "all_keys";
+    detectedFramework?: string | null;
+  },
 ) {
   const { data, error, response } = await client.POST("/api/repositories", {
     body: {
-      projectId,
-      gitUrl,
-      provider,
-      branches,
-      localePathPattern,
-      githubInstallationId,
-      prTranslations,
-      skipDraftPrs,
+      projectId: options.projectId,
+      gitUrl: options.gitUrl,
+      provider: options.provider,
+      branches: options.branches,
+      patterns: options.patterns,
+      githubInstallationId: options.githubInstallationId,
+      gitlabConnectionId: options.gitlabConnectionId,
+      importMode: options.importMode,
+      importScope: options.importScope,
+      detectedFramework: options.detectedFramework,
     },
   });
   if (error) throw new Error(extractError(response, error));
@@ -46,13 +52,12 @@ export async function updateRepository(
   updates: {
     gitUrl?: string;
     branches?: string[];
-    localePathPattern?: string | null;
     githubInstallationId?: string;
+    gitlabConnectionId?: string;
     provider?: "github" | "gitlab";
-    fileFormat?: string;
+    importMode?: "ignore" | "reviewed" | "translated";
+    importScope?: "new_keys_only" | "all_keys";
     detectedFramework?: string | null;
-    prTranslations?: boolean;
-    skipDraftPrs?: boolean;
   },
 ) {
   const { data, error, response } = await client.PATCH("/api/repositories/{id}", {
@@ -73,6 +78,14 @@ export async function deleteRepository(client: ApiClient, id: string) {
 
 export async function detectRepository(client: ApiClient, id: string) {
   const { data, error, response } = await client.POST("/api/repositories/{id}/detect", {
+    params: { path: { id } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function listRepositoryBranches(client: ApiClient, id: string) {
+  const { data, error, response } = await client.GET("/api/repositories/{id}/branches", {
     params: { path: { id } },
   });
   if (error) throw new Error(extractError(response, error));
@@ -101,26 +114,28 @@ export function register(group: Command, getClient: ClientFactory): void {
     .requiredOption("--git-url <url>", "Git repository URL")
     .addOption(new Option("--provider <provider>", "Git provider").choices(["github", "gitlab"]).makeOptionMandatory())
     .option("--branches <branches...>", "Branches to track")
-    .option("--locale-path-pattern <pattern>", "Locale path pattern")
+    .option("--patterns <json>", "Patterns as JSON array of {pattern, fileFormat}")
     .option("--github-installation-id <id>", "GitHub App installation ID")
-    .option("--pr-translations", "Enable PR translations")
-    .option("--skip-draft-prs", "Skip draft pull requests")
+    .option("--gitlab-connection-id <id>", "GitLab connection UUID")
+    .addOption(new Option("--import-mode <mode>", "Import mode").choices(["ignore", "reviewed", "translated"]))
+    .addOption(new Option("--import-scope <scope>", "Import scope").choices(["new_keys_only", "all_keys"]))
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
+        const patterns = cmdOpts.patterns ? JSON.parse(cmdOpts.patterns) : undefined;
         output(
-          await createRepository(
-            client,
-            cmdOpts.projectId,
-            cmdOpts.gitUrl,
-            cmdOpts.provider,
-            cmdOpts.branches,
-            cmdOpts.localePathPattern,
-            cmdOpts.githubInstallationId,
-            cmdOpts.prTranslations,
-            cmdOpts.skipDraftPrs,
-          ),
+          await createRepository(client, {
+            projectId: cmdOpts.projectId,
+            gitUrl: cmdOpts.gitUrl,
+            provider: cmdOpts.provider,
+            branches: cmdOpts.branches,
+            patterns,
+            githubInstallationId: cmdOpts.githubInstallationId,
+            gitlabConnectionId: cmdOpts.gitlabConnectionId,
+            importMode: cmdOpts.importMode,
+            importScope: cmdOpts.importScope,
+          }),
           opts,
         );
       } catch (e) {
@@ -134,15 +149,12 @@ export function register(group: Command, getClient: ClientFactory): void {
     .requiredOption("--id <id>", "Repository UUID")
     .option("--git-url <url>", "Git repository URL")
     .option("--branches <branches...>", "Branches to track")
-    .option("--locale-path-pattern <pattern>", "Locale path pattern")
     .option("--github-installation-id <id>", "GitHub App installation ID")
+    .option("--gitlab-connection-id <id>", "GitLab connection UUID")
     .addOption(new Option("--provider <provider>", "Git provider").choices(["github", "gitlab"]))
-    .option("--file-format <format>", "File format")
     .option("--detected-framework <framework>", "Detected framework")
-    .option("--pr-translations", "Enable PR translations")
-    .option("--no-pr-translations", "Disable PR translations")
-    .option("--skip-draft-prs", "Skip draft pull requests")
-    .option("--no-skip-draft-prs", "Do not skip draft pull requests")
+    .addOption(new Option("--import-mode <mode>", "Import mode").choices(["ignore", "reviewed", "translated"]))
+    .addOption(new Option("--import-scope <scope>", "Import scope").choices(["new_keys_only", "all_keys"]))
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
@@ -150,13 +162,12 @@ export function register(group: Command, getClient: ClientFactory): void {
         const updates: Record<string, unknown> = {};
         if (cmdOpts.gitUrl !== undefined) updates.gitUrl = cmdOpts.gitUrl;
         if (cmdOpts.branches !== undefined) updates.branches = cmdOpts.branches;
-        if (cmdOpts.localePathPattern !== undefined) updates.localePathPattern = cmdOpts.localePathPattern;
         if (cmdOpts.githubInstallationId !== undefined) updates.githubInstallationId = cmdOpts.githubInstallationId;
+        if (cmdOpts.gitlabConnectionId !== undefined) updates.gitlabConnectionId = cmdOpts.gitlabConnectionId;
         if (cmdOpts.provider !== undefined) updates.provider = cmdOpts.provider;
-        if (cmdOpts.fileFormat !== undefined) updates.fileFormat = cmdOpts.fileFormat;
         if (cmdOpts.detectedFramework !== undefined) updates.detectedFramework = cmdOpts.detectedFramework;
-        if (cmdOpts.prTranslations !== undefined) updates.prTranslations = cmdOpts.prTranslations;
-        if (cmdOpts.skipDraftPrs !== undefined) updates.skipDraftPrs = cmdOpts.skipDraftPrs;
+        if (cmdOpts.importMode !== undefined) updates.importMode = cmdOpts.importMode;
+        if (cmdOpts.importScope !== undefined) updates.importScope = cmdOpts.importScope;
         output(await updateRepository(client, cmdOpts.id, updates), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
@@ -186,6 +197,20 @@ export function register(group: Command, getClient: ClientFactory): void {
       try {
         const client = await getClient();
         output(await detectRepository(client, cmdOpts.id), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("branches")
+    .description("List branches from the connected provider")
+    .requiredOption("--id <id>", "Repository UUID")
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(await listRepositoryBranches(client, cmdOpts.id), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }

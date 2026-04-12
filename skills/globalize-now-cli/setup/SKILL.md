@@ -1,7 +1,7 @@
 ---
 name: globalize-now-cli-setup
 description: >-
-  Set up the Globalize CLI, create a translation project, and connect a GitHub repository.
+  Set up the Globalize CLI, create a translation project, and connect a GitHub or GitLab repository.
   Use this skill when the user asks to set up Globalize, install the Globalize CLI,
   authenticate with Globalize, or connect their project to the Globalize translation
   platform. Also use when the user mentions @globalize-now/cli-client or globalise-now-cli.
@@ -46,7 +46,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - [x] Step 3: Authenticate — {auth method}
 - [x] Step 4: Verify — {org name}
 - [x] Step 5: Create Project — "{name}" (source: {source}, targets: {targets})
-- [x] Step 6: Connect Repository — {owner/repo} connected, locale pattern: {pattern or "not detected"}, PR translations: {enabled/disabled}, skip drafts: {enabled/disabled}
+- [x] Step 6: Connect Repository — {owner/repo} connected via {GitHub|GitLab}, patterns: {count configured or "none"}, import mode: {mode}
 
 ### Warnings (if any)
 - {e.g., Uncommitted changes detected — i18n detection used remote code only}
@@ -63,9 +63,9 @@ After Step 1 (detection) completes without blockers, ask the user:
 - **Project name**: derived from the repo name (parsed from the git remote URL, e.g. `github.com/acme/my-app` → `my-app`) or the current directory name. Never ask.
 - **Source language**: detected from existing i18n config (`sourceLocale`, `defaultLocale`, `lng`). If not detected, default to `en`.
 - **Target languages**: detected from existing i18n config (remaining locales after excluding source). If not detected, ask the user.
-- **Locale path pattern**: detected from i18n config or directory structure (e.g., `locales/{locale}/{namespace}.json`). Falls back to server-side detection via `github detect` in Step 6. Never ask the user.
-- **PR translations**: enabled by default. Never ask.
-- **Skip draft PRs**: enabled by default. Never ask.
+- **Locale path patterns**: detected from i18n config or directory structure. Falls back to server-side detection via `github detect` or `gitlab detect` in Step 6. Never ask the user.
+- **Import mode**: `ignore` by default. Never ask.
+- **Import scope**: `new_keys_only` by default. Never ask.
 
 If no localization setup is detected at all (non-localized project), ask the user for source and target languages before proceeding to Step 5.
 
@@ -82,7 +82,7 @@ Check the following before proceeding:
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
 | **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
 | **Git remote URL** | `git remote get-url origin` — record the URL. If no remote named `origin`, record as absent. |
-| **GitHub repo** | Parse the remote URL for `github.com`. Extract `<OWNER>` and `<REPO>` from HTTPS (`https://github.com/OWNER/REPO.git`) or SSH (`git@github.com:OWNER/REPO.git`) format. **Important:** The CLI only accepts HTTPS URLs for `--git-url`. If the remote is SSH, convert to HTTPS: `https://github.com/<OWNER>/<REPO>.git`. |
+| **Git provider** | Parse the remote URL. If it contains `github.com`, record provider as `github` and extract `<OWNER>/<REPO>` from HTTPS (`https://github.com/OWNER/REPO.git`) or SSH (`git@github.com:OWNER/REPO.git`) format. If it contains `gitlab.com`, record provider as `gitlab` and extract `<OWNER>/<PROJECT>` from HTTPS (`https://gitlab.com/OWNER/PROJECT.git`) or SSH (`git@gitlab.com:OWNER/PROJECT.git`) format. **Important:** The CLI only accepts HTTPS URLs for `--git-url`. If the remote is SSH, convert to HTTPS: `https://github.com/<OWNER>/<REPO>.git` or `https://gitlab.com/<OWNER>/<PROJECT>.git`. |
 | **Uncommitted changes** | `git status --porcelain` — non-empty output means uncommitted changes exist. |
 | **Unpushed commits** | `git log @{u}..HEAD --oneline 2>/dev/null` — non-empty output means unpushed commits. Fails gracefully if no upstream is set. |
 
@@ -280,9 +280,11 @@ This step connects the current git repository to the Globalize project created i
 - **Guided**: present the detected git URL, owner, and repo. Ask the user to confirm before proceeding.
 - **Unguided**: use the detected values without asking.
 
-### 6b. Non-GitHub check
+### 6b. Determine provider
 
-If the remote URL does not contain `github.com`: **SKIP** this step. Note: "Step 6 skipped — Globalize currently only supports GitHub repositories."
+- If the remote URL contains `github.com`: proceed to Step 6c (GitHub flow).
+- If the remote URL contains `gitlab.com`: proceed to Step 6c-gitlab (GitLab flow).
+- Otherwise: **SKIP** this step. Note: "Step 6 skipped — Globalize supports GitHub and GitLab repositories only."
 
 ### 6c. Set up GitHub App
 
@@ -292,7 +294,7 @@ Check for existing installations:
 npx @globalize-now/cli-client github installations --json
 ```
 
-Each installation has an `id` (a **numeric** GitHub installation ID, e.g. `122432012`) and an `account` with `login`. If an installation's `account.login` matches `<OWNER>` (case-insensitive): use its `id` as `<INSTALLATION_ID>` and skip to 6d.
+Each installation has `id` (a **UUID** — Globalize's internal installation record), `installationId` (the **numeric** GitHub installation ID, e.g. `122432012`), `accountLogin` (the GitHub org or user name), and `accountType`. Match `accountLogin` against `<OWNER>` (case-insensitive). Use the UUID `id` as `<INSTALLATION_ID>` for `--github-installation-id`.
 
 If no matching installation, start the install flow:
 
@@ -300,7 +302,7 @@ If no matching installation, start the install flow:
 npx @globalize-now/cli-client github install --no-wait --json
 ```
 
-This returns `{ "url": "...", "nonce": "..." }`.
+This returns `{ "installUrl": "...", "nonce": "..." }`.
 
 **Browser interaction required.** This pauses in both guided and unguided modes — it is an external authorization step (same pattern as `auth login` in Step 3), not an explanation or consent gate. Present the URL to the user and ask them to:
 
@@ -315,9 +317,43 @@ After the user confirms, verify:
 npx @globalize-now/cli-client github install-status --nonce <NONCE> --json
 ```
 
-This returns `{ "completed": true, "installationId": "..." }` when done, or `{ "completed": false }` if the user hasn't finished yet. If not completed, ask the user to try again. Once completed, re-run `github installations --json` to get the `<INSTALLATION_ID>` for the target owner.
+This returns `{ "status": "completed", "installationId": "...", "accountLogin": "..." }` when done, `{ "status": "pending" }` if the user hasn't finished yet, or `{ "status": "expired" }` if the nonce expired. Check `status === "completed"`. If not completed, ask the user to try again. Once completed, re-run `github installations --json` to get the `<INSTALLATION_ID>` for the target owner.
 
-### 6d. Verify repository access
+### 6c-gitlab. Set up GitLab Connection
+
+Check for existing connections:
+
+```bash
+npx @globalize-now/cli-client gitlab connections --json
+```
+
+Each connection has `id` (UUID), `username`, `gitlabUserId`, `status`, and `createdAt`. If a connection's `username` matches the GitLab project owner (case-insensitive), use its `id` as `<CONNECTION_ID>` and skip to 6d-gitlab.
+
+If no matching connection, start the OAuth flow:
+
+```bash
+npx @globalize-now/cli-client gitlab install --no-wait --json
+```
+
+This returns `{ "installUrl": "...", "nonce": "...", "expiresIn": ... }`.
+
+**Browser interaction required.** Present the URL to the user and ask them to:
+
+1. Open the URL in their browser
+2. Authorize the GitLab OAuth application
+3. Confirm completion
+
+After the user confirms, verify:
+
+```bash
+npx @globalize-now/cli-client gitlab install-status --nonce <NONCE> --json
+```
+
+This returns `{ "status": "completed", "connectionId": "...", "username": "..." }` when done, `{ "status": "pending" }` if not finished, or `{ "status": "expired" }` if the nonce expired.
+
+Once completed, use `connectionId` as `<CONNECTION_ID>`.
+
+### 6d. Verify repository access (GitHub)
 
 ```bash
 npx @globalize-now/cli-client github repos --installation-id <INSTALLATION_ID> --json
@@ -328,9 +364,30 @@ Confirm that `<OWNER>/<REPO>` appears in the returned list. If not:
 - Inform the user they need to update the installation's repository access settings on GitHub.
 - In unguided mode, note in summary and skip the connection step.
 
-### 6e. Detect locale path pattern (if not already known)
+### 6d-gitlab. Verify project access and detect (GitLab)
 
-If Step 1 did not determine a locale path pattern, use the GitHub App to detect it server-side before connecting:
+List projects accessible through the connection:
+
+```bash
+npx @globalize-now/cli-client gitlab projects --connection-id <CONNECTION_ID> --json
+```
+
+Confirm that the target project appears in the list by matching `pathWithNamespace` against `<OWNER>/<PROJECT>`. Record the numeric `id` as `<GITLAB_PROJECT_ID>`.
+
+If Step 1 did not determine locale path patterns, detect server-side:
+
+```bash
+npx @globalize-now/cli-client gitlab detect \
+  --connection-id <CONNECTION_ID> \
+  --project-id <GITLAB_PROJECT_ID> \
+  --json
+```
+
+The response includes `scoredPresets` (ranked i18n preset matches with confidence levels), `preset` (best match or null), `sourceLanguage`, `targetLanguages`, `localePathPattern` (string or null), `fileFormat` (string or null), `discoveredFiles` (array of `{path, language}`), `namespaces` (array of `{name, filePattern}`), and `framework` (string or null). Use `localePathPattern` and `fileFormat` if present to construct patterns for the repository create command.
+
+### 6e. Detect locale path patterns (if not already known)
+
+If the provider is GitHub and Step 1 did not determine a locale path pattern, use the GitHub App to detect it server-side before connecting:
 
 ```bash
 npx @globalize-now/cli-client github detect \
@@ -340,20 +397,13 @@ npx @globalize-now/cli-client github detect \
   --json
 ```
 
-The response includes `localePathPattern` (string or null), `discoveredFiles`, and `framework`. Use `localePathPattern` if present. If not, proceed without it — the flag is optional.
+The response includes `scoredPresets` (ranked i18n preset matches with confidence levels), `preset` (best match or null), `sourceLanguage`, `targetLanguages`, `localePathPattern` (string or null), `fileFormat` (string or null), `discoveredFiles` (array of `{path, language}`), `namespaces` (array of `{name, filePattern}`), and `framework` (string or null). Use `localePathPattern` and `fileFormat` if present to construct patterns for the repository create command.
 
-### 6f. Configure PR translation settings
+If the provider is GitLab, detection was already handled in 6d-gitlab — skip to 6f.
 
-- **Guided**: ask the user:
-  > **PR translation settings:**
-  > 1. **Enable PR translations?** — Globalize will translate new/changed strings found in pull requests. (default: yes)
-  > 2. **Skip draft PRs?** — Globalize will not translate strings in draft pull requests. (default: yes)
+### 6f. Connect the repository
 
-  Use the user's answers to set the `--pr-translations` and `--skip-draft-prs` flags in 6g.
-
-- **Unguided**: enable both by default — always pass `--pr-translations --skip-draft-prs`.
-
-### 6g. Connect the repository
+**For GitHub:**
 
 ```bash
 npx @globalize-now/cli-client repositories create \
@@ -361,21 +411,29 @@ npx @globalize-now/cli-client repositories create \
   --git-url <GIT_URL> \
   --provider github \
   --github-installation-id <INSTALLATION_ID> \
-  --locale-path-pattern "<LOCALE_PATH_PATTERN>" \
-  --pr-translations \
-  --skip-draft-prs \
+  --patterns '[{"pattern": "<LOCALE_PATH_PATTERN>", "fileFormat": "<FORMAT>"}]' \
   --json
 ```
 
-If no locale path pattern was detected (neither in Step 1 nor in 6e), omit the `--locale-path-pattern` flag.
+**For GitLab:**
 
-If the user chose to disable PR translations in guided mode (6f), omit `--pr-translations`. If the user chose not to skip drafts, omit `--skip-draft-prs`.
+```bash
+npx @globalize-now/cli-client repositories create \
+  --project-id <PROJECT_ID> \
+  --git-url <GIT_URL> \
+  --provider gitlab \
+  --gitlab-connection-id <CONNECTION_ID> \
+  --patterns '[{"pattern": "<LOCALE_PATH_PATTERN>", "fileFormat": "<FORMAT>"}]' \
+  --json
+```
 
-In guided mode: if a pattern was detected, show it to the user and ask for confirmation before proceeding.
+If no patterns were detected (neither in Step 1 nor in 6d-gitlab/6e), omit the `--patterns` flag. The `--import-mode` and `--import-scope` flags are optional (default to `ignore` and `new_keys_only`).
+
+In guided mode: if patterns were detected, show them to the user and ask for confirmation before proceeding.
 
 Parse the returned JSON to extract the **repository ID**.
 
-### 6h. Detect i18n configuration
+### 6g. Detect i18n configuration
 
 After connecting, run detection to discover i18n patterns in the repository:
 
@@ -385,4 +443,4 @@ npx @globalize-now/cli-client repositories detect --id <REPO_ID> --json
 
 Report findings. In guided mode, explain what was detected. In unguided mode, include in the summary.
 
-If uncommitted or unpushed changes were detected in Step 1, add a note: "i18n detection runs against remote code on GitHub — uncommitted or unpushed local changes are not reflected in the detection results."
+If uncommitted or unpushed changes were detected in Step 1, add a note: "i18n detection runs against remote code — uncommitted or unpushed local changes are not reflected in the detection results."
