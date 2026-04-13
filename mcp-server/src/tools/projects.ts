@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ApiClient } from "@globalize-now/cli-client";
-import { listProjects, createProject, getProject, deleteProject } from "@globalize-now/cli-client";
+import { listProjects, createProject, updateProject, getProject, deleteProject } from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
 
 export function registerProjectTools(server: McpServer, client: ApiClient) {
@@ -33,6 +33,62 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
     async ({ name, sourceLanguage, targetLanguages }) => {
       try {
         return formatSuccess(await createProject(client, name, sourceLanguage, targetLanguages));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "update_project",
+    {
+      description: "Update a project's name, languages, or config",
+      inputSchema: {
+        id: z.string().uuid().describe("Project UUID"),
+        name: z.string().optional().describe("New project name"),
+        sourceLanguage: z.string().uuid().optional().describe("New source language UUID"),
+        targetLanguages: z.array(z.string().uuid()).optional().describe("New target language UUIDs"),
+        config: z
+          .object({
+            qa: z
+              .object({
+                enabledChecks: z.array(z.enum(["placeholder", "length", "terminology", "formatting"])).optional(),
+                qualityThreshold: z.number().optional(),
+                lengthRatioBounds: z.record(z.object({ min: z.number(), max: z.number() })).optional(),
+                aiReviewScope: z.enum(["passes-only", "all", "none"]).optional(),
+              })
+              .optional(),
+            defaultProvider: z.string().optional(),
+            providerOverrides: z.record(z.string()).optional(),
+            deeplFormality: z.record(z.string()).optional(),
+            github: z
+              .object({
+                prTranslations: z.boolean().optional(),
+                ignoreDraftPrs: z.boolean().optional(),
+              })
+              .optional(),
+            gitlab: z
+              .object({
+                mrTranslations: z.boolean().optional(),
+                ignoreDraftMrs: z.boolean().optional(),
+              })
+              .optional(),
+            notifications: z
+              .object({
+                webhookUrl: z.string().optional(),
+                webhookSecret: z.string().optional(),
+                emailRecipients: z.array(z.string()).optional(),
+                enabledEvents: z.array(z.enum(["job_failed", "qa_issues", "delivery_failed", "job_completed"])).optional(),
+              })
+              .optional(),
+          })
+          .optional()
+          .describe("Project configuration"),
+      },
+    },
+    async ({ id, ...updates }) => {
+      try {
+        return formatSuccess(await updateProject(client, id, updates));
       } catch (e) {
         return formatError(e);
       }

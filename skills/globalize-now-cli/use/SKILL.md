@@ -267,6 +267,71 @@ npx @globalize-now/cli-client repositories detect \
 
 ---
 
+## Step 2.5: Project Configuration
+
+Projects have a typed `config` object for QA, provider, VCS, and notification settings. Use `projects update` with `--config` to set or change configuration.
+
+### Reading current config
+
+```bash
+npx @globalize-now/cli-client projects get --id <PROJECT_ID> --json
+```
+
+The returned JSON includes a `config` object with the current settings.
+
+### Updating config
+
+Pass a JSON object via `--config`. The object is **merged** — only include the keys you want to change:
+
+```bash
+npx @globalize-now/cli-client projects update \
+  --id <PROJECT_ID> \
+  --config '{"qa": {"enabledChecks": ["placeholder", "terminology"], "qualityThreshold": 80}}' \
+  --json
+```
+
+You can also update `--name`, `--source-language`, and `--target-languages` in the same call.
+
+### Config sections
+
+| Section | Fields | Description |
+|---------|--------|-------------|
+| `qa` | `enabledChecks` (`"placeholder"`, `"length"`, `"terminology"`, `"formatting"`), `qualityThreshold` (number), `lengthRatioBounds` (object keyed by locale, each `{min, max}`), `aiReviewScope` (`"passes-only"`, `"all"`, `"none"`) | Quality assurance checks and thresholds |
+| `defaultProvider` | string | Default translation provider |
+| `providerOverrides` | object keyed by locale → provider string | Per-language provider overrides |
+| `deeplFormality` | object keyed by locale → formality string | DeepL formality settings per language |
+| `github` | `prTranslations` (boolean), `ignoreDraftPrs` (boolean) | GitHub integration behaviour |
+| `gitlab` | `mrTranslations` (boolean), `ignoreDraftMrs` (boolean) | GitLab integration behaviour |
+| `notifications` | `webhookUrl` (string), `webhookSecret` (string), `emailRecipients` (string[]), `enabledEvents` (`"job_failed"`, `"qa_issues"`, `"delivery_failed"`, `"job_completed"`) | Webhook and email notification settings |
+
+### Examples
+
+**Enable QA checks:**
+```bash
+npx @globalize-now/cli-client projects update \
+  --id <PROJECT_ID> \
+  --config '{"qa": {"enabledChecks": ["placeholder", "length", "terminology", "formatting"], "qualityThreshold": 90, "aiReviewScope": "all"}}' \
+  --json
+```
+
+**Configure GitHub PR translations:**
+```bash
+npx @globalize-now/cli-client projects update \
+  --id <PROJECT_ID> \
+  --config '{"github": {"prTranslations": true, "ignoreDraftPrs": true}}' \
+  --json
+```
+
+**Set up webhook notifications:**
+```bash
+npx @globalize-now/cli-client projects update \
+  --id <PROJECT_ID> \
+  --config '{"notifications": {"webhookUrl": "https://example.com/webhook", "enabledEvents": ["job_failed", "job_completed"]}}' \
+  --json
+```
+
+---
+
 ## Step 3: Managing Project Languages
 
 After project creation, add or remove target languages as needed.
@@ -486,6 +551,7 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `orgs delete` | `--id` | |
 | `projects list` | | |
 | `projects create` | `--name`, `--source-language` (ID), `--target-languages` (IDs) | |
+| `projects update` | `--id` | `--name`, `--source-language`, `--target-languages`, `--config` (JSON) |
 | `projects get` | `--id` | |
 | `projects delete` | `--id` | |
 | `languages list` | | |

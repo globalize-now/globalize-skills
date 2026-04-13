@@ -20,7 +20,10 @@ export async function createRepository(
     gitUrl: string;
     provider: "github" | "gitlab";
     branches?: string[];
-    patterns?: { pattern: string; fileFormat: "json-flat" | "json-nested" | "xliff" | "xliff-2" | "xliff-1.2" | "yaml" | "po" }[];
+    patterns?: {
+      pattern: string;
+      fileFormat: "json-flat" | "json-nested" | "xliff" | "xliff-2" | "xliff-1.2" | "yaml" | "po";
+    }[];
     githubInstallationId?: string;
     gitlabConnectionId?: string;
     importMode?: "ignore" | "reviewed" | "translated";

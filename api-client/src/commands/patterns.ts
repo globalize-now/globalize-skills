@@ -32,7 +32,10 @@ export async function updatePattern(
   client: ApiClient,
   repoId: string,
   patternId: string,
-  updates: { pattern?: string; fileFormat?: "json-flat" | "json-nested" | "xliff" | "xliff-2" | "xliff-1.2" | "yaml" | "po" },
+  updates: {
+    pattern?: string;
+    fileFormat?: "json-flat" | "json-nested" | "xliff" | "xliff-2" | "xliff-1.2" | "yaml" | "po";
+  },
 ) {
   const { data, error, response } = await client.PATCH("/api/repositories/{repoId}/patterns/{patternId}", {
     params: { path: { repoId, patternId } },
@@ -79,20 +82,18 @@ export function register(group: Command, getClient: ClientFactory): void {
     .description("Create a pattern")
     .requiredOption("--repository-id <id>", "Repository UUID")
     .requiredOption("--pattern <pattern>", "Locale path pattern")
-    .addOption(new Option("--file-format <format>", "File format").choices(["json-flat", "json-nested", "xliff", "xliff-2", "xliff-1.2", "yaml", "po"]).makeOptionMandatory())
+    .addOption(
+      new Option("--file-format <format>", "File format")
+        .choices(["json-flat", "json-nested", "xliff", "xliff-2", "xliff-1.2", "yaml", "po"])
+        .makeOptionMandatory(),
+    )
     .option("--position <n>", "Position", parseInt)
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         output(
-          await createPattern(
-            client,
-            cmdOpts.repositoryId,
-            cmdOpts.pattern,
-            cmdOpts.fileFormat,
-            cmdOpts.position,
-          ),
+          await createPattern(client, cmdOpts.repositoryId, cmdOpts.pattern, cmdOpts.fileFormat, cmdOpts.position),
           opts,
         );
       } catch (e) {
@@ -106,7 +107,17 @@ export function register(group: Command, getClient: ClientFactory): void {
     .requiredOption("--repository-id <id>", "Repository UUID")
     .requiredOption("--pattern-id <id>", "Pattern UUID")
     .option("--pattern <pattern>", "Locale path pattern")
-    .addOption(new Option("--file-format <format>", "File format").choices(["json-flat", "json-nested", "xliff", "xliff-2", "xliff-1.2", "yaml", "po"]))
+    .addOption(
+      new Option("--file-format <format>", "File format").choices([
+        "json-flat",
+        "json-nested",
+        "xliff",
+        "xliff-2",
+        "xliff-1.2",
+        "yaml",
+        "po",
+      ]),
+    )
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {

@@ -281,6 +281,8 @@ Parse the returned JSON to extract the **project ID**.
 
 In guided mode: show the project ID and confirm creation succeeded.
 
+**Note:** Project configuration (QA checks, provider settings, GitHub/GitLab behaviour, notifications) can be customised after creation via `projects update --id <PROJECT_ID> --config '<JSON>'`. See the `globalize-now-cli-use` skill (Step 2.5) for details.
+
 ---
 
 ## Step 6: Connect Repository

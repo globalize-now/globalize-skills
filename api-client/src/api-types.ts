@@ -4723,7 +4723,41 @@ export interface paths {
                             orgId: string;
                             name: string;
                             slug: string;
-                            config: unknown;
+                            config: {
+                                qa?: {
+                                    enabledChecks?: ("placeholder" | "length" | "terminology" | "formatting")[];
+                                    qualityThreshold?: number;
+                                    lengthRatioBounds?: {
+                                        [key: string]: {
+                                            min: number;
+                                            max: number;
+                                        };
+                                    };
+                                    /** @enum {string} */
+                                    aiReviewScope?: "passes-only" | "all" | "none";
+                                };
+                                defaultProvider?: string;
+                                providerOverrides?: {
+                                    [key: string]: string;
+                                };
+                                deeplFormality?: {
+                                    [key: string]: string;
+                                };
+                                github?: {
+                                    prTranslations?: boolean;
+                                    ignoreDraftPrs?: boolean;
+                                };
+                                gitlab?: {
+                                    mrTranslations?: boolean;
+                                    ignoreDraftMrs?: boolean;
+                                };
+                                notifications?: {
+                                    webhookUrl?: string;
+                                    webhookSecret?: string;
+                                    emailRecipients?: string[];
+                                    enabledEvents?: ("job_failed" | "qa_issues" | "delivery_failed" | "job_completed")[];
+                                };
+                            };
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -4889,7 +4923,39 @@ export interface paths {
                         targetLanguages: string[];
                         /** @default {} */
                         config?: {
-                            [key: string]: unknown;
+                            qa?: {
+                                enabledChecks?: ("placeholder" | "length" | "terminology" | "formatting")[];
+                                qualityThreshold?: number;
+                                lengthRatioBounds?: {
+                                    [key: string]: {
+                                        min: number;
+                                        max: number;
+                                    };
+                                };
+                                /** @enum {string} */
+                                aiReviewScope?: "passes-only" | "all" | "none";
+                            };
+                            defaultProvider?: string;
+                            providerOverrides?: {
+                                [key: string]: string;
+                            };
+                            deeplFormality?: {
+                                [key: string]: string;
+                            };
+                            github?: {
+                                prTranslations?: boolean;
+                                ignoreDraftPrs?: boolean;
+                            };
+                            gitlab?: {
+                                mrTranslations?: boolean;
+                                ignoreDraftMrs?: boolean;
+                            };
+                            notifications?: {
+                                webhookUrl?: string;
+                                webhookSecret?: string;
+                                emailRecipients?: string[];
+                                enabledEvents?: ("job_failed" | "qa_issues" | "delivery_failed" | "job_completed")[];
+                            };
                         };
                     };
                 };
@@ -4906,7 +4972,41 @@ export interface paths {
                             orgId: string;
                             name: string;
                             slug: string;
-                            config: unknown;
+                            config: {
+                                qa?: {
+                                    enabledChecks?: ("placeholder" | "length" | "terminology" | "formatting")[];
+                                    qualityThreshold?: number;
+                                    lengthRatioBounds?: {
+                                        [key: string]: {
+                                            min: number;
+                                            max: number;
+                                        };
+                                    };
+                                    /** @enum {string} */
+                                    aiReviewScope?: "passes-only" | "all" | "none";
+                                };
+                                defaultProvider?: string;
+                                providerOverrides?: {
+                                    [key: string]: string;
+                                };
+                                deeplFormality?: {
+                                    [key: string]: string;
+                                };
+                                github?: {
+                                    prTranslations?: boolean;
+                                    ignoreDraftPrs?: boolean;
+                                };
+                                gitlab?: {
+                                    mrTranslations?: boolean;
+                                    ignoreDraftMrs?: boolean;
+                                };
+                                notifications?: {
+                                    webhookUrl?: string;
+                                    webhookSecret?: string;
+                                    emailRecipients?: string[];
+                                    enabledEvents?: ("job_failed" | "qa_issues" | "delivery_failed" | "job_completed")[];
+                                };
+                            };
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -5264,7 +5364,41 @@ export interface paths {
                             orgId: string;
                             name: string;
                             slug: string;
-                            config: unknown;
+                            config: {
+                                qa?: {
+                                    enabledChecks?: ("placeholder" | "length" | "terminology" | "formatting")[];
+                                    qualityThreshold?: number;
+                                    lengthRatioBounds?: {
+                                        [key: string]: {
+                                            min: number;
+                                            max: number;
+                                        };
+                                    };
+                                    /** @enum {string} */
+                                    aiReviewScope?: "passes-only" | "all" | "none";
+                                };
+                                defaultProvider?: string;
+                                providerOverrides?: {
+                                    [key: string]: string;
+                                };
+                                deeplFormality?: {
+                                    [key: string]: string;
+                                };
+                                github?: {
+                                    prTranslations?: boolean;
+                                    ignoreDraftPrs?: boolean;
+                                };
+                                gitlab?: {
+                                    mrTranslations?: boolean;
+                                    ignoreDraftMrs?: boolean;
+                                };
+                                notifications?: {
+                                    webhookUrl?: string;
+                                    webhookSecret?: string;
+                                    emailRecipients?: string[];
+                                    enabledEvents?: ("job_failed" | "qa_issues" | "delivery_failed" | "job_completed")[];
+                                };
+                            };
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -5468,7 +5602,39 @@ export interface paths {
                         sourceLanguage?: string;
                         targetLanguages?: string[];
                         config?: {
-                            [key: string]: unknown;
+                            qa?: {
+                                enabledChecks?: ("placeholder" | "length" | "terminology" | "formatting")[];
+                                qualityThreshold?: number;
+                                lengthRatioBounds?: {
+                                    [key: string]: {
+                                        min: number;
+                                        max: number;
+                                    };
+                                };
+                                /** @enum {string} */
+                                aiReviewScope?: "passes-only" | "all" | "none";
+                            };
+                            defaultProvider?: string;
+                            providerOverrides?: {
+                                [key: string]: string;
+                            };
+                            deeplFormality?: {
+                                [key: string]: string;
+                            };
+                            github?: {
+                                prTranslations?: boolean;
+                                ignoreDraftPrs?: boolean;
+                            };
+                            gitlab?: {
+                                mrTranslations?: boolean;
+                                ignoreDraftMrs?: boolean;
+                            };
+                            notifications?: {
+                                webhookUrl?: string;
+                                webhookSecret?: string;
+                                emailRecipients?: string[];
+                                enabledEvents?: ("job_failed" | "qa_issues" | "delivery_failed" | "job_completed")[];
+                            };
                         };
                     };
                 };
@@ -5485,7 +5651,41 @@ export interface paths {
                             orgId: string;
                             name: string;
                             slug: string;
-                            config: unknown;
+                            config: {
+                                qa?: {
+                                    enabledChecks?: ("placeholder" | "length" | "terminology" | "formatting")[];
+                                    qualityThreshold?: number;
+                                    lengthRatioBounds?: {
+                                        [key: string]: {
+                                            min: number;
+                                            max: number;
+                                        };
+                                    };
+                                    /** @enum {string} */
+                                    aiReviewScope?: "passes-only" | "all" | "none";
+                                };
+                                defaultProvider?: string;
+                                providerOverrides?: {
+                                    [key: string]: string;
+                                };
+                                deeplFormality?: {
+                                    [key: string]: string;
+                                };
+                                github?: {
+                                    prTranslations?: boolean;
+                                    ignoreDraftPrs?: boolean;
+                                };
+                                gitlab?: {
+                                    mrTranslations?: boolean;
+                                    ignoreDraftMrs?: boolean;
+                                };
+                                notifications?: {
+                                    webhookUrl?: string;
+                                    webhookSecret?: string;
+                                    emailRecipients?: string[];
+                                    enabledEvents?: ("job_failed" | "qa_issues" | "delivery_failed" | "job_completed")[];
+                                };
+                            };
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */

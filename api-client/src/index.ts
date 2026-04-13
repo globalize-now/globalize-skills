@@ -6,7 +6,7 @@ export { resolveAuth, readConfigFile, writeConfigFile, deleteConfigFile, type Au
 export { listOrgs, createOrg, deleteOrg } from "./commands/orgs.js";
 
 // Projects
-export { listProjects, createProject, getProject, deleteProject } from "./commands/projects.js";
+export { listProjects, createProject, updateProject, getProject, deleteProject } from "./commands/projects.js";
 
 // Languages
 export { listLanguages, getLanguage } from "./commands/languages.js";
@@ -25,13 +25,7 @@ export {
 } from "./commands/repositories.js";
 
 // Patterns
-export {
-  listPatterns,
-  createPattern,
-  updatePattern,
-  deletePattern,
-  reorderPattern,
-} from "./commands/patterns.js";
+export { listPatterns, createPattern, updatePattern, deletePattern, reorderPattern } from "./commands/patterns.js";
 
 // Glossary
 export { listGlossary, createGlossaryEntry, deleteGlossaryEntry } from "./commands/glossary.js";

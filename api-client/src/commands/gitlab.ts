@@ -44,24 +44,18 @@ export async function listGitlabProjects(client: ApiClient, connectionId: string
 }
 
 export async function listGitlabProjectBranches(client: ApiClient, connectionId: string, projectId: number) {
-  const { data, error, response } = await client.GET(
-    "/api/gitlab/connections/{id}/projects/{projectId}/branches",
-    {
-      params: { path: { id: connectionId, projectId } },
-    },
-  );
+  const { data, error, response } = await client.GET("/api/gitlab/connections/{id}/projects/{projectId}/branches", {
+    params: { path: { id: connectionId, projectId } },
+  });
   if (error) throw new Error(extractError(response, error));
   return data!;
 }
 
 export async function detectGitlabProject(client: ApiClient, connectionId: string, projectId: number) {
-  const { data, error, response } = await client.POST(
-    "/api/gitlab/connections/{id}/projects/{projectId}/detect",
-    {
-      params: { path: { id: connectionId, projectId } },
-      body: {},
-    },
-  );
+  const { data, error, response } = await client.POST("/api/gitlab/connections/{id}/projects/{projectId}/detect", {
+    params: { path: { id: connectionId, projectId } },
+    body: {},
+  });
   if (error) throw new Error(extractError(response, error));
   return data!;
 }
