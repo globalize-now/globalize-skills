@@ -4,6 +4,7 @@ import { extractError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
+type ProjectCreateBody = paths["/api/projects"]["post"]["requestBody"]["content"]["application/json"];
 type ProjectUpdateBody = paths["/api/projects/{id}"]["patch"]["requestBody"]["content"]["application/json"];
 
 type ClientFactory = () => Promise<ApiClient>;
@@ -19,9 +20,10 @@ export async function createProject(
   name: string,
   sourceLanguage: string,
   targetLanguages: string[],
+  config?: ProjectCreateBody["config"],
 ) {
   const { data, error, response } = await client.POST("/api/projects", {
-    body: { name, sourceLanguage, targetLanguages },
+    body: { name, sourceLanguage, targetLanguages, config },
   });
   if (error) throw new Error(extractError(response, error));
   return data!;
@@ -72,6 +74,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .requiredOption("--name <name>", "Project name")
     .requiredOption("--source-language <id>", "Source language ID")
     .requiredOption("--target-languages <ids...>", "Target language IDs (variadic or comma-separated)")
+    .option("--config <json>", "Project config as JSON")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
@@ -87,7 +90,15 @@ export function register(group: Command, getClient: ClientFactory): void {
               .split(",")
               .map((x: string) => x.trim())
               .filter(Boolean);
-        output(await createProject(client, cmdOpts.name, cmdOpts.sourceLanguage, targetLanguages), opts);
+        let config: ProjectCreateBody["config"];
+        if (cmdOpts.config !== undefined) {
+          try {
+            config = JSON.parse(cmdOpts.config);
+          } catch {
+            throw new Error(`Invalid JSON for --config: ${cmdOpts.config}`);
+          }
+        }
+        output(await createProject(client, cmdOpts.name, cmdOpts.sourceLanguage, targetLanguages, config), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }
