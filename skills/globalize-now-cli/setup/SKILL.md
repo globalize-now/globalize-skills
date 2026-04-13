@@ -45,7 +45,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - [x] Step 2: Install CLI — {npx or global}
 - [x] Step 3: Authenticate — {auth method}
 - [x] Step 4: Verify — {org name}
-- [x] Step 5: Create Project — "{name}" (source: {source}, targets: {targets})
+- [x] Step 5: Create Project — "{name}" (source: {source}, targets: {targets}, config: {config summary or "none"})
 - [x] Step 6: Connect Repository — {owner/repo} connected via {GitHub|GitLab}, patterns: {count configured or "none"}, import mode: {mode}
 
 ### Warnings (if any)
@@ -269,17 +269,24 @@ Match the detected or provided locale codes against the `locale` field in the re
 
 ### 5e. Create the project
 
+Build the `--config` flag based on the git provider detected in Step 1:
+
+- **GitHub** (`github.com` remote): `{"github": {"prTranslations": true, "ignoreDraftPrs": true}}`
+- **GitLab** (`gitlab.com` remote): `{"gitlab": {"mrTranslations": true, "ignoreDraftMrs": true}}`
+- **No git remote / unsupported provider**: omit `--config`
+
 ```bash
 npx @globalize-now/cli-client projects create \
   --name "<PROJECT_NAME>" \
   --source-language <SOURCE_LANGUAGE_UUID> \
   --target-languages <TARGET_UUID_1> <TARGET_UUID_2> \
+  --config '<CONFIG_JSON>' \
   --json
 ```
 
 Parse the returned JSON to extract the **project ID**.
 
-In guided mode: show the project ID and confirm creation succeeded.
+In guided mode: show the project ID and the applied config, and confirm creation succeeded.
 
 **Note:** Project configuration (QA checks, provider settings, GitHub/GitLab behaviour, notifications) can be customised after creation via `projects update --id <PROJECT_ID> --config '<JSON>'`. See the `globalize-now-cli-use` skill (Step 2.5) for details.
 
