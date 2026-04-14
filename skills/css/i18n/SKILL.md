@@ -218,7 +218,7 @@ Flexbox and grid layouts automatically respect `dir="rtl"` — the main axis fli
 
 ## Step 4: Workflow
 
-Process files in this priority order (matching the translate skill's pattern):
+Process files in this priority order (matching the convert skill's pattern):
 
 1. **Layout components** (app shell, sidebar, navbar, footer) — affect every page
 2. **Shared components** (buttons, cards, modals, form fields) — reused everywhere

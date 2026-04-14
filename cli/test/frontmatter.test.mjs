@@ -19,7 +19,7 @@ description: Set up LinguiJS
 
   it("parses multi-line folded description (>-)", () => {
     const input = `---
-name: lingui-translate
+name: lingui-convert
 description: >-
   Wrap hardcoded UI strings with LinguiJS macros and detect
   localization gaps in any React-based project.
@@ -28,7 +28,7 @@ description: >-
 Body here`;
 
     const result = parseFrontmatter(input);
-    assert.equal(result.attributes.name, "lingui-translate");
+    assert.equal(result.attributes.name, "lingui-convert");
     assert.equal(
       result.attributes.description,
       "Wrap hardcoded UI strings with LinguiJS macros and detect localization gaps in any React-based project.",

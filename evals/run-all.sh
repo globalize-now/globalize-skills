@@ -36,30 +36,30 @@ run_eval "lingui/setup" "vite-swc"
 run_eval "lingui/setup" "vite-babel"
 run_eval "lingui/setup" "shadcn-admin"
 
-# ─── lingui/translate evals ───
-run_translate_eval() {
+# ─── lingui/convert evals ───
+run_convert_eval() {
   local fixture="$1"
   TOTAL=$((TOTAL + 1))
 
   echo ""
   echo "========================================"
-  echo "  EVAL: lingui/translate / $fixture"
+  echo "  EVAL: lingui/convert / $fixture"
   echo "========================================"
   echo ""
 
-  if "$SCRIPT_DIR/run-eval-translate.sh" "$fixture"; then
+  if "$SCRIPT_DIR/run-eval-convert.sh" "$fixture"; then
     PASSED=$((PASSED + 1))
-    RESULTS+=("PASS  lingui/translate / $fixture")
+    RESULTS+=("PASS  lingui/convert / $fixture")
   else
     FAILED=$((FAILED + 1))
-    RESULTS+=("FAIL  lingui/translate / $fixture")
+    RESULTS+=("FAIL  lingui/convert / $fixture")
   fi
 }
 
-run_translate_eval "nextjs-app-router"
-run_translate_eval "vite-swc"
-run_translate_eval "vite-babel"
-run_translate_eval "shadcn-admin"
+run_convert_eval "nextjs-app-router"
+run_convert_eval "vite-swc"
+run_convert_eval "vite-babel"
+run_convert_eval "shadcn-admin"
 
 # ─── Summary ───
 echo ""

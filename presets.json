@@ -1,11 +1,11 @@
 {
   "i18n-guide": {
     "description": "Not sure where to start? Detects your stack and recommends the right i18n library — includes all skills",
-    "skills": ["i18n-guide", "lingui-setup", "lingui-translate", "lingui-code", "next-intl-setup", "next-intl-translate", "css-i18n", "globalize-now-cli-setup", "globalize-now-cli-use"]
+    "skills": ["i18n-guide", "lingui-setup", "lingui-convert", "lingui-code", "next-intl-setup", "next-intl-convert", "css-i18n", "globalize-now-cli-setup", "globalize-now-cli-use"]
   },
   "lingui": {
-    "description": "All LinguiJS skills (setup, translate, code) plus CSS i18n",
-    "skills": ["lingui-setup", "lingui-translate", "lingui-code", "css-i18n"]
+    "description": "All LinguiJS skills (setup, convert, code) plus CSS i18n",
+    "skills": ["lingui-setup", "lingui-convert", "lingui-code", "css-i18n"]
   },
   "css": {
     "description": "CSS internationalization (logical properties, RTL support)",
@@ -16,7 +16,7 @@
     "skills": ["globalize-now-cli-setup", "globalize-now-cli-use"]
   },
   "next-intl": {
-    "description": "next-intl internationalization for Next.js (setup and translate)",
-    "skills": ["next-intl-setup", "next-intl-translate"]
+    "description": "next-intl internationalization for Next.js (setup and convert)",
+    "skills": ["next-intl-setup", "next-intl-convert"]
   }
 }

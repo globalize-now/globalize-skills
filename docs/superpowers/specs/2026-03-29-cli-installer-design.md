@@ -32,8 +32,8 @@ Defined in `presets.json` at the repo root:
 ```json
 {
   "lingui": {
-    "description": "All LinguiJS skills (setup, translate, code)",
-    "skills": ["lingui-setup", "lingui-translate", "lingui-code"]
+    "description": "All LinguiJS skills (setup, convert, code)",
+    "skills": ["lingui-setup", "lingui-convert", "lingui-code"]
   }
 }
 ```

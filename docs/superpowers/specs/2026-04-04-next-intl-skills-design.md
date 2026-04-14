@@ -2,11 +2,11 @@
 
 ## Context
 
-The globalization-skills repo currently covers LinguiJS (setup, translate, code) and CSS i18n. next-intl is the most popular i18n library specifically built for Next.js, with native App Router and Server Component support. Adding next-intl skills expands coverage to the dominant Next.js i18n choice.
+The globalization-skills repo currently covers LinguiJS (setup, convert, code) and CSS i18n. next-intl is the most popular i18n library specifically built for Next.js, with native App Router and Server Component support. Adding next-intl skills expands coverage to the dominant Next.js i18n choice.
 
 Two skills will be created:
 - **next-intl-setup** — Install and configure next-intl in a Next.js project
-- **next-intl-translate** — Wrap hardcoded strings with next-intl APIs in an already-configured project
+- **next-intl-convert** — Wrap hardcoded strings with next-intl APIs in an already-configured project
 
 ## Structure
 
@@ -17,7 +17,7 @@ skills/next-intl/
     references/
       nextjs-app-router.md
       nextjs-pages-router.md
-  translate/
+  convert/
     SKILL.md
     references/
       nextjs-app-router.md
@@ -42,7 +42,7 @@ description: >-
   Next.js app", "add language support", "make my app multilingual". This skill
   handles the full setup: package installation, routing config, middleware,
   provider wiring, and message file scaffolding. It does NOT cover converting
-  existing strings — that's next-intl-translate.
+  existing strings — that's next-intl-convert.
 ```
 
 ### Step Risk Classification
@@ -318,12 +318,12 @@ format.number(1234.5, {style: 'currency', currency: 'EUR'});
 
 ---
 
-## Skill 2: next-intl-translate
+## Skill 2: next-intl-convert
 
 ### Frontmatter
 
 ```yaml
-name: next-intl-translate
+name: next-intl-convert
 description: >-
   Wrap hardcoded UI strings with next-intl translation functions in a Next.js
   project that already has next-intl configured. Use this skill when the user
@@ -435,7 +435,7 @@ After batch wrapping:
 2. Run dev server, verify no missing key warnings
 3. Run existing tests
 
-### Variant Differences (translate)
+### Variant Differences (convert)
 
 **App Router reference** covers:
 - `getTranslations()` for Server Components (async, awaited)
@@ -460,7 +460,7 @@ After batch wrapping:
 5. Verify Server Component translations render (App Router)
 6. Verify Client Component translations render (both routers)
 
-### Translate skill verification
+### Convert skill verification
 1. Install in a project with next-intl already configured
 2. Create a component with hardcoded strings
 3. Run the skill, confirm strings are wrapped correctly

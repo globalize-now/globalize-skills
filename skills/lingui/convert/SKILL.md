@@ -1,5 +1,5 @@
 ---
-name: lingui-translate
+name: lingui-convert
 description: >-
   Wrap hardcoded UI strings with LinguiJS macros and detect localization gaps in
   any React-based project that already has LinguiJS set up. Use this skill when

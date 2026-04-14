@@ -2,13 +2,13 @@
 
 ## Context
 
-Lingui supports `comment` (translator notes) and `context` (disambiguation) on translation macros. Both the `lingui-translate` and `lingui-code` skills document the mechanics, but comments are treated as an afterthought — a reference section rather than an active part of the workflow. This leads to under-commented catalogs where translators see ambiguous strings like "Save", "Post", or "Park" without context.
+Lingui supports `comment` (translator notes) and `context` (disambiguation) on translation macros. Both the `lingui-convert` and `lingui-code` skills document the mechanics, but comments are treated as an afterthought — a reference section rather than an active part of the workflow. This leads to under-commented catalogs where translators see ambiguous strings like "Save", "Post", or "Park" without context.
 
 The goal: make comments a first-class part of both skills — detected smartly, added inline during wrapping, and reviewed after the fact.
 
 ## Design
 
-### 1. Detect App Domain (new Step 3 in translate skill)
+### 1. Detect App Domain (new Step 3 in convert skill)
 
 Inserted after "Detect the Project" (current Step 2). Remaining steps shift by one.
 
@@ -52,7 +52,7 @@ Both skills instruct the agent to run the heuristic checklist as each string is 
 
 **Code skill:** "Translator comments" section rewritten: "Before finishing any string wrap, check the ambiguity checklist. If the string matches, add the comment inline."
 
-### 4. Comment Review Pass (new Step 9 in translate skill)
+### 4. Comment Review Pass (new Step 9 in convert skill)
 
 After all wrapping and extraction:
 
@@ -67,12 +67,12 @@ Code skill does not get a review pass — inline checklist is sufficient for one
 
 ## Files Modified
 
-- `skills/lingui/translate/SKILL.md` — new Step 3 (domain detection), heuristic checklist prepended to Step 7 (comments section), inline instruction in Step 8 (workflow), new Step 9 (review pass)
+- `skills/lingui/convert/SKILL.md` — new Step 3 (domain detection), heuristic checklist prepended to Step 7 (comments section), inline instruction in Step 8 (workflow), new Step 9 (review pass)
 - `skills/lingui/code/SKILL.md` — rewrite "Translator comments" section with heuristic checklist, add domain awareness note
 
 No new files.
 
-## Step Renumbering (translate skill)
+## Step Renumbering (convert skill)
 
 | Old | New | Title |
 |-----|-----|-------|

@@ -7,7 +7,7 @@ description: >-
   Pages Router), TanStack Router, React Router, or any other React setup. This skill
   handles the full setup: package installation, config file, build tool integration,
   provider wiring, and locale scaffolding. It does NOT cover converting existing strings
-  to macros — that's a separate concern (lingui-translate).
+  to macros — that's a separate concern (lingui-convert).
 ---
 
 # LinguiJS Setup
@@ -615,7 +615,7 @@ const label = t`{count, plural, one {# item} other {# items}}`
 
 > Always include `other` — it is required and serves as the fallback for all languages.
 
-For comprehensive string wrapping, localization gap detection (numbers, currencies, dates), and full ICU MessageFormat guidance, use the `lingui-translate` skill.
+For comprehensive string wrapping, localization gap detection (numbers, currencies, dates), and full ICU MessageFormat guidance, use the `lingui-convert` skill.
 
 ---
 
@@ -633,4 +633,4 @@ Catalog files (PO or JSON) need a translation pipeline. Options:
 
 ### Wrap existing strings
 
-This skill set up the infrastructure but did **not** convert existing hardcoded strings to `<Trans>` or `t` macros. Use the `lingui-translate` skill to automatically wrap existing strings with LinguiJS macros.
+This skill set up the infrastructure but did **not** convert existing hardcoded strings to `<Trans>` or `t` macros. Use the `lingui-convert` skill to automatically wrap existing strings with LinguiJS macros.

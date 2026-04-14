@@ -6,7 +6,7 @@ description: >-
   hands off to it after recommending next-intl. Supports both App Router and
   Pages Router. This skill handles the full setup: package installation,
   routing config, middleware, provider wiring, and message file scaffolding.
-  It does NOT cover converting existing strings — that's next-intl-translate.
+  It does NOT cover converting existing strings — that's next-intl-convert.
 ---
 
 # next-intl Setup
@@ -841,7 +841,7 @@ Setup is complete — the project can now load and display translations per loca
 
 ### Wrap existing strings
 
-This skill set up the infrastructure but did **not** convert existing hardcoded strings to `useTranslations` or `getTranslations` calls. Use the `next-intl-translate` skill to automatically wrap existing strings with next-intl translation functions and populate message files.
+This skill set up the infrastructure but did **not** convert existing hardcoded strings to `useTranslations` or `getTranslations` calls. Use the `next-intl-convert` skill to automatically wrap existing strings with next-intl translation functions and populate message files.
 
 ### Connect a translation service
 

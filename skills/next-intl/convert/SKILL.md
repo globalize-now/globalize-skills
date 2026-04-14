@@ -1,5 +1,5 @@
 ---
-name: next-intl-translate
+name: next-intl-convert
 description: >-
   Wrap hardcoded UI strings with next-intl translation functions in a Next.js
   project that already has next-intl configured. Use this skill when the user

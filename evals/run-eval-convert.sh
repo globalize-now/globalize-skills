@@ -1,19 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-# Usage: ./evals/run-eval-translate.sh <fixture-name>
-# Example: ./evals/run-eval-translate.sh vite-swc
+# Usage: ./evals/run-eval-convert.sh <fixture-name>
+# Example: ./evals/run-eval-convert.sh vite-swc
 #
-# Runs lingui-setup + lingui-translate against a fixture project,
+# Runs lingui-setup + lingui-convert against a fixture project,
 # then verifies infrastructure, string wrapping, and translation quality.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-FIXTURE="${1:?Usage: run-eval-translate.sh <fixture-name>}"
+FIXTURE="${1:?Usage: run-eval-convert.sh <fixture-name>}"
 
 SETUP_SKILL_PATH="$REPO_ROOT/skills/lingui/setup"
-TRANSLATE_SKILL_PATH="$REPO_ROOT/skills/lingui/translate"
+CONVERT_SKILL_PATH="$REPO_ROOT/skills/lingui/convert"
 MANIFEST="$SCRIPT_DIR/fixtures.json"
 
 if [ ! -d "$SETUP_SKILL_PATH" ]; then
@@ -21,8 +21,8 @@ if [ ! -d "$SETUP_SKILL_PATH" ]; then
   exit 1
 fi
 
-if [ ! -d "$TRANSLATE_SKILL_PATH" ]; then
-  echo "ERROR: lingui/translate skill not found: $TRANSLATE_SKILL_PATH"
+if [ ! -d "$CONVERT_SKILL_PATH" ]; then
+  echo "ERROR: lingui/convert skill not found: $CONVERT_SKILL_PATH"
   exit 1
 fi
 
@@ -80,9 +80,9 @@ echo "==> Installing skill: lingui-setup"
 mkdir -p "$WORKDIR/.claude/skills/lingui-setup"
 cp -R "$SETUP_SKILL_PATH/." "$WORKDIR/.claude/skills/lingui-setup/"
 
-echo "==> Installing skill: lingui-translate"
-mkdir -p "$WORKDIR/.claude/skills/lingui-translate"
-cp -R "$TRANSLATE_SKILL_PATH/." "$WORKDIR/.claude/skills/lingui-translate/"
+echo "==> Installing skill: lingui-convert"
+mkdir -p "$WORKDIR/.claude/skills/lingui-convert"
+cp -R "$CONVERT_SKILL_PATH/." "$WORKDIR/.claude/skills/lingui-convert/"
 
 # 3. Install dependencies
 echo "==> Installing dependencies..."
@@ -97,7 +97,7 @@ echo "==> Creating pre-agent backup..."
 mkdir -p .eval-backup
 rsync -a --exclude='node_modules' --exclude='.claude' --exclude='.git' --exclude='.eval-backup' --exclude='.eval-files-before.txt' . .eval-backup/
 
-# 6. Run the agent with combined setup + translate prompt
+# 6. Run the agent with combined setup + convert prompt
 echo "==> Running Claude Code agent..."
 PROMPT="Set up LinguiJS i18n in this project with English (en) as source locale and Spanish (es) and French (fr) as target locales. Then wrap all user-facing strings with Lingui macros."
 
@@ -111,7 +111,7 @@ find . -type f -not -path './node_modules/*' -not -path './.claude/*' -not -path
 # 8. Run infrastructure verification
 echo ""
 echo "============================================"
-echo "  VERIFICATION: lingui/translate / $FIXTURE"
+echo "  VERIFICATION: lingui/convert / $FIXTURE"
 echo "============================================"
 echo ""
 
@@ -124,7 +124,7 @@ EXPECTATIONS="$SCRIPT_DIR/expectations/$FIXTURE.json"
 if [ -f "$EXPECTATIONS" ]; then
   echo ""
   echo "============================================"
-  echo "  STRING WRAPPING: lingui/translate / $FIXTURE"
+  echo "  STRING WRAPPING: lingui/convert / $FIXTURE"
   echo "============================================"
   echo ""
 
@@ -135,7 +135,7 @@ fi
 # 10. Run translation quality verification
 echo ""
 echo "============================================"
-echo "  TRANSLATE QUALITY: lingui/translate / $FIXTURE"
+echo "  TRANSLATE QUALITY: lingui/convert / $FIXTURE"
 echo "============================================"
 echo ""
 
@@ -145,7 +145,7 @@ TRANSLATE_EXIT=$?
 # Summary
 echo ""
 echo "============================================"
-echo "  SUMMARY: lingui/translate / $FIXTURE"
+echo "  SUMMARY: lingui/convert / $FIXTURE"
 echo "============================================"
 if [ $VERIFY_EXIT -eq 0 ] && [ $STRING_EXIT -eq 0 ] && [ $TRANSLATE_EXIT -eq 0 ]; then
   echo "  RESULT: PASS"

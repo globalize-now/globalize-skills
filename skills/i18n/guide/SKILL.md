@@ -41,7 +41,7 @@ Evaluate these hard stops top-to-bottom. If any applies, stop immediately — do
    **STOP.** Tell the user: "No supported i18n skill for this stack yet. This guide currently covers React-based projects."
 
 2. **Already has an i18n library installed** — any of `@lingui/core`, `@lingui/react`, `next-intl`, `react-intl`, `i18next`, `react-i18next` found in deps or devDeps.
-   **STOP.** Tell the user: "This project already uses `{library}`. To wrap existing strings, run the matching translate skill (e.g., `lingui-translate` or `next-intl-translate`). If setup is incomplete, run the matching setup skill directly."
+   **STOP.** Tell the user: "This project already uses `{library}`. To wrap existing strings, run the matching convert skill (e.g., `lingui-convert` or `next-intl-convert`). If setup is incomplete, run the matching setup skill directly."
 
 ---
 
