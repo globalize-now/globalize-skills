@@ -90,6 +90,7 @@ Read the project's `package.json`, build config (`next.config.*`), and directory
 | Signal | How to detect |
 |--------|--------------|
 | **Framework** | `next` in deps → Next.js. No `next` → STOP. |
+| **Next.js version** | Read the `next` version string from `package.json` deps or devDeps. Parse the major version number (e.g., `"^14.2.0"` → 14, `"16.2.1"` → 16, `"~15.1.0"` → 15). Store as `nextMajor`. |
 | **Router type** | `app/` directory with `layout.tsx`/`layout.jsx` → App Router. `pages/` directory with `_app.tsx`/`_app.jsx` → Pages Router. Both present → App Router (hybrid — treat as App Router). |
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
@@ -104,6 +105,7 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 | **Not Next.js** | No `next` in deps | **STOP.** Tell the user: "next-intl requires Next.js. This project does not have `next` as a dependency. Consider react-i18next or LinguiJS for non-Next.js React apps." Do NOT proceed. |
 | **Existing i18n library** | `react-i18next`, `i18next`, `@lingui/core`, `next-translate`, `react-intl`, `@formatjs/intl`, `typesafe-i18n` in `package.json` deps or devDeps | **STOP.** Tell the user: "{library} is already installed. Adding next-intl alongside it will create conflicting translation pipelines. Options: (1) migrate from {library} to next-intl (separate effort, not covered by this skill), or (2) remove {library} first, then re-run this setup." Do NOT proceed. |
 | **next-intl already installed** | `next-intl` in `package.json` deps or devDeps | **STOP.** Tell the user: "next-intl is already installed. If setup is incomplete, review the existing configuration manually." Do NOT proceed. |
+| **Next.js too old** | `nextMajor` < 12 | **STOP.** Tell the user: "next-intl v4 requires Next.js 12+. This project uses Next.js {nextMajor}. Consider upgrading Next.js first, or install `next-intl@3` manually (not covered by this skill)." Do NOT proceed. |
 
 Based on the detection, pick the right variant reference file:
 
@@ -124,6 +126,17 @@ Use the project's existing package manager. next-intl is a single package — no
 |---------|------|---------|
 | `next-intl` | runtime | Full i18n library: routing, middleware, translations, formatting |
 
+### Version selection
+
+Use the `nextMajor` value detected in Step 1 to choose the right next-intl version:
+
+| Next.js version | Install command | Why |
+|-----------------|----------------|-----|
+| 15+ | `next-intl` (latest) | next-intl v4 is actively maintained and supports Next.js 15-16. |
+| 12–14 | `next-intl` (latest) | next-intl v4 supports Next.js 12-14 via peer deps. If the project uses TypeScript < 5, install `next-intl@3` instead — v4 requires TypeScript 5+. |
+
+> **Note:** Projects on Next.js < 12 are stopped in Step 1 and never reach this step.
+
 ```bash
 # npm
 npm install next-intl
@@ -137,6 +150,8 @@ pnpm add next-intl
 # bun
 bun add next-intl
 ```
+
+If the TypeScript < 5 fallback applies, append `@3` to the package name (e.g., `npm install next-intl@3`).
 
 ---
 

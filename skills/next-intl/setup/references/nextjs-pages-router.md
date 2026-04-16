@@ -10,6 +10,8 @@ Only one package is required:
 |---------|------|---------|
 | `next-intl` | runtime | Full i18n: translations, formatting, provider |
 
+The main SKILL.md (Step 2) determines which next-intl version to install based on the detected Next.js version. Use the install command it selects.
+
 **Example (npm):**
 
 ```bash

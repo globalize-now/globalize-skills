@@ -12,6 +12,8 @@ Only one package is required:
 
 Unlike LinguiJS (which requires `@lingui/swc-plugin` separately), next-intl bundles everything — routing, middleware, server/client APIs — in a single package.
 
+The main SKILL.md (Step 2) determines which next-intl version to install based on the detected Next.js version. Use the install command it selects.
+
 **Example (npm):**
 
 ```bash
