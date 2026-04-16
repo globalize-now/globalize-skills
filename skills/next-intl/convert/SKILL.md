@@ -3,18 +3,21 @@ name: next-intl-convert
 description: >-
   Wrap hardcoded UI strings with next-intl translation functions in a Next.js
   project that already has next-intl configured. Use this skill when the user
-  asks to "wrap strings", "translate the UI", "find hardcoded text",
-  "internationalize existing components", "add translations to components",
-  "detect localization gaps", "find untranslated strings", or "make the app
-  translatable". Also use when the user mentions missing useTranslations or
-  getTranslations usage in existing code. This is a one-time batch job. This
-  skill does NOT install packages or create config — run next-intl-setup first
-  if next-intl is not yet configured.
+  asks to "wrap strings", "find hardcoded text", "internationalize existing
+  components", "make the UI translatable", "detect localization gaps",
+  "find unwrapped strings", or "convert strings for translation". Also use when
+  the user mentions missing useTranslations or getTranslations usage in existing
+  code. This is a one-time batch job. This skill does NOT translate content into
+  other languages — it only makes strings translatable. It does NOT install
+  packages or create config — run next-intl-setup first if next-intl is not yet
+  configured.
 ---
 
 # next-intl String Wrapping
 
 This skill finds hardcoded user-facing strings and wraps them with next-intl translation functions. It also identifies localization gaps: numbers, currencies, dates, and plurals that need locale-aware handling.
+
+> **Scope:** This skill converts strings to make them translatable — it does not translate content. All strings remain in the source language after conversion.
 
 ---
 
@@ -195,7 +198,7 @@ Scan files systematically for these patterns. Apply the confidence tiers to deci
 
 ### Flag with judgment (medium confidence)
 
-Review these and translate only if they appear in the actual UI:
+Review these and wrap only if they appear in the actual UI:
 
 - **`toFixed()` and number formatting**: Raw `toFixed()` won't respect locale decimal separators. Use `format.number()` instead.
 - **Currency symbols hardcoded near numbers**: `"$" + price` or `price + " USD"` — use `format.number(price, {style: 'currency', currency: 'USD'})`.
@@ -393,7 +396,7 @@ Use this path for small-to-medium projects (15 files or fewer).
 
 Work file-by-file in this priority order:
 
-1. **Layout and shell components** (navbar, sidebar, footer) — highest reuse, translate first
+1. **Layout and shell components** (navbar, sidebar, footer) — highest reuse, wrap first
 2. **Shared components** (buttons, modals, form fields) — reused across pages
 3. **Page/route components** — specific to one view
 4. **Utility files** with user-visible strings (constants, route configs, notification messages)

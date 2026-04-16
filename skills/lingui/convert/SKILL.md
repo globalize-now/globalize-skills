@@ -3,19 +3,22 @@ name: lingui-convert
 description: >-
   Wrap hardcoded UI strings with LinguiJS macros and detect localization gaps in
   any React-based project that already has LinguiJS set up. Use this skill when
-  the user explicitly asks to "wrap strings", "translate the UI", "find hardcoded
-  text", "internationalize existing components", "add translations to components",
-  "detect localization gaps", "find untranslated strings", or "make the app
-  translatable". Also use when the user mentions missing <Trans>, t, or useLingui
+  the user explicitly asks to "wrap strings", "find hardcoded text",
+  "internationalize existing components", "make the UI translatable",
+  "detect localization gaps", "find unwrapped strings", or "convert strings for
+  translation". Also use when the user mentions missing <Trans>, t, or useLingui
   usage in existing code. This is a one-time batch job — for wrapping strings as
-  new code is written, use lingui-code instead. This skill does NOT install
-  packages or create config — run lingui-setup first if LinguiJS is not yet
-  configured.
+  new code is written, use lingui-code instead. This skill does NOT translate
+  content into other languages — it only makes strings translatable. It does NOT
+  install packages or create config — run lingui-setup first if LinguiJS is not
+  yet configured.
 ---
 
 # LinguiJS String Wrapping
 
 This skill finds hardcoded user-facing strings and wraps them with the correct Lingui macros. It also identifies localization gaps: numbers, currencies, dates, and plurals that need locale-aware handling.
+
+> **Scope:** This skill converts strings to make them translatable — it does not translate content. All strings remain in the source language after conversion.
 
 ---
 
@@ -192,7 +195,7 @@ Scan files systematically for these patterns. Apply the confidence tiers to deci
 
 ### Flag with judgment (medium confidence)
 
-Review these and translate only if they appear in the actual UI:
+Review these and wrap only if they appear in the actual UI:
 
 - **`toFixed()` and number formatting**: Raw `toFixed()` won't respect locale decimal separators. Use `i18n.number()` instead.
 - **Currency symbols hardcoded near numbers**: `"$" + price` or `price + " USD"` — use `i18n.number(price, { style: 'currency', currency: 'USD' })`.
@@ -481,7 +484,7 @@ Use this path for small-to-medium projects (15 files or fewer).
 
 Work file-by-file in this priority order:
 
-1. **Layout and shell components** (navbar, sidebar, footer) — highest reuse, translate first
+1. **Layout and shell components** (navbar, sidebar, footer) — highest reuse, wrap first
 2. **Shared components** (buttons, modals, form fields) — reused across pages
 3. **Page/route components** — specific to one view
 4. **Utility and config files** — constant objects, route configs, sidebar data
