@@ -702,3 +702,252 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </I18nProvider>,
 )
 ```
+
+### 6. Language Switcher
+
+The component depends on the routing strategy.
+
+#### Strategy 1 and 2: URL-based routing (TanStack Router)
+
+```tsx
+// src/components/LanguageSwitcher.tsx
+import { Link, useParams } from '@tanstack/react-router'
+import { LOCALES, SOURCE_LOCALE } from '../i18n'
+
+export function LanguageSwitcher() {
+  const params = useParams({ strict: false })
+  const currentLocale = (params as { locale?: string }).locale ?? SOURCE_LOCALE
+
+  return (
+    <div style={{display: 'flex', gap: '8px'}}>
+      {LOCALES.map((loc) => (
+        <Link
+          key={loc}
+          to={`/${loc}`}
+          style={{fontWeight: loc === currentLocale ? 'bold' : 'normal'}}
+        >
+          {loc}
+        </Link>
+      ))}
+    </div>
+  )
+}
+```
+
+This links to each locale's root path (`/en`, `/fr`). For same-page switching, TanStack Router's typed `to` prop makes it difficult to build a generic "current page in another locale" link without knowing the route structure. For a more complete same-page switcher, use `window.location.pathname` to reconstruct the path:
+
+```tsx
+export function LanguageSwitcher() {
+  const params = useParams({ strict: false })
+  const currentLocale = (params as { locale?: string }).locale ?? SOURCE_LOCALE
+
+  function getLocalePath(targetLocale: string): string {
+    const pathname = window.location.pathname
+    // Strip current locale prefix
+    let basePath = pathname
+    for (const loc of LOCALES) {
+      if (pathname.startsWith(`/${loc}/`)) {
+        basePath = pathname.slice(loc.length + 1)
+        break
+      }
+      if (pathname === `/${loc}`) {
+        basePath = '/'
+        break
+      }
+    }
+    return `/${targetLocale}${basePath}`
+  }
+
+  return (
+    <div style={{display: 'flex', gap: '8px'}}>
+      {LOCALES.map((loc) => (
+        <a
+          key={loc}
+          href={getLocalePath(loc)}
+          style={{fontWeight: loc === currentLocale ? 'bold' : 'normal'}}
+        >
+          {loc}
+        </a>
+      ))}
+    </div>
+  )
+}
+```
+
+For Strategy 1 (unprefixed source), adjust the source locale link to use the bare path:
+
+```tsx
+function getLocalePath(targetLocale: string): string {
+  // ...strip prefix to get basePath...
+  if (targetLocale === SOURCE_LOCALE) return basePath
+  return `/${targetLocale}${basePath}`
+}
+```
+
+#### Strategy 1 and 2: URL-based routing (React Router)
+
+```tsx
+// src/components/LanguageSwitcher.tsx
+import { Link, useParams, useLocation } from 'react-router'
+import { LOCALES, SOURCE_LOCALE } from '../i18n'
+import { localePath } from '../localePath'
+
+export function LanguageSwitcher() {
+  const { locale } = useParams()
+  const location = useLocation()
+  const currentLocale = locale ?? SOURCE_LOCALE
+
+  // Strip current locale prefix to get base path
+  let basePath = location.pathname
+  for (const loc of LOCALES) {
+    if (basePath.startsWith(`/${loc}/`)) {
+      basePath = basePath.slice(loc.length + 1)
+      break
+    }
+    if (basePath === `/${loc}`) {
+      basePath = '/'
+      break
+    }
+  }
+
+  return (
+    <div style={{display: 'flex', gap: '8px'}}>
+      {LOCALES.map((loc) => (
+        <Link
+          key={loc}
+          to={localePath(loc, basePath)}
+          style={{fontWeight: loc === currentLocale ? 'bold' : 'normal'}}
+        >
+          {loc}
+        </Link>
+      ))}
+    </div>
+  )
+}
+```
+
+#### Option 3 / plain SPA: No URL routing
+
+No navigation occurs — the switcher dynamically loads a new catalog and re-activates the locale. `useLingui()` ensures the component re-renders when the locale changes.
+
+**Single catalog:**
+
+```tsx
+// src/components/LanguageSwitcher.tsx
+import { useLingui } from '@lingui/react'
+
+const LOCALES = ['en', 'fr']  // adjust to match lingui.config.ts
+const DEFAULT_LOCALE = 'en'
+
+export function LanguageSwitcher() {
+  const { i18n } = useLingui()
+
+  async function switchLocale(newLocale: string) {
+    try {
+      const { messages } = await import(`../locales/${newLocale}/messages.ts`)
+      i18n.loadAndActivate({ locale: newLocale, messages })
+      localStorage.setItem('lang', newLocale)
+      document.documentElement.lang = newLocale
+    } catch (e) {
+      console.error(`Failed to load locale "${newLocale}"`, e)
+    }
+  }
+
+  return (
+    <select value={i18n.locale} onChange={(e) => switchLocale(e.target.value)}>
+      {LOCALES.map((loc) => (
+        <option key={loc} value={loc}>
+          {loc}
+        </option>
+      ))}
+    </select>
+  )
+}
+```
+
+If the project already has `activateLocale()` and `saveLocale()` helpers in `src/i18n.ts`, use those instead of inlining the logic:
+
+```tsx
+import { useLingui } from '@lingui/react'
+import { activateLocale, saveLocale } from '../i18n'
+
+// ...
+async function switchLocale(newLocale: string) {
+  try {
+    const { messages } = await import(`../locales/${newLocale}/messages.ts`)
+    activateLocale(newLocale, messages)
+    saveLocale(newLocale)
+  } catch (e) {
+    console.error(`Failed to load locale "${newLocale}"`, e)
+  }
+}
+```
+
+**Per-page catalogs with Option 3:** Each route loads its own co-located catalog, so the switcher cannot import from a single known path. Two approaches:
+
+1. **Reload the page** — simplest. Set the locale in localStorage and reload: `saveLocale(newLocale); window.location.reload()`. The route's `beforeLoad`/`loader` will detect the new locale via `detectLocale()` and load the correct catalog.
+
+2. **Catalog loader prop** — pass a loader function from each page that knows its own catalog path:
+
+   ```tsx
+   // In a route component:
+   <LanguageSwitcher loadCatalog={async (locale) => {
+     const { messages } = await import(`./locales/about/${locale}.ts`)
+     return messages
+   }} />
+   ```
+
+   This avoids a full page reload but requires each page to pass the loader.
+
+Approach 1 is recommended for simplicity unless the reload causes a poor user experience (e.g., loss of form state).
+
+#### Wiring
+
+Import the switcher into the root route component or a shared layout:
+
+**TanStack Router** — in `src/routes/__root.tsx`:
+
+```tsx
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
+
+// Inside the component function:
+<I18nProvider i18n={i18n}>
+  <LanguageSwitcher />
+  <Outlet />
+</I18nProvider>
+```
+
+**React Router** — in the root layout:
+
+```tsx
+import { LanguageSwitcher } from './components/LanguageSwitcher'
+
+// Inside the component function:
+<I18nProvider i18n={i18n}>
+  <LanguageSwitcher />
+  <Outlet />
+</I18nProvider>
+```
+
+**Plain SPA** — in `main.tsx` or `App.tsx`:
+
+```tsx
+import { LanguageSwitcher } from './components/LanguageSwitcher'
+
+// Inside the component tree:
+<I18nProvider i18n={i18n}>
+  <LanguageSwitcher />
+  <App />
+</I18nProvider>
+```
+
+If the project has a shared header/navigation component, place the switcher there instead of directly in the provider wrapper.
+
+**Displaying locale names**: The examples above render raw locale codes (`en`, `fr`). For a better user experience, use `Intl.DisplayNames` to show locale names in the user's language:
+
+```tsx
+const displayNames = new Intl.DisplayNames([currentLocale], {type: 'language'});
+
+// In a Link or option:
+{displayNames.of(loc) ?? loc}
+```

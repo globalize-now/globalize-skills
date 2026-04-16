@@ -563,6 +563,135 @@ Notes:
 - Each page can export its own `generateMetadata` for page-specific paths; the layout version covers the base case.
 - If many pages need custom metadata, extract `getLocaleUrl` into `src/i18n/locales.ts` to keep it DRY.
 
+### 6. Language Switcher
+
+**Skip this section if the user chose Option 3 (hardcoded locale).**
+
+Create a client component that renders links to switch between locales. The component reads the current locale from route params and builds links for each configured locale.
+
+#### Strategy 1: Unprefixed source locale
+
+The source locale link points to the bare path (no prefix), while other locales get `/${locale}${basePath}`:
+
+```tsx
+// src/app/[locale]/LanguageSwitcher.tsx
+'use client'
+
+import Link from 'next/link'
+import { useParams, usePathname } from 'next/navigation'
+import { locales, sourceLocale } from '../../i18n/locales'
+
+export function LanguageSwitcher() {
+  const params = useParams()
+  const pathname = usePathname()
+  const currentLocale = (params?.locale as string) ?? sourceLocale
+
+  // Strip locale prefix to get the base path
+  let basePath = pathname
+  for (const loc of locales) {
+    if (pathname.startsWith(`/${loc}/`)) {
+      basePath = pathname.slice(loc.length + 1)
+      break
+    }
+    if (pathname === `/${loc}`) {
+      basePath = '/'
+      break
+    }
+  }
+
+  return (
+    <div style={{display: 'flex', gap: '8px'}}>
+      {locales.map((loc) => (
+        <Link
+          key={loc}
+          href={loc === sourceLocale ? basePath : `/${loc}${basePath}`}
+          style={{fontWeight: loc === currentLocale ? 'bold' : 'normal'}}
+        >
+          {loc}
+        </Link>
+      ))}
+    </div>
+  )
+}
+```
+
+#### Strategy 2: All locales prefixed
+
+All locale links use the `/${locale}${basePath}` format:
+
+```tsx
+// src/app/[locale]/LanguageSwitcher.tsx
+'use client'
+
+import Link from 'next/link'
+import { useParams, usePathname } from 'next/navigation'
+import { locales } from '../../i18n/locales'
+
+export function LanguageSwitcher() {
+  const params = useParams()
+  const pathname = usePathname()
+  const currentLocale = params?.locale as string
+
+  // Strip locale prefix to get the base path
+  let basePath = pathname
+  for (const loc of locales) {
+    if (pathname.startsWith(`/${loc}/`)) {
+      basePath = pathname.slice(loc.length + 1)
+      break
+    }
+    if (pathname === `/${loc}`) {
+      basePath = '/'
+      break
+    }
+  }
+
+  return (
+    <div style={{display: 'flex', gap: '8px'}}>
+      {locales.map((loc) => (
+        <Link
+          key={loc}
+          href={`/${loc}${basePath}`}
+          style={{fontWeight: loc === currentLocale ? 'bold' : 'normal'}}
+        >
+          {loc}
+        </Link>
+      ))}
+    </div>
+  )
+}
+```
+
+#### Wiring
+
+Import the switcher into the `[locale]/layout.tsx` so it appears on every page:
+
+```tsx
+// In src/app/[locale]/layout.tsx, inside the <body> tag:
+import { LanguageSwitcher } from './LanguageSwitcher'
+
+// ...inside the return:
+<body>
+  <LanguageSwitcher />
+  <LinguiClientProvider
+    initialLocale={locale}
+    initialMessages={i18n.messages}
+  >
+    {children}
+  </LinguiClientProvider>
+</body>
+```
+
+The `LanguageSwitcher` sits outside the `LinguiClientProvider` because it doesn't use any Lingui macros — it only handles navigation. If the project has a shared header or navigation component, place the switcher there instead.
+
+**Displaying locale names**: The examples above render raw locale codes (`en`, `fr`). For a better user experience, use `Intl.DisplayNames` to show locale names in the user's language:
+
+```tsx
+const displayNames = new Intl.DisplayNames([currentLocale], {type: 'language'});
+
+// In the Link:
+{displayNames.of(loc) ?? loc}
+```
+
 ### Using translations in components
 
 Both server and client components can use the same macros:

@@ -29,8 +29,9 @@ Follow these steps in order. Each builds on the last.
 | 8. Message files | Additive | Scaffold `messages/{locale}.json` |
 | 9. Directory restructure | **Modifies existing file** | Move pages under `[locale]/` segment (App Router only) |
 | 10. Navigation helpers | Additive | New `src/i18n/navigation.ts` |
-| 11. Scaffold & verify | Read-only | Dev server check |
-| 12. CI/CD | **Modifies existing file** | Optional — ask first |
+| 11. Language Switcher | **Modifies existing file** | New component file + wired into layout/navigation |
+| 12. Scaffold & verify | Read-only | Dev server check |
+| 13. CI/CD | **Modifies existing file** | Optional — ask first |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.** _(This rule is modified by the setup mode chosen below.)_
 
@@ -109,7 +110,7 @@ Based on the detection, pick the right variant reference file:
 - **Next.js App Router** → read `references/nextjs-app-router.md`
 - **Next.js Pages Router** → read `references/nextjs-pages-router.md`
 
-Then continue with Steps 2-12 below, using the variant-specific instructions from the reference file where noted.
+Then continue with Steps 2-13 below, using the variant-specific instructions from the reference file where noted.
 
 If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
 
@@ -558,7 +559,29 @@ The locale-aware `Link` works identically to the Next.js `Link` — same props, 
 
 ---
 
-## Step 11: Scaffold & Verify
+## Step 11: Language Switcher
+
+**This step creates a new component file and modifies an existing layout or navigation file to render it.** Before wiring the switcher into the layout:
+
+1. Describe which file you will modify and where the switcher will appear.
+2. Ask the user to confirm before proceeding.
+
+**Skip this step if the user chose `localePrefix: 'never'` in Step 3** — locale switching via URL prefix is not supported in this mode. If the user needs locale switching with `never` mode (e.g., domain-based), that requires custom implementation outside this skill's scope.
+
+Create a `LanguageSwitcher` component that lets users switch between the configured locales. Without this, users can only change locale by manually editing the URL.
+
+The component should:
+- Display all configured locales from `routing.locales`
+- Highlight the currently active locale
+- Switch locale using the navigation helpers from Step 10
+
+Follow the variant-specific reference file for this step. It provides the component implementation and wiring instructions for your router type.
+
+After creating the component, import and render it in a visible location — typically the root layout or a shared navigation/header component. The switcher should be accessible from every page.
+
+---
+
+## Step 12: Scaffold & Verify
 
 Run the dev server and verify the setup works end-to-end:
 
@@ -608,7 +631,7 @@ Run the dev server and verify the setup works end-to-end:
 
 5. **Verify the string renders** — "Hello, world!" should appear on the page.
 
-6. **Check locale switching** — verify that navigating between locales changes the page content and URL prefix as expected.
+6. **Check locale switching** — use the language switcher component from Step 11 to switch between locales. Verify that the page content updates to the alternate locale's messages and the URL prefix changes as expected per your locale prefix strategy.
 
 If any step fails, check in this order:
 1. **Middleware** (Step 6) — is the matcher correct? Is the file in the right location?
@@ -618,9 +641,9 @@ If any step fails, check in this order:
 
 ---
 
-## Step 12: CI/CD (Optional)
+## Step 13: CI/CD (Optional)
 
-This step is **not required** for the initial setup to work. The app will function correctly after Step 11. Ask the user: "Would you like me to set up CI/CD integration (TypeScript strict key checking, missing key detection)? This can also be done later." **If the user declines, skip this step.**
+This step is **not required** for the initial setup to work. The app will function correctly after Step 12. Ask the user: "Would you like me to set up CI/CD integration (TypeScript strict key checking, missing key detection)? This can also be done later." **If the user declines, skip this step.**
 
 **CONSENT GATE: This step modifies existing config files. Describe changes and get confirmation before proceeding.**
 
@@ -837,7 +860,7 @@ export default async function InvoicePage() {
 
 ## Next Steps
 
-Setup is complete — the project can now load and display translations per locale. Here's what typically comes next:
+Setup is complete — the project can now load and display translations per locale. A language switcher is already wired into the layout, so users can switch between configured locales out of the box. Here's what typically comes next:
 
 ### Wrap existing strings
 

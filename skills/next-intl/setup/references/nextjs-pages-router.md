@@ -323,22 +323,15 @@ import Link from 'next/link';
 ```tsx
 import {useRouter} from 'next/router';
 
-function LanguagePicker() {
+function MyComponent() {
   const router = useRouter();
-  const {locale, locales} = router;
+  const {locale} = router;
 
-  return (
-    <div>
-      <p>Current: {locale}</p>
-      {locales?.map((loc) => (
-        <Link key={loc} href={router.asPath} locale={loc}>
-          {loc}
-        </Link>
-      ))}
-    </div>
-  );
+  return <p>Current locale: {locale}</p>;
 }
 ```
+
+For a full locale switching component, see the Language Switcher step below.
 
 ### Programmatic navigation
 
@@ -373,6 +366,66 @@ i18n: {
   defaultLocale: 'en',
   localeDetection: false,
 }
+```
+
+## Step 11: Language Switcher
+
+Create a component that lets users switch between locales. Pages Router has native `<Link locale={loc}>` support, making this straightforward.
+
+**Component**: Create `src/components/LanguageSwitcher.tsx` (or `components/LanguageSwitcher.tsx` if no `src/`):
+
+```tsx
+import Link from 'next/link';
+import {useRouter} from 'next/router';
+
+export default function LanguageSwitcher() {
+  const router = useRouter();
+  const {locale, locales, asPath} = router;
+
+  return (
+    <div style={{display: 'flex', gap: '8px'}}>
+      {locales?.map((loc) => (
+        <Link key={loc} href={asPath} locale={loc}>
+          <span style={{fontWeight: loc === locale ? 'bold' : 'normal'}}>
+            {loc}
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+```
+
+Each `<Link>` points to the same page (`asPath`) but with a different `locale` prop — Next.js handles the locale prefix automatically.
+
+**Wiring**: Import into `pages/_app.tsx` or a shared layout/header component:
+
+```tsx
+// In pages/_app.tsx:
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+
+export default function App({Component, pageProps}: AppProps) {
+  const router = useRouter();
+
+  return (
+    <NextIntlClientProvider
+      locale={router.locale}
+      messages={pageProps.messages}
+    >
+      <LanguageSwitcher />
+      <Component {...pageProps} />
+    </NextIntlClientProvider>
+  );
+}
+```
+
+**Displaying locale names**: The example renders raw locale codes. For display names, use `Intl.DisplayNames`:
+
+```tsx
+const displayNames = new Intl.DisplayNames([locale ?? 'en'], {type: 'language'});
+
+// In the Link:
+<span>{displayNames.of(loc) ?? loc}</span>
 ```
 
 ## SEO: Alternate Language Tags

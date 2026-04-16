@@ -25,10 +25,11 @@ Follow these steps in order. Each builds on the last.
 | 3. Configure | Additive | New `lingui.config.ts` file |
 | 4. Build tool | **Modifies existing file** | Changes `vite.config` or `next.config` |
 | 5. Provider | **Modifies existing file** | Routing strategy choice, changes root layout / `main.tsx`, may add middleware or new route files |
-| 6. ESLint | Additive | Already asks user |
-| 7. Scaffold | Additive | New catalog files |
-| 8. CI/CD | **Modifies existing file** | Changes build script — **optional, ask first** |
-| 9. Tests | Additive | New test wrapper file — **optional, ask first** |
+| 6. Language Switcher | **Modifies existing file** | New component file + wired into layout/navigation |
+| 7. ESLint | Additive | Already asks user |
+| 8. Scaffold | Additive | New catalog files |
+| 9. CI/CD | **Modifies existing file** | Changes build script — **optional, ask first** |
+| 10. Tests | Additive | New test wrapper file — **optional, ask first** |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.** _(This rule is modified by the setup mode chosen below.)_
 
@@ -112,7 +113,7 @@ Based on the detection, pick the right variant reference file:
 - **Vite + SWC** (including TanStack Router, React Router, plain Vite) → read `references/vite-swc.md`
 - **Vite + Babel** → read `references/vite-babel.md`
 
-Then continue with Steps 2-8 below, using the variant-specific instructions from the reference file for Steps 4 and 5.
+Then continue with Steps 2-9 below, using the variant-specific instructions from the reference file for Steps 4, 5, and 6.
 
 If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
 
@@ -338,7 +339,7 @@ Tell the user what you found and what will change. If the existing `lang` value 
 
 ### Link handling with locale routing
 
-**Only relevant for Strategy 1 (unprefixed source) and Strategy 2 (all prefixed).** If the user chose Strategy 3 or the project is a plain SPA without file-based routing, skip this — URLs don't change, so existing links work as-is.
+**Only relevant for Option 1 (unprefixed source) and Option 2 (all prefixed).** If the user chose Option 3 or the project is a plain SPA without file-based routing, skip this — URLs don't change, so existing links work as-is.
 
 When locale routing is enabled, internal navigation links must include the locale prefix. Without this, links navigate to the wrong locale or produce 404s. This affects:
 
@@ -350,7 +351,29 @@ The reference files provide the idiomatic pattern for each framework — a path 
 
 ---
 
-## Step 6: Set Up ESLint Plugin
+## Step 6: Language Switcher
+
+**This step creates a new component file and modifies an existing layout or navigation file to render it.** Before wiring the switcher into the layout:
+
+1. Describe which file you will modify and where the switcher will appear.
+2. Ask the user to confirm before proceeding.
+
+**Skip this step if the project uses Next.js App Router and the user chose Option 3 (hardcoded single locale) in Step 5** — locale switching is not possible with a hardcoded locale. For Vite projects using Option 3 (no URL routing), the switcher loads catalogs dynamically without URL changes — proceed with this step.
+
+Create a `LanguageSwitcher` component that lets users switch between the configured locales. Without this, users can only change locale by manually editing the URL.
+
+The component should:
+- Display all configured locales
+- Highlight the currently active locale
+- Navigate to the selected locale when clicked/changed
+
+Follow the variant-specific reference file for this step. It provides the component implementation and wiring instructions for your framework and routing strategy.
+
+After creating the component, import and render it in a visible location — typically the root layout or a shared navigation/header component. The switcher should be accessible from every page.
+
+---
+
+## Step 7: Set Up ESLint Plugin
 
 The `eslint-plugin-lingui` package catches unwrapped strings and incorrect macro usage at lint time — it's the primary safety net against shipping untranslated text.
 
@@ -393,7 +416,7 @@ The `recommended` preset enables:
 
 ---
 
-## Step 7: Scaffold and Verify
+## Step 8: Scaffold and Verify
 
 Run extraction to generate the initial catalog files:
 
@@ -445,14 +468,15 @@ Use `.js` instead of `.ts` if the project is JavaScript-only (i.e., you omitted 
 4. For per-page catalogs, verify that catalog directories appeared co-located next to page files (e.g., `src/app/about/locales/page/en.po` for a page at `src/app/about/page.tsx`)
 5. `npx lingui compile` (with `--typescript` if applicable) compiles without errors
 6. The string renders in the browser
+7. **Test the language switcher** — click a different locale in the language switcher. For URL-based routing (Option 1 or 2): the URL should update to include or remove the locale prefix, and the page content should reflect the new locale. For Vite apps without locale routing (Option 3): the page content should update without a URL change. If only one locale is configured, temporarily add a second locale to `lingui.config.ts` and the `locales`/`LOCALES` array, run extract and compile, then test switching.
 
 If any step fails, check the build tool integration (Step 4) first — that's where most setup issues originate.
 
 ---
 
-## Step 8: CI/CD Integration (Optional)
+## Step 9: CI/CD Integration (Optional)
 
-This step is **not required** for the initial setup to work. The app will function correctly after Step 7. Ask the user: "Would you like me to set up CI/CD integration (build script changes, catalog freshness checks)? This can also be done later." **If the user declines, skip to Step 9.**
+This step is **not required** for the initial setup to work. The app will function correctly after Step 8. Ask the user: "Would you like me to set up CI/CD integration (build script changes, catalog freshness checks)? This can also be done later." **If the user declines, skip to Step 10.**
 
 Set up catalog checks and build-time compilation so the i18n pipeline stays healthy in CI.
 
@@ -465,7 +489,7 @@ Add the extract command as a CI step (e.g., in a GitHub Actions workflow or pre-
 
 ### Compile at build time
 
-Since compiled catalogs are gitignored (Step 7), the build pipeline must compile them. Read the project's existing `"build"` script in `package.json` and prepend the compile command:
+Since compiled catalogs are gitignored (Step 8), the build pipeline must compile them. Read the project's existing `"build"` script in `package.json` and prepend the compile command:
 
 | Before | After (TypeScript project) | After (JavaScript project) |
 |--------|---------------------------|---------------------------|
@@ -482,7 +506,7 @@ The extract command prints per-locale stats showing how many messages are missin
 
 ---
 
-## Step 9: Test Setup (Optional)
+## Step 10: Test Setup (Optional)
 
 This step is **not required** for the initial setup to work. Tests that don't render Lingui components are unaffected. Ask the user: "Would you like me to set up the test wrapper for components that use Lingui? This can also be done later." **If the user declines, skip this step.**
 
@@ -573,9 +597,9 @@ Vitest uses the same SWC or Babel plugin configured in `vite.config.ts` (Step 4)
 - **ESM/CJS conflicts**: ESM projects use `lingui.config.ts`. CJS projects use `lingui.config.js` with `module.exports`.
 - **Monorepo root vs package**: `lingui.config.ts` goes next to the `package.json` of the package that contains the UI code, not the monorepo root.
 - **`extract-experimental` not finding messages**: Ensure the `entries` glob in `lingui.config.ts` actually matches the project's page files. If a shared component's strings are missing from a page catalog, verify it is imported (directly or transitively) from that page's entry point.
-- **Tests fail after adding i18n**: Components using `<Trans>` or `useLingui()` need `I18nProvider` in the test render tree. See Step 9.
+- **Tests fail after adding i18n**: Components using `<Trans>` or `useLingui()` need `I18nProvider` in the test render tree. See Step 10.
 - **Regional locale mismatch (`es-MX` falls back to `en` instead of `es`)**: `@lingui/detect-locale`'s `fromNavigator()` returns the raw browser locale (e.g., `es-MX`). If that exact string isn't in the `locales` array, the catalog import fails or the app falls through to the default locale — skipping the base language `es` entirely. The variant reference files (Step 5) include locale validation in the `detectLocale()` function that tries the base language tag before falling back. Lingui's `fallbackLocales` (Step 3) handles translation-level fallback separately — it cascades missing translations through CLDR parent locales by default.
-- **Links navigate to wrong locale or 404 after adding locale routing**: With Strategy 1 or 2, all internal `<Link>` hrefs and programmatic navigation calls (`router.push()`, `navigate()`, `redirect()`) must include the locale prefix. A link to `/about` in a locale-prefixed route structure will either 404 or land on the source locale regardless of the user's current language. See the "Link Handling" section in the variant reference file for the idiomatic fix per framework.
+- **Links navigate to wrong locale or 404 after adding locale routing**: With Option 1 or 2, all internal `<Link>` hrefs and programmatic navigation calls (`router.push()`, `navigate()`, `redirect()`) must include the locale prefix. A link to `/about` in a locale-prefixed route structure will either 404 or land on the source locale regardless of the user's current language. See the "Link Handling" section in the variant reference file for the idiomatic fix per framework.
 - **Missing `dir` attribute / LTR-only CSS**: If any target locale is RTL (Arabic, Hebrew, Persian, Urdu, etc.), the `<html>` element must have `dir="rtl"`. Without it, text alignment, flexbox order, and scrollbar placement break. Equally important: CSS must use logical properties (`margin-inline-start` instead of `margin-left`, `padding-inline-end` instead of `padding-right`, `inset-inline-start` instead of `left`). Physical properties don't flip in RTL and require a full CSS audit to fix retroactively. Run the `css-i18n` skill for a full CSS audit and conversion.
 
 ---
@@ -634,7 +658,7 @@ For comprehensive string wrapping, localization gap detection (numbers, currenci
 
 ## Next Steps
 
-Setup is complete — the project can now extract, compile, and load translations. Here's what typically comes next:
+Setup is complete — the project can now extract, compile, and load translations. A language switcher is already wired into the layout, so users can switch between configured locales out of the box. Here's what typically comes next:
 
 ### Connect a translation service
 

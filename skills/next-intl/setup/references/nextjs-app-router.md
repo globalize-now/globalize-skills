@@ -786,3 +786,87 @@ export default async function DateDisplay() {
 | Locale | `getLocale` from `next-intl/server` | `useLocale` from `next-intl` |
 | Now | `getNow` from `next-intl/server` | `useNow` from `next-intl` |
 | Timezone | `getTimeZone` from `next-intl/server` | `useTimeZone` from `next-intl` |
+
+## Step 11: Language Switcher
+
+Create a client component that switches between locales using the navigation helpers from Step 10.
+
+**Component**: Create `src/components/LanguageSwitcher.tsx` (or `components/LanguageSwitcher.tsx` if the project does not use `src/`):
+
+```tsx
+'use client';
+
+import {useLocale} from 'next-intl';
+import {usePathname, useRouter} from '@/i18n/navigation';
+import {routing} from '@/i18n/routing';
+
+export default function LanguageSwitcher() {
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  function onSelectChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    router.replace(pathname, {locale: event.target.value});
+  }
+
+  return (
+    <select value={locale} onChange={onSelectChange}>
+      {routing.locales.map((loc) => (
+        <option key={loc} value={loc}>
+          {loc}
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+This uses `router.replace()` instead of `router.push()` so the locale switch doesn't add a history entry — pressing "back" doesn't cycle through locales.
+
+**Key points:**
+- `useLocale()` from `next-intl` returns the current locale string
+- `usePathname()` from `@/i18n/navigation` returns the path **without** the locale prefix, so it works correctly across locales
+- `useRouter()` from `@/i18n/navigation` handles locale-prefixed routing automatically
+- `routing.locales` is the single source of truth for the locale list — no hardcoded arrays
+
+**Wiring**: Import into the locale layout or a shared navigation component. The switcher must be inside the `NextIntlClientProvider` tree (it uses client-side hooks).
+
+In `app/[locale]/layout.tsx`:
+
+```tsx
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+
+// Inside the return:
+<NextIntlClientProvider messages={messages}>
+  <LanguageSwitcher />
+  {children}
+</NextIntlClientProvider>
+```
+
+Or in a shared header/navigation component if one exists.
+
+**Displaying locale names**: The example uses raw locale codes (`en`, `de`). For a better user experience, map codes to display names:
+
+```tsx
+const localeNames: Record<string, string> = {
+  en: 'English',
+  de: 'Deutsch',
+  fr: 'Français',
+};
+
+// In the <option>:
+<option key={loc} value={loc}>
+  {localeNames[loc] ?? loc}
+</option>
+```
+
+Or use `Intl.DisplayNames` for automatic locale name resolution:
+
+```tsx
+const displayNames = new Intl.DisplayNames([locale], {type: 'language'});
+
+// In the <option>:
+<option key={loc} value={loc}>
+  {displayNames.of(loc) ?? loc}
+</option>
+```
