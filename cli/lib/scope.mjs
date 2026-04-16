@@ -29,8 +29,8 @@ export async function promptScope() {
   const choice = await select({
     message: "Install scope:",
     choices: [
-      { name: `Global  — available in all projects (${os.homedir()})`, value: "global" },
       { name: `Local   — this project only (${process.cwd()})`, value: "local" },
+      { name: `Global  — available in all projects (${os.homedir()})`, value: "global" },
     ],
   });
   return resolveTargetDir(choice);

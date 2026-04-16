@@ -25,6 +25,7 @@ export async function run() {
 
   // Build choices: presets first, then individual skills
   const choices = [];
+  const isFirstTime = installedSkills.size === 0;
 
   const presetEntries = Object.entries(presets);
   if (presetEntries.length > 0) {
@@ -34,7 +35,7 @@ export async function run() {
       choices.push({
         name: `${name} — ${preset.description}`,
         value: `preset:${name}`,
-        checked: allInstalled,
+        checked: allInstalled || (isFirstTime && name === "i18n-guide"),
       });
     }
     choices.push(new Separator("── Individual skills ──"));
@@ -45,7 +46,7 @@ export async function run() {
     choices.push({
       name: `${skill.name} — ${desc}`,
       value: `skill:${skill.name}`,
-      checked: installedSkills.has(skill.name),
+      checked: installedSkills.has(skill.name) || (isFirstTime && skill.name === "i18n-guide"),
     });
   }
 
