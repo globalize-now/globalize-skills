@@ -629,6 +629,46 @@ import {Link} from '@/i18n/navigation';
 
 No changes needed in component code — the routing configuration handles the mapping.
 
+## SEO: Alternate Language Tags
+
+hreflang tags tell search engines which locale variants exist for each page, preventing duplicate content issues across localized URLs.
+
+```tsx
+// app/[locale]/layout.tsx (add generateMetadata to existing layout)
+import type { Metadata } from 'next'
+import { routing } from '@/i18n/routing'
+import { getPathname } from '@/i18n/navigation'
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+
+function getUrl(pathname: string, locale: string) {
+  return `${siteUrl}${getPathname({href: pathname, locale})}`
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const pathname = '/'  // adjust per page
+
+  return {
+    alternates: {
+      canonical: getUrl(pathname, locale),
+      languages: Object.fromEntries(
+        [...routing.locales.map((l) => [l, getUrl(pathname, l)]),
+         ['x-default', getUrl(pathname, routing.defaultLocale)]]
+      ),
+    },
+  }
+}
+```
+
+- `NEXT_PUBLIC_SITE_URL` must be set in the environment (e.g., `https://example.com`) — hreflang requires absolute URLs
+- Each page can export its own `generateMetadata` for page-specific paths; the layout version covers the base case
+- If `pathnames` are configured in `routing.ts`, `getPathname` automatically resolves localized URL slugs in the hreflang output
+
 ## Using Translations
 
 Quick reference for using translations after setup is complete.
