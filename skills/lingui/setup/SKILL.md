@@ -93,6 +93,8 @@ Read the project's `package.json`, build config (`vite.config.*`, `next.config.*
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
 | **Route entry points** | Next.js App Router: `src/app/**/page.tsx` exists. TanStack Router (file-based): `src/routes/` directory exists. React Router v7 framework mode: `app/routes/` exists. If none found → plain SPA (no file-based routing). |
+| **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
+| **Current branch** | `git branch --show-current` — record the branch name. |
 
 Determine whether the project uses **file-based routing** with identifiable page entry points. This decides whether to use per-page catalog splitting (Step 3) or a single global catalog.
 
@@ -114,6 +116,18 @@ Based on the detection, pick the right variant reference file:
 - **Vite + Babel** → read `references/vite-babel.md`
 
 Then continue with Steps 2-9 below, using the variant-specific instructions from the reference file for Steps 4, 5, and 6.
+
+### Branch Recommendation
+
+If the project is a git repository and the current branch is `main`, `master`, or `develop`, recommend switching to a dedicated branch before proceeding:
+
+> You're currently on `{branch}`. This setup will modify several existing files. I'd recommend creating a dedicated branch first so you can easily review or revert the changes:
+> ```
+> git checkout -b chore/i18n-setup
+> ```
+> Want me to create this branch, or continue on `{branch}`?
+
+If the user is already on a feature branch, or the project is not a git repository, skip this silently.
 
 If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
 

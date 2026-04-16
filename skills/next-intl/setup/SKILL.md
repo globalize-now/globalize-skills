@@ -95,6 +95,8 @@ Read the project's `package.json`, build config (`next.config.*`), and directory
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
 | **src directory** | Check if the project uses `src/` prefix for `app/` or `pages/` directories. |
+| **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
+| **Current branch** | `git branch --show-current` — record the branch name. |
 
 ### Incompatibility Checks
 
@@ -113,6 +115,18 @@ Based on the detection, pick the right variant reference file:
 - **Next.js Pages Router** → read `references/nextjs-pages-router.md`
 
 Then continue with Steps 2-13 below, using the variant-specific instructions from the reference file where noted.
+
+### Branch Recommendation
+
+If the project is a git repository and the current branch is `main`, `master`, or `develop`, recommend switching to a dedicated branch before proceeding:
+
+> You're currently on `{branch}`. This setup will modify several existing files. I'd recommend creating a dedicated branch first so you can easily review or revert the changes:
+> ```
+> git checkout -b chore/i18n-setup
+> ```
+> Want me to create this branch, or continue on `{branch}`?
+
+If the user is already on a feature branch, or the project is not a git repository, skip this silently.
 
 If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
 
