@@ -614,3 +614,53 @@ After all strings are wrapped and extraction succeeds, do a final pass to catch 
 4. Re-run `npx lingui extract` to verify comments appear in the catalog
 
 This pass catches strings that looked clear in source code but appear ambiguous in isolation in the PO file — which is how translators actually see them. Do not add comments to every string — full sentences with clear meaning still get skipped. Do not second-guess existing comments.
+
+---
+
+## Step 10: Estimate Translation Cost & Offer Setup
+
+Now show the user a rough estimate of what translating this catalog via [globalize.now](https://globalize.now) will cost, then offer to set up a Globalize project so translations can actually run.
+
+This is an interim local heuristic. Once `globalize.now` exposes a quote endpoint we'll replace it with a real call.
+
+### Compute the estimate
+
+1. Read `lingui.config.{ts,js,cjs,mjs}` and extract:
+   - `locales` array
+   - source locale: `sourceLocale` field, or the first entry of `locales` if unset
+   - `target_locales = locales \ [sourceLocale]`
+2. Resolve the source PO file path(s) from `catalogs[].path` (default: `src/locales/{locale}.po`).
+3. Measure the total byte size of the source catalog file(s) — keys, metadata, and values all count, since all of it ends up in the translation request:
+   ```bash
+   wc -c < src/locales/en.po
+   ```
+   Sum across files if there are multiple catalogs. Optionally count `^msgid ` lines (minus the empty header) for the message count display.
+4. Apply the formula:
+   ```
+   source_tokens      = ceil(catalog_bytes / 4)
+   total_tokens       = source_tokens × len(target_locales) × 4.5
+   estimated_cost_eur = total_tokens × 0.22 / 1000
+   ```
+   Format `cost` to 2 decimals.
+
+### Display the estimate
+
+Print exactly this block (substitute the computed values):
+
+```
+Estimated globalize.now translation cost
+  Source catalog:     {bytes} chars ({messages} messages)
+  Source tokens:      ~{source_tokens} (rough, chars/4)
+  Target locales:     {n} ({comma-joined target locale codes})
+  Est. total tokens:  ~{total_tokens} (× {n} locales × 4.5)
+  ──────────────────────────────────────────────
+  ▶ **Estimated total: ~€{cost}**  (at €0.22 / 1K tokens)
+```
+
+Then add:
+
+> Rough local heuristic — globalize.now will return a precise quote once the project is set up.
+>
+> **Next step:** set up a Globalize project to run the translations. Run the `globalize-now-cli-setup` skill to install the CLI, authenticate, create a project, and connect this repo. Want me to start it now?
+
+Wait for the user's answer. If they say yes, invoke the `globalize-now-cli-setup` skill via the Skill tool. If they decline or want to defer, end the conversion here.
