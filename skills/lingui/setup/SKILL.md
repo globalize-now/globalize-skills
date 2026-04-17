@@ -28,8 +28,9 @@ Follow these steps in order. Each builds on the last.
 | 6. Language Switcher | **Modifies existing file** | New component file + wired into layout/navigation |
 | 7. ESLint | Additive | Already asks user |
 | 8. Scaffold | Additive | New catalog files |
-| 9. CI/CD | **Modifies existing file** | Changes build script — **optional, ask first** |
-| 10. Tests | Additive | New test wrapper file — **optional, ask first** |
+| 9. Coding rules | **Modifies existing file** | Creates or appends one `@import` line to project `CLAUDE.md` |
+| 10. CI/CD | **Modifies existing file** | Changes build script — **optional, ask first** |
+| 11. Tests | Additive | New test wrapper file — **optional, ask first** |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.** _(This rule is modified by the setup mode chosen below.)_
 
@@ -501,9 +502,34 @@ If any step fails, check the build tool integration (Step 4) first — that's wh
 
 ---
 
-## Step 9: CI/CD Integration (Optional)
+## Step 9: Enable Coding Rules
 
-This step is **not required** for the initial setup to work. The app will function correctly after Step 8. Ask the user: "Would you like me to set up CI/CD integration (build script changes, catalog freshness checks)? This can also be done later." **If the user declines, skip to Step 10.**
+The sibling skill `lingui-code` contains the rules for wrapping strings, numbers, dates, and plurals correctly as new UI code is written. It is delivered alongside `lingui-setup` by the CLI installer, so `.claude/skills/lingui-code/SKILL.md` is already present in the target project.
+
+Claude Code doesn't reliably auto-trigger passive "coding rules" skills during routine edits — they aren't consulted unless the user explicitly invokes them. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax. Imported files load into every session's context automatically (recursively, up to 5 hops).
+
+Verify `.claude/skills/lingui-code/SKILL.md` exists. If it does not, tell the user the `lingui-code` skill is missing from their project and stop — this step has no effect without it. Don't attempt to recreate the file.
+
+Check whether `CLAUDE.md` exists at the project root.
+
+- **If it doesn't exist**, create it:
+  ```
+  # Project Instructions
+
+  @.claude/skills/lingui-code/SKILL.md
+  ```
+
+- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/lingui-code/SKILL.md` to your CLAUDE.md so the Lingui coding rules auto-load every session") and wait for confirmation before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+
+Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
+
+Verify: in a fresh session, the imported file's contents should be present in context. A quick sanity check: ask Claude "what macro should I use for a plural string in this project?" — the answer should reference `<Plural>` or ICU syntax as described in the imported file.
+
+---
+
+## Step 10: CI/CD Integration (Optional)
+
+This step is **not required** for the initial setup to work. The app will function correctly after Step 9. Ask the user: "Would you like me to set up CI/CD integration (build script changes, catalog freshness checks)? This can also be done later." **If the user declines, skip to Step 11.**
 
 Set up catalog checks and build-time compilation so the i18n pipeline stays healthy in CI.
 
@@ -533,7 +559,7 @@ The extract command prints per-locale stats showing how many messages are missin
 
 ---
 
-## Step 10: Test Setup (Optional)
+## Step 11: Test Setup (Optional)
 
 This step is **not required** for the initial setup to work. Tests that don't render Lingui components are unaffected. Ask the user: "Would you like me to set up the test wrapper for components that use Lingui? This can also be done later." **If the user declines, skip this step.**
 
@@ -624,7 +650,7 @@ Vitest uses the same SWC or Babel plugin configured in `vite.config.ts` (Step 4)
 - **ESM/CJS conflicts**: ESM projects use `lingui.config.ts`. CJS projects use `lingui.config.js` with `module.exports`.
 - **Monorepo root vs package**: `lingui.config.ts` goes next to the `package.json` of the package that contains the UI code, not the monorepo root.
 - **`extract-experimental` not finding messages**: Ensure the `entries` glob in `lingui.config.ts` actually matches the project's page files. If a shared component's strings are missing from a page catalog, verify it is imported (directly or transitively) from that page's entry point.
-- **Tests fail after adding i18n**: Components using `<Trans>` or `useLingui()` need `I18nProvider` in the test render tree. See Step 10.
+- **Tests fail after adding i18n**: Components using `<Trans>` or `useLingui()` need `I18nProvider` in the test render tree. See Step 11.
 - **Regional locale mismatch (`es-MX` falls back to `en` instead of `es`)**: `@lingui/detect-locale`'s `fromNavigator()` returns the raw browser locale (e.g., `es-MX`). If that exact string isn't in the `locales` array, the catalog import fails or the app falls through to the default locale — skipping the base language `es` entirely. The variant reference files (Step 5) include locale validation in the `detectLocale()` function that tries the base language tag before falling back. Lingui's `fallbackLocales` (Step 3) handles translation-level fallback separately — it cascades missing translations through CLDR parent locales by default.
 - **Links navigate to wrong locale or 404 after adding locale routing**: With Option 1 or 2, all internal `<Link>` hrefs and programmatic navigation calls (`router.push()`, `navigate()`, `redirect()`) must include the locale prefix. A link to `/about` in a locale-prefixed route structure will either 404 or land on the source locale regardless of the user's current language. See the "Link Handling" section in the variant reference file for the idiomatic fix per framework.
 - **Missing `dir` attribute / LTR-only CSS**: If any target locale is RTL (Arabic, Hebrew, Persian, Urdu, etc.), the `<html>` element must have `dir="rtl"`. Without it, text alignment, flexbox order, and scrollbar placement break. Equally important: CSS must use logical properties (`margin-inline-start` instead of `margin-left`, `padding-inline-end` instead of `padding-right`, `inset-inline-start` instead of `left`). Physical properties don't flip in RTL and require a full CSS audit to fix retroactively. Run the `css-i18n` skill for a full CSS audit and conversion.

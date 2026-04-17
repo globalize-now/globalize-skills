@@ -30,3 +30,19 @@ Copy the skill directory into the target project's `.claude/skills/` with a flat
 ```bash
 cp -r skills/lingui/setup /path/to/project/.claude/skills/lingui-setup
 ```
+
+## Delivery Mechanisms
+
+Not every skill should be delivered the same way. Claude Code's router only consults skills for specialized, multi-step tasks — it doesn't pull in a skill mid-edit for routine code changes. This means skills split into two delivery tracks:
+
+- **Routed skills** — invoked on demand (setup, convert, guide). Live in `.claude/skills/<name>/` as usual and rely on a discriminating `description` to trigger. Examples: `lingui-setup`, `lingui-convert`, `i18n-guide`.
+
+- **Passive-rule skills** — continuous coding guidelines that should apply to every edit in a project (macro wrapping, plural handling, CSS logical properties). These don't trigger reliably via the router. Instead, the corresponding setup skill wires them into the target project's `CLAUDE.md` via Claude Code's `@import` syntax:
+
+  ```
+  @.claude/skills/lingui-code/SKILL.md
+  ```
+
+  Imported files load into every session's context, so the rules are always in effect without depending on routing. Examples: `lingui-code`, `css-i18n` (intended). The file still lives at `.claude/skills/<name>/SKILL.md`; the frontmatter becomes unused in the import path but stays for parity.
+
+When creating a new skill, decide up front which track it belongs on — and if it's passive-rule, make sure the sibling setup skill installs the `@import` line.
