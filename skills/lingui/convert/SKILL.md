@@ -657,8 +657,7 @@ This is an interim local heuristic. Once `globalize.now` exposes a quote endpoin
 4. Apply the formula:
    ```
    source_tokens      = ceil(catalog_bytes / 4)
-   total_tokens       = source_tokens × len(target_locales) × 4.5
-   estimated_cost_eur = total_tokens × 0.22 / 1000
+   estimated_cost_eur = (source_tokens / 1000) × 0.012976 × len(target_locales)
    ```
    Format `cost` to 2 decimals.
 
@@ -671,9 +670,8 @@ Estimated globalize.now translation cost
   Source catalog:     {bytes} chars ({messages} messages)
   Source tokens:      ~{source_tokens} (rough, chars/4)
   Target locales:     {n} ({comma-joined target locale codes})
-  Est. total tokens:  ~{total_tokens} (× {n} locales × 4.5)
   ──────────────────────────────────────────────
-  ▶ **Estimated total: ~€{cost}**  (at €0.22 / 1K tokens)
+  ▶ **Estimated total: ~€{cost}**  (at €0.012976 / 1K source tokens × {n} locales)
 ```
 
 Then add:
