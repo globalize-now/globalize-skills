@@ -2,6 +2,8 @@
 
 This covers Next.js projects using the Pages Router (`pages/` directory, `_app.tsx`). The setup is simpler than the App Router variant — no middleware, no `[locale]` directory restructuring, and no server/client component distinction.
 
+> **Catalog format note:** the code samples below use `.json` message imports (including the shared `getMessages` helper and the namespace-filtered variant). If the user chose **PO** as the catalog format in the main SKILL.md, swap `.json` for `.po` in every `import(`../../messages/${locale}.json`)` expression and use the seed file format from `catalog-format-po.md`. The rest of the Pages Router setup (i18n config, provider, `getStaticProps` pattern) is format-independent.
+
 ## Packages
 
 Only one package is required:

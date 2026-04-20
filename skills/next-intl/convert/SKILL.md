@@ -27,7 +27,7 @@ Before wrapping anything, verify next-intl is configured:
 
 1. Check that `next-intl` is in `node_modules` (i.e., `npm ls next-intl` exits 0)
 2. Check that `next.config.*` uses `createNextIntlPlugin()` (import from `next-intl/plugin`)
-3. Check that message files exist in the `messages/` directory (e.g., `messages/en.json`)
+3. Check that message files exist in the `messages/` directory (`messages/*.json` or `messages/*.po`)
 4. Check that `NextIntlClientProvider` is wired in the root layout (`app/layout.tsx` or `app/[locale]/layout.tsx`) or `_app.tsx`
 
 5. **Pages Router only:** Check that at least one page has `getStaticProps` or `getServerSideProps` returning `messages` in its props. Without this, `useTranslations` will silently return empty strings. Spot-check the most visited page (e.g., `pages/index.tsx`).
@@ -46,12 +46,19 @@ Read `package.json` and the directory structure to determine the project type:
 | **Router** | `app/` directory with `layout.tsx` → App Router. `pages/` directory with `_app.tsx` → Pages Router. |
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 
-Examine existing message files (`messages/*.json`) to understand the current namespace structure — top-level keys represent namespaces, nested objects represent sub-namespaces.
+Examine existing message files in `messages/` to determine the catalog format:
 
-Based on detection, read the relevant reference file for framework-specific patterns:
+- **`messages/*.json` present** → `catalogFormat = 'json'`. Top-level JSON keys represent namespaces, nested objects represent sub-namespaces.
+- **`messages/*.po` present** → `catalogFormat = 'po'`. Each entry's `msgid` is a dot-path (`Namespace.key` or `Namespace.sub.key`) and the namespace is the first segment.
+- **Both present or neither detectable** → ask the user which format the project targets before proceeding. Do not guess.
+
+Record `catalogFormat` — Step 7 branches on it, and the cost estimate at the end of Step 7.2 uses it to pick the right source file.
+
+Based on detection, read the relevant reference files for framework-specific and format-specific patterns:
 
 - **Next.js App Router** → read `references/nextjs-app-router.md`
 - **Next.js Pages Router** → read `references/nextjs-pages-router.md`
+- **`catalogFormat === 'po'`** → also read `references/catalog-format-po.md` for PO-specific subagent output shape, merge algorithm, and description-comment authoring rules.
 
 Then continue with the steps below.
 
@@ -261,7 +268,9 @@ Review these and wrap only if they appear in the actual UI:
 
 ## Step 5: ICU Patterns in next-intl
 
-Message files (`messages/*.json`) use ICU MessageFormat. All translation values are ICU strings — the same syntax used by FormatJS and other ICU-based libraries.
+Message files use ICU MessageFormat. All translation values are ICU strings — the same syntax used by FormatJS and other ICU-based libraries.
+
+The ICU examples below use JSON. When `catalogFormat === 'po'`, the same ICU body goes inside `msgstr` instead of a JSON value, and the key moves from a JSON path to a dot-pathed `msgid`. See `references/catalog-format-po.md` for the side-by-side translation.
 
 ### Interpolation
 
@@ -375,7 +384,7 @@ English only uses `one` and `other`, but other languages have `zero`, `two`, `fe
 
 ## Step 6: Namespace Strategy
 
-next-intl organizes translations by namespace — top-level keys in the messages JSON. Namespaces scope translations so each component only loads the keys it needs.
+next-intl organizes translations by namespace. In JSON, namespaces are top-level keys. In PO, the namespace is the first dot-separated segment of the `msgid` (e.g. `msgid "HomePage.title"` → namespace `HomePage`, key `title`). Namespaces scope translations so each component only loads the keys it needs; the namespace-naming rules in this step apply identically to both formats.
 
 ### How namespaces work
 
@@ -449,11 +458,17 @@ Within each file, handle in this order:
    - Pages Router → always `import {useTranslations} from 'next-intl'`
 3. **Choose or create a namespace** matching the component's domain (see Step 6)
 4. **Wrap strings** using `t('key')` for all user-facing text
-5. **Add corresponding keys** to `messages/{locale}.json` under the chosen namespace
+5. **Add corresponding keys** to the message files under the chosen namespace (`messages/{locale}.json` or `messages/{locale}.po`, per `catalogFormat`)
 
 ### Adding keys to message files
 
-When wrapping a string, add the key to every locale file. For the source locale, use the actual text. For other locales, copy the source text as a placeholder (to be translated later). Every locale file must have the same key structure.
+When wrapping a string, add the key to every locale file. For the source locale, use the actual text. For other locales, copy the source text as a placeholder (to be translated later). Every locale file must have the same keys.
+
+> **If `catalogFormat === 'po'`:** follow `references/catalog-format-po.md` § Adding Entries. Each new entry must include:
+> - `msgid` as a dot-path (`Namespace.key`)
+> - `msgstr` with the source-language text (or placeholder for non-source locales)
+> - `#.` description comment — a one-line note about the string's purpose, audience, or tone. **This is the main reason to pick PO over JSON — do not skip it.** If the string's intent isn't obvious from the component context, spend a few extra seconds on a good description.
+> - `#:` source reference pointing to the file where the string is rendered (path relative to project root; `src/components/Header.tsx:42` format)
 
 ### Passing server-translated strings to Client Components
 
@@ -469,7 +484,7 @@ If the Client Component needs many translations or handles dynamic content, use 
 
 ### After batch wrapping
 
-1. **Check all locale files have the same keys** — every key in `messages/en.json` must exist in `messages/de.json`, `messages/fr.json`, etc. Missing keys will cause runtime warnings.
+1. **Check all locale files have the same keys** — every key/msgid in the source locale file must exist in every other locale file. Missing keys will cause runtime warnings. For PO, this means every `msgid` in `messages/{sourceLocale}.po` has a matching entry (with the same `#.` description and `#:` reference) in every target-locale `.po`.
 2. **Run the dev server** — verify no missing key warnings in the console. next-intl logs warnings for missing messages by default.
 3. **Run existing tests** — if tests fail with missing provider errors, ensure the test setup wraps components with `NextIntlClientProvider`:
    ```tsx
@@ -502,7 +517,7 @@ Use this path for large projects (more than 15 files). The work is partitioned a
 
 Before dispatching subagents:
 
-1. Read the existing namespace structure from the source locale message file (e.g., `messages/en.json`).
+1. Read the existing namespace structure from the source locale message file (`messages/{sourceLocale}.json` for JSON; `messages/{sourceLocale}.po` for PO — namespaces are the first dot-path segment of each `msgid`).
 2. Map each partition's directories to namespaces using the naming conventions from Step 6.
 3. Assign each partition a list of namespaces it owns. If a namespace doesn't exist yet, include it in the assignment for the partition whose files will use it.
 4. The `Common` namespace (shared strings) should be assigned to the partition that contains shared components. Other partitions that need a common string should create a feature-specific key instead — duplicates are resolved in the merge step.
@@ -528,7 +543,7 @@ You are wrapping hardcoded UI strings with next-intl translation functions in a 
 ## Your Namespace Assignment
 You own these namespaces: {list of namespaces}
 Existing namespace structure:
-{JSON snippet of current messages/en.json relevant to this partition's namespaces}
+{snippet of existing entries under these namespaces — JSON object for catalogFormat=json, PO entries for catalogFormat=po}
 
 Namespace rules:
 - PascalCase names matching the component domain (HomePage, Navigation, Common, Auth)
@@ -536,7 +551,7 @@ Namespace rules:
 - Add keys under your assigned namespaces only
 
 ## Reference File
-Read `{path to reference file — e.g., references/nextjs-app-router.md}` for framework-specific patterns before you start wrapping.
+Read `{path to router reference file — e.g., references/nextjs-app-router.md}` for framework-specific patterns before you start wrapping. {If catalogFormat=po, also read `references/catalog-format-po.md` for the PO-specific entry format and subagent output shape.}
 
 ## Your Files (process in this order)
 {numbered list of file paths with their category — e.g.:
@@ -558,6 +573,9 @@ Within each file, process in this order: JSX text → user-visible attributes �
 
 ## IMPORTANT: Do not edit message files
 Do NOT directly edit any files in the messages/ directory.
+
+### If catalogFormat === 'json' — include this block:
+
 Instead, after processing all your files, output a JSON object listing every new key you need added:
 
 {
@@ -568,16 +586,39 @@ Instead, after processing all your files, output a JSON object listing every new
 }
 
 Include only keys you actually used in your t() calls. Use the same nesting structure as the message files.
+
+### If catalogFormat === 'po' — include this block INSTEAD (not in addition):
+
+Instead, after processing all your files, output a JSON array of entries. Each entry describes one new PO message:
+
+[
+  {
+    "msgid": "Namespace.key",
+    "msgstr": "English value",
+    "description": "One-line intent/audience/tone note — mandatory, must be specific",
+    "reference": "src/components/Foo.tsx:42"
+  }
+]
+
+Rules:
+- `msgid` is a dot-path (`Namespace.key` or `Namespace.sub.key`). Namespace = first segment.
+- Include one entry per `t(...)` call you introduced. Do not nest.
+- `description` is required and must be a real one-line note — not "TODO", not a copy of the English value. If intent isn't obvious from context, spell it out.
+- `reference` points at the source file (and optionally line) where the string is rendered.
+- ICU goes inside `msgstr` exactly as it would inside a JSON value (`{count, plural, one {# item} other {# items}}`). Do not split a plural across multiple entries.
+- See `references/catalog-format-po.md` § Subagent Output Format and § ICU Patterns in PO for worked examples.
 ```
+
+> **Orchestrator note:** when you assemble the dispatch prompt, include **only one** of the two blocks above based on the detected `catalogFormat`. Do not ship both — a subagent receiving both will waffle between output shapes and the merge step will fail.
 
 #### After all subagents complete — merge message keys
 
-1. **Collect** the JSON key objects from all subagent outputs.
-2. **Check for collisions** — if two subagents added the same namespace + key combination with different values, resolve by keeping the more descriptive value.
-3. **Deep-merge** all keys into `messages/{locale}.json` for each locale file:
-   - Source locale (e.g., `en.json`): use the actual English values from the subagent outputs
-   - Other locales: copy the source text as a placeholder (to be translated later)
-4. **Verify** all locale files have the same key structure.
+1. **Collect** the outputs from all subagents (JSON objects for `catalogFormat === 'json'`, entry arrays for `catalogFormat === 'po'`).
+2. **Check for collisions** — if two subagents added the same namespace + key (same `msgid` for PO) with different values, resolve by keeping the more descriptive value. For PO, also merge `#.` descriptions and `#:` references if they diverge — concatenate references separated by newlines, pick the more informative description.
+3. **Merge** into the locale files:
+   - **JSON**: deep-merge into `messages/{locale}.json` for every locale. Source locale gets actual English; other locales get the English as a placeholder.
+   - **PO**: append new entries to `messages/{locale}.po` for every locale (follow `references/catalog-format-po.md` § Merge Algorithm — it spells out entry formatting, duplicate detection by `msgid`, and the placeholder strategy for non-source locales). Preserve the existing header block at the top of each file.
+4. **Verify** every locale file has the same keys/msgids. For PO, also verify that `#.` descriptions and `#:` references are identical across locales for each `msgid`.
 
 #### Verification
 
@@ -606,10 +647,14 @@ This is an interim local heuristic. Once `globalize.now` exposes a quote endpoin
 
 1. Locate the messages directory (typically `messages/` or `src/messages/`).
 2. Determine the source locale from the i18n config (`i18n/request.ts`, `i18n.ts`, or `routing.ts`) — `defaultLocale` if set, otherwise the first entry of `locales`. `target_locales = locales \ [sourceLocale]`.
-3. Measure the byte size of the source catalog file (keys + values + JSON structure all count, since all of it ends up in the translation request):
+3. Measure the byte size of the source catalog file. Everything in the file counts — globalize.now ingests the whole file, including JSON structure or PO headers, `#.` descriptions, and `#:` references (the descriptions in particular are sent to the translator so they get counted):
    ```bash
+   # JSON
    wc -c < messages/en.json
+   # PO
+   wc -c < messages/en.po
    ```
+   Use whichever file matches your detected `catalogFormat`.
 4. Apply the formula:
    ```
    source_tokens      = ceil(catalog_bytes / 4)
@@ -621,7 +666,7 @@ This is an interim local heuristic. Once `globalize.now` exposes a quote endpoin
 
 ```
 Estimated globalize.now translation cost
-  Source catalog:     {bytes} chars ({messages} messages)
+  Source catalog:     {bytes} chars ({messages} messages, {json|po})
   Source tokens:      ~{source_tokens} (rough, chars/4)
   Target locales:     {n} ({comma-joined target locale codes})
   ──────────────────────────────────────────────

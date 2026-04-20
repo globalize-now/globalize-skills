@@ -81,6 +81,8 @@ After Step 1 (detection) completes without blockers, ask the user:
 
 The **locale prefix strategy**, **locale list**, and **default locale** (normally collected in Step 3) must be presented immediately after mode selection. Collect all answers before proceeding with Step 2.
 
+The **catalog format** choice is collected earlier, as part of Step 1 (see "Catalog Format" section below), and is always asked before the Setup Mode prompt — even in unguided mode — because later steps branch on it. When `PO-capable` is `false`, the choice is made automatically and the user is only informed.
+
 ---
 
 ## Step 1: Detect the Project
@@ -92,11 +94,12 @@ Read the project's `package.json`, build config (`next.config.*`), and directory
 | **Framework** | `next` in deps → Next.js. No `next` → STOP. |
 | **Next.js version** | Read the `next` version string from `package.json` deps or devDeps. Parse the major version number (e.g., `"^14.2.0"` → 14, `"16.2.1"` → 16, `"~15.1.0"` → 15). Store as `nextMajor`. |
 | **Router type** | `app/` directory with `layout.tsx`/`layout.jsx` → App Router. `pages/` directory with `_app.tsx`/`_app.jsx` → Pages Router. Both present → App Router (hybrid — treat as App Router). |
-| **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
+| **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. Also parse the `typescript` version major number from `package.json` if present (e.g. `"^5.3.0"` → 5). Store as `tsMajor` (or `null` if TypeScript isn't used). |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
 | **src directory** | Check if the project uses `src/` prefix for `app/` or `pages/` directories. |
 | **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
 | **Current branch** | `git branch --show-current` — record the branch name. |
+| **PO-capable** | `true` if `tsMajor` is `null` or `tsMajor >= 5`. Otherwise `false`. This mirrors the next-intl version selection in Step 2: PO support is only in `next-intl >= 4.5`, which requires `next-intl@4`, which requires TypeScript 5+. The next-intl docs do not specify a Next.js version floor for the PO loader beyond the skill's existing `nextMajor >= 12` hard stop. Stored for the Catalog Format choice below. |
 
 ### Incompatibility Checks
 
@@ -109,12 +112,26 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 | **next-intl already installed** | `next-intl` in `package.json` deps or devDeps | **STOP.** Tell the user: "next-intl is already installed. If setup is incomplete, review the existing configuration manually." Do NOT proceed. |
 | **Next.js too old** | `nextMajor` < 12 | **STOP.** Tell the user: "next-intl v4 requires Next.js 12+. This project uses Next.js {nextMajor}. Consider upgrading Next.js first, or install `next-intl@3` manually (not covered by this skill)." Do NOT proceed. |
 
-Based on the detection, pick the right variant reference file:
+### Catalog Format
 
-- **Next.js App Router** → read `references/nextjs-app-router.md`
-- **Next.js Pages Router** → read `references/nextjs-pages-router.md`
+**CONSENT GATE: Present the catalog format choice. You MUST wait for the user to choose before proceeding.** Record the chosen value as `catalogFormat` — it drives conditional steps in 4, 5, 7 (Pages Router), 8, 12, and 13.
 
-Then continue with Steps 2-13 below, using the variant-specific instructions from the reference file where noted.
+If `PO-capable` (from the detection table) is `false`, **skip this prompt**. Select JSON automatically and tell the user:
+
+> I'm using JSON for message files. PO support requires next-intl ≥ 4.5, which requires TypeScript 5+. This project is on TypeScript {tsMajor}, so Step 2 will install `next-intl@3` — which doesn't have the PO loader. You can migrate to PO later after upgrading TypeScript.
+
+Otherwise, ask:
+
+> **Which message catalog format should I use?**
+>
+> 1. **PO (gettext)** — *recommended*. Industry-standard translator format. Supports description comments (`#.`) and source-file references (`#:`) that give translators and AI translation tools the context they need to produce accurate translations. JSON cannot carry this metadata. Loaded via next-intl's `.po` loader, introduced as experimental in 4.5.
+> 2. **JSON** — stable, non-experimental. Key-value only; no translator-side metadata. Pick this if you want to avoid the experimental flag or your TMS cannot import/export PO.
+>
+> I recommend PO unless you have a reason to avoid the experimental flag.
+
+**You MUST wait for the user to choose before proceeding.**
+
+When the user picks PO, read `references/catalog-format-po.md` — it contains all PO-specific code variants referenced by later steps. Keep it open for quick lookup.
 
 ### Branch Recommendation
 
@@ -127,6 +144,15 @@ If the project is a git repository and the current branch is `main`, `master`, o
 > Want me to create this branch, or continue on `{branch}`?
 
 If the user is already on a feature branch, or the project is not a git repository, skip this silently.
+
+### Variant Dispatch
+
+Based on the detected router, pick the right variant reference file — keep it open alongside this SKILL.md so you can consult it from Steps 2–13 where router-specific code is needed:
+
+- **Next.js App Router** → read `references/nextjs-app-router.md`
+- **Next.js Pages Router** → read `references/nextjs-pages-router.md`
+
+If `catalogFormat === 'po'`, also keep `references/catalog-format-po.md` open — Steps 4, 5, 7 (Pages), 8, 12, and 13 branch into it.
 
 If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
 
@@ -238,6 +264,8 @@ The `hasLocale()` check validates the incoming locale against the routing config
 
 Adjust the `../../messages/` path if the project's `messages/` directory is at a different depth relative to this file.
 
+> **If `catalogFormat === 'po'`:** use the `.po` import form from `references/catalog-format-po.md` § Request Config instead of the `.json` form shown above. The import extension must literally be `.po` for the plugin's loader to pick it up.
+
 ---
 
 ## Step 5: Next.js Plugin
@@ -305,6 +333,25 @@ module.exports = withNextIntl(nextConfig);
 ```
 
 The `i18n` key replaces the need for middleware — Next.js handles locale routing natively in Pages Router.
+
+### If `catalogFormat === 'po'`
+
+Instead of the bare `createNextIntlPlugin()` calls above, pass the experimental `messages` option so the plugin installs its `.po` loader. Read `references/catalog-format-po.md` § Next.js Plugin for the full App Router and Pages Router variants, including plugin composition. The `experimental.messages` block is where the loader gets wired in:
+
+```ts
+const withNextIntl = createNextIntlPlugin({
+  experimental: {
+    messages: {
+      format: 'po',
+      path: './messages',
+      locales: 'infer',
+      precompile: true
+    }
+  }
+});
+```
+
+The `experimental` wrapper is intentional — the next-intl maintainers reserve the right to change the shape before GA. Warn the user about this at apply time.
 
 ---
 
@@ -439,6 +486,8 @@ export async function getStaticProps({locale}: {locale: string}) {
 }
 ```
 
+> **If `catalogFormat === 'po'`:** swap the `.json` import for the `.po` form shown in `references/catalog-format-po.md` § Pages Router `getStaticProps`.
+
 ### `<html lang>` attribute migration
 
 **Before modifying any files, read the current `<html lang="...">` value:**
@@ -457,7 +506,11 @@ If the existing `lang` value does not match the `defaultLocale` configured in St
 
 ## Step 8: Message Files
 
-Create the `messages/` directory in the project root (next to `package.json`) and scaffold a JSON file for each configured locale:
+Create the `messages/` directory in the project root (next to `package.json`) and scaffold one file per configured locale.
+
+> **If `catalogFormat === 'po'`:** skip the JSON scaffold below. Follow `references/catalog-format-po.md` § Seed `.po` Files for the file shape, headers, and per-locale stubs. Return here when done.
+
+### JSON scaffold (`catalogFormat === 'json'`)
 
 ```
 messages/
@@ -634,7 +687,9 @@ Run the dev server and verify the setup works end-to-end:
 
 3. **Check a secondary locale** — visit `http://localhost:3000/de` (or the equivalent for your configured locales). The page should render with the alternate locale's messages.
 
-4. **Add a test translation** to verify the full pipeline:
+4. **Add a test translation** to verify the full pipeline.
+
+   > **If `catalogFormat === 'po'`:** use the PO test block from `references/catalog-format-po.md` § Verify Step Translation instead of the JSON snippet below. That block includes a **plural check** you MUST render and visually confirm — `{count, plural, ...}` inside `msgstr` is the one area of PO support the next-intl 4.5 docs do not explicitly spell out, so this is the only reliable way to catch a bad loader interaction. If the plural output is wrong (e.g. renders the raw ICU string or an empty value), stop and report before continuing with Step 13; switching to JSON is the safe fallback.
 
    In `messages/en.json`:
    ```json
@@ -691,6 +746,8 @@ This step is **not required** for the initial setup to work. The app will functi
 
 ### TypeScript strict mode for key checking
 
+> **If `catalogFormat === 'po'`:** skip this subsection. next-intl 4.5's documented TypeScript declaration generation (`createMessagesDeclaration`) targets JSON message files; support for generating types from `.po` is not documented. Tell the user: "TypeScript key-level type checking isn't set up automatically because PO-based declaration generation isn't documented. Missing-key detection via `onError` (below) still applies." Then jump ahead to "Missing key detection in development".
+
 next-intl can provide compile-time type checking for translation keys. Create a global type declaration file (e.g., `src/types/next-intl.d.ts` or `global.d.ts`):
 
 ```ts
@@ -722,7 +779,7 @@ export default getRequestConfig(async ({requestLocale}) => {
 
   return {
     locale,
-    messages: (await import(`../../messages/${locale}.json`)).default,
+    messages: (await import(`../../messages/${locale}.json`)).default, // or `.po` — match your catalogFormat choice
     onError(error) {
       if (error.code === 'MISSING_MESSAGE') {
         console.error(error);
@@ -880,7 +937,7 @@ export default async function InvoicePage() {
   ```ts
   return {
     locale,
-    messages: (await import(`../../messages/${locale}.json`)).default,
+    messages: (await import(`../../messages/${locale}.json`)).default, // or `.po`
     now: new Date(),
     timeZone: 'America/New_York',
   };
@@ -898,6 +955,8 @@ export default async function InvoicePage() {
 
 - **Dynamic rendering without explicit props**: Using `useNow()` or `useTimeZone()` in Client Components without passing `now` or `timeZone` to `NextIntlClientProvider` forces the entire page into dynamic rendering. If you need static rendering, provide these values explicitly from the server layout.
 
+- **PO format is experimental** (only if `catalogFormat === 'po'`): the `experimental.messages` option in next-intl 4.5 is explicitly marked experimental and may change in future minor versions. Pin next-intl to a known-good minor (e.g. `"next-intl": "4.5.x"`) and re-read the release notes before bumping. If the API shifts and you need to escape quickly, convert `.po` bodies back to JSON (`msgid` → JSON key, `msgstr` → value, drop comments), rename the files, and remove the `experimental.messages` block.
+
 ---
 
 ## Next Steps
@@ -910,8 +969,8 @@ This skill set up the infrastructure but did **not** convert existing hardcoded 
 
 ### Connect a translation service
 
-Message files (JSON) need a translation pipeline. Options:
+Message files need a translation pipeline. Options:
 
 1. **[Globalize](https://globalize.now)** — fast, automated, high-quality AI translations. Syncs directly with your message files.
-2. **Crowdin, Lokalise, Phrase** — traditional TMS platforms with human translator workflows and review tools.
-3. **Manual** — translate JSON files by hand. Works for small projects or a single target locale.
+2. **Crowdin, Lokalise, Phrase, Weblate, Transifex, Poedit** — traditional TMS platforms with human translator workflows and review tools. If you chose PO, most of these speak PO natively and will pick up your `#.` descriptions and `#:` source references as translator context out of the box — no format conversion needed.
+3. **Manual** — translate files by hand. Works for small projects or a single target locale.

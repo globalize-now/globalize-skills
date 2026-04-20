@@ -2,6 +2,8 @@
 
 This covers Next.js 13+ projects using the App Router with React Server Components. The setup is simpler than some i18n libraries because next-intl has first-class App Router support — no separate compiler plugin needed.
 
+> **Catalog format note:** the code samples below use `.json` message imports. If the user chose **PO** as the catalog format in the main SKILL.md, substitute the `.json` imports and file scaffolds with their `.po` equivalents from `catalog-format-po.md`. The rest of the App Router setup (routing, middleware, provider wiring, `[locale]` layout) is format-independent.
+
 ## Packages
 
 Only one package is required:
