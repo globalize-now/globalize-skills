@@ -11,6 +11,27 @@ const CONVERTERS = {
   cursor: installCursor,
 };
 
+const HELP = `Usage: globalize-skills add <skills...> [options]
+
+Install one or more skills into the current project.
+
+Examples:
+  globalize-skills add lingui-setup
+  globalize-skills add lingui-setup lingui-extract
+  globalize-skills add --preset lingui
+  globalize-skills add lingui-setup --agent cursor
+  globalize-skills add lingui-setup --agent all
+
+Options:
+  --preset <name>       Install a preset bundle of skills
+  --agent <name>        Target agent: claude, codex, cursor, or all
+                        (auto-detected by default)
+  --repo <owner/repo>   Use a different GitHub repository
+  --target <path>       Target directory (prompts by default)
+  --no-cache            Skip local cache and fetch fresh from GitHub
+  -h, --help            Show this help
+`;
+
 function parseArgs(args) {
   const flags = {};
   const positional = [];
@@ -35,6 +56,11 @@ function parseArgs(args) {
 }
 
 export async function run(args = []) {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(HELP);
+    return;
+  }
+
   const { skills: skillNames, preset, agent, repo, noCache, target } = parseArgs(args);
 
   const targetDir = target !== undefined ? resolveTargetDir(target) : await promptScope();

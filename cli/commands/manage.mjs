@@ -13,7 +13,24 @@ const CONVERTERS = {
   cursor: installCursor,
 };
 
-export async function run() {
+const HELP = `Usage: globalize-skills manage
+
+Interactively add and remove skills. Detects what's already installed
+and pre-checks those in the selection list. Deselecting a skill
+removes it.
+
+This is the default command — running \`globalize-skills\` with no
+arguments opens the same interactive session.
+
+Options:
+  -h, --help   Show this help
+`;
+
+export async function run(args = []) {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(HELP);
+    return;
+  }
   const [skills, presets] = await Promise.all([listSkills({ noCache: false }), fetchPresets({ noCache: false })]);
 
   const availableSkillNames = new Set(skills.map((s) => s.name));

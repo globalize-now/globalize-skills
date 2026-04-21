@@ -1,6 +1,21 @@
 import { listSkills, fetchPresets } from "../lib/registry.mjs";
 
+const HELP = `Usage: globalize-skills list [options]
+
+Show available skills and presets.
+
+Options:
+  --repo <owner/repo>   Use a different GitHub repository
+  --no-cache            Skip local cache and fetch fresh from GitHub
+  -h, --help            Show this help
+`;
+
 export async function run(args = []) {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(HELP);
+    return;
+  }
+
   const noCache = args.includes("--no-cache");
   const repo = args.find((_, i, a) => a[i - 1] === "--repo") || undefined;
 

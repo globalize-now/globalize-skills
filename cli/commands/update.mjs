@@ -12,6 +12,24 @@ const CONVERTERS = {
   cursor: installCursor,
 };
 
+const HELP = `Usage: globalize-skills update [options]
+
+Update all installed skills to the latest version. Auto-detects
+installed skills and refreshes them from GitHub.
+
+Examples:
+  globalize-skills update
+  globalize-skills update --target /path/to/project
+  globalize-skills update --agent claude
+
+Options:
+  --agent <name>        Target agent: claude, codex, cursor, or all
+                        (auto-detected by default)
+  --repo <owner/repo>   Use a different GitHub repository
+  --target <path>       Target directory (defaults to current directory)
+  -h, --help            Show this help
+`;
+
 function parseArgs(args) {
   const flags = {};
   for (let i = 0; i < args.length; i++) {
@@ -27,6 +45,11 @@ function parseArgs(args) {
 }
 
 export async function run(args = []) {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(HELP);
+    return;
+  }
+
   const { agent, repo, target } = parseArgs(args);
 
   const targetDir = resolveTargetDir(target || "local");
