@@ -88,12 +88,12 @@ Read the project's `package.json`, build config (`vite.config.*`, `next.config.*
 
 | Signal | How to detect |
 |--------|--------------|
-| **Framework** | `next` in deps → Next.js. `vite` in devDeps → Vite. `react-scripts` → CRA. |
-| **Compiler** | `@vitejs/plugin-react-swc` → SWC. `@vitejs/plugin-react` (no `-swc`) → Babel. Next.js → SWC unless `.babelrc` exists. |
-| **Router** | `@tanstack/react-router` → TanStack Router. `react-router` → React Router. Next.js → file-based routing. |
+| **Framework** | `next` in deps → Next.js. `@tanstack/react-start` in deps → TanStack Start. `vite` in devDeps → Vite. `react-scripts` → CRA. |
+| **Compiler** | `@vitejs/plugin-react-swc` → SWC. `@vitejs/plugin-react` (no `-swc`) → Babel. Next.js → SWC unless `.babelrc` exists. TanStack Start → Babel (uses `@vitejs/plugin-react`). |
+| **Router** | `@tanstack/react-start` → TanStack Start (SSR). `@tanstack/react-router` (without `react-start`) → TanStack Router (client-only). `react-router` → React Router. Next.js → file-based routing. |
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
-| **Route entry points** | Next.js App Router: `src/app/**/page.tsx` exists. TanStack Router (file-based): `src/routes/` directory exists. React Router v7 framework mode: `app/routes/` exists. If none found → plain SPA (no file-based routing). |
+| **Route entry points** | Next.js App Router: `src/app/**/page.tsx` exists. TanStack Router / TanStack Start (file-based): `src/routes/` directory exists — Start allows customizing this via `tanstackStart({ router: { routesDirectory } })` in `vite.config.ts`, check there if `src/routes/` is absent. React Router v7 framework mode: `app/routes/` exists. If none found → plain SPA (no file-based routing). |
 | **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
 | **Current branch** | `git branch --show-current` — record the branch name. |
 
@@ -113,7 +113,8 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 Based on the detection, pick the right variant reference file:
 
 - **Next.js App Router** → read `references/nextjs-app-router.md`
-- **Vite + SWC** (including TanStack Router, React Router, plain Vite) → read `references/vite-swc.md`
+- **TanStack Start** → read `references/tanstack-start.md`
+- **Vite + SWC** (including TanStack Router client-only, React Router, plain Vite) → read `references/vite-swc.md`
 - **Vite + Babel** → read `references/vite-babel.md`
 
 Then continue with Steps 2-9 below, using the variant-specific instructions from the reference file for Steps 4, 5, and 6.
@@ -194,7 +195,7 @@ Set the `entries` glob to match the project's route entry points:
 | Router | `entries` glob |
 |--------|---------------|
 | Next.js App Router | `<rootDir>/src/app/**/page.tsx` |
-| TanStack Router (file-based) | `<rootDir>/src/routes/**/*.tsx` |
+| TanStack Router / TanStack Start (file-based) | `<rootDir>/src/routes/**/*.tsx` |
 | React Router v7 framework mode | `<rootDir>/app/routes/**/*.tsx` |
 
 Adjust the file extension (`.tsx` vs `.jsx` / `.ts` vs `.js`) to match the project. The `output` pattern uses `{entryDir}` (directory of the entry file), `{entryName}` (filename without extension), and `{locale}` to place catalogs co-located next to each page — e.g., `src/app/about/page.tsx` produces `src/app/about/locales/page/en.po`.

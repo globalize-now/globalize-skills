@@ -47,7 +47,7 @@ Read `package.json` and build config to determine the project type:
 Based on detection, read the relevant reference file for framework-specific patterns:
 
 - **Next.js App Router** → read `references/nextjs-app-router.md`
-- **Everything else** (Vite + SWC, Vite + Babel, React Router, TanStack Router) → read `references/react-standard.md`
+- **Everything else** (Vite + SWC, Vite + Babel, React Router, TanStack Router, TanStack Start) → read `references/react-standard.md`
 
 Then continue with the steps below.
 
