@@ -58,7 +58,7 @@ If the project already has other Vite plugins (Vue DevTools, Vitest setup, etc.)
 > Choose a locale routing strategy:
 > 1. **Unprefixed source locale** — source locale (e.g., English) keeps original URLs (`/about`). Other locales use `/{locale}/about` (e.g., `/fr/about`). Best for preserving existing URLs and SEO.
 > 2. **All locales prefixed** — every locale gets a prefix (`/en/about`, `/fr/about`). Bare paths (`/about`) redirect to the source locale (`/en/about`). Cleanest structure, single route tree.
-> 3. **Skip locale routing** — use a `?lang=` query param, `localStorage`, or browser detection only, no URL path changes. Simplest setup.
+> 3. **Skip locale routing** — use a `?locale=` query param, `localStorage`, or browser detection only, no URL path changes. Simplest setup.
 
 **You MUST wait for the user to choose before proceeding. Do NOT default to option 1.**
 
@@ -218,7 +218,7 @@ export function localePath(locale: string, path: string): string {
 
 ### Strategy 3 / plain SPA: No URL routing
 
-No router changes. The locale is detected from `?lang=`, `localStorage`, then `navigator.language`.
+No router changes. The locale is detected from `?locale=`, `localStorage`, then `navigator.language`.
 
 Extend `src/i18n/index.ts` from Step 3 with a detector:
 
@@ -226,10 +226,10 @@ Extend `src/i18n/index.ts` from Step 3 with a detector:
 // Append to src/i18n/index.ts
 function detectLocale(): Locale {
   const params = new URLSearchParams(window.location.search)
-  const fromUrl = params.get('lang')
+  const fromUrl = params.get('locale')
   if (fromUrl && (locales as readonly string[]).includes(fromUrl)) return fromUrl as Locale
 
-  const fromStorage = localStorage.getItem('lang')
+  const fromStorage = localStorage.getItem('locale')
   if (fromStorage && (locales as readonly string[]).includes(fromStorage)) return fromStorage as Locale
 
   const fromNav = navigator.language.split('-')[0]
@@ -246,7 +246,7 @@ And persist the selection when the switcher fires:
 
 ```ts
 export function saveLocale(locale: Locale) {
-  localStorage.setItem('lang', locale)
+  localStorage.setItem('locale', locale)
 }
 ```
 

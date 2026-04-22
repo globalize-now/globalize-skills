@@ -99,7 +99,28 @@ Register the boot file in `quasar.config.ts` by adding `'i18n'` to the `boot: []
 
 Quasar renders its own `index.html` under `src-spa/` (or similar for SSR / Capacitor modes). Read the current `<html lang="...">` value. Update the static lang to the source locale. `setLocale()` (from `src/i18n/index.ts`) sets `document.documentElement.lang` and `.dir` dynamically after hydration.
 
-For Quasar's SSR mode, the static value matters more — set it to the source locale and rely on `setLocale()` running in `onServerPrefetch()` / middleware if the app detects a different initial locale.
+For Quasar's SSR mode, the static value matters more — the server renders HTML before any client JS runs, and a mismatch between the static `lang` and the locale the server actually renders in will cause a hydration flash. The `setLocale()` helper from Step 3 already guards DOM writes (`typeof document !== 'undefined'`) so it's safe to call in either environment. To resolve the locale on the server before render, use Quasar's `ssrContext` in the boot file:
+
+```ts
+// src/boot/i18n.ts (SSR-aware)
+import { boot } from 'quasar/wrappers'
+import { i18n, setLocale } from '../i18n'
+import type { Locale } from '../i18n/locales'
+import { locales } from '../i18n/locales'
+
+export default boot(async ({ app, ssrContext }) => {
+  app.use(i18n)
+  if (ssrContext) {
+    const header = (ssrContext.req.headers['accept-language'] ?? '') as string
+    const preferred = header.split(',')[0]?.split('-')[0]
+    if (preferred && (locales as readonly string[]).includes(preferred)) {
+      await setLocale(preferred as Locale)
+    }
+  }
+})
+```
+
+Alternatively, skip the server-side resolve and let the client reconcile after hydration — accept a brief flash. For apps with heavy SEO requirements on translated content, the server-side resolve above is the correct path.
 
 ## Language Switcher (Step 6)
 
@@ -124,7 +145,7 @@ const options = computed(() =>
 
 watch(selected, async (next) => {
   await setLocale(next)
-  localStorage.setItem('lang', next)
+  localStorage.setItem('locale', next)
 })
 </script>
 

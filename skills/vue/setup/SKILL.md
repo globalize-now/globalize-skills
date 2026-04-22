@@ -103,7 +103,7 @@ The **locale list** and **default / source locale** are also collected at this p
 
 ## Step 1: Detect the Project
 
-Read the project's `package.json`, build config (`vite.config.*`, `nuxt.config.*`, `quasar.config.*`), and any `.vitepress/` directory to determine:
+Read the project's `package.json`, build config (`vite.config.*`, `nuxt.config.*`, `quasar.config.*`), and any `.vitepress/` directory to determine the project shape. **Record the actual extension of whichever config file exists** (`.ts`, `.mts`, `.js`, `.mjs`, `.cjs`) — later steps (Step 4, Step 5) must edit that exact file, not assume `.ts`.
 
 | Signal | How to detect |
 |--------|--------------|
@@ -113,8 +113,8 @@ Read the project's `package.json`, build config (`vite.config.*`, `nuxt.config.*
 | **API style** | Run a quick grep against `src/**/*.vue` (or `app/**/*.vue` / `pages/**/*.vue` for Nuxt) for `<script setup>` vs `export default { }` Options-style. Hint-only; skill emits Composition API output regardless. |
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` or `bun.lockb` → bun. |
-| **Router** | `vue-router` in deps. For Vite SPAs, check `src/router/` or grep for `createRouter` to locate the route table. Nuxt has file-based routing built in — no `vue-router` package needed in deps. |
-| **Existing i18n** | `vue-i18n`, `@intlify/*`, `@nuxtjs/i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@paraglide/*`, `@lingui/*` in deps or devDeps. |
+| **Router** | `vue-router` in deps. For Vite SPAs, locate the route table: first check `src/router/` (conventional), then grep `src/**/*.{ts,tsx,js,mjs,vue}` for `createRouter(` or `defineRoutes(` to catch inline / programmatic setups (e.g. routes declared in `main.ts` or produced by `unplugin-vue-router`). Record the file(s) containing `createRouter(`; that's what Step 5 will edit. If `vue-router` is in deps but no `createRouter(` call is found anywhere, warn the user — the router is installed but not wired, and the routing-strategy choice may not apply. Nuxt has file-based routing built in — no `vue-router` package needed in deps. |
+| **Existing i18n** | `vue-i18n`, `@nuxtjs/i18n`, `@intlify/vue-i18n` (legacy standalone), `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@paraglide/*`, `@lingui/*` in deps or devDeps. Note: `@intlify/unplugin-vue-i18n` and `@intlify/eslint-plugin-vue-i18n` are supporting packages this skill itself uses — do **not** treat them as competing i18n libraries. |
 | **Existing `<html lang>`** | Check `index.html` (Vite / Quasar) or `app.vue` / `nuxt.config.ts` `app.head` (Nuxt) for an existing `<html lang="...">` value. Used to infer the source locale. |
 | **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
 | **Current branch** | `git branch --show-current` — record the branch name. |
@@ -128,8 +128,22 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 | **Not a Vue project** | No `vue` in deps, no `nuxt` in deps. Or: `react`, `svelte`, `@angular/core`, `solid-js` in deps with no `vue`. | **STOP.** Tell the user: "vue-i18n requires Vue. This project does not have `vue` (or `nuxt`) as a dependency. This skill cannot set up i18n for non-Vue projects." Do NOT proceed. |
 | **Vue 2 detected** | `vue` semver major is `2` (e.g. `"^2.7.0"`). | **STOP.** Tell the user: "This project uses Vue 2 (detected `vue@{version}`). vue-i18n v11 requires Vue 3; Vue 2 uses the legacy `vue-i18n@8` with a different plugin API. This skill only covers Vue 3. Recommended path: upgrade the project to Vue 3 first (see https://v3-migration.vuejs.org/), then re-run this setup. Or install `vue-i18n@8` manually — not covered by this skill." Do NOT proceed. |
 | **VitePress-only project** | `vitepress` in devDeps AND no `vue` in runtime deps (or only present transitively), AND a `.vitepress/config.*` file exists. | **STOP.** Tell the user: "This project is VitePress. VitePress has its own native `locales` configuration and does not use vue-i18n for documentation site localization. See https://vitepress.dev/guide/i18n. This skill cannot set up i18n for VitePress projects." Do NOT proceed. |
-| **Existing i18n library** | One of `vue-i18n`, `@nuxtjs/i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@paraglide/*`, `@lingui/core` in `package.json` deps or devDeps. | **STOP.** Tell the user: "{library} is already installed. Adding another i18n pipeline alongside it will create conflicts. Options: (1) if you want to switch libraries, remove {library} first, then re-run this setup; (2) if the existing setup is incomplete, review it manually instead of re-running this skill." Do NOT proceed. |
+| **Competing i18n library** | One of `@nuxtjs/i18n` (in a non-Nuxt project), `@intlify/vue-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@paraglide/*`, `@lingui/core` in `package.json` deps or devDeps. | **STOP.** Tell the user: "{library} is already installed. Adding vue-i18n alongside it will create conflicting translation pipelines. Options: (1) if you want to switch to vue-i18n, remove {library} first, then re-run this setup; (2) stay on {library} and skip this setup." Do NOT proceed. |
+| **Existing vue-i18n** (Vite / Quasar only — Nuxt uses `@nuxtjs/i18n`) | `vue-i18n` in `package.json` deps. Inspect whether the ICU setup this skill produces is already complete: look for (a) `intl-messageformat` in deps, (b) a file matching `**/i18n/messageCompiler.*`, and (c) a `createI18n(` call with `legacy: false` and `messageCompiler`. | **If all three signals are present** → tell the user: "vue-i18n appears to already be configured with the ICU `messageCompiler` this skill would install. Re-running would overwrite `src/i18n/*` and may clobber customisations. Stop unless you specifically want to regenerate — confirm before proceeding." Wait for confirmation. **If vue-i18n is present but any signal is missing** → tell the user: "I found `vue-i18n` already installed but the ICU setup looks incomplete (missing: {list}). I can complete the setup — this will create/overwrite `src/i18n/index.*`, `src/i18n/messageCompiler.*`, and `src/i18n/locales.*`, and edit `vite.config.*` / `main.*` to wire the plugin and provider. Proceed, or stop so you can review manually?" Wait for explicit confirmation before continuing. |
 | **Vue CLI / webpack-based** | `@vue/cli-service` in devDeps OR `vue.config.js` exists at project root. No `vite.config.*`, no `nuxt.config.*`, no `quasar.config.*`. | **STOP.** Tell the user: "This project uses Vue CLI / webpack (detected `@vue/cli-service` / `vue.config.js`). Vue CLI is in maintenance mode and effectively EOL. This skill targets Vite, Nuxt, or Quasar. Recommended path: migrate the project to Vite first (see https://vite.dev/guide/), then re-run this setup." Do NOT proceed. |
+
+### TypeScript warning (non-blocking)
+
+All generated files in this skill use `.ts` extensions and TypeScript syntax (interfaces, `as const`, typed function signatures). Vite transpiles `.ts` via esbuild regardless of project-level TS config, so the app will run, but a JS-only codebase will see these files standing out stylistically and IDE tooling may flag the type annotations.
+
+If `typescript` is **not** in devDeps and no `tsconfig.json` exists at project root, tell the user:
+
+> This project looks like plain JavaScript (no `typescript` in devDeps, no `tsconfig.json`). This setup creates `.ts` files with type annotations — Vite will still compile them, but they'll be stylistically out of place. Options:
+> 1. Add TypeScript to the project first (`npm install -D typescript` plus a minimal `tsconfig.json`), then re-run.
+> 2. Continue — I'll generate `.ts` files; you can convert them to `.js` (or `.js` + JSDoc) after.
+> 3. Stop.
+
+Wait for the user to pick before continuing.
 
 ### Options-API warning (non-blocking)
 
@@ -188,7 +202,11 @@ Pin `vue-i18n` to `^11` (Vite / Quasar) or `@nuxtjs/i18n` to its current major (
 Create the shared locale constants module first. This is the single source of truth for locale configuration — both the i18n setup and language switcher import from it:
 
 ```ts
-// src/i18n/locales.ts  (or i18n/locales.ts at project root for Nuxt 4)
+// Vite / Quasar:  src/i18n/locales.ts
+// Nuxt 3:         src/i18n/locales.ts  (or project root if no src/)
+// Nuxt 4:         i18n/locales.ts      (locale-metadata module — separate from
+//                                       the per-locale catalog JSON files at
+//                                       i18n/locales/{locale}.json; see Step 7)
 export const sourceLocale = 'en'
 export const locales = ['en'] as const
 export type Locale = (typeof locales)[number]
@@ -250,8 +268,10 @@ export async function setLocale(locale: Locale) {
     i18n.global.setLocaleMessage(locale, messages)
   }
   i18n.global.locale.value = locale
-  document.documentElement.lang = locale
-  document.documentElement.dir = getDirection(locale)
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = locale
+    document.documentElement.dir = getDirection(locale)
+  }
 }
 ```
 
@@ -260,6 +280,31 @@ For **Nuxt**, the equivalent lives in `i18n.config.ts` — at project root on Nu
 > Why `legacy: false`? It enables the Composition API (`useI18n()`) and tree-shakes the legacy `this.$t` bindings. It is required by vue-i18n v11 for Composition API use, and mandatory for vue-i18n v12 (where Legacy is removed).
 
 > Why a custom `messageCompiler`? Without it, vue-i18n uses its built-in compiler which parses the native pipe-plural syntax and does not support ICU `plural`/`select`/`selectordinal`. Routing all messages through `intl-messageformat` gives us parity with ICU MessageFormat as used in next-intl and LinguiJS.
+
+### Number and date formats (optional, recommended)
+
+The `n()` and `d()` composables in `vue-code` accept named format keys (`n(1234.5, 'currency')`, `d(date, 'long')`). These names must be declared on the i18n instance — without them, `n()` / `d()` silently fall back to browser defaults and currency calls won't produce a currency symbol at all.
+
+Add a minimal baseline to the `createI18n(...)` call so the examples in `vue-code` work out of the box. Ask the user for a default currency code (ISO 4217, e.g. `USD`, `EUR`, `GBP`) — infer from the source locale if obvious (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`), otherwise prompt.
+
+```ts
+// Inside createI18n({ ... }) — add alongside `messages`
+numberFormats: {
+  en: {
+    currency: { style: 'currency', currency: 'USD' },
+    percent:  { style: 'percent', minimumFractionDigits: 0, maximumFractionDigits: 1 },
+  },
+},
+datetimeFormats: {
+  en: {
+    short: { year: 'numeric', month: 'short', day: 'numeric' },
+    long:  { year: 'numeric', month: 'long',  day: 'numeric', weekday: 'long' },
+    time:  { hour: '2-digit', minute: '2-digit' },
+  },
+},
+```
+
+Replicate the per-locale block for each configured target locale, swapping the currency where the locale's region implies a different one. Teams that have no `n()` / `d()` usage planned can skip this block — `t()` works without it.
 
 ### Scripts
 
@@ -281,7 +326,7 @@ This is not required for the app to run; defer until Step 9 (CI/CD).
 
 **This step modifies the project's build configuration** (`vite.config.ts`, `nuxt.config.ts`, or `quasar.config.ts`). Before making changes:
 
-1. Describe the specific modification to the user (e.g., "I will add `VueI18nPlugin` to the `plugins` array in `vite.config.ts` with `runtimeOnly: false`").
+1. Describe the specific modification to the user, naming the **actual** config file detected in Step 1 (e.g., `vite.config.mjs`, not `vite.config.ts`). Example: "I will add `VueI18nPlugin` to the `plugins` array in `vite.config.mjs` with `runtimeOnly: false`." Snippets in the reference files show `.ts` — adapt the import syntax (drop the `defineConfig` generic, strip type annotations) if the target is `.js` / `.mjs`.
 2. If the build config has unusual structure or plugins you don't recognize, show the proposed change and ask for confirmation.
 3. Proceed only after the user confirms.
 
