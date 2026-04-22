@@ -9,8 +9,9 @@ description: >-
   my app", "make my app support multiple languages", "add language support",
   or any generic request about translating, localizing, or internationalizing
   an application. Does NOT trigger when a specific library is mentioned
-  (LinguiJS, Lingui, next-intl, i18next, react-intl) — those go directly
-  to library-specific skills.
+  (LinguiJS, Lingui, next-intl, i18next, react-intl, vue-i18n, @nuxtjs/i18n,
+  Nuxt i18n, @intlify, i18next-vue, @tolgee/vue) — those go directly to
+  library-specific skills.
 ---
 
 # i18n Library Guide
