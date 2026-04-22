@@ -49,6 +49,82 @@ export default defineConfig({
 
 If the project already has other Vite plugins (Vue DevTools, Vitest setup, etc.), keep them — just add `VueI18nPlugin()` alongside them.
 
+### PO loader when `catalogFormat === 'po'`
+
+Create `src/i18n/poLoader.ts` alongside `messageCompiler.ts` and `locales.ts`:
+
+```ts
+// src/i18n/poLoader.ts
+import { readFileSync } from 'node:fs'
+import gettextParser from 'gettext-parser'
+import type { Plugin } from 'vite'
+
+/**
+ * Transforms .po files into nested JS objects keyed by each msgid's dot-path.
+ *   msgid "HomePage.title" + msgstr "Welcome"  ->  { HomePage: { title: 'Welcome' } }
+ *
+ * msgctxt + msgid pairs are encoded via a "__ctx_<context>" suffix on the final key
+ * segment, so call sites reach them with t('HomePage.title__ctx_direction').
+ */
+export function poLoader(): Plugin {
+  return {
+    name: 'vue-i18n-po-loader',
+    enforce: 'pre',
+    transform(_code, id) {
+      if (!id.endsWith('.po')) return null
+      const parsed = gettextParser.po.parse(readFileSync(id))
+      const tree: Record<string, unknown> = {}
+      for (const ctx of Object.keys(parsed.translations)) {
+        for (const [msgid, entry] of Object.entries(parsed.translations[ctx])) {
+          if (!msgid) continue  // empty msgid = PO header
+          const fullKey = ctx ? `${msgid}__ctx_${ctx}` : msgid
+          const value = entry.msgstr[0] || msgid   // fall back to source text if msgstr empty
+          setByPath(tree, fullKey, value)
+        }
+      }
+      return { code: `export default ${JSON.stringify(tree)}`, map: null }
+    },
+  }
+}
+
+function setByPath(tree: Record<string, unknown>, dotPath: string, value: string) {
+  const parts = dotPath.split('.')
+  let node = tree as Record<string, unknown>
+  for (let i = 0; i < parts.length - 1; i++) {
+    const p = parts[i]
+    if (typeof node[p] !== 'object' || node[p] === null) node[p] = {}
+    node = node[p] as Record<string, unknown>
+  }
+  node[parts[parts.length - 1]] = value
+}
+```
+
+Then wire it in `vite.config.ts` — `poLoader()` **before** `VueI18nPlugin()`:
+
+```ts
+// vite.config.ts  (PO variant)
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
+import { poLoader } from './src/i18n/poLoader'
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    poLoader(),                // must come before VueI18nPlugin
+    VueI18nPlugin({
+      runtimeOnly: false,
+      compositionOnly: true,
+      strictMessage: false,
+    }),
+  ],
+})
+```
+
+The `enforce: 'pre'` on `poLoader()` makes the ordering explicit even if a user rearranges the array.
+
+**Source-map caveat:** `.po → JS` transforms don't emit source maps. `.po` parse errors surface through `gettext-parser`'s thrown exception with a line reference; runtime errors will point at the compiled JS, not the source `.po` file. In practice this is fine — the loader output is mechanical, and TMS-level validation catches real catalog issues.
+
 ## Provider Setup (Step 5)
 
 ### Locale Routing Strategy

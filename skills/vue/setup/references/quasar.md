@@ -77,6 +77,45 @@ build: {
 },
 ```
 
+### PO loader when `catalogFormat === 'po'`
+
+Create `src/i18n/poLoader.ts` using the same body as the Vite SPA variant (see `vue-setup/references/vite-spa.md` § PO loader — copy verbatim). Then register it in `quasar.config.ts` as an additional Vite plugin, **before** `@intlify/unplugin-vue-i18n/vite`:
+
+```ts
+// quasar.config.ts  (PO variant)
+import { poLoader } from './src/i18n/poLoader'
+
+export default configure(() => ({
+  boot: ['i18n'],
+  build: {
+    vitePlugins: [
+      [poLoader, {}],            // runs first thanks to enforce: 'pre' inside the plugin
+      ['@intlify/unplugin-vue-i18n/vite', {
+        runtimeOnly: false,
+        compositionOnly: true,
+        strictMessage: false,
+      }],
+    ],
+  },
+}))
+```
+
+Quasar's `vitePlugins` array accepts either a tuple of `[pluginFnOrSpecifier, options]` or a raw plugin factory. The factory form (`[poLoader, {}]`) is preferred when the plugin lives in the project — Quasar invokes it with the options object at build time.
+
+For older Quasar versions using `extendViteConf`, push `poLoader()` before `VueI18nPlugin()`:
+
+```ts
+build: {
+  extendViteConf(viteConf) {
+    viteConf.plugins = viteConf.plugins ?? []
+    viteConf.plugins.push(poLoader())
+    viteConf.plugins.push(VueI18nPlugin({ runtimeOnly: false, compositionOnly: true, strictMessage: false }))
+  },
+},
+```
+
+**Source-map caveat:** same as the other variants — `.po → JS` transforms don't emit source maps; `gettext-parser` errors point at the `.po` line, but runtime errors surface against compiled JS.
+
 ## Provider Setup (Step 5)
 
 Quasar uses boot files to initialize Vue plugins. Create `src/boot/i18n.ts`:

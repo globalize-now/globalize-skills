@@ -65,6 +65,56 @@ export default defineNuxtConfig({
 })
 ```
 
+### PO loader when `catalogFormat === 'po'`
+
+> **Experimental — verify end-to-end before shipping.** The Nuxt wiring shown here assumes `@nuxtjs/i18n`'s lazy-loading pipeline routes `.po` file imports through Vite's transform chain, so `poLoader()` with `enforce: 'pre'` intercepts them before the module's own bundling runs. This *should* hold — the module calls `import(...)` for locale files and Vite's `enforce: 'pre'` runs before any other transform — but the skill has not been validated against a real Nuxt 3 / Nuxt 4 project in every routing strategy. If locales don't load correctly, re-run `vue-setup` and pick JSON while we validate the Nuxt path, or drop into the `@nuxtjs/i18n` issue tracker with a minimal reproduction. The Vite-SPA and Quasar PO paths are better-tested.
+
+Create the loader module. Path depends on Nuxt major:
+
+- **Nuxt 4**: `i18n/poLoader.ts`
+- **Nuxt 3**: `poLoader.ts` at project root (alongside `i18n.config.ts`)
+
+The loader body is identical to the Vite SPA variant (see `references/vite-spa.md` § PO loader). Copy it verbatim — it's framework-agnostic (uses only Vite's `Plugin` type and `node:fs`).
+
+Then wire it through `nuxt.config.ts` via `vite.plugins` — **not** `modules` (it's a Vite plugin, not a Nuxt module):
+
+```ts
+// nuxt.config.ts  (PO variant)
+import { poLoader } from './i18n/poLoader'   // Nuxt 4
+// import { poLoader } from './poLoader'     // Nuxt 3
+
+export default defineNuxtConfig({
+  modules: ['@nuxtjs/i18n'],
+  vite: {
+    plugins: [poLoader()],
+  },
+  i18n: {
+    defaultLocale: 'en',
+    strategy: 'prefix_except_default',
+    langDir: 'locales',
+    lazy: true,
+    locales: [
+      { code: 'en', language: 'en-US', file: 'en.po' },   // note: .po extension
+      // { code: 'fr', language: 'fr-FR', file: 'fr.po' },
+      // { code: 'ar', language: 'ar-EG', file: 'ar.po', dir: 'rtl' },
+    ],
+    bundle: {
+      compositionOnly: true,
+      runtimeOnly: false,
+      fullInstall: true,
+    },
+    compilation: {
+      strictMessage: false,
+    },
+    vueI18n: './i18n/i18n.config.ts',
+  },
+})
+```
+
+The `@nuxtjs/i18n` module's `file` field accepts any extension — when the file is requested, Nuxt goes through Vite, which runs `poLoader` before handing the transformed JS to the module's loader.
+
+**Source-map caveat:** the Vite SPA caveat applies — `.po` files have no source-map back-references after transform. Parse errors throw from `gettext-parser` with a line number; runtime errors point at compiled JS.
+
 ### Strategy choice
 
 The module's `strategy` option decides how locale routing works:

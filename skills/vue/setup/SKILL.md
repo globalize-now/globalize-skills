@@ -29,7 +29,7 @@ This skill covers **Vue 3** projects using the **Composition API** on **Vite** (
 - **VitePress** — has native `locales` config and doesn't use vue-i18n. **Hard stop**, point at the [VitePress i18n docs](https://vitepress.dev/guide/i18n).
 - **Quasar** — partially covered (experimental reference file). Warn the user v1 treats this as experimental; proceed only on explicit confirmation.
 - **Non-ICU message format** — this skill configures ICU MessageFormat via a custom `messageCompiler`. Projects that need vue-i18n's native pipe-plural / custom-format syntax for existing content should not run this setup.
-- **Converting existing hardcoded strings** to `t('...')` across the codebase — deferred to a separate `vue-convert` skill. This skill only scaffolds; it does not rewrite your views.
+- **Converting existing hardcoded strings** to `t('...')` across the codebase — handled by the `vue-convert` skill. This skill only scaffolds; it does not rewrite your views. Run `vue-convert` after setup is complete.
 - **Other Vue i18n libraries** (`i18next-vue`, `@tolgee/vue`, `fluent-vue`, Lingui-for-Vue, Paraglide) — this skill installs `vue-i18n` exclusively. If one of these is already installed, **hard stop** (same pattern as Lingui's "existing i18n library" check).
 
 ---
@@ -97,6 +97,8 @@ After Step 1 (detection) completes without blockers, ask the user:
 
 For Vite SPAs that use `vue-router`, the **locale routing strategy** choice (from `references/vite-spa.md`) must be presented immediately after mode selection. For Nuxt, the **routing strategy** choice (`strategy` option — default is `prefix_except_default`) must be confirmed. Collect these answers before proceeding with Step 2.
 
+The **catalog format** choice (JSON vs PO — see "Catalog Format" above) must also be confirmed in unguided mode before Step 2, since it drives the package list and the Vite plugin wiring.
+
 The **locale list** and **default / source locale** are also collected at this point in unguided mode. Auto-detect them from the existing `<html lang="...">` attribute if possible; otherwise prompt.
 
 ---
@@ -163,6 +165,18 @@ Based on the detection, pick the right variant reference file:
 
 Then continue with Steps 2–8 below, using the variant-specific instructions from the reference file for Steps 4, 5, and 6.
 
+### Catalog Format
+
+Ask the user which translation-file format to use:
+
+> **Which catalog format should translations use?**
+> 1. **JSON** (default) — simple, widely supported, maps naturally to the vue-i18n runtime shape. No build-time transform.
+> 2. **PO (gettext)** — supports `msgctxt` for disambiguating identical source strings, translator comments (`#.`), and source references (`#:`). Requires a small build-time loader this skill will install.
+>
+> Recommendation: pick **PO** if you plan to translate into many languages, use a TMS (Crowdin / Lokalise / Weblate / Phrase), or have domain-ambiguous UI words (e.g., "Right" as direction vs. correctness). Pick **JSON** for simpler projects or when the translation workflow is AI-driven and doesn't depend on gettext conventions.
+
+Record `catalogFormat: 'json' | 'po'`. The value branches Steps 2, 3, 4, 7, 9, and 10 below. When `catalogFormat === 'po'`, this skill installs `gettext-parser` plus a tiny Vite plugin (`poLoader`) that transforms `.po` files into nested JS objects at build time. Runtime remains identical to the JSON path — vue-i18n still receives a nested `messages` object and the custom ICU `messageCompiler` operates on leaf strings.
+
 ### Branch Recommendation
 
 If the project is a git repository and the current branch is `main`, `master`, or `develop`, recommend switching to a dedicated branch before proceeding:
@@ -194,6 +208,18 @@ Use the project's existing package manager (detected in Step 1). The packages de
 **Nuxt:** install `@nuxtjs/i18n` only. Do NOT install raw `vue-i18n` — the Nuxt module bundles a compatible version. ICU support is wired via a custom `messageCompiler` in `i18n.config.ts`, which still requires `intl-messageformat` as a runtime dependency.
 
 Pin `vue-i18n` to `^11` (Vite / Quasar) or `@nuxtjs/i18n` to its current major (^9 at time of writing) unless the user has a reason to deviate.
+
+### Additional package when `catalogFormat === 'po'`
+
+Install `gettext-parser` as a **dev** dependency for all variants:
+
+```bash
+npm install -D gettext-parser
+```
+
+This is the PO parser used by the build-time `poLoader` Vite plugin installed in Step 4. It runs only at build time — nothing gettext-related ships in the runtime bundle.
+
+**Do not hardcode a semver range in this skill.** Run `npm view gettext-parser version` at the time of install and pin to the current major (e.g. `^8` if that's what `npm view` reports). The library has stable `.po.parse()` API surface that this skill depends on — parsing `.po` files to the `{ translations: { '': { msgid: { msgstr: [...] } } } }` shape — and that interface has been consistent across majors, but pinning to a known-good major keeps unexpected breakage out.
 
 ---
 
@@ -246,7 +272,9 @@ import { messageCompiler } from './messageCompiler'
 import { sourceLocale, locales, type Locale } from './locales'
 
 // Import locale catalogs statically for the initial locale; lazy-load others in Step 5.
-import en from './locales/en.json'
+// When catalogFormat === 'po', change the extension to '.po' — the poLoader Vite plugin
+// (installed in Step 4) transforms .po files into the same nested JS object shape.
+import en from './locales/en.json'   // or './locales/en.po' when catalogFormat === 'po'
 
 export const i18n = createI18n({
   legacy: false,
@@ -264,6 +292,8 @@ export function getDirection(locale: string): 'ltr' | 'rtl' {
 
 export async function setLocale(locale: Locale) {
   if (!i18n.global.availableLocales.includes(locale)) {
+    // Swap the extension to '.po' in both the static import above and this dynamic
+    // import when catalogFormat === 'po'. The runtime shape is identical either way.
     const messages = (await import(`./locales/${locale}.json`)).default
     i18n.global.setLocaleMessage(locale, messages)
   }
@@ -274,6 +304,8 @@ export async function setLocale(locale: Locale) {
   }
 }
 ```
+
+**When `catalogFormat === 'po'`**, change the two `.json` extensions above to `.po`. The `poLoader` plugin (Step 4) transforms `.po` files into nested JS objects keyed by the msgid's dot-path — vue-i18n receives the same shape as the JSON path. `msgctxt` is mangled into a `__ctx_<context>` key suffix by the loader; call sites reference it via `t('Namespace.key__ctx_<context>')`. No changes to `createI18n({ ... })` or `messageCompiler.ts`.
 
 For **Nuxt**, the equivalent lives in `i18n.config.ts` — at project root on Nuxt 3, and inside the `i18n/` directory on Nuxt 4 (`i18n/i18n.config.ts`). The reference file covers the exact shape and the matching `vueI18n:` path in `nuxt.config.ts`.
 
@@ -341,6 +373,12 @@ Follow the variant-specific reference file for this step. It specifies the exact
 
 > **SFC `<i18n>` blocks note**: If a project wants to use SFC-embedded `<i18n>` custom blocks, the plugin is required for the block transform — but `<i18n>` blocks are compiled by the plugin's default vue-i18n compiler, not the ICU one. For ICU-consistent behavior across the whole app, stick with plain JSON catalogs (the default in this skill) and avoid SFC `<i18n>` blocks.
 
+### PO loader when `catalogFormat === 'po'`
+
+The PO path requires one extra Vite plugin alongside `VueI18nPlugin`: a tiny `poLoader` that parses `.po` files with `gettext-parser` and emits nested JS objects keyed by each msgid's dot-path. The plugin source is identical across variants; the wiring differs (it goes in `vite.config.*` `plugins` for Vite SPA, `vite: { plugins: [...] }` inside `nuxt.config.*` for Nuxt, and `build.vitePlugins` in `quasar.config.*` for Quasar).
+
+Both the loader source (~20 lines) and the exact wiring snippet live in the variant reference file — follow the PO section there when `catalogFormat === 'po'`. Ordering rule: `poLoader()` must run **before** `VueI18nPlugin` (use `enforce: 'pre'` in the plugin metadata), so the raw PO never reaches the unplugin.
+
 ---
 
 ## Step 5: Wire Up the Provider
@@ -405,31 +443,52 @@ After creating the component, import and render it in a visible location — typ
 
 ## Step 7: Scaffold Locale Catalogs
 
-Create one JSON catalog per configured locale. Location depends on the variant:
+Create one catalog file per configured locale. Location depends on the variant:
 
-- **Vite SPA / Quasar**: `src/i18n/locales/{locale}.json`
-- **Nuxt 3**: `locales/{locale}.json`
-- **Nuxt 4**: `i18n/locales/{locale}.json`
+- **Vite SPA / Quasar**: `src/i18n/locales/{locale}.{json|po}`
+- **Nuxt 3**: `locales/{locale}.{json|po}`
+- **Nuxt 4**: `i18n/locales/{locale}.{json|po}`
 
-Seed each file with a single example key so the app can boot without a catalog-loading error:
+Use `.json` when `catalogFormat === 'json'`, `.po` when `catalogFormat === 'po'`. File contents differ by format:
 
-```json
-{
-  "welcome": "Welcome to {appName}"
-}
-```
+### When `catalogFormat === 'json'`
+
+Seed each file with a couple of example keys so the app can boot without a catalog-loading error and translators see ICU syntax in context:
 
 ```json
 {
-  "welcome": "{count, plural, one {One new message} other {# new messages}}"
+  "welcome": "Welcome to {appName}",
+  "messages": "{count, plural, one {One new message} other {# new messages}}"
 }
 ```
 
-The ICU plural example is commented as a reference for translators — when they extend the catalog, they see what ICU syntax looks like in context.
+### When `catalogFormat === 'po'`
 
-**What to commit:** the JSON source catalogs are the translation source of truth. Commit them.
+Seed each file with a minimal PO header plus the same two example entries. Keep the header on its own block — the `poLoader` plugin parses and discards the header; the loader and this skill's merge logic require that the header block stays intact across edits.
 
-**What to gitignore:** nothing yet — ICU source files are not compiled separately in this setup; the `messageCompiler` processes them at runtime.
+```po
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+
+#. Example entry — demonstrates {appName} interpolation.
+msgid "welcome"
+msgstr "Welcome to {appName}"
+
+#. Example ICU plural entry — translators pattern-match on this when extending the catalog.
+msgid "messages"
+msgstr "{count, plural, one {One new message} other {# new messages}}"
+```
+
+Substitute `"Language: {locale}\n"` for each locale file. For target-locale files, copy the source `msgstr` values as placeholders — they're replaced by actual translations later. Keep the `#.` descriptions identical across locales; they're authoritative metadata shared among translators.
+
+### Commit and ignore rules (both formats)
+
+**What to commit:** the catalog source files (`.json` or `.po`) are the translation source of truth. Commit them.
+
+**What to gitignore:** nothing yet — ICU source files are not compiled separately in this setup; the `messageCompiler` processes them at runtime. For PO, the loader runs during Vite's transform phase in both dev and build, so no intermediate artifacts land on disk.
 
 ### Verify the setup works
 
@@ -481,9 +540,9 @@ Verify: in a fresh session, ask Claude "how should I wrap a plural string in thi
 
 This step is **not required** for the initial setup to work. Ask the user: "Would you like me to set up CI/CD integration (catalog sanity checks, missing-key detection)? This can also be done later." **If the user declines, skip to Step 10.**
 
-### Catalog JSON validity check
+### Catalog validity check
 
-Add a cheap sanity check that runs in CI to catch invalid JSON or missing-key imbalances across locales:
+Add a cheap sanity check that runs in CI to catch parse errors or missing-key imbalances across locales:
 
 ```json
 {
@@ -493,7 +552,7 @@ Add a cheap sanity check that runs in CI to catch invalid JSON or missing-key im
 }
 ```
 
-A minimal `scripts/checkLocales.mjs`:
+**When `catalogFormat === 'json'`**, a minimal `scripts/checkLocales.mjs`:
 
 ```js
 import fs from 'node:fs'
@@ -519,11 +578,48 @@ for (const [locale, cat] of Object.entries(catalogs)) {
 process.exit(hadIssue ? 1 : 0)
 ```
 
-This is intentionally minimal — it does not check ICU syntax validity (let `intl-messageformat` fail loudly at runtime in dev) or enforce translation coverage thresholds (teams decide what fraction of missing keys blocks a merge).
+**When `catalogFormat === 'po'`**, the check reads `.po` files with `gettext-parser` and compares `(msgid, msgctxt)` sets instead of JSON keys:
+
+```js
+import fs from 'node:fs'
+import path from 'node:path'
+import gettextParser from 'gettext-parser'
+
+const LOCALES_DIR = 'src/i18n/locales'  // adjust per variant
+const files = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.po'))
+
+function entryKey(msgid, ctx) {
+  return ctx ? `${ctx} ${msgid}` : msgid
+}
+
+const catalogs = Object.fromEntries(files.map((f) => {
+  const parsed = gettextParser.po.parse(fs.readFileSync(path.join(LOCALES_DIR, f)))
+  const keys = new Set()
+  for (const ctx of Object.keys(parsed.translations)) {
+    for (const msgid of Object.keys(parsed.translations[ctx])) {
+      if (msgid) keys.add(entryKey(msgid, ctx))
+    }
+  }
+  return [f.replace(/\.po$/, ''), keys]
+}))
+
+const source = catalogs.en ?? Object.values(catalogs)[0]
+let hadIssue = false
+for (const [locale, keys] of Object.entries(catalogs)) {
+  const missing = [...source].filter((k) => !keys.has(k))
+  if (missing.length > 0) {
+    console.error(`[i18n] ${locale} missing ${missing.length} entry/entries: ${missing.slice(0, 5).map((k) => k.replace(' ', ' / ')).join(', ')}${missing.length > 5 ? '…' : ''}`)
+    hadIssue = true
+  }
+}
+process.exit(hadIssue ? 1 : 0)
+```
+
+Both scripts are intentionally minimal — they do not check ICU syntax validity (let `intl-messageformat` fail loudly at runtime in dev) or enforce translation coverage thresholds (teams decide what fraction of missing keys blocks a merge).
 
 ### Catalog format validation
 
-If the team uses a TMS (Crowdin, Lokalise, etc.), the TMS typically validates ICU syntax on upload. The minimal script above is the right default for teams without a TMS.
+If the team uses a TMS (Crowdin, Lokalise, etc.), the TMS typically validates ICU syntax on upload. The minimal scripts above are the right default for teams without a TMS. For PO specifically, TMSes often reorder entries or reflow `msgstr` across multiple lines during round-trips — the `poLoader` reads the parsed result regardless of formatting, so diffs are cosmetic only.
 
 ---
 
@@ -706,4 +802,4 @@ JSON catalog files need a translation pipeline. Options:
 
 ### Wrap existing strings
 
-This skill set up the infrastructure but did **not** convert existing hardcoded strings to `t('...')` calls. The `vue-convert` skill (planned, v2) will automate this — for now, wrapping is manual. The `vue-code` rules loaded via `@import` will guide Claude to wrap new strings correctly as you edit.
+This skill set up the infrastructure but did **not** convert existing hardcoded strings to `t('...')` calls. Run the `vue-convert` skill to automate that — it finds hardcoded UI strings across `.vue` and `.ts` files, wraps them with `t()` / `<i18n-t>` / `n()` / `d()`, and writes matching entries into the catalog files this setup created (it detects whether you chose JSON or PO and writes into the right format). The `vue-code` rules loaded via `@import` will guide Claude to wrap new strings correctly as you edit from now on.
