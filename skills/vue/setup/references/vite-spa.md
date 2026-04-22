@@ -23,13 +23,13 @@ Use the project's detected package manager (pnpm / yarn / bun) instead of `npm` 
 
 ## Build Tool Integration (Step 4)
 
-**This modifies `vite.config.ts`.** Describe the change before making it: adding `VueI18nPlugin` with `runtimeOnly: false` (so the message compiler is in the bundle — required for dynamically-loaded locales) and `strictMessage: false` (so ICU placeholder syntax doesn't trip the plugin's HTML check).
+**This modifies `vite.config.ts`.** Describe the change before making it: adding `VueI18nPlugin` with `runtimeOnly: false` (so the message-compiler runtime our custom ICU compiler plugs into stays in the bundle) and `strictMessage: false` (so ICU placeholder syntax doesn't trip the plugin's HTML check).
+
+**Do NOT set the `include` option.** Pre-compiling the catalog JSON would hand our custom ICU `messageCompiler` a pre-built function instead of the raw source string, breaking ICU parsing. Vite's built-in JSON importer loads the catalogs as plain objects, which is what we want.
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
@@ -37,8 +37,8 @@ export default defineConfig({
   plugins: [
     vue(),
     VueI18nPlugin({
-      // Path must be absolute; resolve relative to this config file.
-      include: resolve(dirname(fileURLToPath(import.meta.url)), './src/i18n/locales/**'),
+      // No `include` — keep catalogs as plain JSON so the custom ICU compiler
+      // (see src/i18n/messageCompiler.ts) can process raw strings at runtime.
       runtimeOnly: false,
       compositionOnly: true,
       strictMessage: false,

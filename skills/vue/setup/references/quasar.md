@@ -37,7 +37,9 @@ Do not proceed to Step 4 until the old plugin is removed.
 
 **This modifies `quasar.config.ts` (or `.js`).** Describe the change before making it: registering the boot file and adding the Vite plugin via `vitePlugins`.
 
-Quasar exposes Vite customization under `build.vitePlugins` (recent versions) or `build.extendViteConf` (older). The modern shape:
+Quasar exposes Vite customization under `build.vitePlugins` (recent versions) or `build.extendViteConf` (older). **Do NOT set the plugin's `include` option** — pre-compiling catalogs would bypass the custom ICU `messageCompiler`. Vite's built-in JSON importer loads the locale JSON as plain objects, which is what the ICU compiler expects.
+
+The modern shape:
 
 ```ts
 // quasar.config.ts (excerpt)
@@ -48,7 +50,8 @@ export default configure(() => ({
   build: {
     vitePlugins: [
       ['@intlify/unplugin-vue-i18n/vite', {
-        include: ['src/i18n/locales/**'],
+        // No `include` — keep catalogs as plain JSON so the custom ICU compiler
+        // (see src/i18n/messageCompiler.ts) can process raw strings at runtime.
         runtimeOnly: false,
         compositionOnly: true,
         strictMessage: false,
@@ -65,7 +68,7 @@ build: {
   extendViteConf(viteConf) {
     viteConf.plugins = viteConf.plugins ?? []
     viteConf.plugins.push(VueI18nPlugin({
-      include: resolve(__dirname, 'src/i18n/locales/**'),
+      // No `include` — see note above.
       runtimeOnly: false,
       compositionOnly: true,
       strictMessage: false,

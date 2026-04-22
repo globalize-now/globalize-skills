@@ -15,7 +15,7 @@ description: >-
 
 `vue-i18n` v11 (Intlify) is the dominant i18n library for Vue 3. This skill configures it with the Composition API (`createI18n({ legacy: false })`, `useI18n()` in `<script setup>`) and enables ICU MessageFormat — matching the rest of this repo's message-format stance and avoiding vue-i18n's pipe-plural syntax, which bakes English-style plurals into source strings.
 
-Unlike compile-time i18n frameworks, vue-i18n is a runtime library: there is no macro transform, and no build step is strictly required. The `@intlify/unplugin-vue-i18n` plugin is used to pre-compile locale resources and enable `<i18n>` custom blocks inside SFCs, but the translation pipeline runs at runtime.
+Unlike compile-time i18n frameworks, vue-i18n is a runtime library: there is no macro transform, and no build step is strictly required. The `@intlify/unplugin-vue-i18n` plugin is installed to enable `<i18n>` custom blocks inside SFCs and to support `@intlify/eslint-plugin-vue-i18n` linting. It is configured **without** the `include` option — pre-compiling catalogs would bypass the custom ICU `messageCompiler` (see Step 4) — so locale JSON is loaded by Vite's built-in JSON importer as plain objects and processed by `intl-messageformat` at lookup time.
 
 Follow these steps in order. Each builds on the last.
 
@@ -174,7 +174,7 @@ Use the project's existing package manager (detected in Step 1). The packages de
 | Package | Type | Purpose |
 |---------|------|---------|
 | `vue-i18n` | runtime | Vue 3 i18n engine (Composition API) |
-| `@intlify/unplugin-vue-i18n` | dev | Pre-compiles locale resources and enables `<i18n>` SFC blocks |
+| `@intlify/unplugin-vue-i18n` | dev | Enables `<i18n>` SFC blocks and supports eslint-plugin-vue-i18n (configured **without** `include` so catalogs stay as plain JSON — see Step 4) |
 | `intl-messageformat` | runtime | ICU MessageFormat compiler, wired into vue-i18n via a custom `messageCompiler` |
 
 **Nuxt:** install `@nuxtjs/i18n` only. Do NOT install raw `vue-i18n` — the Nuxt module bundles a compatible version. ICU support is wired via a custom `messageCompiler` in `i18n.config.ts`, which still requires `intl-messageformat` as a runtime dependency.
@@ -207,9 +207,10 @@ import type { MessageCompiler, MessageContext, CompileError } from 'vue-i18n'
 
 export const messageCompiler: MessageCompiler = (message, { locale, key, onError }) => {
   if (typeof message !== 'string') {
-    // When messages are pre-compiled to AST by the bundler plugin, they arrive as
-    // non-strings. ICU compilation must happen on the original string — so disable
-    // pre-compilation in the plugin config (see Step 4).
+    // Defensive fallback: ICU compilation needs the raw string. If a bundler ever
+    // feeds us a pre-compiled AST or function (e.g. because someone added the
+    // plugin's `include` option to the locales directory), fail loudly rather
+    // than silently mis-render.
     onError?.(new Error(`[i18n] ICU compiler requires string messages (key: ${key})`) as CompileError)
     return () => key
   }
@@ -254,7 +255,7 @@ export async function setLocale(locale: Locale) {
 }
 ```
 
-For **Nuxt**, the equivalent lives in `i18n.config.ts` at project root — the reference file covers the exact shape.
+For **Nuxt**, the equivalent lives in `i18n.config.ts` — at project root on Nuxt 3, and inside the `i18n/` directory on Nuxt 4 (`i18n/i18n.config.ts`). The reference file covers the exact shape and the matching `vueI18n:` path in `nuxt.config.ts`.
 
 > Why `legacy: false`? It enables the Composition API (`useI18n()`) and tree-shakes the legacy `this.$t` bindings. It is required by vue-i18n v11 for Composition API use, and mandatory for vue-i18n v12 (where Legacy is removed).
 
@@ -288,10 +289,12 @@ Follow the variant-specific reference file for this step. It specifies the exact
 
 **Key option notes** (common to all variants):
 
-- `runtimeOnly: false` — include the vue-i18n message compiler in the build. The ICU compiler needs to run against string messages at runtime. Without this, dynamically-loaded locale catalogs won't work.
+- `runtimeOnly: false` — include the vue-i18n message compiler in the build. The ICU compiler (our custom `messageCompiler`) runs against string messages at runtime. Without this, the compiled bundle drops the message-compiler runtime that our custom function plugs into.
 - `compositionOnly: true` — tree-shake the Legacy API (default for the plugin; keep it explicit).
 - `strictMessage: false` — disable the plugin's built-in HTML-tag check. ICU messages may legitimately contain angle-bracketed placeholders (e.g. within rich text via `<i18n-t>`), which the check flags as false positives.
-- `include` — point at the locales directory so SFC-embedded `<i18n>` blocks are processed. The reference file gives the exact glob.
+- **`include` — deliberately omitted.** The plugin's `include` option pre-compiles matched JSON/YAML/JS/TS files into AST/JS at build time, which would bypass our custom ICU `messageCompiler` (it would receive a compiled function instead of the source string). Letting Vite's built-in JSON importer load the catalogs as plain objects — which is what happens when `include` is not set — keeps them as raw strings for the ICU compiler to process at lookup time.
+
+> **SFC `<i18n>` blocks note**: If a project wants to use SFC-embedded `<i18n>` custom blocks, the plugin is required for the block transform — but `<i18n>` blocks are compiled by the plugin's default vue-i18n compiler, not the ICU one. For ICU-consistent behavior across the whole app, stick with plain JSON catalogs (the default in this skill) and avoid SFC `<i18n>` blocks.
 
 ---
 
@@ -496,9 +499,11 @@ import { createI18n } from 'vue-i18n'
 import { messageCompiler } from '../i18n/messageCompiler'
 import type { Component } from 'vue'
 
+// MountingOptions<P> is typed on component props; use `any` so callers can pass
+// typed props for any component without wrestling with a generic P inference.
 export function mountWithI18n<C extends Component>(
   component: C,
-  options?: MountingOptions<unknown>,
+  options?: MountingOptions<any>,
   messages: Record<string, Record<string, string>> = { en: {} },
 ) {
   const i18n = createI18n({
@@ -538,7 +543,7 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
 
 ## Common Gotchas
 
-- **`Uncaught (in promise) SyntaxError: ICU compiler requires string messages`** — your `@intlify/unplugin-vue-i18n` config is pre-compiling messages to AST (default when `include` matches), which conflicts with the custom ICU `messageCompiler`. The pre-compiled AST reaches the compiler as a non-string. **Fix**: keep `include` pointed at the locales directory but ensure locale files are imported as plain JSON (the default) rather than via `?jit` or `?ast` query suffixes. Also confirm `runtimeOnly: false` in the plugin config.
+- **`[i18n] ICU compiler requires string messages`** — the `@intlify/unplugin-vue-i18n` plugin's `include` option has been added (or a `?jit` / `?ast` query suffix is being used), which pre-compiles catalogs into AST/JS functions before our custom ICU `messageCompiler` sees them. This skill deliberately **omits** `include` so Vite's built-in JSON importer loads catalogs as plain objects and the ICU compiler processes raw strings. **Fix**: remove `include` from the plugin config (or drop `?jit` / `?ast` query suffixes on catalog imports). Keep `runtimeOnly: false` so the message-compiler runtime the custom function plugs into stays in the bundle. If you need `include` for SFC `<i18n>` blocks, know that those blocks will be compiled by the plugin's default compiler, not the ICU one — prefer plain JSON catalogs.
 - **`useI18n()` returns `undefined` for `t`** — the `i18n` plugin isn't installed on the app. For Vite, ensure `app.use(i18n)` is called before `app.mount()`. For Quasar, ensure the boot file is registered in `quasar.config.ts`. For Nuxt, ensure `@nuxtjs/i18n` is in `modules` (not `buildModules`).
 - **`Not Available in Legacy Mode`** — you're calling `useI18n()` without `legacy: false` in `createI18n`. Set `legacy: false`.
 - **`$tc` / `tc` is not a function** — `$tc` / `tc` were removed in vue-i18n v11. Use `t(key, count)` with ICU plural syntax instead:
@@ -547,7 +552,7 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
   ```
 - **Missing `dir` attribute / LTR-only CSS in RTL locales** — the `<html>` element must have `dir="rtl"` for Arabic, Hebrew, Persian, Urdu, etc. The `getDirection()` helper covers this. Equally important: CSS must use logical properties (`margin-inline-start` instead of `margin-left`, `padding-inline-end` instead of `padding-right`, `inset-inline-start` instead of `left`). Physical properties don't flip in RTL and require a full CSS audit. Run the `css-i18n` skill for a CSS audit and conversion.
 - **Links navigate to wrong locale** — with `@nuxtjs/i18n`, always use `<NuxtLink>` (not raw `<a>`) for internal paths; the module rewrites `to` props based on the active locale and routing strategy. For Vite SPA with vue-router's Strategy 1 or 2, every `<RouterLink :to>` must go through the `localePath()` helper in `references/vite-spa.md`.
-- **Nuxt: `vueI18n` config not picked up** — `@nuxtjs/i18n` auto-loads `i18n.config.ts` (or `.js` / `.mjs`) from the project root only when `vueI18n` points at it explicitly **or** it lives at the default path. If your config isn't applying, set `i18n: { vueI18n: './i18n.config.ts' }` in `nuxt.config.ts`.
+- **Nuxt: `vueI18n` config not picked up** — the `vueI18n` path in `nuxt.config.ts` must match the actual file location. Nuxt 4 convention puts the config inside the `i18n/` directory (`i18n: { vueI18n: './i18n/i18n.config.ts' }`); Nuxt 3 convention puts it at project root (`i18n: { vueI18n: './i18n.config.ts' }`). If your config isn't applying, double-check the path.
 - **SFC `<i18n>` custom blocks not recognized** — confirm `@intlify/unplugin-vue-i18n` is listed in `vite.config.ts` `plugins` (or equivalent); the plugin is what activates SFC `<i18n>` blocks. Without it, Vue treats them as unknown elements.
 - **Hydration mismatch on SSR (Nuxt)** — the server renders in one locale, the client hydrates and detects a different preferred locale, causing a mismatch. Use `useLocaleHead()` for `<html lang>` / `<html dir>` and avoid reading `navigator.language` during hydration; let `@nuxtjs/i18n`'s browser-detection middleware handle it.
 

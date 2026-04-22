@@ -57,8 +57,10 @@ export default defineNuxtConfig({
     compilation: {
       strictMessage: false,   // ICU placeholders may look HTML-ish; disable the strict check
     },
-    // vueI18n defaults to './i18n.config.ts' when that file exists. Make it explicit:
-    vueI18n: './i18n.config.ts',
+    // vueI18n points at the config file. Path differs by Nuxt major:
+    //   Nuxt 4: './i18n/i18n.config.ts'  (config lives inside the i18n/ directory)
+    //   Nuxt 3: './i18n.config.ts'        (config lives at project root)
+    vueI18n: './i18n/i18n.config.ts',
   },
 })
 ```
@@ -78,10 +80,15 @@ If the user already has a strong preference, honor it. Otherwise default to `pre
 
 ## Vue I18n Config (Step 3)
 
-Create `i18n.config.ts` at project root. This is where the ICU `messageCompiler` lives — `@nuxtjs/i18n` picks it up via the `vueI18n` option in `nuxt.config.ts`:
+Create the i18n config file. Path depends on Nuxt major:
+
+- **Nuxt 4**: `i18n/i18n.config.ts` (inside the `i18n/` directory, alongside `locales/`)
+- **Nuxt 3**: `i18n.config.ts` at project root
+
+This is where the ICU `messageCompiler` lives — `@nuxtjs/i18n` picks it up via the `vueI18n` option in `nuxt.config.ts` (make sure that path matches the location you chose above):
 
 ```ts
-// i18n.config.ts
+// i18n/i18n.config.ts  (Nuxt 4)  —  or  i18n.config.ts at project root (Nuxt 3)
 import IntlMessageFormat from 'intl-messageformat'
 import type { MessageCompiler, MessageContext, CompileError } from 'vue-i18n'
 
@@ -103,18 +110,18 @@ export default defineI18nConfig(() => ({
 
 `defineI18nConfig` is auto-imported by the module — no `import` is needed. `locale` is deliberately omitted here: the module sets the active locale based on URL / cookie / browser detection per the chosen `strategy`.
 
-Locale JSON files live at (Nuxt 4 convention):
+Locale JSON files and the config file live at (Nuxt 4 convention):
 
 ```
 i18n/
+  i18n.config.ts
   locales/
     en.json
     fr.json  (etc.)
-i18n.config.ts  ← can live at root or inside i18n/ — this example keeps it at root for symmetry with nuxt.config.ts
 nuxt.config.ts
 ```
 
-For Nuxt 3, swap `i18n/locales/` for `locales/` at project root and keep the config at root.
+For Nuxt 3, swap `i18n/locales/` for `locales/` at project root and put `i18n.config.ts` at project root too (the Nuxt 3 convention pre-dates the `i18n/` directory). Update the `vueI18n:` path in `nuxt.config.ts` to match whichever layout you choose.
 
 ## Provider (Step 5)
 
