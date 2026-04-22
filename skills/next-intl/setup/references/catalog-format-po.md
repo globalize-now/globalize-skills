@@ -95,6 +95,8 @@ Option notes:
 
 ### Pages Router (CJS)
 
+**Use `precompile: false` on Pages Router.** With `precompile: true`, the webpack alias that rewires `use-intl/format-message` to the precompiled runtime does not take effect for Pages Router bundles (verified against `next-intl@4.9.1`, `next@15.5.15`, webpack). Every ICU message — interpolation, plurals, select, rich text — throws `INVALID_MESSAGE` at render in both dev and prod. `precompile: false` routes messages through the runtime ICU compiler and works correctly. App Router is not affected.
+
 ```js
 const createNextIntlPlugin = require('next-intl/plugin');
 
@@ -104,7 +106,7 @@ const withNextIntl = createNextIntlPlugin({
       format: 'po',
       path: './messages',
       locales: 'infer',
-      precompile: true
+      precompile: false    // Pages Router: precompile: true is broken upstream (webpack alias scoping)
     }
   }
 });
@@ -119,6 +121,13 @@ const nextConfig = {
 };
 
 module.exports = withNextIntl(nextConfig);
+```
+
+**Stub `i18n/request.ts` required even on Pages Router.** When `experimental.messages` is set, `createNextIntlPlugin` hard-errors at build with "Could not locate request configuration module" if the file is missing, even though Pages Router loads messages through `getStaticProps` and never consumes the config. Create a one-liner stub at `src/i18n/request.ts` (or `i18n/request.ts`):
+
+```ts
+import {getRequestConfig} from 'next-intl/server';
+export default getRequestConfig(async () => ({locale: 'en', messages: {}}));
 ```
 
 ### Composing with other plugins

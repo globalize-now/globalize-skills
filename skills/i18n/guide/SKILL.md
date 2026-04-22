@@ -44,6 +44,18 @@ Evaluate these hard stops top-to-bottom. If any applies, stop immediately — do
 2. **Already has an i18n library installed** — any of `@lingui/core`, `@lingui/react`, `next-intl`, `react-intl`, `i18next`, `react-i18next`, `vue-i18n`, `@nuxtjs/i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue` found in deps or devDeps.
    **STOP.** Tell the user: "This project already uses `{library}`. For React projects, run the matching convert skill (`lingui-convert` or `next-intl-convert`) to wrap existing strings. A Vue convert skill is not yet available — if you have `vue-i18n` (or `@nuxtjs/i18n`) installed but setup is incomplete, re-run `vue-setup`; otherwise continue with your library's own conventions."
 
+3. **React Native / Expo** — `react-native`, `expo`, or any `@expo/*` package found in deps.
+   **STOP.** Tell the user: "This guide doesn't cover React Native / Expo. The LinguiJS setup expects a web build pipeline (Vite / Next.js / CRA) and would fail. For React Native, set up manually with `expo-localization` (for device locale) plus either `i18n-js` or `react-i18next` as the message runtime. vue-i18n / next-intl do not apply here."
+
+4. **Gatsby** — `gatsby` found in deps.
+   **STOP.** Tell the user: "This guide doesn't cover Gatsby yet. The LinguiJS setup would hit a 'custom build pipeline' stop because Gatsby doesn't use Vite / Next.js / CRA. For manual setup, use `gatsby-plugin-react-i18next` (if you want a turn-key solution), or wire Lingui yourself via Gatsby's `gatsby-node.ts#onCreateBabelConfig` hook to add `@lingui/babel-plugin-lingui-macro`. If you want a dedicated Gatsby reference added to this skill, open an issue."
+
+5. **react-email** — `react-email` or any `@react-email/*` package found in deps.
+   **STOP.** Tell the user: "This guide doesn't cover react-email. Email templates don't fit the SPA model — there is no client runtime, no Vite/Next.js plugin hook, and messages are rendered through react-email's own CLI. For localizing email templates, use `@formatjs/intl` or direct `Intl.*` calls with locale-specific template files."
+
+6. **Remix** — `@remix-run/dev`, `@remix-run/react`, or `@remix-run/node` found in deps.
+   **STOP.** Tell the user: "This guide doesn't cover Remix yet. The LinguiJS Vite reference assumes `@vitejs/plugin-react`'s `babel.plugins` passthrough, which Remix's `vitePlugin` does not expose, and the provider pattern used here reads `window` / `localStorage` at module scope which crashes under Remix SSR. Use `remix-i18next` for a Remix-native i18n setup. If you want a dedicated Remix reference added to this skill, open an issue."
+
 ---
 
 ## Step 3: Recommend a Library

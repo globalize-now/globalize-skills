@@ -236,6 +236,32 @@ Scan `.vue` and `.ts` files systematically. Apply the confidence tiers to decide
 
 - **`v-html` on user-visible content.** The HTML would need to either (a) become a `<i18n-t>` block with named slots or (b) stay as `v-html` while the underlying content gets sourced from `t()`. Flag for manual review — auto-rewriting `v-html` to `t()` is unsafe (escapes differ; XSS surface changes).
 
+- **Module-scope `Intl.*Format` constants.** `const X = new Intl.NumberFormat('en-US', {...})` (or `DateTimeFormat`, `RelativeTimeFormat`, `ListFormat`) defined outside any component. These capture the locale at module evaluation time and never react to `useI18n().locale.value` changes — switching locales in the app still renders numbers/dates in the original locale, and any locale string hardcoded as the first argument pins it further.
+
+  ```ts
+  // ← flag — module-scope, fixed locale, not reactive to locale changes
+  const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+  export function formatPrice(amount: number) {
+    return USD.format(amount)
+  }
+  ```
+
+  **Recipe**: move the formatting into the component via vue-i18n's `n()` / `d()` helpers — they read the current locale from the i18n instance and stay reactive:
+
+  ```vue
+  <script setup lang="ts">
+  import { useI18n } from 'vue-i18n'
+  const { n } = useI18n({ useScope: 'global' })
+  defineProps<{ amount: number }>()
+  </script>
+
+  <template>
+    <span>{{ n(amount, 'currency') }}</span>
+  </template>
+  ```
+
+  Requires `numberFormats.{locale}.currency` to be registered on the i18n instance (seeded in `vue-setup` Step 3). If the format isn't registered yet, either (a) register it alongside the conversion edit, or (b) fall back to `n(amount, { style: 'currency', currency: 'USD' })` as an inline format. Do not reintroduce `new Intl.NumberFormat(locale.value, ...)` inside the component — `n()` and `d()` already delegate to those APIs, caching per-locale.
+
 ### Flag with judgment (medium confidence)
 
 Review these and wrap only if they appear in the UI:

@@ -173,6 +173,18 @@ nuxt.config.ts
 
 For Nuxt 3, swap `i18n/locales/` for `locales/` at project root and put `i18n.config.ts` at project root too (the Nuxt 3 convention pre-dates the `i18n/` directory). Update the `vueI18n:` path in `nuxt.config.ts` to match whichever layout you choose.
 
+### ICU seed — why the Nuxt catalog is non-ICU by default
+
+The main SKILL.md Step 7 ships a **non-ICU seed** for Nuxt (`{"welcome": "Welcome to {appName}"}`, no plural entry). Root cause: `@nuxtjs/i18n` delegates lazy-JSON handling to `@intlify/unplugin-vue-i18n`, which pre-compiles every lazy locale file at build time using Intlify's **default** (non-ICU) compiler. The custom `messageCompiler` registered in `i18n.config.ts` runs for messages evaluated at runtime (e.g. SFC `<i18n>` blocks, plain-string fallbacks), but the lazy-loaded bundle has already been pre-compiled by the time it lands on the client. Build-time pre-compilation of `{count, plural, one {...} other {...}}` fails with `error code: 2`.
+
+This interaction is not exposed as a single flag on `@nuxtjs/i18n`'s `compilation` block (which today only surfaces `strictMessage` and `escapeHtml`). Real escape hatches as of `@nuxtjs/i18n@9` / `@intlify/unplugin-vue-i18n@6`:
+
+1. **Move ICU-heavy messages into SFC `<i18n>` blocks** rather than lazy JSON. Custom blocks route through the runtime `messageCompiler` even under the default bundling path. Trade-off: loses the translator-friendly central catalog.
+2. **Drop the `langDir` + `lazy` pattern** and import locale JSON statically, the same way the Vite SPA variant does. The custom `messageCompiler` then handles ICU end-to-end. Trade-off: loses `@nuxtjs/i18n`'s SSR-aware lazy loading.
+3. **Wait for upstream.** `unplugin-vue-i18n` has an open issue thread around exposing the pre-compilation step; track the `@intlify/unplugin-vue-i18n` changelog before committing to ICU plurals on the Nuxt lazy path.
+
+Until one of those lands, keep the seed interpolation-only and advise users that ICU plurals / select require one of the workarounds above. Interpolation (`{name}`) works fine under default Nuxt bundling — it's only the ICU-specific keywords (`plural`, `select`, `selectordinal`) that trip the non-ICU pre-compile.
+
 ## Provider (Step 5)
 
 **No manual `app.use(i18n)` call is needed** — the module registers vue-i18n during Nuxt bootstrapping. The `useI18n()` composable works directly inside any component's `<script setup>`.

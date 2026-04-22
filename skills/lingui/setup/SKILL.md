@@ -56,7 +56,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - Execute all steps without pausing for per-step explanations or confirmations.
 - Consent gates for "Modifies existing file" steps are **suspended** — proceed with the modification without asking.
 - Hard stops (incompatibility checks in Step 1) still halt execution — these are never skipped.
-- Required user choices (marked with "MUST wait for the user to choose") still require input — collect these immediately after mode selection (see below).
+- "MUST wait for the user to choose" lines in this file and the reference files are **overridden** by the unguided-defaults table below when a default is listed. For choices not covered by that table, still collect input before proceeding.
 - Optional steps (CI/CD, test setup) are **included by default** unless the user excluded them.
 - At the end, produce a summary:
 
@@ -76,9 +76,23 @@ After Step 1 (detection) completes without blockers, ask the user:
 - {recommendations}
 ```
 
+#### Unguided defaults
+
+In unguided mode, apply the defaults below without prompting. Log each default choice in the final summary so the user can revisit any of them:
+
+| Choice | Unguided default | Rationale |
+|--------|------------------|-----------|
+| **Source locale** | Project's existing `<html lang="...">` if found; otherwise `en` | Matches what the app already ships. |
+| **Target locale** | User-specified if given in the initial prompt; otherwise `es` | One additional locale is enough to validate the pipeline; users can add more after. |
+| **Catalog format** | JSON | Matches the cross-skill unguided default. PO remains opt-in if the user explicitly picks it — Lingui supports both via `@lingui/format-po` / `@lingui/format-json` and swapping later is a one-line config change. |
+| **Locale routing strategy** (file-based routing variants — TanStack Start, etc.) | Strategy 1 — unprefixed source locale (`/about` = source, `/$locale/about` = target) | Preserves existing URLs and SEO without introducing prefixes for the default locale. |
+| **Optional steps** (CI/CD, test setup) | Included | Unless the user named them to skip at mode-selection time (`Unguided — skip CI/CD`). |
+
+If the user named a different target locale, a different catalog format, or a different routing strategy at mode-selection time (free-form in the "Unguided" reply), honor that over the default. Otherwise proceed silently.
+
 #### Required choices in unguided mode
 
-If the project uses file-based routing, the **locale routing strategy** choice (from the variant reference file) must be presented immediately after mode selection. Collect the answer before proceeding with Step 2.
+None — the table above covers every choice. If a genuinely unrecoverable ambiguity appears at runtime (e.g. the detector cannot decide between App Router and Pages Router), stop and ask; don't guess.
 
 ---
 
@@ -89,7 +103,7 @@ Read the project's `package.json`, build config (`vite.config.*`, `next.config.*
 | Signal | How to detect |
 |--------|--------------|
 | **Framework** | `next` in deps → Next.js. `@tanstack/react-start` in deps → TanStack Start. `vite` in devDeps → Vite. `react-scripts` → CRA. |
-| **Compiler** | `@vitejs/plugin-react-swc` → SWC. `@vitejs/plugin-react` (no `-swc`) → Babel. Next.js → SWC unless `.babelrc` exists. TanStack Start → Babel (uses `@vitejs/plugin-react`). |
+| **Compiler** | `@vitejs/plugin-react-swc` → SWC. `@vitejs/plugin-react` (no `-swc`) → Babel, **but only on plugin-react v5 or lower**. `@vitejs/plugin-react@6+` dropped the `babel` option — on v6+, treat as SWC and use `references/vite-swc.md` (switching the project to `@vitejs/plugin-react-swc` + `@lingui/swc-plugin` as part of Step 4). Next.js → SWC unless `.babelrc` exists. TanStack Start → Babel (uses `@vitejs/plugin-react`). |
 | **Router** | `@tanstack/react-start` → TanStack Start (SSR). `@tanstack/react-router` (without `react-start`) → TanStack Router (client-only). `react-router` → React Router. Next.js → file-based routing. |
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |

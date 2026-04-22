@@ -4,6 +4,8 @@ This covers Next.js 13+ projects using the App Router with React Server Componen
 
 > **Catalog format note:** the code samples below use `.json` message imports. If the user chose **PO** as the catalog format in the main SKILL.md, substitute the `.json` imports and file scaffolds with their `.po` equivalents from `catalog-format-po.md`. The rest of the App Router setup (routing, middleware, provider wiring, `[locale]` layout) is format-independent.
 
+> **Path-alias handling.** Every code sample below uses `@/i18n/routing`, `@/i18n/navigation`, `@/components/...`, etc. Before emitting them, check `tsconfig.json` for `compilerOptions.baseUrl` + `compilerOptions.paths` entries that map `@/*` to `./src/*` (or equivalent). If the alias is **not** configured, rewrite every `@/...` import in the emitted code to a relative path based on the destination file's location (`../../i18n/routing`, `../i18n/routing`, etc.) rather than editing `tsconfig.json`. Touching `tsconfig.json` is out of scope for this skill.
+
 ## Packages
 
 Only one package is required:
@@ -250,7 +252,9 @@ The innermost wrapper (`withNextIntl`) should wrap the config object directly. O
 
 ## Step 6: Middleware
 
-Create `src/middleware.ts` (or `middleware.ts` at the project root if the project does not use `src/`):
+**File name depends on Next.js major**: on **Next.js 16+**, this file must be named **`proxy.ts`** (the Next 16 rename of `middleware.ts`). On **Next.js 14/15**, keep the name `middleware.ts`. Both files live at the same location with the same `createMiddleware(routing)` contents shown below — only the filename changes. Emitting `middleware.ts` on Next 16 produces a deprecation warning today; the rename is expected to become hard in a later release.
+
+Create `src/middleware.ts` on Next 14/15, or `src/proxy.ts` on Next 16+ (or `middleware.ts` / `proxy.ts` at the project root if the project does not use `src/`):
 
 ```ts
 import createMiddleware from 'next-intl/middleware';
@@ -275,7 +279,7 @@ The middleware handles:
 
 ### Composing with existing middleware
 
-**If `middleware.ts` already exists**, do NOT overwrite it. This is a **CONSENT GATE**.
+**If `middleware.ts` (or `proxy.ts` on Next 16+) already exists**, do NOT overwrite it. This is a **CONSENT GATE**.
 
 Read the existing middleware, then show the user the proposed composition. The pattern depends on what the existing middleware does:
 
@@ -445,6 +449,32 @@ export function generateStaticParams() {
 ```
 
 This goes in `app/[locale]/layout.tsx` alongside the layout component. Without it, locale pages are only rendered on-demand.
+
+### `setRequestLocale` must be called in every static page, not just the layout
+
+`setRequestLocale(locale)` opts the current render into static rendering by telling next-intl's server APIs which locale to resolve. **Next.js does not propagate layout `setRequestLocale` calls into individual pages** — each page that accepts `params.locale` must call `setRequestLocale` itself at the top of the component body, or static generation silently bails out to on-demand rendering and `useTranslations` / `getTranslations` inside that page throws at request time.
+
+Apply this to every page file under `app/[locale]/` that reads `params.locale`:
+
+```tsx
+// app/[locale]/page.tsx
+import {setRequestLocale} from 'next-intl/server';
+import {getTranslations} from 'next-intl/server';
+
+type Props = {
+  params: Promise<{locale: string}>;  // Next 15+; drop Promise on Next 13-14
+};
+
+export default async function HomePage({params}: Props) {
+  const {locale} = await params;
+  setRequestLocale(locale);            // REQUIRED for static rendering — must be called before any getTranslations/useTranslations
+
+  const t = await getTranslations('HomePage');
+  return <h1>{t('title')}</h1>;
+}
+```
+
+Client component pages (`'use client'`) do not need `setRequestLocale` — static rendering only applies to server components. Nested server-component pages under `app/[locale]/**/page.tsx` need the call individually. Missing the call is the most common cause of "dynamic rendering" deopts in otherwise-correct `app/[locale]/` setups.
 
 ## Step 9: Directory Restructure
 

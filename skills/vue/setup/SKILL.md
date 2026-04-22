@@ -73,7 +73,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - Execute all steps without pausing for per-step explanations or confirmations.
 - Consent gates for "Modifies existing file" steps are **suspended** — proceed with the modification without asking.
 - Hard stops (incompatibility checks in Step 1) still halt execution — these are never skipped.
-- Required user choices (marked with "MUST wait for the user to choose") still require input — collect these immediately after mode selection (see below).
+- "MUST wait for the user to choose" lines in this file and the reference files are **overridden** by the unguided-defaults table below when a default is listed. For choices not covered by that table, still collect input before proceeding.
 - Optional steps (CI/CD, test setup) are **included by default** unless the user excluded them.
 - At the end, produce a summary:
 
@@ -93,13 +93,22 @@ After Step 1 (detection) completes without blockers, ask the user:
 - {recommendations}
 ```
 
-#### Required choices in unguided mode
+#### Unguided defaults
 
-For Vite SPAs that use `vue-router`, the **locale routing strategy** choice (from `references/vite-spa.md`) must be presented immediately after mode selection. For Nuxt, the **routing strategy** choice (`strategy` option — default is `prefix_except_default`) must be confirmed. Collect these answers before proceeding with Step 2.
+In unguided mode, apply the defaults below without prompting. Log each default choice in the final summary so the user can revisit any of them:
 
-The **catalog format** choice (JSON vs PO — see "Catalog Format" above) must also be confirmed in unguided mode before Step 2, since it drives the package list and the Vite plugin wiring.
+| Choice | Unguided default | Rationale |
+|--------|------------------|-----------|
+| **Source locale** | Existing `<html lang="...">` if found; otherwise `en` | Matches what the app already ships. |
+| **Target locale** | User-specified if given in the initial prompt; otherwise `es` | One additional locale is enough to validate the pipeline. |
+| **Catalog format** | JSON | Zero-config — no `poLoader` plugin, no Nuxt ICU pre-compile surprises. PO remains opt-in if the user explicitly picks it. |
+| **Vite-SPA locale routing strategy** (`references/vite-spa.md`, when `vue-router` is in deps) | "Unprefixed default locale" — source-locale URLs stay bare, target locales get a prefix (`/es/about`) | Preserves existing URLs. |
+| **Nuxt routing strategy** (`references/nuxt.md`, when Nuxt is detected) | `prefix_except_default` | Matches both `@nuxtjs/i18n`'s own default and the Vite-SPA default for consistency. |
+| **Default currency** (Step 3 `numberFormats` seeding) | Inferred from source locale (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`, `fr-FR` → `EUR`, `es-ES` → `EUR`, `ja-JP` → `JPY`) with `USD` fallback | Seed a working currency format so `n(amount, 'currency')` works out of the box. |
+| **`main.ts` / provider wrapping** | Apply silently | Consent gate suspended in unguided mode per the rule above. |
+| **Optional steps** (CI/CD, test wrapper) | Included | Unless the user named them to skip at mode-selection time. |
 
-The **locale list** and **default / source locale** are also collected at this point in unguided mode. Auto-detect them from the existing `<html lang="...">` attribute if possible; otherwise prompt.
+If the user named a different target locale, a different catalog format, or a different routing strategy at mode-selection time (free-form in the "Unguided" reply), honor that over the default.
 
 ---
 
@@ -459,6 +468,14 @@ Seed each file with a couple of example keys so the app can boot without a catal
 {
   "welcome": "Welcome to {appName}",
   "messages": "{count, plural, one {One new message} other {# new messages}}"
+}
+```
+
+> **Nuxt exception — ship a non-ICU seed.** With `@nuxtjs/i18n` + `bundle.runtimeOnly: false` (the default this skill emits), `unplugin-vue-i18n` pre-compiles the lazy locale JSON at build time using its **default**, non-ICU compiler — *before* the custom `messageCompiler` registered in `i18n.config.ts` runs. A seed containing `{count, plural, one {...} other {...}}` will fail the build with `error code: 2`. For Nuxt, drop the `messages` entry from the seed (keep only `welcome`). See `references/nuxt.md` § ICU seed upgrade for how to re-enable build-time ICU once the catalog is actually in use.
+
+```json
+{
+  "welcome": "Welcome to {appName}"
 }
 ```
 

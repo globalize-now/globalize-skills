@@ -220,7 +220,8 @@ count === 1 ? t`item` : t`items`
 **Select (gender, status):**
 ```tsx
 // JSX — use Select macro (preferred)
-<Select value={gender} male="He liked it" female="She liked it" other="They liked it" />
+// Non-`other` choice props need a `_` prefix per SelectChoiceProps
+<Select value={gender} _male="He liked it" _female="She liked it" other="They liked it" />
 
 // Non-JSX — use ICU syntax in t
 t`{gender, select, male {He liked it} female {She liked it} other {They liked it}}`

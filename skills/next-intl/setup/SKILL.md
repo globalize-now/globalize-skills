@@ -15,6 +15,8 @@ next-intl is purpose-built for Next.js with native Server Component support. It 
 
 Follow these steps in order. Each builds on the last.
 
+> **Path aliases.** Every scaffold in this skill and its references uses `@/i18n/routing`, `@/i18n/navigation`, `@/components/...` imports. Before emitting any of them, check `tsconfig.json` for `compilerOptions.baseUrl` + `compilerOptions.paths` mapping `@/*` to `./src/*` (or equivalent). If the alias is not configured, rewrite every `@/...` import in the emitted code to a relative path from the destination file's location. Do not modify `tsconfig.json`.
+
 ### Step Risk Classification
 
 | Step | Risk | Notes |
@@ -57,7 +59,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - Execute all steps without pausing for per-step explanations or confirmations.
 - Consent gates for "Modifies existing file" steps are **suspended** — proceed with the modification without asking.
 - Hard stops (incompatibility checks in Step 1) still halt execution — these are never skipped.
-- Required user choices (marked with "MUST wait for the user to choose") still require input — collect these immediately after mode selection (see below).
+- "MUST wait for the user to choose" lines in this file and the reference files are **overridden** by the unguided-defaults table below when a default is listed. For choices not covered by that table, still collect input before proceeding.
 - Optional steps (CI/CD) are **included by default** unless the user excluded them.
 - At the end, produce a summary:
 
@@ -77,11 +79,22 @@ After Step 1 (detection) completes without blockers, ask the user:
 - {recommendations}
 ```
 
-#### Required choices in unguided mode
+#### Unguided defaults
 
-The **locale prefix strategy**, **locale list**, and **default locale** (normally collected in Step 3) must be presented immediately after mode selection. Collect all answers before proceeding with Step 2.
+In unguided mode, apply the defaults below without prompting. Log each default choice in the final summary so the user can revisit any of them:
 
-The **catalog format** choice is collected earlier, as part of Step 1 (see "Catalog Format" section below), and is always asked before the Setup Mode prompt — even in unguided mode — because later steps branch on it. When `PO-capable` is `false`, the choice is made automatically and the user is only informed.
+| Choice | Unguided default | Rationale |
+|--------|------------------|-----------|
+| **Source / default locale** | Project's existing `<html lang="...">` if found; otherwise `en` | Matches what the app already ships. |
+| **Target locale** | User-specified if given in the initial prompt; otherwise `es` | One additional locale is enough to validate the pipeline. |
+| **Locale prefix strategy** | `as-needed` | Source locale stays unprefixed (`/about`), target locales get a prefix (`/es/about`). Best-balanced default for SEO preservation on existing URLs. |
+| **Catalog format** | JSON | Avoids the `experimental.messages` plugin block on App Router and avoids the Pages Router precompile bug entirely. PO remains opt-in — if the user explicitly picks it, switch to `catalogFormat = 'po'` and follow `references/catalog-format-po.md`. |
+| **Layout / `_app.tsx` provider wrapping** | Apply silently | Consent gate suspended in unguided mode per the rule above. |
+| **Optional steps** (CI/CD) | Included | Unless the user named them to skip at mode-selection time. |
+
+If the user named a different target locale, a different prefix strategy, or PO format at mode-selection time (free-form in the "Unguided" reply), honor that over the default.
+
+Note: when `PO-capable` is `false` (older TypeScript / missing deps), the catalog format is forced to JSON regardless of the default — see "Catalog Format" below.
 
 ---
 
@@ -283,12 +296,12 @@ Wrap the existing Next.js config with `createNextIntlPlugin()`. This plugin tell
 
 ### Precompilation (default when `PO-capable === true`)
 
-When `PO-capable` is `true`, pass an `experimental.messages` block with `precompile: true`. The plugin compiles ICU message bodies into minified ASTs at build time; a ~650-byte runtime evaluates them using native `Intl` APIs. Full ICU feature parity is preserved — interpolation (`{name}`), plurals (`{count, plural, …}`), `select`, rich text via `t.rich` / `t.markup`, and formatting helpers all work unchanged.
+When `PO-capable` is `true`, pass an `experimental.messages` block with `precompile: true` — **on App Router only**. Pages Router has an upstream bug where the webpack alias `precompile: true` depends on does not take effect, causing every ICU message to throw `INVALID_MESSAGE` at render. For Pages Router, use the rules in § Pages Router below. The plugin compiles ICU message bodies into minified ASTs at build time; a ~650-byte runtime evaluates them using native `Intl` APIs. Full ICU feature parity is preserved — interpolation (`{name}`), plurals (`{count, plural, …}`), `select`, rich text via `t.rich` / `t.markup`, and formatting helpers all work unchanged.
 
 **Two implications the user must understand before confirming:**
 
 1. **`experimental.messages` is experimental.** The next-intl maintainers reserve the right to change its shape before GA. Pin next-intl to a known-good minor (e.g. `"next-intl": "4.8.x"`) and re-read the release notes before bumping.
-2. **`t.raw` is not supported under precompilation.** With precompile on, the original ICU source strings are not retained at runtime, so `t.raw('key')` will not work. The convert skill never emits `t.raw`, so freshly-converted projects are safe. If the project has hand-written `t.raw` callers (rare), either migrate them to `t.rich` / `t.markup` / MDX / a CMS lookup, or **drop the entire `experimental.messages` block** (fall back to the bare-plugin form below) — do not try to keep the block and just set `precompile: false`, because `experimental.messages` itself rewires the loader path.
+2. **`t.raw` is not supported under precompilation.** With precompile on, the original ICU source strings are not retained at runtime, so `t.raw('key')` will not work. The convert skill never emits `t.raw`, so freshly-converted projects are safe. If the project has hand-written `t.raw` callers (rare), either migrate them to `t.rich` / `t.markup` / MDX / a CMS lookup, or drop the entire `experimental.messages` block (fall back to the bare-plugin form below). On App Router, setting `precompile: false` while keeping the block is a second-best alternative for JSON — but on Pages Router, setting `precompile: false` is required regardless (see Pages Router block below), since `precompile: true` is silently broken there.
 
 ### App Router — `PO-capable === true` (default)
 
@@ -349,35 +362,14 @@ export default withNextIntl(nextConfig);
 
 Use `createNextIntlPlugin('./path/to/i18n/request.ts')` to override the request path. Messages load per-request via the dynamic `import()` in `src/i18n/request.ts` — no build-time compilation.
 
-### Pages Router — `PO-capable === true` (default)
+### Pages Router — `PO-capable === true`
 
-For Pages Router, the plugin wraps the config the same way, but the `next.config.js` also needs the built-in `i18n` key for locale routing:
+**Precompilation is broken on Pages Router today.** The webpack alias `use-intl/format-message` → `use-intl/format-message/format-only` that `createNextIntlPlugin` installs for `precompile: true` does not take effect for Pages Router bundles (verified against `next-intl@4.9.1`, `next@15.5.15`, webpack). Every ICU message — interpolation, plurals, select, rich text — throws `INVALID_MESSAGE` at render. Two workarounds, pick by catalog format:
 
-```js
-const createNextIntlPlugin = require('next-intl/plugin');
+- **JSON (default)**: drop `experimental.messages` entirely and use the `PO-capable === false` fallback form below. JSON catalogs load per-request via the bare plugin and work fine; you only lose build-time precompile, which Pages Router bundles can't consume anyway.
+- **PO**: keep `experimental.messages` (the PO loader lives inside it), but set `precompile: false`. See `references/catalog-format-po.md` § Pages Router (CJS) for the full block, including the required `i18n/request.ts` stub.
 
-const withNextIntl = createNextIntlPlugin({
-  experimental: {
-    messages: {
-      format: 'json',
-      path: './messages',
-      locales: 'infer',
-      precompile: true
-    }
-  }
-});
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  i18n: {
-    locales: ['en', 'de'],       // match routing.ts locales
-    defaultLocale: 'en',          // match routing.ts defaultLocale
-  },
-  // ...existing config
-};
-
-module.exports = withNextIntl(nextConfig);
-```
+App Router is not affected — `precompile: true` is fine there.
 
 ### Pages Router — `PO-capable === false` fallback
 
@@ -1030,7 +1022,7 @@ export default async function InvoicePage() {
 
 - **`experimental.messages` is experimental** (applies whenever Step 5 emits the block — JSON precompile on 4.8+ or PO on 4.5+): the option is explicitly marked experimental and may change in future minor versions. Pin next-intl to a known-good minor (e.g. `"next-intl": "4.8.x"`) and re-read the release notes before bumping. If the API shifts and you need to escape quickly: for JSON projects, just remove the `experimental.messages` block to fall back to per-request loading; for PO projects, also convert `.po` bodies back to JSON (`msgid` → JSON key, `msgstr` → value, drop comments) and rename the files.
 
-- **`t.raw` + precompile**: `t.raw('key')` returns the uncompiled source string for a message. With `precompile: true` on (Step 5's default when `PO-capable === true`), those source strings are not retained at runtime — only the compiled ASTs survive — so `t.raw` does not work. Options: (1) migrate callers to `t.rich` / `t.markup` / MDX / a CMS lookup; (2) drop the **entire** `experimental.messages` block from `next.config.*` (falls back to the bare-plugin form in Step 5 § `PO-capable === false` fallback). Do not try to keep `experimental.messages` and just set `precompile: false` — the block itself rewires the loader path.
+- **`t.raw` + precompile**: `t.raw('key')` returns the uncompiled source string for a message. With `precompile: true` on (Step 5's default when `PO-capable === true`), those source strings are not retained at runtime — only the compiled ASTs survive — so `t.raw` does not work. Options on App Router: (1) migrate callers to `t.rich` / `t.markup` / MDX / a CMS lookup; (2) drop the **entire** `experimental.messages` block from `next.config.*` (falls back to the bare-plugin form in Step 5 § `PO-capable === false` fallback); (3) for JSON, keep the block and set `precompile: false` (loses build-time precompile but retains source). On Pages Router, option (3) is mandatory regardless of `t.raw` because `precompile: true` is broken upstream — see Step 5 § Pages Router.
 
 ---
 

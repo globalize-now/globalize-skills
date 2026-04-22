@@ -35,7 +35,14 @@ import { lingui } from '@lingui/vite-plugin'
 
 export default defineConfig({
   plugins: [
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        // Catalog files live at src/routes/**/locales/** — keep the router plugin from
+        // scanning them as route modules (they're not routes; ignoring avoids routeTree.gen.ts pollution
+        // and "Route module not found" warnings from @tanstack/router-plugin).
+        routeFileIgnorePattern: 'locales/',
+      },
+    }),
     viteReact({
       babel: {
         plugins: ['@lingui/babel-plugin-lingui-macro'],
@@ -47,6 +54,8 @@ export default defineConfig({
 ```
 
 If the project already has Babel plugins configured in the `viteReact()` call, add `@lingui/babel-plugin-lingui-macro` to the existing array. Do not reorder other plugins — preserve any `tailwindcss()`, `nitro()`, or custom plugins that were already present.
+
+If `tanstackStart()` is already configured with a `router` block (e.g. `routesDirectory`, `generatedRouteTree`, `entry`, `basepath`), merge `routeFileIgnorePattern: 'locales/'` into that existing block rather than overwriting it. The `router` key accepts both the Start-specific options (`entry`, `basepath`) and the full set of `@tanstack/router-plugin` config options — `routeFileIgnorePattern`, `routesDirectory`, `generatedRouteTree`, etc. are forwarded through.
 
 ## Provider Setup (Step 5)
 
@@ -287,7 +296,7 @@ export const Route = createRootRoute({
 
 Strategy 1 doesn't call `getLocale()` — the cookie is only meaningful for first-visit Accept-Language redirects, which Strategy 1 doesn't perform (`/about` is always source locale). The cookie middleware still runs so server functions and future strategy changes behave consistently, but it's not consulted here.
 
-> **Canonicalization:** Visiting `/en/about` (when `en` is the source locale) will render the target-locale route tree with an English catalog — not the canonical `/about`. For SEO hygiene, add a redirect for source-locale-prefixed paths if your site is public: inside the check above, when `firstSegment === sourceLocale`, `throw redirect({ to: location.pathname.slice(sourceLocale.length + 1) || '/' })`.
+> **Canonicalization:** Visiting `/en/about` (when `en` is the source locale) will render the target-locale route tree with an English catalog — not the canonical `/about`. For SEO hygiene, add a redirect for source-locale-prefixed paths if your site is public: inside the check above, when `firstSegment === sourceLocale`, `throw redirect({ href: location.pathname.slice(sourceLocale.length + 1) || '/' })`. **Use `href`, not `to`.** `to` is strictly typed against TanStack Router's inferred route tree — a `string` built by concatenation doesn't narrow to a known route and fails TypeScript. `href` accepts an arbitrary path string, which is exactly what these locale-prefix redirects need.
 
 ```tsx
 // src/pages/About.tsx — shared page component
@@ -352,7 +361,7 @@ export const Route = createRootRoute({
     if (!firstSegment || !(locales as readonly string[]).includes(firstSegment)) {
       // Bare path — redirect to cookie-resolved (or Accept-Language) locale
       const locale = await getLocale()
-      throw redirect({ to: `/${locale}${location.pathname}` })
+      throw redirect({ href: `/${locale}${location.pathname}` })   // href, not to — `to` is strictly typed to known routes and rejects template-literal strings
     }
     // URL already carries a valid locale — use it as context
     return { locale: firstSegment as Locale }
@@ -628,4 +637,17 @@ export const sendConfirmationEmail = createServerFn({ method: 'POST' }).handler(
 - **Plugin order**: `@vitejs/plugin-react` must come **after** `tanstackStart()` in `vite.config.ts`. Reversing the order breaks Start's code splitting and server/client boundary handling.
 - **Missing `src/start.ts` before the router builds**: `createStart(...)` must be imported somewhere in the server bundle (often via `src/server.ts` / `src/server-entry.ts` re-exporting or importing `src/start.ts`). If `startInstance` is unused, Vite tree-shakes the middleware away — verify that your server entry imports `./start` (even as a side-effect import: `import './start'`).
 - **Catalog missing on a route**: `lingui extract-experimental` generates co-located `locales/{route}/{locale}.po` files on first extraction. If a route's `beforeLoad` fails with "Cannot find module ./locales/...", run `npm run lingui:extract` followed by `npm run lingui:compile` before starting the dev server.
+
+- **First extract fails: "No matches for the glob in `./locales/${locale}.ts`"**: Dynamic `import(\`./locales/${locale}.ts\`)` calls in per-page `beforeLoad` hooks are resolved by esbuild at load time. On first run — before any extraction has happened — the `locales/` directory is empty, the glob resolves to zero matches, and `lingui extract-experimental` errors out before it has a chance to create the files it's supposed to create.
+
+  **Fix — bootstrap before the first extract**: for every route that contains a dynamic `import(\`./locales/{route}/\${locale}.ts\`)`, seed empty compiled catalog files at the target paths so the glob resolves:
+
+  ```
+  src/routes/about/locales/about/en.ts   // export const messages = {}
+  src/routes/about/locales/about/fr.ts   // export const messages = {}
+  ```
+
+  One `export const messages = {}` line per file is enough. After the first `lingui:extract` + `lingui:compile` cycle, the extractor will overwrite these files with real compiled catalogs. Script the seeding as part of the setup or document it as a one-time bootstrap step in the project's README.
+
+  Alternative: run `npm run lingui:compile` first (which, on an empty PO catalog, still produces empty compiled files), then `lingui:extract`, then `lingui:compile` again. Pick one recipe and apply it consistently across routes.
 - **`@lingui/detect-locale` errors on the server**: if the package got installed (e.g., copied from the Vite SPA guide), its `fromStorage`/`fromNavigator` detectors throw during SSR because `localStorage` and `navigator` don't exist. Uninstall it — the server middleware above replaces it.

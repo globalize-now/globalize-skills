@@ -212,6 +212,29 @@ Scan files systematically for these patterns. Apply the confidence tiers to deci
   ```
   Also flag `count === 1 ? t\`item\` : t\`items\`` ternaries — two translation keys cannot express plural rules in other languages. Rewrite as a single `<Plural>` or ICU plural `t`.
 
+- **Module-scope `Intl.*Format` constants**: `const X = new Intl.NumberFormat('en-US', {...})` (or `DateTimeFormat`, `RelativeTimeFormat`, `ListFormat`) defined at module scope. These capture the locale at module evaluation time and never update when the user's locale changes — switching locales in the app will still format numbers/dates in the original locale. Also flag any locale string hardcoded as the first argument.
+
+  ```tsx
+  // ← flag — module-scope, fixed locale, formats never change
+  const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+  export function Price({ amount }: { amount: number }) {
+    return <span>{USD.format(amount)}</span>
+  }
+  ```
+
+  **Recipe**: move the format call into the component body and route through `i18n.number()` / `i18n.date()` so the active locale is picked up automatically:
+
+  ```tsx
+  import { useLingui } from '@lingui/react/macro'
+
+  export function Price({ amount }: { amount: number }) {
+    const { i18n } = useLingui()
+    return <span>{i18n.number(amount, { style: 'currency', currency: 'USD' })}</span>
+  }
+  ```
+
+  `i18n.number` and `i18n.date` delegate to `Intl.NumberFormat` / `Intl.DateTimeFormat` internally using the active locale — no manual `new Intl.*Format(locale, options)` construction needed. If the format object is reused across many calls for performance, move it into a `useMemo(() => new Intl.NumberFormat(i18n.locale, options), [i18n.locale, options])` inside the component instead of top-level.
+
 - **Imported strings referenced in JSX**: `<h1>{title}</h1>` where `title` is an imported identifier. Trace the import to its definition; if it resolves to a bare string literal (e.g. `export const title = "Welcome"`), flag **the definition site**, not the JSX site — that is where the wrapping goes.
 
   **Disambiguation — a JSX expression `{foo}` can be:**
@@ -293,10 +316,11 @@ Different languages have different plural forms. English only uses `one` and `ot
 import { Select } from '@lingui/react/macro'
 
 // JSX — use Select macro (preferred)
-<Select value={gender} male="He liked your post" female="She liked your post" other="They liked your post" />
+// Note: non-`other` choice props need a `_` prefix (SelectChoiceProps: [option: `_${string}`])
+<Select value={gender} _male="He liked your post" _female="She liked your post" other="They liked your post" />
 
 // Status selection
-<Select value={status} active="Active" inactive="Inactive" other="Unknown" />
+<Select value={status} _active="Active" _inactive="Inactive" other="Unknown" />
 
 // Non-JSX — use ICU syntax in t
 t`{gender, select, male {He liked your post} female {She liked your post} other {They liked your post}}`

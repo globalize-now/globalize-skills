@@ -2,6 +2,15 @@
 
 This covers Vite projects using `@vitejs/plugin-react` (Babel-based, without the `-swc` suffix).
 
+> **Version gate — `@vitejs/plugin-react` v6+**: `@vitejs/plugin-react@6.0.0` (Oct 2025) dropped the `babel` option from its public `Options` type. Only `include`, `exclude`, `jsxImportSource`, `jsxRuntime`, and `reactRefreshHost` remain. The `react({ babel: {...} })` form below is silently ignored on v6+ — macros never get transformed, `tsc` errors with TS2353 on the `babel` property, and `@lingui/vite-plugin`'s macro-import check fails at build time.
+>
+> Before applying this reference, read the project's installed `@vitejs/plugin-react` version (from `package.json` or `package-lock.json` / `pnpm-lock.yaml` / `bun.lock`). If the major is 6 or higher:
+>
+> 1. Switch the project to `@vitejs/plugin-react-swc` + `@lingui/swc-plugin`.
+> 2. Use `references/vite-swc.md` instead of this file for the rest of the setup.
+>
+> If the project is locked to v5 or lower (e.g. the lockfile pins a Vite/React combo that pre-dates v6), this reference still applies verbatim. Do not proactively downgrade `@vitejs/plugin-react`.
+
 ## Packages
 
 In addition to the core packages from Step 2, install:
