@@ -4,6 +4,56 @@ Nuxt-specific guidance for the `vue-convert` skill. Covers Nuxt 3 and Nuxt 4 pro
 
 ---
 
+## When you hit ICU
+
+The main SKILL.md Step 6 gates ICU emission on framework. This section is the decision recipe. Apply it before writing any catalog entry that uses `plural`, `select`, or `selectordinal`.
+
+- **Default path (Nuxt + `@nuxtjs/i18n` + `langDir` + `lazy` + JSON catalog)**: do NOT put ICU into the JSON. Write the message as an SFC `<i18n>` custom block in the component that uses it — custom blocks route through the runtime `messageCompiler`, so ICU keywords parse correctly. Copy-paste shape:
+
+  ```vue
+  <!-- components/Cart.vue -->
+  <script setup lang="ts">
+  const { t } = useI18n()
+  defineProps<{ count: number }>()
+  </script>
+
+  <template>
+    <p>{{ t('items', { count }) }}</p>
+  </template>
+
+  <i18n lang="json">
+  {
+    "en": {
+      "items": "{count, plural, one {# item selected} other {# items selected}}"
+    },
+    "fr": {
+      "items": "{count, plural, one {# article sélectionné} other {# articles sélectionnés}}"
+    }
+  }
+  </i18n>
+  ```
+
+  The `<i18n>` block's top-level keys are locale codes; entries merge into the component-scoped catalog at build time. Namespacing rules from Step 7 don't apply inside the block — scope is the component, so short keys (`items`, not `Cart.items`) are fine.
+
+- **Interpolation-only** (`{count}`, `{name}`, no ICU keywords): safe in the JSON catalog. Write it there and keep the namespace structure.
+
+- **Escape hatches if the project needs ICU in central JSON** (all require user consent — surface them, do not apply silently):
+  1. Drop `langDir` + `lazy` and import locale JSON statically (the Vite SPA pattern). The custom `messageCompiler` then handles ICU end-to-end, but you lose `@nuxtjs/i18n`'s SSR-aware lazy loading.
+  2. Switch the catalog format to PO (re-run `vue-setup`). PO strings pass through the runtime compiler under the default Nuxt bundling path.
+  3. Wait for upstream. Track `@intlify/unplugin-vue-i18n` for a flag exposing the pre-compilation step.
+
+See § "ICU workarounds (advanced)" below for the root-cause explanation.
+
+---
+
+## ICU workarounds (advanced)
+
+Root cause: `@nuxtjs/i18n` delegates lazy-JSON handling to `@intlify/unplugin-vue-i18n`, which pre-compiles every lazy locale file at build time using Intlify's **default** (non-ICU) compiler. The custom `messageCompiler` registered in `i18n.config.ts` runs for messages evaluated at runtime (SFC `<i18n>` blocks, plain-string fallbacks), but the lazy-loaded bundle has already been pre-compiled by the time it lands on the client. Build-time pre-compilation of `{count, plural, one {...} other {...}}` fails with `error code: 2` and breaks the whole locale file.
+
+This interaction is not exposed as a single flag on `@nuxtjs/i18n`'s `compilation` block (which today only surfaces `strictMessage` and `escapeHtml`). The three escape hatches listed under "When you hit ICU" above are the real options as of `@nuxtjs/i18n@9` / `@intlify/unplugin-vue-i18n@6`. Interpolation (`{name}`) works fine under default Nuxt bundling — it's only the ICU-specific keywords (`plural`, `select`, `selectordinal`) that trip the non-ICU pre-compile.
+
+---
+
 ## SSR safety
 
 `@nuxtjs/i18n` runs `t()` during server render using the locale chosen from URL / cookie / `accept-language`. The locale is decided before the component renders, so `{{ t('…') }}` in templates works transparently on both server and client.

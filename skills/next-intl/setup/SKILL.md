@@ -127,7 +127,10 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 
 ### Catalog Format
 
-**CONSENT GATE: Present the catalog format choice. You MUST wait for the user to choose before proceeding.** Record the chosen value as `catalogFormat` — it drives conditional steps in 4, 5, 7 (Pages Router), 8, 12, and 13.
+**Guided mode**: present the catalog format choice and wait for the user's answer.
+**Unguided mode**: apply the default from the "Unguided defaults" table (`JSON` for Catalog format) silently; note the applied value in the end-of-run summary.
+
+Record the chosen value as `catalogFormat` — it drives conditional steps in 4, 5, 7 (Pages Router), 8, 12, and 13.
 
 If `PO-capable` (from the detection table) is `false`, **skip this prompt**. Select JSON automatically and tell the user:
 
@@ -142,7 +145,8 @@ Otherwise, ask:
 >
 > I recommend PO unless you have a reason to avoid the experimental flag.
 
-**You MUST wait for the user to choose before proceeding.**
+**Guided mode**: wait for the user's answer before proceeding.
+**Unguided mode**: select `JSON` per the "Unguided defaults" table and note it in the end-of-run summary.
 
 When the user picks PO, read `references/catalog-format-po.md` — it contains all PO-specific code variants referenced by later steps. Keep it open for quick lookup.
 
@@ -210,7 +214,8 @@ If the TypeScript < 5 fallback applies, append `@3` to the package name (e.g., `
 
 ## Step 3: Configure Routing
 
-**CONSENT GATE: Present locale prefix strategy choice. You MUST wait for the user to choose before proceeding.**
+**Guided mode**: present the locales and locale-prefix-strategy choices and wait for the user's answers.
+**Unguided mode**: apply the defaults from the "Unguided defaults" table (source/default locale from `<html lang>` or `en`; target locale from the initial prompt or `es`; `as-needed` prefix strategy) silently; list the applied values in the end-of-run summary.
 
 Before creating any files, ask the user two things:
 
@@ -231,7 +236,8 @@ All locales are prefixed (`/en/about`, `/de/about`). Every URL clearly signals i
 
 No locale prefixes at all — locale is determined by domain or other external means. Requires custom domain-based routing configuration that is outside this skill's scope. If the user wants this, point them to the next-intl docs on domain-based routing.
 
-**You MUST wait for the user to choose before proceeding.**
+**Guided mode**: wait for the user's answer before proceeding.
+**Unguided mode**: select `as-needed` per the "Unguided defaults" table and note it in the end-of-run summary.
 
 Once the user chooses, create `src/i18n/routing.ts` (or `i18n/routing.ts` if the project does not use a `src/` directory):
 
@@ -249,9 +255,16 @@ Replace `locales`, `defaultLocale`, and `localePrefix` with the user's choices.
 
 ---
 
-## Step 4: Configure Request (App Router only)
+## Step 4: Configure Request (App Router) / Create Stub (Pages Router)
 
-> **Pages Router**: Skip this step. Messages are loaded via `getStaticProps` / `getServerSideProps` instead.
+> **Pages Router**: create a stub `i18n/request.ts` but do not wire it into runtime. Since next-intl 4.9, `next-intl/plugin` asserts this file exists at module load and throws `Could not locate request configuration module` otherwise — even though Pages Router resolves messages through `getStaticProps` / `getServerSideProps`. Minimal stub:
+>
+> ```ts
+> import {getRequestConfig} from 'next-intl/server';
+> export default getRequestConfig(async () => ({messages: {}}));
+> ```
+>
+> The default export is never read at runtime on Pages Router — the stub exists purely to satisfy the load-time check. Skip the rest of this step; the App Router guidance below does not apply.
 
 Create `src/i18n/request.ts` (or `i18n/request.ts` if no `src/`). This file tells next-intl how to resolve the locale and load messages for each server request:
 
@@ -283,7 +296,8 @@ Adjust the `../../messages/` path if the project's `messages/` directory is at a
 
 ## Step 5: Next.js Plugin
 
-**CONSENT GATE: This step modifies the project's `next.config.*` file. Describe the exact change and get confirmation before proceeding.**
+**Guided mode**: describe the exact change to `next.config.*` and wait for confirmation before writing.
+**Unguided mode**: apply the change silently; list the modified file in the end-of-run summary.
 
 Wrap the existing Next.js config with `createNextIntlPlugin()`. This plugin tells Next.js where to find the `i18n/request.ts` configuration, and — when `PO-capable` is `true` — also installs the build-time message loader (PO and/or JSON precompilation).
 
@@ -422,7 +436,10 @@ The middleware intercepts every matched request, detects the user's locale (via 
 
 ### If middleware already exists
 
-**CONSENT GATE:** If a `middleware.ts` file already exists in the project, do NOT overwrite it. Instead:
+**Guided mode**: describe the proposed composition and wait for confirmation before writing.
+**Unguided mode**: the "Unguided defaults" table does not cover merging into an existing `middleware.ts` — the composition has to be tailored to the user's existing logic, so do NOT auto-apply. Stop and ask the user to review the proposed composition even in unguided mode; note the deferred change in the end-of-run summary.
+
+If a `middleware.ts` file already exists in the project, do NOT overwrite it. Instead:
 
 1. Show the user the existing middleware content.
 2. Explain that next-intl's middleware needs to be composed with their existing logic.
@@ -453,7 +470,8 @@ export const config = {
 
 ## Step 7: Provider Setup
 
-**CONSENT GATE: This step modifies the root layout or `_app.tsx`. Describe the exact change and get confirmation before proceeding.**
+**Guided mode**: describe the exact change to the root layout (or `_app.tsx`) and wait for confirmation before writing.
+**Unguided mode**: apply the change silently per the "Unguided defaults" table (Layout / `_app.tsx` provider wrapping = Apply silently); list the modified file in the end-of-run summary.
 
 ### App Router
 
@@ -590,7 +608,8 @@ Message files use nested JSON with ICU MessageFormat values. Namespaces (top-lev
 
 > **Pages Router**: Skip this step. Pages Router uses the built-in `i18n` config and does not require a `[locale]` route segment.
 
-**CONSENT GATE: This step moves page files under a `[locale]` dynamic segment. Show the user the full file move plan and get confirmation before executing.**
+**Guided mode**: show the full file move plan and wait for confirmation before executing.
+**Unguided mode**: execute the moves silently (the "Unguided defaults" rule suspends "Modifies existing file" gates); list every moved file in the end-of-run summary.
 
 For App Router with locale prefix routing (`as-needed` or `always`), pages need to live under `app/[locale]/` so Next.js can extract the locale from the URL path.
 
@@ -807,7 +826,8 @@ If any step fails, check in this order:
 
 This step is **not required** for the initial setup to work. The app will function correctly after Step 12. Ask the user: "Would you like me to set up CI/CD integration (TypeScript strict key checking, missing key detection)? This can also be done later." **If the user declines, skip this step.**
 
-**CONSENT GATE: This step modifies existing config files. Describe changes and get confirmation before proceeding.**
+**Guided mode**: describe every config-file change and wait for confirmation before writing.
+**Unguided mode**: apply the changes silently (the "Unguided defaults" table includes optional CI/CD steps by default); list each modified file in the end-of-run summary.
 
 ### TypeScript strict mode for key checking
 

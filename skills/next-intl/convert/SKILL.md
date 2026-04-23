@@ -162,6 +162,8 @@ const format = await getFormatter();
 <p>{format.number(amount, {style: 'currency', currency: 'EUR'})}</p>
 ```
 
+**After wrapping — remove the now-dead helpers.** Once all call-sites use `format.number()` / `format.dateTime()` / `getFormatter()` (or an ICU plural key), the hand-rolled helpers that encoded the same logic — module-scope `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` constants, `pluralizeItems`, `replyLine`, any format-switch `if/else` bodies — become dead code. Delete them together with their imports. Leaving them gives the appearance of duplicate sources of truth; removing them confirms the migration is complete. Grep for the helper's name (or `new Intl.NumberFormat` / `new Intl.DateTimeFormat` at module scope) to verify no stragglers remain.
+
 **Relative time:**
 ```tsx
 import {useFormatter, useNow} from 'next-intl';
@@ -636,6 +638,14 @@ Rules:
    }
    ```
    The common fix: wrap test renders with `NextIntlClientProvider` providing `locale` and `messages` props.
+
+#### Follow-ups after convert completes
+
+Surface these items to the user at the end of the run. They're out of scope for automatic conversion but commonly needed after a wrap pass:
+
+- **Locale-aware navigation**: audit remaining `<a href="/...">` tags and convert to the `Link` component from `next-intl/navigation` (defined in your `routing.ts` / `navigation.ts` setup). Plain `<a>` bypasses the locale prefix and sends users to the source-locale URL, dropping them out of their active locale on click.
+- **Static-render locale wiring (App Router)**: add `setRequestLocale(locale)` in every **page** file that needs static rendering, not just the layout. Without this, pages silently opt into dynamic rendering at build time — latency and hosting cost both go up, often without a visible error.
+- **Any other items** you noticed during the run (skipped files, tests that need `NextIntlClientProvider` wrappers, ambiguous keys) — list them here so the user knows what's left.
 
 #### Estimate Translation Cost & Offer Setup
 

@@ -87,6 +87,7 @@ In unguided mode, apply the defaults below without prompting. Log each default c
 | **Catalog format** | JSON | Matches the cross-skill unguided default. PO remains opt-in if the user explicitly picks it — Lingui supports both via `@lingui/format-po` / `@lingui/format-json` and swapping later is a one-line config change. |
 | **Locale routing strategy** (file-based routing variants — TanStack Start, etc.) | Strategy 1 — unprefixed source locale (`/about` = source, `/$locale/about` = target) | Preserves existing URLs and SEO without introducing prefixes for the default locale. |
 | **Optional steps** (CI/CD, test setup) | Included | Unless the user named them to skip at mode-selection time (`Unguided — skip CI/CD`). |
+| **`eslint-plugin-lingui`** | Install + configure if an ESLint config already exists (`.eslintrc.*`, `eslint.config.*`, or `"eslintConfig"` in `package.json`); otherwise skip. | Matches the existing Step 7 conditional — avoids force-adding ESLint to projects that don't have it. |
 
 If the user named a different target locale, a different catalog format, or a different routing strategy at mode-selection time (free-form in the "Unguided" reply), honor that over the default. Otherwise proceed silently.
 
@@ -103,11 +104,11 @@ Read the project's `package.json`, build config (`vite.config.*`, `next.config.*
 | Signal | How to detect |
 |--------|--------------|
 | **Framework** | `next` in deps → Next.js. `@tanstack/react-start` in deps → TanStack Start. `vite` in devDeps → Vite. `react-scripts` → CRA. |
-| **Compiler** | `@vitejs/plugin-react-swc` → SWC. `@vitejs/plugin-react` (no `-swc`) → Babel, **but only on plugin-react v5 or lower**. `@vitejs/plugin-react@6+` dropped the `babel` option — on v6+, treat as SWC and use `references/vite-swc.md` (switching the project to `@vitejs/plugin-react-swc` + `@lingui/swc-plugin` as part of Step 4). Next.js → SWC unless `.babelrc` exists. TanStack Start → Babel (uses `@vitejs/plugin-react`). |
+| **Compiler** | `@vitejs/plugin-react-swc` → SWC. `@vitejs/plugin-react` (no `-swc`) → Babel, **but only on plugin-react v5 or lower**. `@vitejs/plugin-react@6+` dropped the `babel` option — on v6+, treat as SWC and use `references/vite-swc.md` (switching the project to `@vitejs/plugin-react-swc` + `@lingui/swc-plugin` as part of Step 4). **TanStack Start exception:** if `@tanstack/react-start` is in deps *and* `@vitejs/plugin-react` is v6+ (or `@vitejs/plugin-react-swc` is already present), route to `references/tanstack-start-swc.md` — `vite-swc.md` doesn't cover Start's SSR wiring. TanStack Start on `@vitejs/plugin-react@5` still uses `references/tanstack-start.md` (Babel). Next.js → SWC unless `.babelrc` exists. |
 | **Router** | `@tanstack/react-start` → TanStack Start (SSR). `@tanstack/react-router` (without `react-start`) → TanStack Router (client-only). `react-router` → React Router. Next.js → file-based routing. |
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
-| **Route entry points** | Next.js App Router: `src/app/**/page.tsx` exists. TanStack Router / TanStack Start (file-based): `src/routes/` directory exists — Start allows customizing this via `tanstackStart({ router: { routesDirectory } })` in `vite.config.ts`, check there if `src/routes/` is absent. React Router v7 framework mode: `app/routes/` exists. If none found → plain SPA (no file-based routing). |
+| **Route entry points** | Next.js App Router: `src/app/**/page.tsx` exists. TanStack Router / TanStack Start (file-based): `src/routes/` directory exists — Start allows customizing this via `tanstackStart({ router: { routesDirectory } })` in `vite.config.ts`, check there if `src/routes/` is absent. React Router v7 framework mode: `app/routes/` exists. React Router v7 declarative mode (e.g., `<BrowserRouter>` or `createBrowserRouter([...])` in `src/main.tsx` or `src/App.tsx`, and no `app/routes/` directory): treat as plain SPA — use `references/vite-babel.md` (or `references/vite-swc.md` on `@vitejs/plugin-react@6+`). If none found → plain SPA (no file-based routing). |
 | **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
 | **Current branch** | `git branch --show-current` — record the branch name. |
 
@@ -127,7 +128,8 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 Based on the detection, pick the right variant reference file:
 
 - **Next.js App Router** → read `references/nextjs-app-router.md`
-- **TanStack Start** → read `references/tanstack-start.md`
+- **TanStack Start** (Babel, `@vitejs/plugin-react@5`) → read `references/tanstack-start.md`
+- **TanStack Start** (SWC, `@vitejs/plugin-react@6+` or `@vitejs/plugin-react-swc`) → read `references/tanstack-start-swc.md`
 - **Vite + SWC** (including TanStack Router client-only, React Router, plain Vite) → read `references/vite-swc.md`
 - **Vite + Babel** → read `references/vite-babel.md`
 
@@ -161,6 +163,7 @@ Use the project's existing package manager. The packages to install depend on th
 | `@lingui/react` | runtime | React bindings (`I18nProvider`, hooks) |
 | `@lingui/macro` | runtime | Compile-time macros (`Trans`, `t`, `msg`) |
 | `@lingui/cli` | dev | CLI for extract/compile commands |
+| `@lingui/conf` | dev | TypeScript types for `lingui.config.ts` — **required when the project has TypeScript** (needed for `import type { LinguiConfig } from '@lingui/conf'` in a typed config) |
 
 Additional packages (compiler plugin, build tool plugin) are specified in the reference file.
 
@@ -217,6 +220,46 @@ Adjust the file extension (`.tsx` vs `.jsx` / `.ts` vs `.js`) to match the proje
 Shared components imported by multiple pages will have their strings duplicated across each page's catalog. This is the expected trade-off — smaller per-page bundles at the cost of slightly larger total catalog size.
 
 > The experimental extractor is labeled "experimental" in Lingui v4 but is stable for production use.
+
+#### Before first extract: seed route-scoped catalog stubs
+
+**Required whenever routes use `import(\`./locales/{route}/${locale}.ts\`)` (the per-page runtime loading pattern shown in the reference files).** Skip this if you chose the merged-catalog variant below — `catalogsMergePath` collapses the per-route dynamic imports into one, so no route-level stubs are needed.
+
+Lingui's per-page extractor resolves every dynamic `import()` it encounters with esbuild *before* it writes any catalog files. On a first run — when `src/routes/about.tsx` does `await import(\`./locales/about/${locale}.ts\`)` but no `locales/about/` directory exists yet — esbuild aborts with either:
+
+- `Could not resolve import(...)`, or
+- `No matches for the glob in ./locales/${locale}.ts`
+
+...and `lingui extract-experimental` exits before generating anything. The fix is a one-time bootstrap: for every route that declares `import(\`./locales/{route}/${locale}.ts\`)`, create a compiled-catalog stub at each target path containing a single line:
+
+```ts
+export const messages = {}
+```
+
+So a project with routes `src/routes/about.tsx` and `src/routes/dashboard.tsx` and locales `en`, `fr` needs four stubs:
+
+```
+src/routes/locales/about/en.ts
+src/routes/locales/about/fr.ts
+src/routes/locales/dashboard/en.ts
+src/routes/locales/dashboard/fr.ts
+```
+
+After the first `lingui extract-experimental` + `lingui compile` cycle, the extractor overwrites these stubs with real compiled catalogs.
+
+If you don't know the full route list yet, grep the routes directory for the dynamic-import pattern to enumerate them — adapt this to the project's shell and locales:
+
+```sh
+# Match routes that call import(`./locales/<name>/${...}.ts`)
+grep -rlE "import\\(\\\`\\./locales/" src/routes/ | while read f; do
+  name="$(basename "$f" .tsx)"
+  dir="$(dirname "$f")/locales/$name"
+  mkdir -p "$dir"
+  for loc in en fr; do echo "export const messages = {}" > "$dir/$loc.ts"; done
+done
+```
+
+The one-liner is a convenience — the load-bearing instruction is the explicit "create these files" above, since routes may use non-default paths (e.g. `./locales/profile/${locale}.ts` in `src/routes/user/settings.tsx`). Verify the seeded paths match the `import()` specifiers in each route file.
 
 **Optional: merge per-page catalogs at compile time.** If you want per-page extraction (for translator workflow — translators see only the strings relevant to each page) but prefer loading a single catalog file per locale at runtime (simpler provider wiring, no per-route dynamic imports), add `catalogsMergePath` to the config:
 
@@ -331,7 +374,12 @@ Follow the variant-specific reference file for this step. It tells you exactly h
 1. List the specific files you will modify and describe what changes you will make.
 2. Ask the user to confirm before proceeding.
 
-Follow the variant-specific reference file for this step. The reference file presents a **locale routing strategy choice** — wait for the user to choose before proceeding. The provider pattern differs significantly between standard React apps (simple `I18nProvider` wrapper) and Next.js App Router (RSC-aware setup with `setI18n` + client provider + middleware), and also depends on the chosen routing strategy.
+Follow the variant-specific reference file for this step. The reference file presents a **locale routing strategy choice**.
+
+**Guided mode**: present the routing strategy options from the reference file and wait for the user's answer.
+**Unguided mode**: apply the default from the "Unguided defaults" table (Strategy 1 — unprefixed source locale, `/about` = source, `/$locale/about` = target) silently; note the applied value in the end-of-run summary.
+
+The provider pattern differs significantly between standard React apps (simple `I18nProvider` wrapper) and Next.js App Router (RSC-aware setup with `setI18n` + client provider + middleware), and also depends on the chosen routing strategy.
 
 For **standard React apps** (Vite, CRA), the provider goes in:
 - `main.tsx` if the app has no router
@@ -459,7 +507,9 @@ The `recommended` preset enables:
 
 ## Step 8: Scaffold and Verify
 
-Run extraction to generate the initial catalog files:
+Run extraction to generate the initial catalog files.
+
+> **Per-page catalogs only:** Before running `lingui extract-experimental` for the first time, seed the route-scoped catalog stubs described in Step 3 ("Before first extract: seed route-scoped catalog stubs"). Without the stubs, esbuild fails to resolve the per-route dynamic imports and the first extract aborts before writing anything. Skip if you used `catalogsMergePath` or a single global catalog.
 
 **Per-page catalogs:**
 ```bash
@@ -534,7 +584,11 @@ Check whether `CLAUDE.md` exists at the project root.
   @.claude/skills/lingui-code/SKILL.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/lingui-code/SKILL.md` to your CLAUDE.md so the Lingui coding rules auto-load every session") and wait for confirmation before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**:
+  - **Guided mode**: describe the change ("I'll append `@.claude/skills/lingui-code/SKILL.md` to your CLAUDE.md so the Lingui coding rules auto-load every session") and wait for confirmation before writing.
+  - **Unguided mode**: apply the change silently (the "Unguided defaults" rule suspends "Modifies existing file" gates); list `CLAUDE.md` in the end-of-run summary as modified.
+
+  Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
 

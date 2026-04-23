@@ -1,8 +1,12 @@
-# TanStack Start Setup
+# TanStack Start Setup (SWC)
 
-This covers projects built on [TanStack Start](https://tanstack.com/start) — the full-stack SSR framework from the TanStack team, built on TanStack Router + Vite. Start renders HTML on every request, so locale must be resolved server-side to avoid hydration mismatches and flash-of-untranslated-content (FOUC). The setup differs from a plain TanStack Router SPA in several places: a server middleware reads the locale, the root document lives in `__root.tsx` (not `index.html`), and the language switcher writes a cookie that the server reads on the next request.
+This covers projects built on [TanStack Start](https://tanstack.com/start) that use `@vitejs/plugin-react-swc` — typically because `create-tanstack-start` now installs `@vitejs/plugin-react@6`, which dropped the `babel` option, making the Babel-based Lingui macro integration a silent no-op. The SWC variant avoids that cliff entirely.
 
-**Detection signal:** `@tanstack/react-start` in `dependencies`. Start uses `@vitejs/plugin-react` (Babel), not the SWC variant.
+Start renders HTML on every request, so locale must be resolved server-side to avoid hydration mismatches and flash-of-untranslated-content (FOUC). The setup differs from a plain TanStack Router SPA in several places: a server middleware reads the locale, the root document lives in `__root.tsx` (not `index.html`), and the language switcher writes a cookie that the server reads on the next request.
+
+**Detection signal:** `@tanstack/react-start` in `dependencies` **and** `@vitejs/plugin-react@6+` (or `@vitejs/plugin-react-swc`) in devDeps. If the project is on `@vitejs/plugin-react@5`, use `references/tanstack-start.md` (the Babel variant) instead — that path is still supported.
+
+> **Switching from `@vitejs/plugin-react` to `@vitejs/plugin-react-swc`.** If the project currently has `@vitejs/plugin-react@6+`, remove it and install `@vitejs/plugin-react-swc`. Both expose a default-export factory called `react` / `viteReact`, so the `vite.config.ts` edit below replaces the import source and otherwise keeps the same call site. Describe this swap to the user before touching `package.json` — it's a dev-dep change, not a breaking one, but it should be explicit.
 
 ## Packages
 
@@ -10,27 +14,30 @@ In addition to the core packages from Step 2, install:
 
 | Package | Type | Purpose |
 |---------|------|---------|
-| `@lingui/babel-plugin-lingui-macro` | dev | Babel macro transform |
+| `@lingui/swc-plugin` | dev | SWC macro transform |
 | `@lingui/vite-plugin` | dev | Vite integration for catalog compilation |
 
 **Example (npm):**
 
 ```bash
 npm install @lingui/core @lingui/react @lingui/macro
-npm install -D @lingui/cli @lingui/babel-plugin-lingui-macro @lingui/vite-plugin
+npm install -D @lingui/cli @lingui/swc-plugin @lingui/vite-plugin @vitejs/plugin-react-swc
+npm uninstall @vitejs/plugin-react   # only if it was present
 ```
+
+**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema or plugin invocation error, look up the compatible version at https://plugins.swc.rs and pin it exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. See "SWC plugin version mismatch" in the main skill's Common Gotchas.
 
 > **No `@lingui/detect-locale`.** That library only works in the browser (`navigator`, `localStorage`, `window.location`). Under SSR it would throw on the server or return a wrong value, producing a hydration mismatch. Start resolves locale from the request headers and cookie instead — see "Server Middleware" below.
 
 ## Build Tool Integration (Step 4)
 
-**This modifies `vite.config.ts`.** Describe the changes to the user before making them: adding `@lingui/babel-plugin-lingui-macro` to the `viteReact` plugin's Babel config and adding `lingui()` as a top-level Vite plugin. The existing `tanstackStart()` plugin must stay, and `viteReact()` must remain **after** `tanstackStart()` — the Start docs state this explicitly: "react's vite plugin must come after start's vite plugin."
+**This modifies `vite.config.ts`.** Describe the changes to the user before making them: swapping the React plugin import to `@vitejs/plugin-react-swc`, adding `@lingui/swc-plugin` to the `react()` plugin's `plugins` array, and adding `lingui()` as a top-level Vite plugin. The existing `tanstackStart()` plugin must stay, and the React plugin must remain **after** `tanstackStart()` — the Start docs state this explicitly: "react's vite plugin must come after start's vite plugin." The same ordering rule applies to the SWC variant.
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import viteReact from '@vitejs/plugin-react'
+import viteReact from '@vitejs/plugin-react-swc'
 import { lingui } from '@lingui/vite-plugin'
 
 export default defineConfig({
@@ -44,16 +51,14 @@ export default defineConfig({
       },
     }),
     viteReact({
-      babel: {
-        plugins: ['@lingui/babel-plugin-lingui-macro'],
-      },
+      plugins: [['@lingui/swc-plugin', {}]],
     }),
     lingui(),
   ],
 })
 ```
 
-If the project already has Babel plugins configured in the `viteReact()` call, add `@lingui/babel-plugin-lingui-macro` to the existing array. Do not reorder other plugins — preserve any `tailwindcss()`, `nitro()`, or custom plugins that were already present.
+If the project already has SWC plugins configured in the `viteReact()` call, add `['@lingui/swc-plugin', {}]` to the existing `plugins` array. Do not reorder other plugins — preserve any `tailwindcss()`, `nitro()`, or custom plugins that were already present.
 
 If `tanstackStart()` is already configured with a `router` block (e.g. `routesDirectory`, `generatedRouteTree`, `entry`, `basepath`), merge `routeFileIgnorePattern: 'locales/'` into that existing block rather than overwriting it. The `router` key accepts both the Start-specific options (`entry`, `basepath`) and the full set of `@tanstack/router-plugin` config options — `routeFileIgnorePattern`, `routesDirectory`, `generatedRouteTree`, etc. are forwarded through.
 
@@ -671,7 +676,9 @@ export const sendConfirmationEmail = createServerFn({ method: 'POST' }).handler(
 ## Common gotchas specific to Start
 
 - **Hydration mismatch on `<html>`**: if you set `document.documentElement.lang` in client code (e.g., an `activateLocale` that mutates the DOM), it will fight the server-rendered `<html lang>`. Keep DOM mutation out of `src/i18n/index.ts` — the server renders the correct attributes on first byte.
-- **Plugin order**: `@vitejs/plugin-react` must come **after** `tanstackStart()` in `vite.config.ts`. Reversing the order breaks Start's code splitting and server/client boundary handling.
+- **Plugin order**: `@vitejs/plugin-react-swc` must come **after** `tanstackStart()` in `vite.config.ts`. The rule is identical to the Babel variant — "react's vite plugin must come after start's vite plugin." Reversing the order breaks Start's code splitting and server/client boundary handling.
+- **SWC plugin silently not transforming macros**: if `<Trans>` renders as raw JSX at runtime (e.g. the extracted key rather than the translated string, or a `ReferenceError`), the SWC plugin isn't being picked up. Verify the `plugins` array is on the `viteReact()` call itself (not on `tanstackStart()`), that the plugin tuple is `['@lingui/swc-plugin', {}]` (string + options object), and that `@lingui/swc-plugin`'s `swc_core` version matches the one shipped by `@vitejs/plugin-react-swc` — see the version-pinning note in Packages above.
+- **Leftover `@vitejs/plugin-react`**: if both `@vitejs/plugin-react` and `@vitejs/plugin-react-swc` are present in devDeps, Vite may resolve either depending on import order and lockfile state. Uninstall `@vitejs/plugin-react` after switching — a stale install is the most common cause of "my SWC config is correct but macros still don't transform."
 - **Missing `src/start.ts` before the router builds**: `createStart(...)` must be imported somewhere in the server bundle (often via `src/server.ts` / `src/server-entry.ts` re-exporting or importing `src/start.ts`). If `startInstance` is unused, Vite tree-shakes the middleware away — verify that your server entry imports `./start` (even as a side-effect import: `import './start'`).
 - **Catalog missing on a route**: `lingui extract-experimental` generates co-located `locales/{route}/{locale}.po` files on first extraction. If a route's `beforeLoad` fails with "Cannot find module ./locales/...", run `npm run lingui:extract` followed by `npm run lingui:compile` before starting the dev server.
 

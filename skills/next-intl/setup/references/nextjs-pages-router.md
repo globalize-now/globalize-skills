@@ -59,9 +59,18 @@ This file centralizes the locale definitions. The actual locale routing is handl
 
 Ask the user for their locale list and default locale at this step.
 
-## Steps 4 and 6: Skipped
+## Step 4: Stub `request.ts`
 
-Pages Router does not use `request.ts` -- messages are loaded via `getStaticProps` in each page (see "Message Loading" section below).
+Pages Router loads messages through `getStaticProps` (see "Message Loading" section below), not through `request.ts`. However, since next-intl 4.9, `next-intl/plugin` asserts that `i18n/request.ts` exists at module load and throws `Could not locate request configuration module` otherwise. Create a one-line stub to satisfy the load-time check:
+
+```ts
+import {getRequestConfig} from 'next-intl/server';
+export default getRequestConfig(async () => ({messages: {}}));
+```
+
+Place this at `src/i18n/request.ts` (or `i18n/request.ts` if the project does not use a `src/` directory). The body is a no-op: the default export is never invoked at runtime on Pages Router, since messages flow through page-level data-fetching functions. The stub exists purely to get past the plugin's startup assertion.
+
+## Step 6: Skipped
 
 Pages Router does not use middleware for locale routing -- locale routing is handled by the built-in `i18n` config in `next.config.js`, which Next.js processes automatically. The `i18n` config is set up in Step 5 alongside the next-intl plugin.
 

@@ -90,6 +90,8 @@ For plain SPAs without file-based routing, skip the routing choice — use optio
 
 **This pattern modifies the root route file** (`__root.tsx` for TanStack Router, root layout for React Router) by wrapping it with `I18nProvider`. Show the user what changes before making them.
 
+> **Heads-up for Step 8 (first extract):** the per-route dynamic imports shown below (`import(\`./locales/{route}/${locale}.ts\`)`) must resolve at extract time, so every target path needs an `export const messages = {}` stub on first run. See the main `SKILL.md` Step 3 subsection *"Before first extract: seed route-scoped catalog stubs"* — follow it before running `lingui extract-experimental` the first time.
+
 #### Strategy 1: Unprefixed source locale (per-page catalogs)
 
 Source locale routes live at `/about`, target locale routes at `/$locale/about`. The i18n setup reads the locale from the URL path:

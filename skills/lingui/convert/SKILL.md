@@ -235,6 +235,8 @@ Scan files systematically for these patterns. Apply the confidence tiers to deci
 
   `i18n.number` and `i18n.date` delegate to `Intl.NumberFormat` / `Intl.DateTimeFormat` internally using the active locale — no manual `new Intl.*Format(locale, options)` construction needed. If the format object is reused across many calls for performance, move it into a `useMemo(() => new Intl.NumberFormat(i18n.locale, options), [i18n.locale, options])` inside the component instead of top-level.
 
+  **After wrapping — remove the now-dead helpers.** Once all call-sites use `i18n.number()` / `i18n.date()` (or an ICU macro for plurals), the hand-rolled helpers that encoded the same logic — module-scope `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` constants, `pluralizeItems`, `replyLine`, any format-switch `if/else` bodies — become dead code. Delete them together with their imports. Leaving them gives the appearance of duplicate sources of truth; removing them confirms the migration is complete. Grep for the helper's name (or `new Intl.NumberFormat` / `new Intl.DateTimeFormat` at module scope) to verify no stragglers remain.
+
 - **Imported strings referenced in JSX**: `<h1>{title}</h1>` where `title` is an imported identifier. Trace the import to its definition; if it resolves to a bare string literal (e.g. `export const title = "Welcome"`), flag **the definition site**, not the JSX site — that is where the wrapping goes.
 
   **Disambiguation — a JSX expression `{foo}` can be:**
@@ -657,6 +659,15 @@ After all strings are wrapped and extraction succeeds, do a final pass to catch 
 4. Re-run `npx lingui extract` to verify comments appear in the catalog
 
 This pass catches strings that looked clear in source code but appear ambiguous in isolation in the PO file — which is how translators actually see them. Do not add comments to every string — full sentences with clear meaning still get skipped. Do not second-guess existing comments.
+
+---
+
+## Follow-ups after convert completes
+
+Surface these items to the user at the end of the run. They're out of scope for automatic conversion but commonly needed after a wrap pass:
+
+- **Locale-aware navigation**: audit remaining `<a href="/...">` tags and convert to a locale-aware component (e.g. `<Link>` from your router that preserves the locale prefix — TanStack Start's `<Link>`, React Router's `<Link>`, Next.js's `next/link` paired with a locale-aware href). Plain `<a>` bypasses the locale prefix and sends users to the source-locale URL, dropping them out of their active locale on click.
+- **Any library-specific items** you noticed during the run (skipped files, ambiguous keys deferred from Step 9, tests that need wrapper updates) — list them here so the user knows what's left.
 
 ---
 

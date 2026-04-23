@@ -4,6 +4,41 @@ This covers Next.js 13+ with App Router and React Server Components (RSC). The k
 
 ---
 
+## Next.js version: async vs sync `params`
+
+Before rewriting any page/layout that destructures route `params`, detect the major version from `package.json`'s `next` dependency. The shape changed between Next 14 and Next 15; emitting the wrong one fails type-check.
+
+Examples in this file assume **Next.js 15+**, where `params` is a `Promise`:
+
+```tsx
+export default async function Page({
+  params
+}: {
+  params: Promise<{locale: string}>;
+}) {
+  const {locale} = await params;
+  const t = await getTranslations('Dashboard');
+  // ...
+}
+```
+
+On **Next.js 13–14**, `params` is a plain object — no `Promise`, no `await`:
+
+```tsx
+export default async function Page({
+  params: {locale}
+}: {
+  params: {locale: string};
+}) {
+  const t = await getTranslations('Dashboard');
+  // ...
+}
+```
+
+The component itself stays `async` in both versions because `getTranslations` is async. `setRequestLocale(locale)` / `unstable_setRequestLocale(locale)` runs after locale is resolved, so the shape change cascades through every server-component page and `generateMetadata` under `app/[locale]/...`. Inline reminders appear lower in the file; this section is the canonical reference.
+
+---
+
 ## Which API works where
 
 | Function | Server Components | Client Components |
@@ -97,6 +132,12 @@ export async function generateMetadata({params}: {params: Promise<{locale: strin
 ```
 
 For Next.js 13-14 (synchronous params): use `params: {locale: string}` without `await`.
+
+---
+
+## Root `app/layout.tsx` metadata
+
+The root layout at `app/layout.tsx` (above `app/[locale]/`) renders before the locale is known. Do not call `setRequestLocale` / `getTranslations` there. For static metadata (`<title>`, `<description>`) in this outer layout, leave it as English or move it down into `app/[locale]/layout.tsx`'s `generateMetadata` — where locale is available and messages can be loaded. Dynamic `<html lang>` belongs in `app/[locale]/layout.tsx`, not the root.
 
 ---
 

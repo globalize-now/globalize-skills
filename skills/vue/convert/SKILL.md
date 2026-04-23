@@ -262,6 +262,8 @@ Scan `.vue` and `.ts` files systematically. Apply the confidence tiers to decide
 
   Requires `numberFormats.{locale}.currency` to be registered on the i18n instance (seeded in `vue-setup` Step 3). If the format isn't registered yet, either (a) register it alongside the conversion edit, or (b) fall back to `n(amount, { style: 'currency', currency: 'USD' })` as an inline format. Do not reintroduce `new Intl.NumberFormat(locale.value, ...)` inside the component — `n()` and `d()` already delegate to those APIs, caching per-locale.
 
+  **After wrapping — remove the now-dead helpers.** Once all call-sites use `n()` / `d()` (or an ICU `plural` / `select` key in the catalog), the hand-rolled helpers that encoded the same logic — module-scope `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` constants, `pluralizeItems`, `replyLine`, any format-switch `if/else` bodies — become dead code. Delete them together with their imports. Leaving them gives the appearance of duplicate sources of truth; removing them confirms the migration is complete. Grep for the helper's name (or `new Intl.NumberFormat` / `new Intl.DateTimeFormat` at module scope) to verify no stragglers remain.
+
 ### Flag with judgment (medium confidence)
 
 Review these and wrap only if they appear in the UI:
@@ -290,6 +292,8 @@ Review these and wrap only if they appear in the UI:
 ## Step 6: Plurals, Select, SelectOrdinal
 
 ICU MessageFormat handles plurals, gender selection, and ordinal positions. This is the most commonly-misused feature — get it right the first time. Never use vue-i18n's native pipe-plural syntax (`"one | many"`); it bakes English plural rules into source strings.
+
+**Framework gate — check before writing.** If Step 1 detected `framework === 'nuxt'` AND `catalogFormat === 'json'` AND the project uses `@nuxtjs/i18n` with the default `langDir` + `lazy` setup, DO NOT write ICU `plural` / `select` / `selectordinal` keywords into the JSON catalog. Nuxt's default JSON pre-compiler (via `@intlify/unplugin-vue-i18n`) cannot parse ICU keywords at build time and fails the entire locale file — users see the breakage the first time they ship a plural. Route ICU messages to SFC `<i18n>` custom blocks in the consuming component instead, and keep JSON entries interpolation-only (`{count}`, `{name}`). See `references/nuxt.md` § "When you hit ICU" for the decision recipe and a copy-paste example. The escape hatches (static imports, build-config changes) all require user consent — surface them, do not apply silently.
 
 ### Plurals
 
@@ -768,6 +772,16 @@ No inline comments to back-fill (see Step 7 — JSON mode does not emit `$<key>`
 4. Do not rewrite JSON entries automatically. The user decides which keys to rename.
 
 This pass catches strings that looked fine in the source but appear ambiguous in isolation in the catalog — which is how translators actually see them.
+
+---
+
+## Follow-ups after convert completes
+
+Surface these items to the user at the end of the run. They're out of scope for automatic conversion but commonly needed after a wrap pass:
+
+- **Locale-aware navigation**: audit remaining `<a href="/...">` tags and convert to `<router-link>` (vue-router) or `<NuxtLink>` (Nuxt). Pair with the project's locale-prefix strategy — `@nuxtjs/i18n` exposes `$localePath()` / `localePath()` for composing locale-aware hrefs; in plain Vue, prepend the active locale from `useI18n().locale.value` when building the `to` prop. Plain `<a>` bypasses the locale prefix and sends users to the source-locale URL, dropping them out of their active locale on click.
+- **Manual follow-up list**: Options-API SFCs and `server/api/*` files that subagents skipped (collected in Step 2 / Step 7). Surface them so the user knows which files still need hand-conversion.
+- **Any other items** you noticed during the run (ambiguous JSON keys deferred from Step 9, component tests that need an `i18n` plugin installed in the mount options) — list them here so the user knows what's left.
 
 ---
 

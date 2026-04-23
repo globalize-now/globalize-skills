@@ -176,7 +176,10 @@ Then continue with Steps 2–8 below, using the variant-specific instructions fr
 
 ### Catalog Format
 
-Ask the user which translation-file format to use:
+**Guided mode**: present the catalog format choice and wait for the user's answer.
+**Unguided mode**: apply the default from the "Unguided defaults" table (`JSON` for Catalog format) silently; note the applied value in the end-of-run summary.
+
+In guided mode, ask the user which translation-file format to use:
 
 > **Which catalog format should translations use?**
 > 1. **JSON** (default) — simple, widely supported, maps naturally to the vue-i18n runtime shape. No build-time transform.
@@ -300,7 +303,9 @@ export function getDirection(locale: string): 'ltr' | 'rtl' {
 }
 
 export async function setLocale(locale: Locale) {
-  if (!i18n.global.availableLocales.includes(locale)) {
+  // Skip the dynamic import for the source locale — it's already statically imported above.
+  // Without this guard, Vite warns that the source catalog is both static- and dynamic-imported.
+  if (locale !== sourceLocale && !i18n.global.availableLocales.includes(locale)) {
     // Swap the extension to '.po' in both the static import above and this dynamic
     // import when catalogFormat === 'po'. The runtime shape is identical either way.
     const messages = (await import(`./locales/${locale}.json`)).default

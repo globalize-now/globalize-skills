@@ -6,6 +6,41 @@ This covers Next.js 13+ projects using the App Router with React Server Componen
 
 > **Path-alias handling.** Every code sample below uses `@/i18n/routing`, `@/i18n/navigation`, `@/components/...`, etc. Before emitting them, check `tsconfig.json` for `compilerOptions.baseUrl` + `compilerOptions.paths` entries that map `@/*` to `./src/*` (or equivalent). If the alias is **not** configured, rewrite every `@/...` import in the emitted code to a relative path based on the destination file's location (`../../i18n/routing`, `../i18n/routing`, etc.) rather than editing `tsconfig.json`. Touching `tsconfig.json` is out of scope for this skill.
 
+## Next.js version: async vs sync `params`
+
+**Detect the major version from `package.json`'s `next` dependency before emitting any file that destructures route `params`.** The shape changed between Next 14 and Next 15, and every server-component page under `[locale]` is affected.
+
+The code examples below assume **Next.js 15+**, where route segment `params` is a `Promise` you must `await`:
+
+```tsx
+export default async function LocaleLayout({
+  children,
+  params
+}: {
+  children: React.ReactNode;
+  params: Promise<{locale: string}>;
+}) {
+  const {locale} = await params;
+  // setRequestLocale(locale), NextIntlClientProvider, etc.
+}
+```
+
+On **Next.js 13–14**, `params` is a plain object — drop the `Promise` wrapper and the `await`:
+
+```tsx
+export default function LocaleLayout({
+  children,
+  params: {locale}
+}: {
+  children: React.ReactNode;
+  params: {locale: string};
+}) {
+  // setRequestLocale(locale), NextIntlClientProvider, etc.
+}
+```
+
+The same split applies to every `page.tsx` / `layout.tsx` / `generateMetadata` under `app/[locale]/...`. `setRequestLocale(locale)` (or `unstable_setRequestLocale(locale)` on older next-intl) is called after locale is resolved, so the shape change cascades through the whole server tree. Inline reminders appear throughout the snippets below; this section is the canonical reference.
+
 ## Packages
 
 Only one package is required:
