@@ -8,35 +8,33 @@ Nuxt-specific guidance for the `vue-convert` skill. Covers Nuxt 3 and Nuxt 4 pro
 
 The main SKILL.md Step 6 gates ICU emission on framework. This section is the Nuxt-specific decision recipe. Apply it before writing any catalog entry that uses `plural`, `select`, or `selectordinal`.
 
-**Default — emit ICU directly into the central catalog.** The setup skill's Nuxt path is configured so the runtime `messageCompiler` sees ICU strings before they're evaluated:
+**Default — PO catalog routes ICU through the runtime compiler.** If the setup skill configured `catalogFormat === 'po'`, write `plural` / `select` / `selectordinal` entries straight into the locale `.po` file using the namespacing rules from Step 7. PO files pass through the `poLoader` Vite plugin (which runs with `enforce: 'pre'` before `@nuxtjs/i18n`'s own transform), so the raw ICU string reaches the custom `messageCompiler` at runtime.
 
-- **PO catalog** (`catalogFormat === 'po'` in the setup skill): ICU strings pass through the runtime compiler unchanged. Write `plural` / `select` / `selectordinal` entries straight into the locale `.po` file, following the namespacing rules from Step 7.
-- **JSON catalog** with `@nuxtjs/i18n@^10` (the version the setup skill now pins): v10's per-locale `file:` form routes JSON messages through the runtime compiler too. Write ICU straight into the locale `.json`.
+**JSON catalog path is not verified ICU-safe on Nuxt.** `@nuxtjs/i18n`'s lazy-loading pipeline has historically pre-compiled JSON locale files at build time using the default (non-ICU) compiler — the `bundle.dropMessageCompiler` option on v10 hints this pre-compile is still the default path. Until the combination "ICU plural in JSON + v10 + default bundle settings" is validated end-to-end against a real Nuxt build, treat JSON as interpolation-only on Nuxt. When you hit an ICU keyword with a JSON catalog, surface this to the user:
 
-Use whichever format the setup skill produced — don't second-guess it during conversion.
+1. Re-run `vue-setup` and pick PO — unblocks ICU under the lazy path immediately.
+2. Drop `langDir` + `lazy` and import locale JSON statically (Vite SPA pattern). The custom `messageCompiler` then handles ICU end-to-end, at the cost of `@nuxtjs/i18n`'s SSR-aware lazy loading.
+3. Leave the string interpolation-only and flag the plural for manual catalog authoring with a workaround.
+
+Both options 1 and 2 require user consent — surface them, do not apply silently.
 
 **Do NOT route ICU into SFC `<i18n>` blocks.** Custom blocks are transformed by `@intlify/unplugin-vue-i18n`'s default (non-ICU) compiler at build time, regardless of the custom `messageCompiler` in `i18n.config.ts`. Emitting `plural` / `select` into an `<i18n>` block triggers `unplugin-vue-i18n:resource` build failures (`error code: 2`). This applies on every `@nuxtjs/i18n` version.
 
 **`<i18n>` blocks — opt-in for non-ICU, component-scoped strings only.** Plain interpolation or bare strings are safe in a custom block if a team prefers colocation. Flag this as a user-driven choice; do not route strings there by default. The central catalog stays the source of truth.
 
-**Legacy escape hatches (only when the project still runs `@nuxtjs/i18n@^9` with JSON catalogs).** v9's lazy-loading pipeline pre-compiles JSON at build time via Intlify's default compiler, so ICU keywords fail there. If you can't upgrade:
-
-1. Re-run `vue-setup` and pick PO format — unblocks ICU under the v9 lazy path immediately.
-2. Drop `langDir` + `lazy` and import locale JSON statically (Vite SPA pattern). The custom `messageCompiler` then handles ICU end-to-end, at the cost of `@nuxtjs/i18n`'s SSR-aware lazy loading.
-
-All three legacy options require user consent — surface them, do not apply silently.
-
-See § "ICU workarounds (advanced)" below for the root-cause explanation that motivated the v10 pin.
+See § "ICU workarounds (advanced)" below for the root-cause explanation.
 
 ---
 
 ## ICU workarounds (advanced)
 
-Root cause (applies to `@nuxtjs/i18n@^9`): the v9 module delegates lazy-JSON handling to `@intlify/unplugin-vue-i18n`, which pre-compiles every lazy locale file at build time using Intlify's **default** (non-ICU) compiler. The custom `messageCompiler` registered in `i18n.config.ts` only runs on messages evaluated at runtime, but the lazy-loaded bundle has already been pre-compiled by the time it lands on the client. Build-time pre-compilation of `{count, plural, one {...} other {...}}` fails with `error code: 2` and breaks the whole locale file. The `compilation` block on the v9 module only surfaces `strictMessage` and `escapeHtml` — there is no flag to bypass the pre-compile.
+Root cause: `@nuxtjs/i18n` delegates lazy-JSON handling to `@intlify/unplugin-vue-i18n`, which pre-compiles every lazy locale file at build time using Intlify's **default** (non-ICU) compiler. The custom `messageCompiler` registered in `i18n.config.ts` only runs on messages evaluated at runtime, but the lazy-loaded bundle has already been pre-compiled by the time it lands on the client. Build-time pre-compilation of `{count, plural, one {...} other {...}}` fails with `error code: 2` and breaks the whole locale file.
 
-`@nuxtjs/i18n@^10` reorganized lazy loading around per-locale `file:` declarations and routes JSON through the runtime compiler, which is why the setup skill pins v10 and the conversion path above defaults to central-catalog ICU. SFC `<i18n>` blocks remain transformed by the default (non-ICU) compiler on every version — that is a separate code path from lazy-JSON loading, and moving ICU there is never the right answer.
+The v10 migration removed the top-level `lazy` option and moved to per-locale `file:` entries, but **does not document a JSON-path bypass for pre-compilation**. The `bundle.dropMessageCompiler` flag surfaces the inverse: opting *into* pre-compiling every resource, which presumes the default path still pre-compiles JSON. Treat the v10 JSON ICU path as unverified until someone ships a green Nuxt build with an ICU plural in a `.json` catalog.
 
-Interpolation (`{name}`) works fine under v9's default bundling — it's only the ICU-specific keywords (`plural`, `select`, `selectordinal`) that trip the non-ICU pre-compile on the v9 lazy path.
+PO files are the documented ICU-safe catalog on Nuxt because the setup skill's `poLoader` Vite plugin runs with `enforce: 'pre'` and intercepts `.po` imports before the module's bundling step. The raw string then reaches the runtime compiler unchanged. SFC `<i18n>` blocks remain transformed by the default (non-ICU) compiler on every version — that is a separate code path from lazy-JSON loading, and moving ICU there is never the right answer.
+
+Interpolation (`{name}`) works fine under default Nuxt bundling — it's only the ICU-specific keywords (`plural`, `select`, `selectordinal`) that trip the non-ICU pre-compile on the lazy JSON path.
 
 ---
 

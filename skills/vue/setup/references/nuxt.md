@@ -13,8 +13,10 @@ Install:
 
 **Do NOT install raw `vue-i18n` separately.** The module bundles a compatible version. Installing it manually risks a version mismatch.
 
+**Pin to `@nuxtjs/i18n@^10`.** v10 simplified the lazy-loading contract (removed the top-level `lazy` option and consolidated config around per-locale `file:` entries) and is the shape the snippets below emit. Older v9 usage is documented separately at the end of this file — prefer upgrading over pinning the legacy shape.
+
 ```bash
-npm install @nuxtjs/i18n intl-messageformat
+npm install @nuxtjs/i18n@^10 intl-messageformat
 ```
 
 Use the project's detected package manager (pnpm / yarn / bun) instead of `npm` if applicable.
@@ -35,14 +37,14 @@ The module resolves `langDir` relative to its own base (the `i18n/` directory in
 **This modifies `nuxt.config.ts`.** Describe the change before making it: adding `'@nuxtjs/i18n'` to `modules`, then an `i18n:` block with strategy, locales, langDir, and bundle settings.
 
 ```ts
-// nuxt.config.ts
+// nuxt.config.ts  —  shape for @nuxtjs/i18n@^10
 export default defineNuxtConfig({
   modules: ['@nuxtjs/i18n'],
   i18n: {
     defaultLocale: 'en',
     strategy: 'prefix_except_default',
     langDir: 'locales',
-    lazy: true,
+    // v10 removed the top-level `lazy` option — locale files are always lazy-loaded now.
     locales: [
       { code: 'en', language: 'en-US', file: 'en.json' },
       // Add additional locales here, e.g.:
@@ -79,7 +81,7 @@ The loader body is identical to the Vite SPA variant (see `references/vite-spa.m
 Then wire it through `nuxt.config.ts` via `vite.plugins` — **not** `modules` (it's a Vite plugin, not a Nuxt module):
 
 ```ts
-// nuxt.config.ts  (PO variant)
+// nuxt.config.ts  (PO variant)  —  shape for @nuxtjs/i18n@^10
 import { poLoader } from './i18n/poLoader'   // Nuxt 4
 // import { poLoader } from './poLoader'     // Nuxt 3
 
@@ -92,7 +94,7 @@ export default defineNuxtConfig({
     defaultLocale: 'en',
     strategy: 'prefix_except_default',
     langDir: 'locales',
-    lazy: true,
+    // v10 removed the top-level `lazy` option — locale files are always lazy-loaded now.
     locales: [
       { code: 'en', language: 'en-US', file: 'en.po' },   // note: .po extension
       // { code: 'fr', language: 'fr-FR', file: 'fr.po' },
@@ -177,13 +179,15 @@ For Nuxt 3, swap `i18n/locales/` for `locales/` at project root and put `i18n.co
 
 The main SKILL.md Step 7 ships a **non-ICU seed** for Nuxt (`{"welcome": "Welcome to {appName}"}`, no plural entry). Root cause: `@nuxtjs/i18n` delegates lazy-JSON handling to `@intlify/unplugin-vue-i18n`, which pre-compiles every lazy locale file at build time using Intlify's **default** (non-ICU) compiler. The custom `messageCompiler` registered in `i18n.config.ts` runs for messages evaluated at runtime (e.g. SFC `<i18n>` blocks, plain-string fallbacks), but the lazy-loaded bundle has already been pre-compiled by the time it lands on the client. Build-time pre-compilation of `{count, plural, one {...} other {...}}` fails with `error code: 2`.
 
-This interaction is not exposed as a single flag on `@nuxtjs/i18n`'s `compilation` block (which today only surfaces `strictMessage` and `escapeHtml`). Real escape hatches as of `@nuxtjs/i18n@9` / `@intlify/unplugin-vue-i18n@6`:
+v10 removed the top-level `lazy` option (locale files are always lazy) but the docs do not describe a JSON-path bypass for pre-compilation; `bundle.dropMessageCompiler` opts further *into* pre-compiling every resource, which is the opposite direction. Treat "ICU plural in JSON + v10 + default bundle settings" as unverified until validated end-to-end against a real build.
 
-1. **Move ICU-heavy messages into SFC `<i18n>` blocks** rather than lazy JSON. Custom blocks route through the runtime `messageCompiler` even under the default bundling path. Trade-off: loses the translator-friendly central catalog.
-2. **Drop the `langDir` + `lazy` pattern** and import locale JSON statically, the same way the Vite SPA variant does. The custom `messageCompiler` then handles ICU end-to-end. Trade-off: loses `@nuxtjs/i18n`'s SSR-aware lazy loading.
-3. **Wait for upstream.** `unplugin-vue-i18n` has an open issue thread around exposing the pre-compilation step; track the `@intlify/unplugin-vue-i18n` changelog before committing to ICU plurals on the Nuxt lazy path.
+Real escape hatches for ICU on Nuxt:
 
-Until one of those lands, keep the seed interpolation-only and advise users that ICU plurals / select require one of the workarounds above. Interpolation (`{name}`) works fine under default Nuxt bundling — it's only the ICU-specific keywords (`plural`, `select`, `selectordinal`) that trip the non-ICU pre-compile.
+1. **Switch `catalogFormat` to PO.** The `poLoader` Vite plugin runs with `enforce: 'pre'` and hands the raw PO string to the runtime `messageCompiler` unchanged. This is the documented ICU-safe path.
+2. **Drop the `langDir` lazy-loading pattern** and import locale JSON statically, the same way the Vite SPA variant does. The custom `messageCompiler` then handles ICU end-to-end. Trade-off: loses `@nuxtjs/i18n`'s SSR-aware lazy loading.
+3. **Move an individual ICU message into an SFC `<i18n>` block** ONLY if the rest of the catalog is non-ICU. Caveat: custom blocks are themselves transformed by the default (non-ICU) compiler — emitting `plural` / `select` there produces `unplugin-vue-i18n:resource` build failures. This hatch is therefore *not* a general ICU workaround and is listed only for completeness; prefer hatches 1 or 2.
+
+Until one of the lazy-path fixes lands upstream, keep the JSON seed interpolation-only and advise users that ICU plurals / select require PO or static imports. Interpolation (`{name}`) works fine under default Nuxt bundling — it's only the ICU-specific keywords (`plural`, `select`, `selectordinal`) that trip the non-ICU pre-compile.
 
 ## Provider (Step 5)
 
@@ -201,7 +205,9 @@ const i18nHead = useLocaleHead({ seo: true })
 useHead(() => ({
   htmlAttrs: {
     lang: i18nHead.value.htmlAttrs?.lang ?? 'en',
-    dir: i18nHead.value.htmlAttrs?.dir ?? 'ltr',
+    // `useHead` types `dir` as the literal union `'ltr' | 'rtl' | 'auto'`,
+    // but `useLocaleHead()` returns `string | undefined`. Narrow explicitly.
+    dir: (i18nHead.value.htmlAttrs?.dir ?? 'ltr') as 'ltr' | 'rtl' | 'auto',
   },
   link: [...(i18nHead.value.link ?? [])],
   meta: [...(i18nHead.value.meta ?? [])],
@@ -251,7 +257,10 @@ import { computed } from 'vue'
 const { locale, locales } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
 
-const availableLocales = computed(() => locales.value as { code: string; language?: string }[])
+// Use `typeof locale.value` so `loc.code` is the same `Locale` union `switchLocalePath` expects.
+const availableLocales = computed(
+  () => locales.value as Array<{ code: typeof locale.value; language?: string }>,
+)
 const displayNames = computed(() => new Intl.DisplayNames([locale.value], { type: 'language' }))
 </script>
 
@@ -326,3 +335,33 @@ function goToSettings() {
 }
 </script>
 ```
+
+## If the project already uses `@nuxtjs/i18n@^9`
+
+The skill emits v10 by default. If the project is pinned to v9 and the user does not want to upgrade, emit the following v9 shape instead of the snippets above:
+
+```ts
+// nuxt.config.ts — v9 shape
+export default defineNuxtConfig({
+  modules: ['@nuxtjs/i18n'],
+  i18n: {
+    defaultLocale: 'en',
+    strategy: 'prefix_except_default',
+    langDir: 'locales',
+    lazy: true,                                      // v9 requires this explicitly
+    locales: [
+      { code: 'en', language: 'en-US', file: 'en.json' },
+      // ...
+    ],
+    bundle: { compositionOnly: true, runtimeOnly: false, fullInstall: true },
+    compilation: { strictMessage: false },
+    vueI18n: './i18n/i18n.config.ts',
+  },
+})
+```
+
+Surface the decision to the user before writing:
+
+> Your project currently uses `@nuxtjs/i18n@^9`. v10 simplifies the lazy-loading contract and is what this skill emits by default. Upgrading is a one-line change to `package.json` + removing the `lazy: true` line. Would you like to upgrade, or emit the v9 shape?
+
+In unguided mode, prefer upgrading — but never silently bump a major-version dependency; if the project is pinned, fall back to the v9 shape and note it in the end-of-run summary.
