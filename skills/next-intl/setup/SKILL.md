@@ -416,7 +416,9 @@ Swap `format: 'json'` for `format: 'po'` in the block above and follow `referenc
 
 > **Pages Router**: Skip this step entirely. Pages Router uses the `i18n` key in `next.config.js` (configured in Step 5) instead of middleware.
 
-Create `src/middleware.ts` (or `middleware.ts` at the project root if no `src/`):
+> **Next.js version gate.** On **Next.js 16+**, this file must be named `proxy.ts` (Next 16 renamed middleware → proxy). On **Next 14 / 15**, keep the legacy name `middleware.ts`. Detect from `package.json`'s `next` dependency major version before writing. Path: `src/proxy.ts` or `src/middleware.ts` accordingly (or at project root when no `src/`).
+
+Create `src/middleware.ts` (or `middleware.ts` at the project root if no `src/`) — or `proxy.ts` on Next 16+:
 
 ```ts
 import createMiddleware from 'next-intl/middleware';

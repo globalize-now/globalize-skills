@@ -4,7 +4,14 @@ This covers Next.js 13+ projects using the App Router with React Server Componen
 
 > **Catalog format note:** the code samples below use `.json` message imports. If the user chose **PO** as the catalog format in the main SKILL.md, substitute the `.json` imports and file scaffolds with their `.po` equivalents from `catalog-format-po.md`. The rest of the App Router setup (routing, middleware, provider wiring, `[locale]` layout) is format-independent.
 
-> **Path-alias handling.** Every code sample below uses `@/i18n/routing`, `@/i18n/navigation`, `@/components/...`, etc. Before emitting them, check `tsconfig.json` for `compilerOptions.baseUrl` + `compilerOptions.paths` entries that map `@/*` to `./src/*` (or equivalent). If the alias is **not** configured, rewrite every `@/...` import in the emitted code to a relative path based on the destination file's location (`../../i18n/routing`, `../i18n/routing`, etc.) rather than editing `tsconfig.json`. Touching `tsconfig.json` is out of scope for this skill.
+## Step 0 (pre-flight): Path alias detection
+
+**Do this before emitting any code sample.** Every import below uses relative paths (`../../i18n/routing`, `../i18n/navigation`, `../../components/...`) sized for destinations under `app/[locale]/**/*.tsx` or `src/components/**/*.tsx`. Two gates decide what actually lands in the user's files:
+
+1. **Check `tsconfig.json`.** If `compilerOptions.paths` maps `@/*` (typically to `./src/*`), **rewrite every relative import in the samples below to `@/...`** before emitting — this keeps the emitted code consistent with the project's conventions.
+2. **Otherwise, keep the relative paths** but recompute depth from the actual destination file. The relative paths shown assume either `src/app/[locale]/layout.tsx` → `src/i18n/routing.ts` (two levels up) or `src/components/LanguageSwitcher.tsx` → `src/i18n/navigation.ts` (one level up). If your destination is deeper, add another `../`; if the project lacks a `src/` root, the same depth still applies because `app/` and `i18n/` are siblings.
+
+Do **not** edit `tsconfig.json` to add a `@/*` alias — that's out of scope for this skill. Relative paths are always a safe fallback.
 
 ## Next.js version: async vs sync `params`
 
@@ -441,7 +448,7 @@ The locale layout validates the locale parameter, enables static rendering, and 
 import {NextIntlClientProvider, hasLocale} from 'next-intl';
 import {getMessages, setRequestLocale} from 'next-intl/server';
 import {notFound} from 'next/navigation';
-import {routing} from '@/i18n/routing';
+import {routing} from '../../i18n/routing';
 
 type Props = {
   children: React.ReactNode;
@@ -476,7 +483,7 @@ Note: `params` is `Promise<{locale: string}>` in Next.js 15+. For Next.js 13-14,
 Add `generateStaticParams` to the locale layout so Next.js pre-renders all locale variants at build time:
 
 ```tsx
-import {routing} from '@/i18n/routing';
+import {routing} from '../../i18n/routing';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({locale}));
@@ -633,7 +640,7 @@ import Link from 'next/link';
 <Link href="/about">About</Link>
 
 // After
-import {Link} from '@/i18n/navigation';
+import {Link} from '../../i18n/navigation';
 <Link href="/about">About</Link>
 ```
 
@@ -648,7 +655,7 @@ const router = useRouter();
 router.push('/dashboard');
 
 // After
-import {useRouter} from '@/i18n/navigation';
+import {useRouter} from '../../i18n/navigation';
 const router = useRouter();
 router.push('/dashboard');  // automatically includes locale
 ```
@@ -661,7 +668,7 @@ import {usePathname} from 'next/navigation';
 const pathname = usePathname();  // returns '/de/about'
 
 // After
-import {usePathname} from '@/i18n/navigation';
+import {usePathname} from '../../i18n/navigation';
 const pathname = usePathname();  // returns '/about' (locale stripped)
 ```
 
@@ -675,14 +682,14 @@ import {redirect} from 'next/navigation';
 redirect('/dashboard');
 
 // After
-import {redirect} from '@/i18n/navigation';
+import {redirect} from '../../i18n/navigation';
 redirect('/dashboard');  // automatically includes locale
 ```
 
 **`getPathname` for server-side URL generation:**
 
 ```tsx
-import {getPathname} from '@/i18n/navigation';
+import {getPathname} from '../../i18n/navigation';
 
 // Generate a locale-specific URL on the server
 const path = getPathname({
@@ -699,7 +706,7 @@ This is useful for generating URLs in Server Components, metadata, sitemaps, and
 If `pathnames` are configured in `routing.ts`, the navigation APIs automatically resolve localized paths:
 
 ```tsx
-import {Link} from '@/i18n/navigation';
+import {Link} from '../../i18n/navigation';
 
 // With pathnames: { '/about': { de: '/ueber-uns' } }
 <Link href="/about">About</Link>
@@ -716,8 +723,8 @@ hreflang tags tell search engines which locale variants exist for each page, pre
 ```tsx
 // app/[locale]/layout.tsx (add generateMetadata to existing layout)
 import type { Metadata } from 'next'
-import { routing } from '@/i18n/routing'
-import { getPathname } from '@/i18n/navigation'
+import { routing } from '../../i18n/routing'
+import { getPathname } from '../../i18n/navigation'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
 
@@ -877,8 +884,8 @@ Create a client component that switches between locales using the navigation hel
 'use client';
 
 import {useLocale} from 'next-intl';
-import {usePathname, useRouter} from '@/i18n/navigation';
-import {routing} from '@/i18n/routing';
+import {usePathname, useRouter} from '../i18n/navigation';
+import {routing} from '../i18n/routing';
 
 export default function LanguageSwitcher() {
   const locale = useLocale();
@@ -918,8 +925,8 @@ This uses `router.replace()` instead of `router.push()` so the locale switch doe
 
 **Key points:**
 - `useLocale()` from `next-intl` returns the current locale string
-- `usePathname()` from `@/i18n/navigation` returns the path **without** the locale prefix, so it works correctly across locales
-- `useRouter()` from `@/i18n/navigation` handles locale-prefixed routing automatically
+- `usePathname()` from the locale-aware navigation module (`../i18n/navigation` in the `src/components/` layout) returns the path **without** the locale prefix, so it works correctly across locales
+- `useRouter()` from the same module handles locale-prefixed routing automatically
 - `routing.locales` is the single source of truth for the locale list — no hardcoded arrays
 - `Intl.DisplayNames` renders locale names in the user's current language (e.g. "Deutsch" when viewing in German)
 
@@ -930,7 +937,7 @@ This uses `router.replace()` instead of `router.push()` so the locale switch doe
 In `app/[locale]/layout.tsx`:
 
 ```tsx
-import LanguageSwitcher from '@/components/LanguageSwitcher';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 // Inside the return:
 <NextIntlClientProvider messages={messages}>

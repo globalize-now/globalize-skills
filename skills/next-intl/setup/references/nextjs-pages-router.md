@@ -4,7 +4,14 @@ This covers Next.js projects using the Pages Router (`pages/` directory, `_app.t
 
 > **Catalog format note:** the code samples below use `.json` message imports (including the shared `getMessages` helper and the namespace-filtered variant). If the user chose **PO** as the catalog format in the main SKILL.md, swap `.json` for `.po` in every `import(`../../messages/${locale}.json`)` expression and use the seed file format from `catalog-format-po.md`. The rest of the Pages Router setup (i18n config, provider, `getStaticProps` pattern) is format-independent.
 
-> **Path-alias handling.** Samples use `@/lib/getMessages`, `@/components/...`. Before emitting them, verify `tsconfig.json` has `compilerOptions.baseUrl` + `compilerOptions.paths` mapping `@/*`. If the alias is **not** configured, rewrite every `@/...` import to a relative path from the destination file. Do not edit `tsconfig.json`.
+## Step 0 (pre-flight): Path alias detection
+
+**Do this before emitting any code sample.** Imports below use relative paths (`../lib/getMessages`, `../components/LanguageSwitcher`) sized for destinations directly under `pages/`. Two gates decide what lands in the user's files:
+
+1. **Check `tsconfig.json`.** If `compilerOptions.paths` maps `@/*` (typically to `./src/*`), **rewrite every relative import to `@/...`** before emitting — keeps the emitted code consistent with project conventions.
+2. **Otherwise, keep the relative paths** but recompute depth from the actual destination file.
+
+Do **not** edit `tsconfig.json` to add a `@/*` alias — out of scope for this skill.
 
 ## Packages
 
@@ -65,7 +72,8 @@ Pages Router loads messages through `getStaticProps` (see "Message Loading" sect
 
 ```ts
 import {getRequestConfig} from 'next-intl/server';
-export default getRequestConfig(async () => ({messages: {}}));
+import {routing} from './routing';
+export default getRequestConfig(async () => ({locale: routing.defaultLocale, messages: {}}));
 ```
 
 Place this at `src/i18n/request.ts` (or `i18n/request.ts` if the project does not use a `src/` directory). The body is a no-op: the default export is never invoked at runtime on Pages Router, since messages flow through page-level data-fetching functions. The stub exists purely to get past the plugin's startup assertion.
@@ -257,7 +265,7 @@ export async function getMessages(locale: string) {
 Then use it in pages:
 
 ```tsx
-import {getMessages} from '@/lib/getMessages';
+import {getMessages} from '../lib/getMessages';
 
 export async function getStaticProps({locale}: {locale: string}) {
   return {
@@ -425,7 +433,7 @@ Each `<Link>` points to the same page (`asPath`) but with a different `locale` p
 
 ```tsx
 // In pages/_app.tsx:
-import LanguageSwitcher from '@/components/LanguageSwitcher';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function App({Component, pageProps}: AppProps) {
   const router = useRouter();
