@@ -165,12 +165,17 @@ function Nav() {
 import { Trans } from '@lingui/react/macro'
 import { useLingui } from '@lingui/react/macro'
 
+// Hoist member/call expressions to a local identifier so the interpolation
+// is a bare name — `lingui/no-expression-in-message` flags `{user.name}`,
+// `{items[0]}`, `{fmt(x)}`, etc. inside `<Trans>` / `` t`...` ``.
+const { name } = user
+
 // JSX interpolation
-<p><Trans>Hello, {user.name}!</Trans></p>
+<p><Trans>Hello, {name}!</Trans></p>
 
 // Template literal interpolation
 const { t } = useLingui()
-const message = t`Hello, ${user.name}!`
+const message = t`Hello, ${name}!`
 ```
 
 ---

@@ -53,6 +53,35 @@ export default defineConfig({
 
 If the project already has Babel plugins configured in the `react()` call, add `@lingui/babel-plugin-lingui-macro` to the existing array.
 
+**Example with TanStack Router:**
+
+```ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
+import { lingui } from '@lingui/vite-plugin'
+
+export default defineConfig({
+  plugins: [
+    TanStackRouterVite({
+      // Exclude per-route locale catalogs (`./locales/{route}/{locale}.ts`)
+      // so the router plugin doesn't try to treat them as route files
+      // (avoids "Route module not found" warnings on first build, before
+      // the catalog stubs exist).
+      routeFileIgnorePattern: 'locales/',
+    }),
+    react({
+      babel: {
+        plugins: ['@lingui/babel-plugin-lingui-macro'],
+      },
+    }),
+    lingui(),
+  ],
+})
+```
+
+**First-run ordering.** On a clean clone, run `vite build` (or start `vite dev` once) before `tsc -b` / `tsc --noEmit`. The TanStack Router plugin generates `src/routeTree.gen.ts` on first Vite run; `tsc` fails if the generated file does not yet exist. If the project's `npm run build` currently runs `tsc -b && vite build`, reorder to `vite build && tsc --noEmit` (or add a pre-build `vite build --mode dev` step) so the route tree is present before type-checking.
+
 ## Provider Setup (Step 5)
 
 The setup depends on whether the project uses per-page catalogs (file-based routing) or a single global catalog.

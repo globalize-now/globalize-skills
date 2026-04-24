@@ -503,6 +503,22 @@ The `recommended` preset enables:
 - `lingui/no-single-tag-to-translate` — prevents wrapping a single component in `<Trans>`
 - `lingui/no-trans-inside-trans` — prevents nesting `<Trans>` inside `<Trans>`
 
+### Compatibility with the convert skill's emitted code
+
+The emitted patterns in `lingui-convert` rely on one lint-sensitive idiom: member or call expressions **inside** `<Trans>` / `` t`...` `` (e.g. `<Trans>Hello, {user.name}!</Trans>`) trip `lingui/no-expression-in-message`. Convert itself hoists the expression to a bare identifier (`const { name } = user; <Trans>Hello, {name}!</Trans>`) — agents finishing the conversion by hand should follow the same pattern.
+
+If a project cannot be refactored (legacy code, generated JSX), downgrade the rule to `warn` rather than disabling it outright, so new violations still surface:
+
+```js
+// Flat config
+export default [
+  linguiPlugin.configs['flat/recommended'],
+  { rules: { 'lingui/no-expression-in-message': 'warn' } },
+]
+```
+
+Runtime formatting helpers (`i18n.number(amount, {...})`, `i18n.date(d, {...})`) are runtime API calls, **not** message content, and the rule does not apply to them — leave them in place.
+
 ---
 
 ## Step 8: Scaffold and Verify

@@ -283,10 +283,19 @@ import { createI18n } from 'vue-i18n'
 import { messageCompiler } from './messageCompiler'
 import { sourceLocale, locales, type Locale } from './locales'
 
-// Import locale catalogs statically for the initial locale; lazy-load others in Step 5.
-// When catalogFormat === 'po', change the extension to '.po' — the poLoader Vite plugin
-// (installed in Step 4) transforms .po files into the same nested JS object shape.
+// Import the source locale statically so it's in the initial bundle. Other
+// locales are discovered via `import.meta.glob`, which emits one chunk per
+// matched file — no template-string dynamic import, no static+dynamic warning
+// from Vite, and the set of available locales is known at build time.
+// When catalogFormat === 'po', change the extension to '.po' in both the
+// static import AND the glob pattern below. The poLoader plugin (Step 4)
+// transforms .po files into the same nested JS object shape.
 import en from './locales/en.json'   // or './locales/en.po' when catalogFormat === 'po'
+
+const localeLoaders = import.meta.glob<Record<string, unknown>>(
+  './locales/*.json',              // './locales/*.po' when catalogFormat === 'po'
+  { import: 'default' },
+)
 
 export const i18n = createI18n({
   legacy: false,
@@ -303,12 +312,11 @@ export function getDirection(locale: string): 'ltr' | 'rtl' {
 }
 
 export async function setLocale(locale: Locale) {
-  // Skip the dynamic import for the source locale — it's already statically imported above.
-  // Without this guard, Vite warns that the source catalog is both static- and dynamic-imported.
+  // Skip the glob lookup for the source locale — it's already statically imported above.
   if (locale !== sourceLocale && !i18n.global.availableLocales.includes(locale)) {
-    // Swap the extension to '.po' in both the static import above and this dynamic
-    // import when catalogFormat === 'po'. The runtime shape is identical either way.
-    const messages = (await import(`./locales/${locale}.json`)).default
+    const loader = localeLoaders[`./locales/${locale}.json`]   // or `.po` when catalogFormat === 'po'
+    if (!loader) throw new Error(`No locale catalog found for ${locale}`)
+    const messages = await loader()
     i18n.global.setLocaleMessage(locale, messages)
   }
   i18n.global.locale.value = locale
