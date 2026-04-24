@@ -58,6 +58,20 @@ After Step 1 (detection) completes without blockers, ask the user:
 - Hard stops (incompatibility checks in Step 1) still halt execution — these are never skipped.
 - "MUST wait for the user to choose" lines in this file and the reference files are **overridden** by the unguided-defaults table below when a default is listed. For choices not covered by that table, still collect input before proceeding.
 - Optional steps (CI/CD, test setup) are **included by default** unless the user excluded them.
+
+#### Unguided pre-flight (printed before any file is modified)
+
+Before executing Step 2, print a short pre-flight block so the user sees the material changes that will happen without further prompts. Print it and proceed immediately; the user can Ctrl+C before the first file write. The block should include, based on detection:
+
+- **Packages to install**: the exact `npm install ...` / `-D` command for the detected package manager.
+- **Compiler-plugin swap** (Vite projects only): if `@vitejs/plugin-react@6+` is detected, the skill will **replace** `@vitejs/plugin-react` with `@vitejs/plugin-react-swc` and `@lingui/babel-plugin-lingui-macro` with `@lingui/swc-plugin` in `package.json` + `vite.config.*`. Call this out explicitly — it's a compiler migration, not just an install.
+- **`vite.config.*` / `next.config.*` changes**: adding the Lingui plugin (and the SWC/Babel plugin pair), and `TanStackRouterVite({ routeFileIgnorePattern: 'locales/' })` if TanStack Router is present.
+- **Provider wrapping** in the detected root (`__root.tsx`, `root.tsx`, App Router `[locale]/layout.tsx`, or `main.tsx`).
+- **Route restructure** for Strategy 1 or 2 when file-based routing is detected.
+- **ESLint config append** (Step 7) and **CLAUDE.md append** to `@import` the `lingui-code` skill (Step 9) — or the `⚠ lingui-code not installed` warning if the code skill is missing.
+
+Format: one bullet per action, each prefixed with a file path. End with a single line: `Proceeding in unguided mode — use Ctrl+C to abort before the first file write.`
+
 - At the end, produce a summary:
 
 ```
@@ -589,7 +603,11 @@ The sibling skill `lingui-code` contains the rules for wrapping strings, numbers
 
 Claude Code doesn't reliably auto-trigger passive "coding rules" skills during routine edits — they aren't consulted unless the user explicitly invokes them. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax. Imported files load into every session's context automatically (recursively, up to 5 hops).
 
-Verify `.claude/skills/lingui-code/SKILL.md` exists. If it does not, tell the user the `lingui-code` skill is missing from their project and stop — this step has no effect without it. Don't attempt to recreate the file.
+Verify `.claude/skills/lingui-code/SKILL.md` exists.
+
+- **If it exists**: proceed.
+- **If it is missing — guided mode**: tell the user the `lingui-code` skill is missing from their project and stop this step. The fix is to install it from a `globalization-skills` checkout (`cp -r skills/lingui/code /path/to/project/.claude/skills/lingui-code`). Don't attempt to recreate the file.
+- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ lingui-code not installed — coding rules not wired` in the end-of-run summary, with the `cp -r` remediation command shown above.
 
 Check whether `CLAUDE.md` exists at the project root.
 

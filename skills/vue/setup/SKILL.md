@@ -547,7 +547,11 @@ The sibling skill `vue-code` contains the rules for wrapping strings, attributes
 
 Claude Code doesn't reliably auto-trigger passive "coding rules" skills during routine edits — they aren't consulted unless the user explicitly invokes them. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
 
-Verify `.claude/skills/vue-code/SKILL.md` exists. If it does not, tell the user the `vue-code` skill is missing from their project and stop — this step has no effect without it. Don't attempt to recreate the file.
+Verify `.claude/skills/vue-code/SKILL.md` exists.
+
+- **If it exists**: proceed.
+- **If it is missing — guided mode**: tell the user the `vue-code` skill is missing from their project and stop this step. The fix is to install it from a `globalization-skills` checkout (`cp -r skills/vue/code /path/to/project/.claude/skills/vue-code`). Don't attempt to recreate the file.
+- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ vue-code not installed — coding rules not wired` in the end-of-run summary, with the `cp -r` remediation command shown above.
 
 Check whether `CLAUDE.md` exists at the project root.
 

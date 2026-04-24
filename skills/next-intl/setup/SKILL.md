@@ -61,6 +61,22 @@ After Step 1 (detection) completes without blockers, ask the user:
 - Hard stops (incompatibility checks in Step 1) still halt execution — these are never skipped.
 - "MUST wait for the user to choose" lines in this file and the reference files are **overridden** by the unguided-defaults table below when a default is listed. For choices not covered by that table, still collect input before proceeding.
 - Optional steps (CI/CD) are **included by default** unless the user excluded them.
+
+#### Unguided pre-flight (printed before any file is modified)
+
+Before executing Step 2, print a short pre-flight block so the user sees the material changes that will happen without further prompts. Print it and proceed immediately; the user can Ctrl+C before the first file write. The block should include, based on detection:
+
+- **Packages to install**: the exact `npm install ...` command for the detected package manager.
+- **`next.config.*` wrap** with `createNextIntlPlugin()`.
+- **Middleware creation**: `src/middleware.ts` (Next 14/15) or `src/proxy.ts` (Next 16+). App Router only.
+- **Root layout rewrite** under `app/[locale]/` with `setRequestLocale`, `NextIntlClientProvider`, and message loading (App Router).
+- **`pages/_app.tsx` provider wrapping** and `i18n` key added to `next.config.*` (Pages Router).
+- **Language switcher component** creation and its wiring into the layout / `_app.tsx`.
+- **Directory restructure** to `app/[locale]/**` for App Router projects with `as-needed` / `always` prefix strategy — this is the largest diff and should be called out explicitly.
+- **CLAUDE.md append** for any passive-rule skill that's installed alongside next-intl (currently none in this repo — note "no passive-rules step for next-intl" in the block).
+
+Format: one bullet per action, each prefixed with a file path. End with a single line: `Proceeding in unguided mode — use Ctrl+C to abort before the first file write.`
+
 - At the end, produce a summary:
 
 ```

@@ -115,14 +115,27 @@ Before wrapping strings, understand what the app does. A word like "Track" needs
 
 1. **Infer** the domain from signals already available:
    - `package.json` `description` field
-   - README first paragraph
+   - `package.json` `name` (when `description` is missing)
+   - README first paragraph (`README.md`, `README.mdx`, `README` — first heading plus first body paragraph)
    - Route names (e.g., `/checkout`, `/patients`, `/fleet`)
-   - Component names (e.g., `ParkingSpotCard`, `PatientList`)
+   - Component names (e.g., `ParkingSpotCard`, `PatientList`) — pick the three most-imported components as the highest-signal sample
    - Nuxt `app.head.title` or `index.html` `<title>` (Vite/Quasar)
 
 2. **Confirm** with the user: *"This looks like a [parking management app]. I'll use this to write better translator comments — for example, 'Park' will get a comment clarifying it means a parking area, not a nature park. Is that right?"*
 
 3. **Carry forward** the domain as context for the rest of the workflow. No config file — just context for this session.
+
+### Unguided defaults
+
+In unguided mode, do **not** block on the confirmation prompt. Apply the inferred domain and record the string used in the final summary so the user can correct it in a follow-up:
+
+| Choice | Unguided default | Rationale |
+|--------|------------------|-----------|
+| **App domain** | Inferred from the signals above (descriptor order: `package.json description` → `package.json name` → README first paragraph → top-3 most-imported component filenames) | Non-blocking — the domain string is used for translator comments, never as a correctness gate. Surfacing it in the summary lets the user fix catalogs in one pass if the inference was off. |
+| **Comment style** | Follow the catalog format set at setup time (`#.` for PO, `$<key>` for JSON) | No per-convert override; consistency with the existing catalog matters more. |
+| **Low-signal inputs** | If all signals are empty, use the literal string `general-purpose web app` | Clearly placeholder; surfaces in the summary as a prompt to fix. |
+
+In guided mode, continue to prompt at step 2 as before.
 
 ---
 
