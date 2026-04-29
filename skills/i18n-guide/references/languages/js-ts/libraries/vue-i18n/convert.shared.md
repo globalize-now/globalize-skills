@@ -1,13 +1,13 @@
 # vue-i18n String Wrapping
 
-This skill finds hardcoded user-facing strings in a Vue 3 project and wraps them with the right vue-i18n API — `{{ t('key') }}` in templates, `:attr="t('key')"` on attributes, `<i18n-t>` for rich text, `n()` / `d()` for numbers and dates. It also identifies localization gaps: numbers, currencies, dates, and plurals that need locale-aware handling.
+This convert phase finds hardcoded user-facing strings in a Vue 3 project and wraps them with the right vue-i18n API — `{{ t('key') }}` in templates, `:attr="t('key')"` on attributes, `<i18n-t>` for rich text, `n()` / `d()` for numbers and dates. It also identifies localization gaps: numbers, currencies, dates, and plurals that need locale-aware handling.
 
-> **Scope:** This skill converts strings to make them translatable — it does not translate content. All strings remain in the source language after conversion.
+> **Scope:** This convert phase converts strings to make them translatable — it does not translate content. All strings remain in the source language after conversion.
 
 ## Out of Scope
 
-- **Vue 2** — this skill only targets Vue 3 + vue-i18n v11. Run `vue-setup` to confirm the project is on Vue 3 before invoking convert.
-- **Options-API-only files** — SFCs without `<script setup>` are warned and skipped (collected into a manual-follow-up list). This skill does not auto-migrate Options API to Composition API.
+- **Vue 2** — this convert phase only targets Vue 3 + vue-i18n v11. Run the setup phase to confirm the project is on Vue 3 before invoking convert.
+- **Options-API-only files** — SFCs without `<script setup>` are warned and skipped (collected into a manual-follow-up list). This convert phase does not auto-migrate Options API to Composition API.
 - **SFC `<i18n>` custom blocks** — the setup deliberately avoids them; convert never writes them.
 - **Non-ICU message syntax** — vue-i18n's native pipe-plural (`"one | many"`) is never emitted. All plurals are ICU.
 - **Nuxt `server/api/*` routes** — server-only code without access to `useI18n()` / `$i18n`. These are flagged in the gap report; localize via `accept-language` header handling out of scope here.
@@ -17,7 +17,7 @@ This skill finds hardcoded user-facing strings in a Vue 3 project and wraps them
 
 ## Step 1: Prerequisite Check
 
-Before wrapping anything, verify vue-i18n is configured with the ICU pipeline `vue-setup` installs. If any check fails, stop and tell the user to run the `vue-setup` skill first. This skill never installs packages or modifies build configuration.
+Before wrapping anything, verify vue-i18n is configured with the ICU pipeline setup installs. If any check fails, stop and tell the user to run the setup phase first. This phase never installs packages or modifies build configuration.
 
 Checks:
 
@@ -26,14 +26,14 @@ Checks:
    - Nuxt: `@nuxtjs/i18n` in `package.json` `dependencies`.
 2. **ICU runtime present.** `intl-messageformat` in `dependencies` (used by the custom `messageCompiler`).
 3. **i18n instance file exists.**
-   - Vite / Quasar: `src/i18n/index.{ts,js,mts,mjs}` or similar (`src/i18n/` is the convention from `vue-setup`).
+   - Vite / Quasar: `src/i18n/index.{ts,js,mts,mjs}` or similar (`src/i18n/` is the convention from setup).
    - Nuxt 3: `i18n.config.{ts,js,mts,mjs}` at project root.
    - Nuxt 4: `i18n/i18n.config.{ts,js,mts,mjs}`.
 4. **ICU compiler wired.** The `createI18n(` (Vite / Quasar) or `defineI18nConfig(() => (` (Nuxt) call includes both:
    - `legacy: false`
    - A `messageCompiler` reference (name it `messageCompiler` or similar)
 
-   If `messageCompiler` is missing, the project is on vue-i18n's default pipe-plural syntax, which conflicts with what this skill emits. Hard-stop: tell the user to re-run `vue-setup` to switch to ICU.
+   If `messageCompiler` is missing, the project is on vue-i18n's default pipe-plural syntax, which conflicts with what this convert phase emits. Hard-stop: tell the user to re-run the setup phase to switch to ICU.
 5. **Catalogs exist.** At least one catalog file under the variant's locales directory:
    - Vite / Quasar: `src/i18n/locales/{locale}.{json,po}`
    - Nuxt 3: `locales/{locale}.{json,po}`
@@ -43,7 +43,7 @@ Checks:
    - Quasar: boot file registered (`boot: ['i18n']` in `quasar.config.*`).
    - Nuxt: `@nuxtjs/i18n` listed in `modules` (not `buildModules`) in `nuxt.config.*`.
 
-If all checks pass, proceed to Step 2. Otherwise, hard-stop with a specific message naming the missing piece and pointing at `vue-setup`.
+If all checks pass, proceed to Step 2. Otherwise, hard-stop with a specific message naming the missing piece and pointing at the setup phase.
 
 ---
 
@@ -78,8 +78,8 @@ Record `catalogFormat`. Steps 7, 8, 9, and 10 branch on this value.
 Record `apiStyle` explicitly — it drives which files get wrapped:
 
 - `composition` → full support. All SFCs get converted.
-- `mixed` → `<script setup>` SFCs get converted. Options-API SFCs are collected into a "manual follow-up" list surfaced at the end. Do not rewrite Options-API files automatically (see vue-code's stance).
-- `options-only` → **hard-stop**. Tell the user: "This project uses Vue 3 Options API throughout — no `<script setup>` blocks detected. `vue-code` and `vue-convert` target the Composition API. vue-i18n v11 still supports Options API via `this.$t`, but it's deprecated and scheduled for removal in v12. Recommended: migrate at least one component to `<script setup>` first, then re-run this skill." Do not proceed.
+- `mixed` → `<script setup>` SFCs get converted. Options-API SFCs are collected into a "manual follow-up" list surfaced at the end. Do not rewrite Options-API files automatically (see the vue-i18n coding rules' stance).
+- `options-only` → **hard-stop**. Tell the user: "This project uses Vue 3 Options API throughout — no `<script setup>` blocks detected. the vue-i18n coding rules and the convert phase target the Composition API. vue-i18n v11 still supports Options API via `this.$t`, but it's deprecated and scheduled for removal in v12. Recommended: migrate at least one component to `<script setup>` first, then re-run this convert phase." Do not proceed.
 
 ### Variant dispatch
 
@@ -124,7 +124,7 @@ In guided mode, continue to prompt at step 2 as before.
 
 ## Step 4: Composable Decision Tree
 
-Choose the right API for each situation. This is the wrapping-time view of the rules `vue-code` enforces at authoring time.
+Choose the right API for each situation. This is the wrapping-time view of the rules the vue-i18n coding rules enforce at authoring time.
 
 ```
 Is this a template text node (between tags, e.g. <p>Hello</p>)?
@@ -256,7 +256,7 @@ Scan `.vue` and `.ts` files systematically. Apply the confidence tiers to decide
   </template>
   ```
 
-  Requires `numberFormats.{locale}.currency` to be registered on the i18n instance (seeded in `vue-setup` Step 3). If the format isn't registered yet, either (a) register it alongside the conversion edit, or (b) fall back to `n(amount, { style: 'currency', currency: 'USD' })` as an inline format. Do not reintroduce `new Intl.NumberFormat(locale.value, ...)` inside the component — `n()` and `d()` already delegate to those APIs, caching per-locale.
+  Requires `numberFormats.{locale}.currency` to be registered on the i18n instance (seeded in setup Step 3). If the format isn't registered yet, either (a) register it alongside the conversion edit, or (b) fall back to `n(amount, { style: 'currency', currency: 'USD' })` as an inline format. Do not reintroduce `new Intl.NumberFormat(locale.value, ...)` inside the component — `n()` and `d()` already delegate to those APIs, caching per-locale.
 
   **After wrapping — remove the now-dead helpers.** Once all call-sites use `n()` / `d()` (or an ICU `plural` / `select` key in the catalog), the hand-rolled helpers that encoded the same logic — module-scope `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` constants, `pluralizeItems`, `replyLine`, any format-switch `if/else` bodies — become dead code. Delete them together with their imports. Leaving them gives the appearance of duplicate sources of truth; removing them confirms the migration is complete. Grep for the helper's name (or `new Intl.NumberFormat` / `new Intl.DateTimeFormat` at module scope) to verify no stragglers remain.
 
@@ -265,7 +265,7 @@ Scan `.vue` and `.ts` files systematically. Apply the confidence tiers to decide
 Review these and wrap only if they appear in the UI:
 
 - **`toFixed()` and number formatting**: Raw `toFixed()` won't respect locale decimal separators. Use `n()` with a named format registered on the i18n instance.
-- **Currency symbols hardcoded near numbers**: `'$' + price` or `price + ' USD'` — use `n(price, 'currency')` with a `currency` format like `{ style: 'currency', currency: 'USD' }`. If no currency format is registered, warn the user — `vue-setup` Step 3 seeds a baseline.
+- **Currency symbols hardcoded near numbers**: `'$' + price` or `price + ' USD'` — use `n(price, 'currency')` with a `currency` format like `{ style: 'currency', currency: 'USD' }`. If no currency format is registered, warn the user — setup Step 3 seeds a baseline.
 - **Date formatting without locale**: `date.toLocaleDateString()` without a locale argument is runtime-dependent; explicit format strings (`'MM/DD/YYYY'`) are not locale-aware. Use `d(date, 'short' | 'long')`.
 - **`new Intl.NumberFormat(...)` inside components**: Prefer `n()` so locale changes are reactive.
 - **Toast / notification / error messages shown to users**: Strings in `toast()` / `notify()` / `$q.notify()` calls, or in `throw new Error(...)` that surfaces in the UI.
@@ -427,7 +427,7 @@ Write entries into `locales/{locale}.json` as a nested object:
 **Translator comments are not first-class in JSON catalogs**, and the skill does **not** emit them inline by default. vue-i18n JSON catalogs have no standard comment mechanism — any sibling-key convention (like `"$save": "comment"`) is seen as a translatable string by most TMSes: they charge to translate it, ship the comment into every target-locale file, and make it possible to render a translated comment if a call site mistakenly references `$save`. That's a real cost, not just a stylistic concern. The skill therefore handles ambiguous strings in JSON mode with one of three strategies in priority order:
 
 1. **Rename to a disambiguating key.** The cleanest answer for single-word ambiguity: instead of `Common.save` + `$save: "editor toolbar context"`, use `DocEditor.saveToolbar` as the key. Semantic keys outlive copy edits and make context obvious from the key alone. Default to this when the ambiguity is a missing object ("Save what?" → rename to name the object) or a domain-sensitive term.
-2. **Switch to PO.** If the project needs systematic translator context across many strings, PO is the right format. Offer to re-run `vue-setup` to switch: "You have N ambiguous keys that would benefit from translator comments. PO catalogs support `#.` description comments that TMSes pass to translators without adding cost. Switch now? (This rewrites your catalog and takes ~30 seconds.)"
+2. **Switch to PO.** If the project needs systematic translator context across many strings, PO is the right format. Offer to re-run the setup phase to switch: "You have N ambiguous keys that would benefit from translator comments. PO catalogs support `#.` description comments that TMSes pass to translators without adding cost. Switch now? (This rewrites your catalog and takes ~30 seconds.)"
 3. **Opt-in adjacent comments file.** As a last resort, write comments to a sibling file that never ships to the TMS: `locales/{locale}.comments.json` keyed by the same dot-path. The skill only creates this file on explicit request (`"Save comments to a separate file?"` prompt) — it's not shipped by default because most TMS / translation pipelines won't read it, which means translators don't actually receive the context.
 
 **Do not emit `$`-prefixed sibling keys** in the generated JSON catalog. It looks like a comment mechanism but behaves like a translatable string in every downstream tool.
@@ -445,7 +445,7 @@ Each new entry includes:
 - `#:` source reference — `src/components/HomePage.vue:42` format
 - `msgctxt` — optional, only for disambiguation (see below)
 
-**Disambiguation in PO**: use `msgctxt`. Two entries with identical `msgid` but different `msgctxt` translate independently. The `poLoader` (installed by `vue-setup`) mangles this into a `__ctx_<context>` key suffix at build time, so call sites render via:
+**Disambiguation in PO**: use `msgctxt`. Two entries with identical `msgid` but different `msgctxt` translate independently. The `poLoader` (installed by setup) mangles this into a `__ctx_<context>` key suffix at build time, so call sites render via:
 
 ```vue
 {{ t('Common.right__ctx_direction') }}
@@ -546,7 +546,7 @@ For each string, run the Step 7 ambiguity checklist and write the comment (`$<ke
 
 1. **Dev server boots** (`npm run dev` / `pnpm dev` / equivalent). No build-time parse errors. vue-i18n's default warning channel logs any missing keys — fix them if they appear.
 2. **Language switcher works.** Pick a target locale; the UI re-renders and falls back to source text for untranslated entries.
-3. **Existing tests pass.** If tests fail with `"Not Available in Legacy Mode"` or `useI18n() is undefined`, wrap mount/render with the `mountWithI18n` helper (see `vue-setup` Step 10). Common fix is adding the helper and re-running.
+3. **Existing tests pass.** If tests fail with `"Not Available in Legacy Mode"` or `useI18n() is undefined`, wrap mount/render with the `mountWithI18n` helper (see setup Step 10). Common fix is adding the helper and re-running.
 
 ---
 
@@ -761,7 +761,7 @@ No inline comments to back-fill (see Step 7 — JSON mode does not emit `$<key>`
    >
    > These strings matched the must-comment checklist but JSON catalogs don't support translator comments. Options:
    > - Rename the key to disambiguate (e.g. `Common.save` → `DocEditor.saveToolbar`)
-   > - Switch to PO now (re-run `vue-setup`, pick PO) — translator comments become first-class
+   > - Switch to PO now (re-run the setup phase, pick PO) — translator comments become first-class
    > - Ship as-is — the translator will work without this context
    >
    > *(full list — key: context note)*

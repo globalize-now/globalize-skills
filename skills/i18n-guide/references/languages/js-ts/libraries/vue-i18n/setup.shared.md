@@ -1,6 +1,6 @@
 # vue-i18n Setup
 
-`vue-i18n` v11 (Intlify) is the dominant i18n library for Vue 3. This skill configures it with the Composition API (`createI18n({ legacy: false })`, `useI18n()` in `<script setup>`) and enables ICU MessageFormat — matching the rest of this repo's message-format stance and avoiding vue-i18n's pipe-plural syntax, which bakes English-style plurals into source strings.
+`vue-i18n` v11 (Intlify) is the dominant i18n library for Vue 3. This setup phase configures it with the Composition API (`createI18n({ legacy: false })`, `useI18n()` in `<script setup>`) and enables ICU MessageFormat — matching the rest of this repo's message-format stance and avoiding vue-i18n's pipe-plural syntax, which bakes English-style plurals into source strings.
 
 Unlike compile-time i18n frameworks, vue-i18n is a runtime library: there is no macro transform, and no build step is strictly required. The `@intlify/unplugin-vue-i18n` plugin is installed to enable `<i18n>` custom blocks inside SFCs and to support `@intlify/eslint-plugin-vue-i18n` linting. It is configured **without** the `include` option — pre-compiling catalogs would bypass the custom ICU `messageCompiler` (see Step 4) — so locale JSON is loaded by Vite's built-in JSON importer as plain objects and processed by `intl-messageformat` at lookup time.
 
@@ -8,16 +8,16 @@ Follow these steps in order. Each builds on the last.
 
 ## Out of Scope
 
-This skill covers **Vue 3** projects using the **Composition API** on **Vite** (SPA) or **Nuxt 3/4** (SSR). It does not cover:
+This setup phase covers **Vue 3** projects using the **Composition API** on **Vite** (SPA) or **Nuxt 3/4** (SSR). It does not cover:
 
 - **Vue 2.x** — separate ecosystem (`vue-i18n@8`, different plugin API, Options API assumed). Recommend upgrading to Vue 3 first; point at the official [Vue 3 migration guide](https://v3-migration.vuejs.org/). **Hard stop.**
-- **Vue 3 projects on the Options API only** — vue-i18n's Legacy API is deprecated and scheduled for removal in v12. This skill emits Composition API setup (`createI18n({ legacy: false })`, `useI18n()` in `<script setup>`). If the codebase is entirely `export default { }` Options-style, the setup still works but the user must adopt `<script setup>` for new strings. Warn, don't block.
+- **Vue 3 projects on the Options API only** — vue-i18n's Legacy API is deprecated and scheduled for removal in v12. This setup phase emits Composition API setup (`createI18n({ legacy: false })`, `useI18n()` in `<script setup>`). If the codebase is entirely `export default { }` Options-style, the setup still works but the user must adopt `<script setup>` for new strings. Warn, don't block.
 - **Vue CLI / webpack-based projects** — effectively EOL. Recommend migrating to Vite first. **Hard stop.**
 - **VitePress** — has native `locales` config and doesn't use vue-i18n. **Hard stop**, point at the [VitePress i18n docs](https://vitepress.dev/guide/i18n).
 - **Quasar** — partially covered (experimental reference file). Warn the user v1 treats this as experimental; proceed only on explicit confirmation.
-- **Non-ICU message format** — this skill configures ICU MessageFormat via a custom `messageCompiler`. Projects that need vue-i18n's native pipe-plural / custom-format syntax for existing content should not run this setup.
-- **Converting existing hardcoded strings** to `t('...')` across the codebase — handled by the `vue-convert` skill. This skill only scaffolds; it does not rewrite your views. Run `vue-convert` after setup is complete.
-- **Other Vue i18n libraries** (`i18next-vue`, `@tolgee/vue`, `fluent-vue`, Lingui-for-Vue, Paraglide) — this skill installs `vue-i18n` exclusively. If one of these is already installed, **hard stop** (same pattern as Lingui's "existing i18n library" check).
+- **Non-ICU message format** — this setup phase configures ICU MessageFormat via a custom `messageCompiler`. Projects that need vue-i18n's native pipe-plural / custom-format syntax for existing content should not run this setup.
+- **Converting existing hardcoded strings** to `t('...')` across the codebase — handled by the convert phase. This setup phase only scaffolds; it does not rewrite your views. Run the convert phase after setup is complete.
+- **Other Vue i18n libraries** (`i18next-vue`, `@tolgee/vue`, `fluent-vue`, Lingui-for-Vue, Paraglide) — this setup phase installs `vue-i18n` exclusively. If one of these is already installed, **hard stop** (same pattern as Lingui's "existing i18n library" check).
 
 ---
 
@@ -112,7 +112,7 @@ Read the project's `package.json`, build config (`vite.config.*`, `nuxt.config.*
 | **TypeScript** | `typescript` in devDeps or `tsconfig.json` exists. |
 | **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` or `bun.lockb` → bun. |
 | **Router** | `vue-router` in deps. For Vite SPAs, locate the route table: first check `src/router/` (conventional), then grep `src/**/*.{ts,tsx,js,mjs,vue}` for `createRouter(` or `defineRoutes(` to catch inline / programmatic setups (e.g. routes declared in `main.ts` or produced by `unplugin-vue-router`). Record the file(s) containing `createRouter(`; that's what Step 5 will edit. If `vue-router` is in deps but no `createRouter(` call is found anywhere, warn the user — the router is installed but not wired, and the routing-strategy choice may not apply. Nuxt has file-based routing built in — no `vue-router` package needed in deps. |
-| **Existing i18n** | `vue-i18n`, `@nuxtjs/i18n`, `@intlify/vue-i18n` (legacy standalone), `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@paraglide/*`, `@lingui/*` in deps or devDeps. Note: `@intlify/unplugin-vue-i18n` and `@intlify/eslint-plugin-vue-i18n` are supporting packages this skill itself uses — do **not** treat them as competing i18n libraries. |
+| **Existing i18n** | `vue-i18n`, `@nuxtjs/i18n`, `@intlify/vue-i18n` (legacy standalone), `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@paraglide/*`, `@lingui/*` in deps or devDeps. Note: `@intlify/unplugin-vue-i18n` and `@intlify/eslint-plugin-vue-i18n` are supporting packages this setup phase itself uses — do **not** treat them as competing i18n libraries. |
 | **Existing `<html lang>`** | Check `index.html` (Vite / Quasar) or `app.vue` / `nuxt.config.ts` `app.head` (Nuxt) for an existing `<html lang="...">` value. Used to infer the source locale. |
 | **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
 | **Current branch** | `git branch --show-current` — record the branch name. |
@@ -123,16 +123,16 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 
 | Check | How to detect | Action |
 |-------|--------------|--------|
-| **Not a Vue project** | No `vue` in deps, no `nuxt` in deps. Or: `react`, `svelte`, `@angular/core`, `solid-js` in deps with no `vue`. | **STOP.** Tell the user: "vue-i18n requires Vue. This project does not have `vue` (or `nuxt`) as a dependency. This skill cannot set up i18n for non-Vue projects." Do NOT proceed. |
-| **Vue 2 detected** | `vue` semver major is `2` (e.g. `"^2.7.0"`). | **STOP.** Tell the user: "This project uses Vue 2 (detected `vue@{version}`). vue-i18n v11 requires Vue 3; Vue 2 uses the legacy `vue-i18n@8` with a different plugin API. This skill only covers Vue 3. Recommended path: upgrade the project to Vue 3 first (see https://v3-migration.vuejs.org/), then re-run this setup. Or install `vue-i18n@8` manually — not covered by this skill." Do NOT proceed. |
-| **VitePress-only project** | `vitepress` in devDeps AND no `vue` in runtime deps (or only present transitively), AND a `.vitepress/config.*` file exists. | **STOP.** Tell the user: "This project is VitePress. VitePress has its own native `locales` configuration and does not use vue-i18n for documentation site localization. See https://vitepress.dev/guide/i18n. This skill cannot set up i18n for VitePress projects." Do NOT proceed. |
+| **Not a Vue project** | No `vue` in deps, no `nuxt` in deps. Or: `react`, `svelte`, `@angular/core`, `solid-js` in deps with no `vue`. | **STOP.** Tell the user: "vue-i18n requires Vue. This project does not have `vue` (or `nuxt`) as a dependency. This setup phase cannot set up i18n for non-Vue projects." Do NOT proceed. |
+| **Vue 2 detected** | `vue` semver major is `2` (e.g. `"^2.7.0"`). | **STOP.** Tell the user: "This project uses Vue 2 (detected `vue@{version}`). vue-i18n v11 requires Vue 3; Vue 2 uses the legacy `vue-i18n@8` with a different plugin API. This setup phase only covers Vue 3. Recommended path: upgrade the project to Vue 3 first (see https://v3-migration.vuejs.org/), then re-run this setup. Or install `vue-i18n@8` manually — not covered by this setup phase." Do NOT proceed. |
+| **VitePress-only project** | `vitepress` in devDeps AND no `vue` in runtime deps (or only present transitively), AND a `.vitepress/config.*` file exists. | **STOP.** Tell the user: "This project is VitePress. VitePress has its own native `locales` configuration and does not use vue-i18n for documentation site localization. See https://vitepress.dev/guide/i18n. This setup phase cannot set up i18n for VitePress projects." Do NOT proceed. |
 | **Competing i18n library** | One of `@nuxtjs/i18n` (in a non-Nuxt project), `@intlify/vue-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@paraglide/*`, `@lingui/core` in `package.json` deps or devDeps. | **STOP.** Tell the user: "{library} is already installed. Adding vue-i18n alongside it will create conflicting translation pipelines. Options: (1) if you want to switch to vue-i18n, remove {library} first, then re-run this setup; (2) stay on {library} and skip this setup." Do NOT proceed. |
-| **Existing vue-i18n** (Vite / Quasar only — Nuxt uses `@nuxtjs/i18n`) | `vue-i18n` in `package.json` deps. Inspect whether the ICU setup this skill produces is already complete: look for (a) `intl-messageformat` in deps, (b) a file matching `**/i18n/messageCompiler.*`, and (c) a `createI18n(` call with `legacy: false` and `messageCompiler`. | **If all three signals are present** → tell the user: "vue-i18n appears to already be configured with the ICU `messageCompiler` this skill would install. Re-running would overwrite `src/i18n/*` and may clobber customisations. Stop unless you specifically want to regenerate — confirm before proceeding." Wait for confirmation. **If vue-i18n is present but any signal is missing** → tell the user: "I found `vue-i18n` already installed but the ICU setup looks incomplete (missing: {list}). I can complete the setup — this will create/overwrite `src/i18n/index.*`, `src/i18n/messageCompiler.*`, and `src/i18n/locales.*`, and edit `vite.config.*` / `main.*` to wire the plugin and provider. Proceed, or stop so you can review manually?" Wait for explicit confirmation before continuing. |
-| **Vue CLI / webpack-based** | `@vue/cli-service` in devDeps OR `vue.config.js` exists at project root. No `vite.config.*`, no `nuxt.config.*`, no `quasar.config.*`. | **STOP.** Tell the user: "This project uses Vue CLI / webpack (detected `@vue/cli-service` / `vue.config.js`). Vue CLI is in maintenance mode and effectively EOL. This skill targets Vite, Nuxt, or Quasar. Recommended path: migrate the project to Vite first (see https://vite.dev/guide/), then re-run this setup." Do NOT proceed. |
+| **Existing vue-i18n** (Vite / Quasar only — Nuxt uses `@nuxtjs/i18n`) | `vue-i18n` in `package.json` deps. Inspect whether the ICU setup this setup phase produces is already complete: look for (a) `intl-messageformat` in deps, (b) a file matching `**/i18n/messageCompiler.*`, and (c) a `createI18n(` call with `legacy: false` and `messageCompiler`. | **If all three signals are present** → tell the user: "vue-i18n appears to already be configured with the ICU `messageCompiler` this setup phase would install. Re-running would overwrite `src/i18n/*` and may clobber customisations. Stop unless you specifically want to regenerate — confirm before proceeding." Wait for confirmation. **If vue-i18n is present but any signal is missing** → tell the user: "I found `vue-i18n` already installed but the ICU setup looks incomplete (missing: {list}). I can complete the setup — this will create/overwrite `src/i18n/index.*`, `src/i18n/messageCompiler.*`, and `src/i18n/locales.*`, and edit `vite.config.*` / `main.*` to wire the plugin and provider. Proceed, or stop so you can review manually?" Wait for explicit confirmation before continuing. |
+| **Vue CLI / webpack-based** | `@vue/cli-service` in devDeps OR `vue.config.js` exists at project root. No `vite.config.*`, no `nuxt.config.*`, no `quasar.config.*`. | **STOP.** Tell the user: "This project uses Vue CLI / webpack (detected `@vue/cli-service` / `vue.config.js`). Vue CLI is in maintenance mode and effectively EOL. This setup phase targets Vite, Nuxt, or Quasar. Recommended path: migrate the project to Vite first (see https://vite.dev/guide/), then re-run this setup." Do NOT proceed. |
 
 ### TypeScript warning (non-blocking)
 
-All generated files in this skill use `.ts` extensions and TypeScript syntax (interfaces, `as const`, typed function signatures). Vite transpiles `.ts` via esbuild regardless of project-level TS config, so the app will run, but a JS-only codebase will see these files standing out stylistically and IDE tooling may flag the type annotations.
+All generated files in this setup phase use `.ts` extensions and TypeScript syntax (interfaces, `as const`, typed function signatures). Vite transpiles `.ts` via esbuild regardless of project-level TS config, so the app will run, but a JS-only codebase will see these files standing out stylistically and IDE tooling may flag the type annotations.
 
 If `typescript` is **not** in devDeps and no `tsconfig.json` exists at project root, tell the user:
 
@@ -147,7 +147,7 @@ Wait for the user to pick before continuing.
 
 If the API-style grep finds **zero** `<script setup>` blocks and **many** Options-API `export default { }` components, warn the user:
 
-> I detected this project is written primarily in the Vue 3 Options API (no `<script setup>` blocks found). vue-i18n v11 still supports the Legacy (Options) API via `this.$t`, but it is deprecated and scheduled for removal in v12. This skill will configure the **Composition API** (`createI18n({ legacy: false })`, `useI18n()` inside `<script setup>`). Existing Options-API components will **not** be automatically migrated. Any new strings should be added via `<script setup>` / `useI18n()`. Continue?
+> I detected this project is written primarily in the Vue 3 Options API (no `<script setup>` blocks found). vue-i18n v11 still supports the Legacy (Options) API via `this.$t`, but it is deprecated and scheduled for removal in v12. This setup phase will configure the **Composition API** (`createI18n({ legacy: false })`, `useI18n()` inside `<script setup>`). Existing Options-API components will **not** be automatically migrated. Any new strings should be added via `<script setup>` / `useI18n()`. Continue?
 
 Wait for the user to confirm before proceeding. This is a warning, not a hard stop.
 
@@ -156,7 +156,7 @@ Wait for the user to confirm before proceeding. This is a warning, not a hard st
 Based on the detection, pick the right variant reference file:
 
 - **Nuxt detected** (`nuxt` in deps) → read `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md`
-- **Quasar detected** (`quasar` in deps) → read `references/languages/js-ts/frameworks/quasar/vue-i18n.setup.md`. **This variant is experimental in v1.** Before continuing, tell the user: "I detected Quasar. The Quasar variant is experimental in this skill — it follows the Quasar boot-file pattern but hasn't been extensively tested. Proceed, or would you prefer to stop and set up manually using the Quasar i18n docs?" Wait for explicit confirmation.
+- **Quasar detected** (`quasar` in deps) → read `references/languages/js-ts/frameworks/quasar/vue-i18n.setup.md`. **This variant is experimental in v1.** Before continuing, tell the user: "I detected Quasar. The Quasar variant is experimental in this setup phase — it follows the Quasar boot-file pattern but hasn't been extensively tested. Proceed, or would you prefer to stop and set up manually using the Quasar i18n docs?" Wait for explicit confirmation.
 - **Vite SPA** (neither Nuxt nor Quasar, but `vite` + `vue` present) → read `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`
 
 Then continue with Steps 2–8 below, using the variant-specific instructions from the reference file for Steps 4, 5, and 6.
@@ -170,11 +170,11 @@ In guided mode, ask the user which translation-file format to use:
 
 > **Which catalog format should translations use?**
 > 1. **JSON** (default) — simple, widely supported, maps naturally to the vue-i18n runtime shape. No build-time transform.
-> 2. **PO (gettext)** — supports `msgctxt` for disambiguating identical source strings, translator comments (`#.`), and source references (`#:`). Requires a small build-time loader this skill will install.
+> 2. **PO (gettext)** — supports `msgctxt` for disambiguating identical source strings, translator comments (`#.`), and source references (`#:`). Requires a small build-time loader this setup phase will install.
 >
 > Recommendation: pick **PO** if you plan to translate into many languages, use a TMS (Crowdin / Lokalise / Weblate / Phrase), or have domain-ambiguous UI words (e.g., "Right" as direction vs. correctness). Pick **JSON** for simpler projects or when the translation workflow is AI-driven and doesn't depend on gettext conventions.
 
-Record `catalogFormat: 'json' | 'po'`. The value branches Steps 2, 3, 4, 7, 9, and 10 below. When `catalogFormat === 'po'`, this skill installs `gettext-parser` plus a tiny Vite plugin (`poLoader`) that transforms `.po` files into nested JS objects at build time. Runtime remains identical to the JSON path — vue-i18n still receives a nested `messages` object and the custom ICU `messageCompiler` operates on leaf strings.
+Record `catalogFormat: 'json' | 'po'`. The value branches Steps 2, 3, 4, 7, 9, and 10 below. When `catalogFormat === 'po'`, this setup phase installs `gettext-parser` plus a tiny Vite plugin (`poLoader`) that transforms `.po` files into nested JS objects at build time. Runtime remains identical to the JSON path — vue-i18n still receives a nested `messages` object and the custom ICU `messageCompiler` operates on leaf strings.
 
 ### Branch Recommendation
 
@@ -218,7 +218,7 @@ npm install -D gettext-parser
 
 This is the PO parser used by the build-time `poLoader` Vite plugin installed in Step 4. It runs only at build time — nothing gettext-related ships in the runtime bundle.
 
-**Do not hardcode a semver range in this skill.** Run `npm view gettext-parser version` at the time of install and pin to the current major (e.g. `^8` if that's what `npm view` reports). The library has stable `.po.parse()` API surface that this skill depends on — parsing `.po` files to the `{ translations: { '': { msgid: { msgstr: [...] } } } }` shape — and that interface has been consistent across majors, but pinning to a known-good major keeps unexpected breakage out.
+**Do not hardcode a semver range in this setup phase.** Run `npm view gettext-parser version` at the time of install and pin to the current major (e.g. `^8` if that's what `npm view` reports). The library has stable `.po.parse()` API surface that this setup phase depends on — parsing `.po` files to the `{ translations: { '': { msgid: { msgstr: [...] } } } }` shape — and that interface has been consistent across majors, but pinning to a known-good major keeps unexpected breakage out.
 
 ---
 
@@ -241,7 +241,7 @@ Populate `sourceLocale` with the detected source locale (inferred from `<html la
 
 ### The ICU message compiler
 
-vue-i18n's default message syntax is pipe-delimited for plurals and lacks `select` / `selectordinal`. Since this skill emits ICU MessageFormat, we install a custom `messageCompiler` backed by `intl-messageformat`. Create the compiler module:
+vue-i18n's default message syntax is pipe-delimited for plurals and lacks `select` / `selectordinal`. Since this setup phase emits ICU MessageFormat, we install a custom `messageCompiler` backed by `intl-messageformat`. Create the compiler module:
 
 ```ts
 // src/i18n/messageCompiler.ts
@@ -324,9 +324,9 @@ For **Nuxt**, the equivalent lives in `i18n.config.ts` — at project root on Nu
 
 ### Number and date formats (optional, recommended)
 
-The `n()` and `d()` composables in `vue-code` accept named format keys (`n(1234.5, 'currency')`, `d(date, 'long')`). These names must be declared on the i18n instance — without them, `n()` / `d()` silently fall back to browser defaults and currency calls won't produce a currency symbol at all.
+The `n()` and `d()` composables in the vue-i18n coding rules accept named format keys (`n(1234.5, 'currency')`, `d(date, 'long')`). These names must be declared on the i18n instance — without them, `n()` / `d()` silently fall back to browser defaults and currency calls won't produce a currency symbol at all.
 
-Add a minimal baseline to the `createI18n(...)` call so the examples in `vue-code` work out of the box. Ask the user for a default currency code (ISO 4217, e.g. `USD`, `EUR`, `GBP`) — infer from the source locale if obvious (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`), otherwise prompt.
+Add a minimal baseline to the `createI18n(...)` call so the examples in the vue-i18n coding rules work out of the box. Ask the user for a default currency code (ISO 4217, e.g. `USD`, `EUR`, `GBP`) — infer from the source locale if obvious (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`), otherwise prompt.
 
 ```ts
 // Inside createI18n({ ... }) — add alongside `messages`
@@ -380,7 +380,7 @@ Follow the variant-specific reference file for this step. It specifies the exact
 - `strictMessage: false` — disable the plugin's built-in HTML-tag check. ICU messages may legitimately contain angle-bracketed placeholders (e.g. within rich text via `<i18n-t>`), which the check flags as false positives.
 - **`include` — deliberately omitted.** The plugin's `include` option pre-compiles matched JSON/YAML/JS/TS files into AST/JS at build time, which would bypass our custom ICU `messageCompiler` (it would receive a compiled function instead of the source string). Letting Vite's built-in JSON importer load the catalogs as plain objects — which is what happens when `include` is not set — keeps them as raw strings for the ICU compiler to process at lookup time.
 
-> **SFC `<i18n>` blocks note**: If a project wants to use SFC-embedded `<i18n>` custom blocks, the plugin is required for the block transform — but `<i18n>` blocks are compiled by the plugin's default vue-i18n compiler, not the ICU one. For ICU-consistent behavior across the whole app, stick with plain JSON catalogs (the default in this skill) and avoid SFC `<i18n>` blocks.
+> **SFC `<i18n>` blocks note**: If a project wants to use SFC-embedded `<i18n>` custom blocks, the plugin is required for the block transform — but `<i18n>` blocks are compiled by the plugin's default vue-i18n compiler, not the ICU one. For ICU-consistent behavior across the whole app, stick with plain JSON catalogs (the default in this setup phase) and avoid SFC `<i18n>` blocks.
 
 ### PO loader when `catalogFormat === 'po'`
 
@@ -471,7 +471,7 @@ Seed each file with a couple of example keys so the app can boot without a catal
 }
 ```
 
-> **Nuxt exception — ship a non-ICU seed.** With `@nuxtjs/i18n` + `bundle.runtimeOnly: false` (the default this skill emits), `unplugin-vue-i18n` pre-compiles the lazy locale JSON at build time using its **default**, non-ICU compiler — *before* the custom `messageCompiler` registered in `i18n.config.ts` runs. A seed containing `{count, plural, one {...} other {...}}` will fail the build with `error code: 2`. For Nuxt, drop the `messages` entry from the seed (keep only `welcome`). See `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md` § ICU seed upgrade for how to re-enable build-time ICU once the catalog is actually in use.
+> **Nuxt exception — ship a non-ICU seed.** With `@nuxtjs/i18n` + `bundle.runtimeOnly: false` (the default this setup phase emits), `unplugin-vue-i18n` pre-compiles the lazy locale JSON at build time using its **default**, non-ICU compiler — *before* the custom `messageCompiler` registered in `i18n.config.ts` runs. A seed containing `{count, plural, one {...} other {...}}` will fail the build with `error code: 2`. For Nuxt, drop the `messages` entry from the seed (keep only `welcome`). See `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md` § ICU seed upgrade for how to re-enable build-time ICU once the catalog is actually in use.
 
 ```json
 {
@@ -481,7 +481,7 @@ Seed each file with a couple of example keys so the app can boot without a catal
 
 ### When `catalogFormat === 'po'`
 
-Seed each file with a minimal PO header plus the same two example entries. Keep the header on its own block — the `poLoader` plugin parses and discards the header; the loader and this skill's merge logic require that the header block stays intact across edits.
+Seed each file with a minimal PO header plus the same two example entries. Keep the header on its own block — the `poLoader` plugin parses and discards the header; the loader and this setup phase's merge logic require that the header block stays intact across edits.
 
 ```po
 msgid ""
@@ -530,15 +530,15 @@ If any step fails, check the build tool integration (Step 4) first — most setu
 
 ## Step 8: Enable Coding Rules
 
-The sibling skill `vue-code` contains the rules for wrapping strings, attributes, plurals, and numbers correctly as new Vue code is written. It is delivered alongside `vue-setup` by the CLI installer, so `.claude/skills/vue-code/SKILL.md` should already be present in the target project.
+The vue-i18n coding rules at `references/languages/js-ts/libraries/vue-i18n/code.md` contain the rules for wrapping strings, attributes, plurals, and numbers correctly as new Vue code is written. They ship as part of the `i18n-guide` skill, so the file already lives at `.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md` in the target project.
 
-Claude Code doesn't reliably auto-trigger passive "coding rules" skills during routine edits — they aren't consulted unless the user explicitly invokes them. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
+Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits — they aren't consulted unless the user explicitly invokes them. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
 
-Verify `.claude/skills/vue-code/SKILL.md` exists.
+Verify `.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md` exists.
 
 - **If it exists**: proceed.
-- **If it is missing — guided mode**: tell the user the `vue-code` skill is missing from their project and stop this step. The fix is to install it from a `globalization-skills` checkout (`cp -r skills/vue/code /path/to/project/.claude/skills/vue-code`). Don't attempt to recreate the file.
-- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ vue-code not installed — coding rules not wired` in the end-of-run summary, with the `cp -r` remediation command shown above.
+- **If it is missing — guided mode**: tell the user the `i18n-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize/globalization-skills --skill i18n-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ vue-i18n coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
 
 Check whether `CLAUDE.md` exists at the project root.
 
@@ -546,10 +546,10 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/vue-code/SKILL.md
+  @.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/vue-code/SKILL.md` to your CLAUDE.md so the vue-i18n coding rules auto-load every session") and wait for confirmation before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md` to your CLAUDE.md so the vue-i18n coding rules auto-load every session") and wait for confirmation before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
 
@@ -705,7 +705,7 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
 
 ## Common Gotchas
 
-- **`[i18n] ICU compiler requires string messages`** — the `@intlify/unplugin-vue-i18n` plugin's `include` option has been added (or a `?jit` / `?ast` query suffix is being used), which pre-compiles catalogs into AST/JS functions before our custom ICU `messageCompiler` sees them. This skill deliberately **omits** `include` so Vite's built-in JSON importer loads catalogs as plain objects and the ICU compiler processes raw strings. **Fix**: remove `include` from the plugin config (or drop `?jit` / `?ast` query suffixes on catalog imports). Keep `runtimeOnly: false` so the message-compiler runtime the custom function plugs into stays in the bundle. If you need `include` for SFC `<i18n>` blocks, know that those blocks will be compiled by the plugin's default compiler, not the ICU one — prefer plain JSON catalogs.
+- **`[i18n] ICU compiler requires string messages`** — the `@intlify/unplugin-vue-i18n` plugin's `include` option has been added (or a `?jit` / `?ast` query suffix is being used), which pre-compiles catalogs into AST/JS functions before our custom ICU `messageCompiler` sees them. This setup phase deliberately **omits** `include` so Vite's built-in JSON importer loads catalogs as plain objects and the ICU compiler processes raw strings. **Fix**: remove `include` from the plugin config (or drop `?jit` / `?ast` query suffixes on catalog imports). Keep `runtimeOnly: false` so the message-compiler runtime the custom function plugs into stays in the bundle. If you need `include` for SFC `<i18n>` blocks, know that those blocks will be compiled by the plugin's default compiler, not the ICU one — prefer plain JSON catalogs.
 - **`useI18n()` returns `undefined` for `t`** — the `i18n` plugin isn't installed on the app. For Vite, ensure `app.use(i18n)` is called before `app.mount()`. For Quasar, ensure the boot file is registered in `quasar.config.ts`. For Nuxt, ensure `@nuxtjs/i18n` is in `modules` (not `buildModules`).
 - **`Not Available in Legacy Mode`** — you're calling `useI18n()` without `legacy: false` in `createI18n`. Set `legacy: false`.
 - **`$tc` / `tc` is not a function** — `$tc` / `tc` were removed in vue-i18n v11. Use `t(key, count)` with ICU plural syntax instead:
@@ -722,7 +722,7 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
 
 ## Quick Start: Using vue-i18n
 
-vue-i18n is now configured. Here are the patterns you'll use most — these mirror what `vue-code` enforces:
+vue-i18n is now configured. Here are the patterns you'll use most — these mirror what the vue-i18n coding rules enforce:
 
 **Template text — `{{ t('key') }}`:**
 
@@ -805,7 +805,7 @@ const { t, n, d } = useI18n()
 </template>
 ```
 
-For comprehensive wrapping patterns, plural/ICU guidance, Pinia/composables edge cases, and Nuxt-specific helpers, see the `vue-code` skill (auto-loaded via `@import`).
+For comprehensive wrapping patterns, plural/ICU guidance, Pinia/composables edge cases, and Nuxt-specific helpers, see the vue-i18n coding rules (auto-loaded via `@import`).
 
 ---
 
@@ -823,4 +823,4 @@ JSON catalog files need a translation pipeline. Options:
 
 ### Wrap existing strings
 
-This skill set up the infrastructure but did **not** convert existing hardcoded strings to `t('...')` calls. Run the `vue-convert` skill to automate that — it finds hardcoded UI strings across `.vue` and `.ts` files, wraps them with `t()` / `<i18n-t>` / `n()` / `d()`, and writes matching entries into the catalog files this setup created (it detects whether you chose JSON or PO and writes into the right format). The `vue-code` rules loaded via `@import` will guide Claude to wrap new strings correctly as you edit from now on.
+This setup phase set up the infrastructure but did **not** convert existing hardcoded strings to `t('...')` calls. Run the convert phase to automate that — it finds hardcoded UI strings across `.vue` and `.ts` files, wraps them with `t()` / `<i18n-t>` / `n()` / `d()`, and writes matching entries into the catalog files this setup created (it detects whether you chose JSON or PO and writes into the right format). The vue-i18n coding rules loaded via `@import` will guide Claude to wrap new strings correctly as you edit from now on.

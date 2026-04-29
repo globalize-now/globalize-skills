@@ -1,12 +1,12 @@
 # Vite SPA Conversion
 
-Vite-specific guidance for the `vue-convert` skill. Everything in the main SKILL.md applies; this file covers what's different about Vite SPAs.
+Vite-specific guidance for the convert phase. Everything in the shared convert reference applies; this file covers what's different about Vite SPAs.
 
 ---
 
 ## Composables and stores
 
-`vue-setup` places composables in `src/composables/` and Pinia stores in `src/stores/`. `useI18n()` works inside any composable called from setup — the common case:
+setup places composables in `src/composables/` and Pinia stores in `src/stores/`. `useI18n()` works inside any composable called from setup — the common case:
 
 ```ts
 // src/composables/useGreeting.ts
@@ -29,11 +29,11 @@ When wrapping strings inside a composable, check whether the composable is invok
 
 ## Router topology and `localePath()`
 
-If `vue-setup` wired Strategy 1 (unprefixed source) or Strategy 2 (all prefixed), it created `src/i18n/localePath.ts`. Check for its existence in Step 2's detection. When it exists, the following rules apply to every `<RouterLink>` you wrap text inside:
+If setup wired Strategy 1 (unprefixed source) or Strategy 2 (all prefixed), it created `src/i18n/localePath.ts`. Check for its existence in Step 2's detection. When it exists, the following rules apply to every `<RouterLink>` you wrap text inside:
 
 - **Leave the `to` prop alone if it already uses `localePath(...)`.**
 - **Warn if `to` is a raw string path.** Example: `<RouterLink to="/about">About</RouterLink>` — wrap the text (`<RouterLink to="/about"><Trans>About</Trans></RouterLink>` → `<RouterLink to="/about">{{ t('Navigation.about') }}</RouterLink>`), then flag the `to` prop: "This `<RouterLink>` uses a raw path; under your locale routing strategy it should go through `localePath(locale, '/about')`. Wrapping only the text for now — please review the `to` prop."
-- **Never rewrite the `to` prop yourself.** Changing routing is outside this skill's scope; it could break tests, external links, or SSR assumptions.
+- **Never rewrite the `to` prop yourself.** Changing routing is outside this convert phase's scope; it could break tests, external links, or SSR assumptions.
 
 If the user chose Strategy 3 (no URL routing) or the project has no router, skip the `localePath` rules entirely.
 
@@ -41,7 +41,7 @@ If the user chose Strategy 3 (no URL routing) or the project has no router, skip
 
 No route-scoped namespace decisions. Use the page component name as the namespace: `components/pages/Dashboard.vue` → `Dashboard`; `src/views/Settings.vue` → `Settings`.
 
-The language switcher from `vue-setup` drives `setLocale()` directly (no route navigation). Nothing to wrap around navigation; focus purely on template text and attribute wrapping.
+The language switcher from setup drives `setLocale()` directly (no route navigation). Nothing to wrap around navigation; focus purely on template text and attribute wrapping.
 
 ## Options API — no auto-migration
 
@@ -51,7 +51,7 @@ When reporting the follow-up list at the end of the conversion, include a one-li
 
 > These SFCs use the Options API and were skipped. To convert them:
 > 1. Migrate each component to `<script setup>` (see the Vue 3 Composition API migration guide).
-> 2. Re-run `vue-convert`.
+> 2. Re-run the convert phase.
 >
 > Alternatively, keep them on Options API and use `this.$t('Namespace.key')` plus entries in the catalog — but note that the Legacy API is scheduled for removal in vue-i18n v12.
 
@@ -60,7 +60,7 @@ When reporting the follow-up list at the end of the conversion, include a one-li
 Vite-SPA apps typically register number/date formats inside `createI18n({ ... })` in `src/i18n/index.ts`. When wrapping `toFixed()` / currency concatenations / date format strings, first check `src/i18n/index.ts` for registered `numberFormats` and `datetimeFormats`:
 
 - If a `currency` format exists for the source locale → use `n(price, 'currency')`.
-- If no currency format exists → warn the user: "I'm about to wrap a currency value with `n(price, 'currency')`, but no `currency` format is registered in `src/i18n/index.ts`. Either (a) add one (see `vue-setup` Step 3), or (b) inline the currency code: `n(price, { style: 'currency', currency: 'USD' })`. Which do you prefer?"
+- If no currency format exists → warn the user: "I'm about to wrap a currency value with `n(price, 'currency')`, but no `currency` format is registered in `src/i18n/index.ts`. Either (a) add one (see setup Step 3), or (b) inline the currency code: `n(price, { style: 'currency', currency: 'USD' })`. Which do you prefer?"
 - Same pattern for `short` / `long` date formats.
 
 Default to option (a) — adding a named format — unless the user overrides.

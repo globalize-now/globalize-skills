@@ -276,4 +276,4 @@ export default defineNuxtRouteMiddleware(() => {
 
 ---
 
-For initial setup, locale scaffolding, provider wiring, and language switcher creation, see the `vue-setup` skill.
+For initial setup, locale scaffolding, provider wiring, and language switcher creation, see the setup phase.

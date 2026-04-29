@@ -1,18 +1,18 @@
 # Nuxt Conversion
 
-Nuxt-specific guidance for the `vue-convert` skill. Covers Nuxt 3 and Nuxt 4 projects using `@nuxtjs/i18n`. Everything in the main SKILL.md applies; this file covers what's different about Nuxt and what's unsafe.
+Nuxt-specific guidance for the convert phase. Covers Nuxt 3 and Nuxt 4 projects using `@nuxtjs/i18n`. Everything in the shared convert reference applies; this file covers what's different about Nuxt and what's unsafe.
 
 ---
 
 ## When you hit ICU
 
-The main SKILL.md Step 6 gates ICU emission on framework. This section is the Nuxt-specific decision recipe. Apply it before writing any catalog entry that uses `plural`, `select`, or `selectordinal`.
+The the shared convert reference Step 6 gates ICU emission on framework. This section is the Nuxt-specific decision recipe. Apply it before writing any catalog entry that uses `plural`, `select`, or `selectordinal`.
 
 **Default — PO catalog routes ICU through the runtime compiler.** If the setup skill configured `catalogFormat === 'po'`, write `plural` / `select` / `selectordinal` entries straight into the locale `.po` file using the namespacing rules from Step 7. PO files pass through the `poLoader` Vite plugin (which runs with `enforce: 'pre'` before `@nuxtjs/i18n`'s own transform), so the raw ICU string reaches the custom `messageCompiler` at runtime.
 
 **JSON catalog path is not verified ICU-safe on Nuxt.** `@nuxtjs/i18n`'s lazy-loading pipeline has historically pre-compiled JSON locale files at build time using the default (non-ICU) compiler — the `bundle.dropMessageCompiler` option on v10 hints this pre-compile is still the default path. Until the combination "ICU plural in JSON + v10 + default bundle settings" is validated end-to-end against a real Nuxt build, treat JSON as interpolation-only on Nuxt. When you hit an ICU keyword with a JSON catalog, surface this to the user:
 
-1. Re-run `vue-setup` and pick PO — unblocks ICU under the lazy path immediately.
+1. Re-run the setup phase and pick PO — unblocks ICU under the lazy path immediately.
 2. Drop `langDir` + `lazy` and import locale JSON statically (Vite SPA pattern). The custom `messageCompiler` then handles ICU end-to-end, at the cost of `@nuxtjs/i18n`'s SSR-aware lazy loading.
 3. Leave the string interpolation-only and flag the plural for manual catalog authoring with a workaround.
 
@@ -76,7 +76,7 @@ Server routes run in Nitro's h3 handler context, outside Nuxt's Vue runtime. The
 - Load catalog JSON / PO content from disk in the server route.
 - Format with `intl-messageformat` directly.
 
-**This skill does not wrap server-route strings.** When the scan finds hardcoded text in `server/api/**`, include those files in a "server-side follow-up" list at the end of the conversion with a one-line remediation note:
+**This convert phase does not wrap server-route strings.** When the scan finds hardcoded text in `server/api/**`, include those files in a "server-side follow-up" list at the end of the conversion with a one-line remediation note:
 
 > These server routes contain user-visible strings. Server routes run outside vue-i18n's runtime — they need their own localization. Consider: (a) moving user-visible text out of server routes into client components that call the API and localize responses, or (b) loading the catalog manually in the server route and formatting with `intl-messageformat`.
 

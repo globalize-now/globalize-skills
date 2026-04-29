@@ -69,7 +69,7 @@ export default defineNuxtConfig({
 
 ### PO loader when `catalogFormat === 'po'`
 
-> **Experimental — verify end-to-end before shipping.** The Nuxt wiring shown here assumes `@nuxtjs/i18n`'s lazy-loading pipeline routes `.po` file imports through Vite's transform chain, so `poLoader()` with `enforce: 'pre'` intercepts them before the module's own bundling runs. This *should* hold — the module calls `import(...)` for locale files and Vite's `enforce: 'pre'` runs before any other transform — but the skill has not been validated against a real Nuxt 3 / Nuxt 4 project in every routing strategy. If locales don't load correctly, re-run `vue-setup` and pick JSON while we validate the Nuxt path, or drop into the `@nuxtjs/i18n` issue tracker with a minimal reproduction. The Vite-SPA and Quasar PO paths are better-tested.
+> **Experimental — verify end-to-end before shipping.** The Nuxt wiring shown here assumes `@nuxtjs/i18n`'s lazy-loading pipeline routes `.po` file imports through Vite's transform chain, so `poLoader()` with `enforce: 'pre'` intercepts them before the module's own bundling runs. This *should* hold — the module calls `import(...)` for locale files and Vite's `enforce: 'pre'` runs before any other transform — but the skill has not been validated against a real Nuxt 3 / Nuxt 4 project in every routing strategy. If locales don't load correctly, re-run the setup phase and pick JSON while we validate the Nuxt path, or drop into the `@nuxtjs/i18n` issue tracker with a minimal reproduction. The Vite-SPA and Quasar PO paths are better-tested.
 
 Create the loader module. Path depends on Nuxt major:
 
@@ -177,7 +177,7 @@ For Nuxt 3, swap `i18n/locales/` for `locales/` at project root and put `i18n.co
 
 ### ICU seed — why the Nuxt catalog is non-ICU by default
 
-The main SKILL.md Step 7 ships a **non-ICU seed** for Nuxt (`{"welcome": "Welcome to {appName}"}`, no plural entry). Root cause: `@nuxtjs/i18n` delegates lazy-JSON handling to `@intlify/unplugin-vue-i18n`, which pre-compiles every lazy locale file at build time using Intlify's **default** (non-ICU) compiler. The custom `messageCompiler` registered in `i18n.config.ts` runs for messages evaluated at runtime (e.g. SFC `<i18n>` blocks, plain-string fallbacks), but the lazy-loaded bundle has already been pre-compiled by the time it lands on the client. Build-time pre-compilation of `{count, plural, one {...} other {...}}` fails with `error code: 2`.
+The the shared setup reference Step 7 ships a **non-ICU seed** for Nuxt (`{"welcome": "Welcome to {appName}"}`, no plural entry). Root cause: `@nuxtjs/i18n` delegates lazy-JSON handling to `@intlify/unplugin-vue-i18n`, which pre-compiles every lazy locale file at build time using Intlify's **default** (non-ICU) compiler. The custom `messageCompiler` registered in `i18n.config.ts` runs for messages evaluated at runtime (e.g. SFC `<i18n>` blocks, plain-string fallbacks), but the lazy-loaded bundle has already been pre-compiled by the time it lands on the client. Build-time pre-compilation of `{count, plural, one {...} other {...}}` fails with `error code: 2`.
 
 v10 removed the top-level `lazy` option (locale files are always lazy) but the docs do not describe a JSON-path bypass for pre-compilation; `bundle.dropMessageCompiler` opts further *into* pre-compiling every resource, which is the opposite direction. Treat "ICU plural in JSON + v10 + default bundle settings" as unverified until validated end-to-end against a real build.
 
@@ -362,6 +362,6 @@ export default defineNuxtConfig({
 
 Surface the decision to the user before writing:
 
-> Your project currently uses `@nuxtjs/i18n@^9`. v10 simplifies the lazy-loading contract and is what this skill emits by default. Upgrading is a one-line change to `package.json` + removing the `lazy: true` line. Would you like to upgrade, or emit the v9 shape?
+> Your project currently uses `@nuxtjs/i18n@^9`. v10 simplifies the lazy-loading contract and is what this setup phase emits by default. Upgrading is a one-line change to `package.json` + removing the `lazy: true` line. Would you like to upgrade, or emit the v9 shape?
 
 In unguided mode, prefer upgrading — but never silently bump a major-version dependency; if the project is pinned, fall back to the v9 shape and note it in the end-of-run summary.

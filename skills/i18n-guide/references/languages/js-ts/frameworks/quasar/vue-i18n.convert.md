@@ -1,8 +1,8 @@
 # Quasar Conversion (Experimental)
 
-> **Warning: Experimental.** The Quasar variant of `vue-convert` follows the same patterns as the Vite SPA variant but receives less validation. Review each file's edits before committing. Report friction back to the skill maintainers.
+> **Warning: Experimental.** The Quasar variant of the convert phase follows the same patterns as the Vite SPA variant but receives less validation. Review each file's edits before committing. Report friction back to the skill maintainers.
 
-Quasar v2 projects use Vite under the hood, so most of `vue-convert`'s behavior matches the Vite SPA variant. This file covers Quasar-specific component attribute conventions and the boot-file context.
+Quasar v2 projects use Vite under the hood, so most of the convert phase's behavior matches the Vite SPA variant. This file covers Quasar-specific component attribute conventions and the boot-file context.
 
 ---
 
@@ -21,7 +21,7 @@ Unbound (no `:` prefix) user-visible Quasar props:
 - `message="..."` / `error-message="..."` on `q-input`, `q-field`
 - `tooltip="..."` on any Quasar component that renders one
 
-Flag these the same way HTML attribute misses are flagged (see main SKILL.md Step 5). The fix is identical: add the colon and wrap with `t()`:
+Flag these the same way HTML attribute misses are flagged (see the shared convert reference Step 5). The fix is identical: add the colon and wrap with `t()`:
 
 ```vue
 <!-- Before -->
@@ -87,15 +87,15 @@ Same pattern for `$q.dialog({ title, message, ok, cancel })`.
 
 ## Boot file — no wrapping needed
 
-`vue-setup` creates `src/boot/i18n.ts` which registers vue-i18n. This file is pure wiring — no user-visible strings. Skip it during conversion.
+setup creates `src/boot/i18n.ts` which registers vue-i18n. This file is pure wiring — no user-visible strings. Skip it during conversion.
 
 ---
 
 ## Router and locale prefixes
 
-Quasar's `src/router/index.ts` follows the same patterns as a plain Vite SPA with `vue-router`. If `vue-setup` wired Strategy 1 or 2 with a `localePath` helper, apply the same `<RouterLink>` rules as `references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md` — wrap only the visible text, warn on raw string paths, never rewrite the `to` prop yourself.
+Quasar's `src/router/index.ts` follows the same patterns as a plain Vite SPA with `vue-router`. If setup wired Strategy 1 or 2 with a `localePath` helper, apply the same `<RouterLink>` rules as `references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md` — wrap only the visible text, warn on raw string paths, never rewrite the `to` prop yourself.
 
-Quasar SPAs that don't use URL-based locale prefixing (Strategy 3) have no routing-related wrapping concerns. The language switcher from `vue-setup` drives `setLocale()` directly.
+Quasar SPAs that don't use URL-based locale prefixing (Strategy 3) have no routing-related wrapping concerns. The language switcher from setup drives `setLocale()` directly.
 
 ---
 

@@ -23,7 +23,7 @@ npm install -D @intlify/unplugin-vue-i18n
 
 If the project already has `@intlify/vite-plugin-vue-i18n` in `devDependencies`, **stop and warn the user**:
 
-> I detected `@intlify/vite-plugin-vue-i18n` in your devDependencies. That package has been **discontinued** in favor of `@intlify/unplugin-vue-i18n`, which is what this skill installs. To avoid conflicts, remove the old plugin before continuing:
+> I detected `@intlify/vite-plugin-vue-i18n` in your devDependencies. That package has been **discontinued** in favor of `@intlify/unplugin-vue-i18n`, which is what this setup phase installs. To avoid conflicts, remove the old plugin before continuing:
 >
 > ```bash
 > npm uninstall @intlify/vite-plugin-vue-i18n
@@ -130,7 +130,7 @@ export default boot(({ app }) => {
 })
 ```
 
-And make sure `src/i18n/index.ts` exists per the main SKILL.md Step 3 (same shape as the Vite SPA variant — `createI18n({ legacy: false })` plus the custom `messageCompiler`).
+And make sure `src/i18n/index.ts` exists per the shared setup reference Step 3 (same shape as the Vite SPA variant — `createI18n({ legacy: false })` plus the custom `messageCompiler`).
 
 Register the boot file in `quasar.config.ts` by adding `'i18n'` to the `boot: []` array (as shown in Step 4 above).
 

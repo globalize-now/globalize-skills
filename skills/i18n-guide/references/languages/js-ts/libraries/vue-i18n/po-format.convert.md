@@ -1,6 +1,6 @@
 # Catalog Format: PO (gettext)
 
-PO-specific guidance for the `vue-convert` skill. Used when `catalogFormat === 'po'` was detected in Step 2 of the main SKILL.md.
+PO-specific guidance for the convert phase. Used when `catalogFormat === 'po'` was detected in Step 2 of the shared convert reference.
 
 This reference covers four things the JSON path handles differently:
 
@@ -9,13 +9,13 @@ This reference covers four things the JSON path handles differently:
 3. **Subagent output format** — the flat entry list that replaces the nested-JSON output in Step 8.2
 4. **Merge algorithm** — how collected entries get appended to existing `.po` files without corrupting the header or duplicating `(msgid, msgctxt)` pairs
 
-Everything else in the main SKILL.md (detection rules, decision tree, namespace conventions, ICU patterns, workflow ordering, comment review) applies unchanged.
+Everything else in the shared convert reference (detection rules, decision tree, namespace conventions, ICU patterns, workflow ordering, comment review) applies unchanged.
 
 ---
 
 ## § ICU Patterns in PO
 
-The Step 6 ICU examples in the main SKILL.md show the call site and the catalog value. Here's the full PO entry for each. Every ICU body lives inside `msgstr`; the `msgid` is a dot-path matching the namespace + key used at the call site.
+The Step 6 ICU examples in the shared convert reference show the call site and the catalog value. Here's the full PO entry for each. Every ICU body lives inside `msgstr`; the `msgid` is a dot-path matching the namespace + key used at the call site.
 
 ### Interpolation
 
@@ -102,7 +102,7 @@ The `poLoader` re-hydrates these into:
 
 ## § `msgctxt` for Disambiguation
 
-`msgctxt` is the PO-level mechanism for splitting same-`msgid` entries that need different translations. Vue-i18n's runtime has no concept of contexts — so the `poLoader` (installed by `vue-setup` Step 4 when `catalogFormat === 'po'`) mangles the two pieces into a single key at build time.
+`msgctxt` is the PO-level mechanism for splitting same-`msgid` entries that need different translations. Vue-i18n's runtime has no concept of contexts — so the `poLoader` (installed by setup Step 4 when `catalogFormat === 'po'`) mangles the two pieces into a single key at build time.
 
 ### The mangling convention
 
@@ -232,7 +232,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 ```
 
-The `vue-setup` skill scaffolds this. The `vue-convert` skill **must not** rewrite it during merge — even if the headers look stale. TMS round-trips own the header metadata (especially `Plural-Forms`, `Last-Translator`, `X-Generator`). Preserving the existing block avoids spurious diffs and TMS re-import churn.
+The setup phase scaffolds this. The convert phase **must not** rewrite it during merge — even if the headers look stale. TMS round-trips own the header metadata (especially `Plural-Forms`, `Last-Translator`, `X-Generator`). Preserving the existing block avoids spurious diffs and TMS re-import churn.
 
 ---
 
@@ -345,15 +345,15 @@ None of these break the `poLoader` — it parses via `gettext-parser`, which tol
 
 1. Pick one authoring source (repo or TMS) and let the other be derived.
 2. Run `msgcat --sort-by-msgid` (or an equivalent pre-commit hook) to keep order stable.
-3. Resist re-running `vue-convert` on code that the TMS has already modified — the skill's soft-merge preserves `msgstr` but may update `#.` / `#:` in ways the TMS will then re-normalize.
+3. Resist re-running the convert phase on code that the TMS has already modified — the skill's soft-merge preserves `msgstr` but may update `#.` / `#:` in ways the TMS will then re-normalize.
 
 ---
 
 ## § Vue-Specific Gotchas in PO
 
-- **The `__ctx_` suffix is load-bearing.** If you rename the mangling convention in `src/i18n/poLoader.ts` (e.g. changing `__ctx_` to `___`), every call site must be updated to match. This skill assumes the `vue-setup`-generated `poLoader` is unmodified.
+- **The `__ctx_` suffix is load-bearing.** If you rename the mangling convention in `src/i18n/poLoader.ts` (e.g. changing `__ctx_` to `___`), every call site must be updated to match. This convert phase assumes the setup-generated `poLoader` is unmodified.
 - **`__ctx_` is a reserved substring.** If a user's own `msgid` happens to contain `__ctx_` (e.g. someone defined `msgid "Admin.key__ctx_thing"` manually with no `msgctxt`), the `poLoader` can't distinguish that from a mangled context key, and two entries could collide in the runtime tree. In practice nobody writes this by accident — but during conversion, grep the existing catalog for `__ctx_` before running convert; if a hit appears, rename it (or add a different mangling convention in `poLoader.ts`) before proceeding.
-- **`gettext-parser` parses defensively.** Malformed PO files throw at load time; the dev server will fail to start with a parse error. Prefer running `vue-convert` on a clean working tree so regressions surface against a known-good baseline.
+- **`gettext-parser` parses defensively.** Malformed PO files throw at load time; the dev server will fail to start with a parse error. Prefer running the convert phase on a clean working tree so regressions surface against a known-good baseline.
 - **`msgstr` strings with ICU placeholders use curly braces.** Do not mistake them for PO's double-quote escaping. `{count, plural, one {# item} other {# items}}` is a single valid `msgstr` value — the curly braces are ICU, not PO syntax.
 - **Never emit vue-i18n pipe-plural syntax** (`"one | many"`) in `msgstr`. The `poLoader` strips nothing; pipe-plurals would pass through to the runtime, where the custom ICU `messageCompiler` would try to parse them and fail. Always ICU.
 - **Multi-line `msgstr` is fine.** `gettext-parser` concatenates continuation lines before the loader ever sees the value. Your ICU body is preserved regardless of how the TMS formats it on disk.
