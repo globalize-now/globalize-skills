@@ -1,0 +1,7 @@
+{
+  "name": "css-i18n",
+  "version": "1.0.0",
+  "description": "Audit and convert CSS to use logical properties for RTL/bidirectional layout support. Library-agnostic.",
+  "tags": ["i18n", "css", "rtl", "logical-properties"],
+  "supportedAgents": ["claude-code"]
+}

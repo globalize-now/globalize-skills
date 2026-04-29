@@ -1,6 +1,6 @@
 # Catalog Format: PO (gettext)
 
-PO-specific variants for `next-intl` setup. The main `SKILL.md` dispatches here from Steps 4, 5, 7 (Pages Router `getStaticProps`), 8, and 12 when the user selects PO as the catalog format.
+PO-specific variants for `next-intl` setup. Each section below corresponds to a step in the variant's setup reference (Request Config, Next.js Plugin, seed catalogs, verification). Apply these PO substitutions in place of the JSON examples when the user has chosen PO as the catalog format.
 
 PO support is **experimental** in next-intl ≥ 4.5 and is enabled via the `experimental.messages` option on `createNextIntlPlugin`. A Turbopack/Webpack loader compiles `.po` into a plain JS object at build time — no `po2json` or pre-build step is required.
 
@@ -16,7 +16,7 @@ Authoring convention: **`msgid` is a dot-path** matching the namespace hierarchy
 
 ## § Request Config
 
-Used from Step 4 (App Router). Replace the `.json` import with `.po`. The literal file extension in the import string is what the plugin's loader matches on:
+Use this in place of the JSON Request Config (App Router only — `i18n/request.ts`). Replace the `.json` import with `.po`. The literal file extension in the import string is what the plugin's loader matches on:
 
 ```ts
 import {getRequestConfig} from 'next-intl/server';
@@ -42,7 +42,7 @@ Adjust the `../../messages/` path for your project depth. Do not wrap the `impor
 
 ## § Pages Router `getStaticProps`
 
-Used from Step 7 (Pages Router). Swap `.json` → `.po` in every `getStaticProps` (and `getServerSideProps`) that loads messages:
+Use this in place of the JSON `getStaticProps` block (Pages Router only). Swap `.json` → `.po` in every `getStaticProps` (and `getServerSideProps`) that loads messages:
 
 ```ts
 export async function getStaticProps({locale}: {locale: string}) {
@@ -60,7 +60,7 @@ Apply the same swap in any shared helper (e.g. `loadMessages(locale)`) if your p
 
 ## § Next.js Plugin
 
-Used from Step 5. Pass the `experimental.messages` option to `createNextIntlPlugin` so the plugin installs the `.po` loader.
+Use this in place of the JSON Next.js Plugin block. Pass the `experimental.messages` option to `createNextIntlPlugin` so the plugin installs the `.po` loader.
 
 ### App Router (ESM)
 
@@ -132,7 +132,7 @@ export default getRequestConfig(async () => ({locale: 'en', messages: {}}));
 
 ### Composing with other plugins
 
-If the project already wraps its config with other plugins (e.g. `withMDX`, `withBundleAnalyzer`), compose `withNextIntl` on the outside exactly as in the main SKILL.md:
+If the project already wraps its config with other plugins (e.g. `withMDX`, `withBundleAnalyzer`), compose `withNextIntl` on the outside:
 
 ```ts
 export default withNextIntl(withMDX(nextConfig));
@@ -158,7 +158,7 @@ const withNextIntl = createNextIntlPlugin({
 
 ## § Seed `.po` Files
 
-Used from Step 8. Create `messages/` at the project root and one `{locale}.po` file per configured locale.
+Use this in place of the JSON seed file scaffold. Create `messages/` at the project root and one `{locale}.po` file per configured locale.
 
 ### `messages/en.po` (default locale)
 
@@ -200,7 +200,7 @@ If the project uses Pages Router, swap `#: src/app/[locale]/layout.tsx` for the 
 
 ## § Verify Step Translation
 
-Used from Step 12 in place of the JSON test-translation block.
+Use this in place of the JSON test-translation block during setup verification.
 
 **Add two messages to `messages/en.po`** — a simple string and a plural. The plural check is non-negotiable: it exercises ICU inside `msgstr`, which the next-intl 4.5 docs do not spell out explicitly. This step is how we confirm the loader handles it.
 

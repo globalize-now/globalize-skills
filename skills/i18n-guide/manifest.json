@@ -1,0 +1,117 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": 1,
+  "stacks": [
+    {
+      "variant": "nextjs-app-router-lingui",
+      "match": { "framework": "next", "router": "app", "library": "lingui" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
+        "dev": ["@lingui/cli", "@lingui/swc-plugin"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.convert.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "nextjs-app-router-next-intl",
+      "match": { "framework": "next", "router": "app", "library": "next-intl" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["next-intl"],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md"],
+        "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.convert.md"],
+        "code": [],
+        "optional": {
+          "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
+          "po-format-convert": ["references/languages/js-ts/libraries/next-intl/po-format.convert.md"]
+        }
+      }
+    },
+    {
+      "variant": "nextjs-pages-router-next-intl",
+      "match": { "framework": "next", "router": "pages", "library": "next-intl" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["next-intl"],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md"],
+        "convert": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.convert.md"],
+        "code": [],
+        "optional": {
+          "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
+          "po-format-convert": ["references/languages/js-ts/libraries/next-intl/po-format.convert.md"]
+        }
+      }
+    },
+    {
+      "variant": "vite-swc-lingui",
+      "match": { "framework": "vite", "compiler": "swc", "library": "lingui" },
+      "supportLevel": "stable",
+      "appliesAlsoTo": [
+        "TanStack Router (client-only, non-SSR)",
+        "React Router (when using Vite + SWC)",
+        "Plain Vite + React + SWC SPA"
+      ],
+      "packages": {
+        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
+        "dev": ["@lingui/cli", "@lingui/swc-plugin"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/vite/react-swc/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "vite-babel-lingui",
+      "match": { "framework": "vite", "compiler": "babel", "library": "lingui" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
+        "dev": ["@lingui/cli", "@lingui/babel-plugin-lingui-macro"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "tanstack-start-lingui",
+      "match": { "framework": "tanstack-start", "library": "lingui" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
+        "dev": ["@lingui/cli", "@lingui/babel-plugin-lingui-macro"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/tanstack-start/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    }
+  ],
+  "incompatibleStacks": [
+    {
+      "match": { "library": "lingui", "router": "pages" },
+      "reason": "LinguiJS setup currently does not cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router."
+    },
+    {
+      "match": { "framework": "cra" },
+      "reason": "Create React App is no longer supported by this skill. Migrate to Vite or Next.js."
+    },
+    {
+      "match": { "react": false },
+      "reason": "These skills currently target React-based projects only."
+    }
+  ]
+}

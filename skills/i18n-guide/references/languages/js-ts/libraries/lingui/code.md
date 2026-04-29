@@ -329,4 +329,4 @@ You do not need to add domain prefixes (like `auth.login` or `dashboard.alerts`)
 
 - **Identical strings should share translations.** "Save" in auth and "Save" in dashboard mean the same thing — one translation entry is correct. Domain namespacing via `context` would create duplicate entries that must be translated identically.
 - **`context` is for disambiguation, not organization.** Use it only when the same English text genuinely needs different translations in different places (e.g., "Right" as direction vs. correctness).
-- **Per-page catalogs already provide organization.** If you use Lingui's per-page catalog extraction (see `lingui-setup`), translations are automatically scoped to each route's dependency tree.
+- **Per-page catalogs already provide organization.** If the project uses Lingui's per-page catalog extraction (configured via `experimental.extractor` in `lingui.config.ts`), translations are automatically scoped to each route's dependency tree.

@@ -1,20 +1,16 @@
 # Catalog Format: PO (gettext)
 
-PO-specific guidance for the `next-intl-convert` skill. Used when `catalogFormat === 'po'` was detected in Step 2 of the main SKILL.md.
-
-This reference covers three things the JSON path handles implicitly:
+PO-specific guidance for next-intl convert. Use this reference whenever the catalog format is PO. The variant's main convert reference covers detection, the API decision tree, namespace conventions, ICU patterns, and workflow ordering — everything in those sections applies unchanged. This file extends them with three things the JSON path handles implicitly:
 
 1. **Translation of ICU patterns to PO shape** — where a JSON key-value goes vs. a `msgid`/`msgstr` pair with metadata
-2. **Subagent output format** — the flat entry list that replaces the nested-JSON output in Step 7.2
+2. **Wrap-subagent output format** — the flat entry list each wrap subagent emits in place of nested JSON
 3. **Merge algorithm** — how collected entries get appended to existing `.po` files without corrupting the header or duplicating `msgid`s
-
-Everything else in the main SKILL.md (detection rules, API decision tree, namespace conventions, ICU patterns, workflow ordering) applies unchanged.
 
 ---
 
 ## § ICU Patterns in PO
 
-The Step 5 ICU examples in the main SKILL.md are written in JSON. Here's how each one looks in PO. Every ICU body lives inside `msgstr`; the `msgid` is a dot-path that matches the namespace/key the component uses at the call site.
+The variant's convert reference shows ICU examples in JSON. Here's how each one looks in PO. Every ICU body lives inside `msgstr`; the `msgid` is a dot-path that matches the namespace/key the component uses at the call site.
 
 ### Interpolation
 
@@ -78,7 +74,7 @@ msgstr "Log in"
 
 ## § Adding Entries
 
-When wrapping a string in Step 7.1 (sequential processing), add an entry to every locale file for each new `msgid`. Every entry must carry:
+When wrapping a string during sequential processing (small projects with one wrap subagent), add an entry to every locale file for each new `msgid`. Every entry must carry:
 
 | Field | Required | Notes |
 |-------|----------|-------|
@@ -116,7 +112,7 @@ The descriptions are the main quality lever for AI translation — models will u
 
 ## § Subagent Output Format
 
-Replaces the JSON output block in Step 7.2's subagent prompt template.
+Use this output shape in place of the JSON output block when dispatching parallel wrap subagents.
 
 The subagent must **not** edit any `.po` file directly. Instead, after processing its files, it outputs a flat list of entries — one per new `msgid` it produced — in this shape:
 

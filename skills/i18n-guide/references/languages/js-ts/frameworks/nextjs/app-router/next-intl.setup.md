@@ -2,7 +2,7 @@
 
 This covers Next.js 13+ projects using the App Router with React Server Components. The setup is simpler than some i18n libraries because next-intl has first-class App Router support — no separate compiler plugin needed.
 
-> **Catalog format note:** the code samples below use `.json` message imports. If the user chose **PO** as the catalog format in the main SKILL.md, substitute the `.json` imports and file scaffolds with their `.po` equivalents from `catalog-format-po.md`. The rest of the App Router setup (routing, middleware, provider wiring, `[locale]` layout) is format-independent.
+> **Catalog format note:** the code samples below use `.json` message imports. If the user has chosen **PO** as the catalog format, substitute the `.json` imports and file scaffolds with their `.po` equivalents from `references/languages/js-ts/libraries/next-intl/po-format.setup.md`. The rest of the App Router setup (routing, middleware, provider wiring, `[locale]` layout) is format-independent.
 
 ## Step 0 (pre-flight): Path alias detection
 
@@ -58,7 +58,7 @@ Only one package is required:
 
 Unlike LinguiJS (which requires `@lingui/swc-plugin` separately), next-intl bundles everything — routing, middleware, server/client APIs — in a single package.
 
-The main SKILL.md (Step 2) determines which next-intl version to install based on the detected Next.js version. Use the install command it selects.
+Pick the correct `next-intl` version based on the detected Next.js version: Next.js 14 → `next-intl@^3`; Next.js 15+ → `next-intl@^4` (current). If unsure, install `next-intl` without a version — npm will resolve to the latest compatible.
 
 **Example (npm):**
 
@@ -84,7 +84,7 @@ yarn add next-intl
 bun add next-intl
 ```
 
-## Step 3: Routing Configuration
+## Routing Configuration
 
 **CONSENT GATE: Present locale prefix strategy choice before proceeding.**
 
@@ -187,7 +187,7 @@ localeDetection: false
 
 This is useful when you want full control over locale selection (e.g., only via explicit URL navigation or a language picker).
 
-## Step 4: Request Configuration
+## Request Configuration
 
 Create `src/i18n/request.ts` (or `i18n/request.ts` if no `src/` directory):
 
@@ -220,7 +220,7 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 Check the project structure — if the project uses `src/`, pass the full path. If `i18n/request.ts` is at the project root, the default works.
 
-## Step 5: Next.js Plugin
+## Next.js Plugin
 
 **CONSENT GATE: This modifies `next.config.*`. Show the exact change before applying.**
 
@@ -292,7 +292,7 @@ export default withBundleAnalyzer(withNextIntl(nextConfig));
 
 The innermost wrapper (`withNextIntl`) should wrap the config object directly. Outer wrappers compose around it.
 
-## Step 6: Middleware
+## Middleware
 
 **File name depends on Next.js major**: on **Next.js 16+**, this file must be named **`proxy.ts`** (the Next 16 rename of `middleware.ts`). On **Next.js 14/15**, keep the name `middleware.ts`. Both files live at the same location with the same `createMiddleware(routing)` contents shown below — only the filename changes. Emitting `middleware.ts` on Next 16 produces a deprecation warning today; the rename is expected to become hard in a later release.
 
@@ -378,7 +378,7 @@ export const config = {
 
 Show the user the exact merged version and ask for confirmation before writing.
 
-## Step 7: Provider and Layout
+## Provider and Layout
 
 The App Router uses a two-layout pattern: a root layout for the `<html>` tag and provider, and a locale layout for locale validation and static rendering.
 
@@ -518,7 +518,7 @@ export default async function HomePage({params}: Props) {
 
 Client component pages (`'use client'`) do not need `setRequestLocale` — static rendering only applies to server components. Nested server-component pages under `app/[locale]/**/page.tsx` need the call individually. Missing the call is the most common cause of "dynamic rendering" deopts in otherwise-correct `app/[locale]/` setups.
 
-## Step 9: Directory Restructure
+## Directory Restructure
 
 **CONSENT GATE: This moves existing files. Show the full plan and ask for confirmation.**
 
@@ -612,7 +612,7 @@ With this approach:
 - No `[locale]` directory is created
 - Locale is determined by domain, cookie, or other means configured outside the app
 
-## Step 10: Navigation
+## Navigation
 
 Create `src/i18n/navigation.ts` (or `i18n/navigation.ts` if no `src/` directory):
 
@@ -874,9 +874,9 @@ export default async function DateDisplay() {
 | Now | `getNow` from `next-intl/server` | `useNow` from `next-intl` |
 | Timezone | `getTimeZone` from `next-intl/server` | `useTimeZone` from `next-intl` |
 
-## Step 11: Language Switcher
+## Language Switcher
 
-Create a client component that switches between locales using the navigation helpers from Step 10.
+Create a client component that switches between locales using the navigation helpers from the Navigation section above.
 
 **Component**: Create `src/components/LanguageSwitcher.tsx` (or `components/LanguageSwitcher.tsx` if the project does not use `src/`):
 

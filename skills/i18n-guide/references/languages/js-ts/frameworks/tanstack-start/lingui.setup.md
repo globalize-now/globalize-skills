@@ -6,7 +6,7 @@ This covers projects built on [TanStack Start](https://tanstack.com/start) — t
 
 ## Packages
 
-In addition to the core packages from Step 2, install:
+In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/macro`, `@lingui/cli`), install:
 
 | Package | Type | Purpose |
 |---------|------|---------|
@@ -22,7 +22,7 @@ npm install -D @lingui/cli @lingui/babel-plugin-lingui-macro @lingui/vite-plugin
 
 > **No `@lingui/detect-locale`.** That library only works in the browser (`navigator`, `localStorage`, `window.location`). Under SSR it would throw on the server or return a wrong value, producing a hydration mismatch. Start resolves locale from the request headers and cookie instead — see "Server Middleware" below.
 
-## Build Tool Integration (Step 4)
+## Build Tool Integration
 
 **This modifies `vite.config.ts`.** Describe the changes to the user before making them: adding `@lingui/babel-plugin-lingui-macro` to the `viteReact` plugin's Babel config and adding `lingui()` as a top-level Vite plugin. The existing `tanstackStart()` plugin must stay, and `viteReact()` must remain **after** `tanstackStart()` — the Start docs state this explicitly: "react's vite plugin must come after start's vite plugin."
 
@@ -57,7 +57,7 @@ If the project already has Babel plugins configured in the `viteReact()` call, a
 
 If `tanstackStart()` is already configured with a `router` block (e.g. `routesDirectory`, `generatedRouteTree`, `entry`, `basepath`), merge `routeFileIgnorePattern: 'locales/'` into that existing block rather than overwriting it. The `router` key accepts both the Start-specific options (`entry`, `basepath`) and the full set of `@tanstack/router-plugin` config options — `routeFileIgnorePattern`, `routesDirectory`, `generatedRouteTree`, etc. are forwarded through.
 
-## Provider Setup (Step 5)
+## Provider Setup
 
 TanStack Start needs five pieces: a server middleware that resolves the locale for every request, a tiny server function that the router calls to read the resolved locale, an i18n helper module, the root document with `<html lang>`, and per-route catalog loading.
 
@@ -80,7 +80,7 @@ TanStack Start needs five pieces: a server middleware that resolves the locale f
 
 ### 0. Locale resolver (shared)
 
-Both the server middleware and the `setLocale` server function need the same logic for validating a raw locale string against the configured locales with a regional fallback. Extend `src/i18n/locales.ts` (created in Step 3) with a `resolveLocale` helper so there's a single source of truth:
+Both the server middleware and the `setLocale` server function need the same logic for validating a raw locale string against the configured locales with a regional fallback. Extend `src/i18n/locales.ts` (the shared locale-constants module created during config) with a `resolveLocale` helper so there's a single source of truth:
 
 ```ts
 // src/i18n/locales.ts

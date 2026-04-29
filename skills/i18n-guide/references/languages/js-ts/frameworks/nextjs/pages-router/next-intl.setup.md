@@ -2,7 +2,7 @@
 
 This covers Next.js projects using the Pages Router (`pages/` directory, `_app.tsx`). The setup is simpler than the App Router variant — no middleware, no `[locale]` directory restructuring, and no server/client component distinction.
 
-> **Catalog format note:** the code samples below use `.json` message imports (including the shared `getMessages` helper and the namespace-filtered variant). If the user chose **PO** as the catalog format in the main SKILL.md, swap `.json` for `.po` in every `import(`../../messages/${locale}.json`)` expression and use the seed file format from `catalog-format-po.md`. The rest of the Pages Router setup (i18n config, provider, `getStaticProps` pattern) is format-independent.
+> **Catalog format note:** the code samples below use `.json` message imports (including the shared `getMessages` helper and the namespace-filtered variant). If the user has chosen **PO** as the catalog format, swap `.json` for `.po` in every `import(`../../messages/${locale}.json`)` expression and use the seed file format from `references/languages/js-ts/libraries/next-intl/po-format.setup.md`. The rest of the Pages Router setup (i18n config, provider, `getStaticProps` pattern) is format-independent.
 
 ## Step 0 (pre-flight): Path alias detection
 
@@ -21,7 +21,7 @@ Only one package is required:
 |---------|------|---------|
 | `next-intl` | runtime | Full i18n: translations, formatting, provider |
 
-The main SKILL.md (Step 2) determines which next-intl version to install based on the detected Next.js version. Use the install command it selects.
+Pick the correct `next-intl` version based on the detected Next.js version: Next.js 14 → `next-intl@^3`; Next.js 15+ → `next-intl@^4` (current). If unsure, install `next-intl` without a version — npm will resolve to the latest compatible.
 
 **Example (npm):**
 
@@ -47,7 +47,7 @@ yarn add next-intl
 bun add next-intl
 ```
 
-## Step 3: Routing Configuration
+## Routing Configuration
 
 Create `src/i18n/routing.ts` (or `i18n/routing.ts` if the project does not use a `src/` directory):
 
@@ -60,13 +60,13 @@ export const routing = defineRouting({
 });
 ```
 
-This file centralizes the locale definitions. The actual locale routing is handled by Next.js built-in `i18n` config in `next.config.js` (configured in Step 5), not by next-intl middleware. This file is still useful as a single source of truth for the locale list, which other parts of the code can import.
+This file centralizes the locale definitions. The actual locale routing is handled by Next.js built-in `i18n` config in `next.config.js` (configured in the Next.js Config section below), not by next-intl middleware. This file is still useful as a single source of truth for the locale list, which other parts of the code can import.
 
-**Note:** The `localePrefix` option from the main SKILL.md Step 3 does not apply to Pages Router. Pages Router uses the built-in `i18n` config for routing, which always uses prefix-based routing (e.g., `/de/about`). The default locale can be unprefixed via the `i18n.localeDetection` option in `next.config.js`.
+**Note:** The `localePrefix` option commonly used in App Router routing config does not apply to Pages Router. Pages Router uses the built-in `i18n` config for routing, which always uses prefix-based routing (e.g., `/de/about`). The default locale can be unprefixed via the `i18n.localeDetection` option in `next.config.js`.
 
 Ask the user for their locale list and default locale at this step.
 
-## Step 4: Stub `request.ts`
+## Stub `request.ts`
 
 Pages Router loads messages through `getStaticProps` (see "Message Loading" section below), not through `request.ts`. However, since next-intl 4.9, `next-intl/plugin` asserts that `i18n/request.ts` exists at module load and throws `Could not locate request configuration module` otherwise. Create a one-line stub to satisfy the load-time check:
 
@@ -78,11 +78,11 @@ export default getRequestConfig(async () => ({locale: routing.defaultLocale, mes
 
 Place this at `src/i18n/request.ts` (or `i18n/request.ts` if the project does not use a `src/` directory). The body is a no-op: the default export is never invoked at runtime on Pages Router, since messages flow through page-level data-fetching functions. The stub exists purely to get past the plugin's startup assertion.
 
-## Step 6: Skipped
+## Skipped: middleware
 
-Pages Router does not use middleware for locale routing -- locale routing is handled by the built-in `i18n` config in `next.config.js`, which Next.js processes automatically. The `i18n` config is set up in Step 5 alongside the next-intl plugin.
+Pages Router does not use middleware for locale routing — locale routing is handled by the built-in `i18n` config in `next.config.js`, which Next.js processes automatically. The `i18n` config is set up in the Next.js Config section below alongside the next-intl plugin.
 
-## Step 5: Next.js Config
+## Next.js Config
 
 **CONSENT GATE: This modifies `next.config.*`. Show the exact change before applying.**
 
@@ -173,7 +173,7 @@ const nextConfig = {
 module.exports = withBundleAnalyzer(withNextIntl(nextConfig));
 ```
 
-## Step 7: Provider in `_app.tsx`
+## Provider in `_app.tsx`
 
 **CONSENT GATE: This modifies `_app.tsx`. Show the exact change before applying.**
 
@@ -391,7 +391,7 @@ i18n: {
 }
 ```
 
-## Step 11: Language Switcher
+## Language Switcher
 
 Create a component that lets users switch between locales. Pages Router has native `<Link locale={loc}>` support, making this straightforward.
 

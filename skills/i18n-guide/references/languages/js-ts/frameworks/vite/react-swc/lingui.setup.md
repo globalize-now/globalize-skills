@@ -1,63 +1,54 @@
-# Vite + Babel Setup
+# Vite + SWC Setup
 
-This covers Vite projects using `@vitejs/plugin-react` (Babel-based, without the `-swc` suffix).
-
-> **Version gate — `@vitejs/plugin-react` v6+**: `@vitejs/plugin-react@6.0.0` (Oct 2025) dropped the `babel` option from its public `Options` type. Only `include`, `exclude`, `jsxImportSource`, `jsxRuntime`, and `reactRefreshHost` remain. The `react({ babel: {...} })` form below is silently ignored on v6+ — macros never get transformed, `tsc` errors with TS2353 on the `babel` property, and `@lingui/vite-plugin`'s macro-import check fails at build time.
->
-> Before applying this reference, read the project's installed `@vitejs/plugin-react` version (from `package.json` or `package-lock.json` / `pnpm-lock.yaml` / `bun.lock`). If the major is 6 or higher:
->
-> 1. Switch the project to `@vitejs/plugin-react-swc` + `@lingui/swc-plugin`.
-> 2. Use `references/vite-swc.md` instead of this file for the rest of the setup.
->
-> If the project is locked to v5 or lower (e.g. the lockfile pins a Vite/React combo that pre-dates v6), this reference still applies verbatim. Do not proactively downgrade `@vitejs/plugin-react`.
+This covers Vite projects using `@vitejs/plugin-react-swc` — including plain Vite, TanStack Router, React Router, and any other SWC-based Vite setup.
 
 ## Packages
 
-In addition to the core packages from Step 2, install:
+In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/macro`, `@lingui/cli`), install:
 
 | Package | Type | Purpose |
 |---------|------|---------|
 | `@lingui/detect-locale` | runtime | Browser locale detection (navigator, URL, storage, cookie) |
-| `@lingui/babel-plugin-lingui-macro` | dev | Babel macro transform |
+| `@lingui/swc-plugin` | dev | SWC macro transform |
 | `@lingui/vite-plugin` | dev | Vite integration for catalog compilation |
 
 **Example (npm):**
 
 ```bash
 npm install @lingui/core @lingui/react @lingui/macro @lingui/detect-locale
-npm install -D @lingui/cli @lingui/babel-plugin-lingui-macro @lingui/vite-plugin
+npm install -D @lingui/cli @lingui/swc-plugin @lingui/vite-plugin
 ```
 
-## Build Tool Integration (Step 4)
+**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema or plugin invocation error, look up the compatible version at https://plugins.swc.rs and pin it exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. See "SWC plugin version mismatch" in Common Gotchas.
 
-**This modifies `vite.config.ts`.** Describe the changes to the user before making them: adding `@lingui/babel-plugin-lingui-macro` to the `react()` plugin's Babel config and adding `lingui()` as a top-level Vite plugin. If the config has unusual structure or unfamiliar plugins, show the proposed diff and ask for confirmation.
+## Build Tool Integration
 
-Modify `vite.config.ts` to add the Babel plugin and the Lingui Vite plugin:
+**This modifies `vite.config.ts`.** Describe the changes to the user before making them: adding `@lingui/swc-plugin` to the `react()` plugin's `plugins` array and adding `lingui()` as a top-level Vite plugin. If the config has unusual structure or unfamiliar plugins, show the proposed diff and ask for confirmation.
+
+Modify `vite.config.ts` to add the SWC plugin and the Lingui Vite plugin:
 
 ```ts
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import react from '@vitejs/plugin-react-swc'
 import { lingui } from '@lingui/vite-plugin'
 
 export default defineConfig({
   plugins: [
     react({
-      babel: {
-        plugins: ['@lingui/babel-plugin-lingui-macro'],
-      },
+      plugins: [['@lingui/swc-plugin', {}]],
     }),
     lingui(),
   ],
 })
 ```
 
-If the project already has Babel plugins configured in the `react()` call, add `@lingui/babel-plugin-lingui-macro` to the existing array.
+If the project already has other Vite plugins (e.g., TanStack Router plugin), keep them — just add the `lingui()` plugin alongside them and add `@lingui/swc-plugin` to the `react()` plugin's `plugins` array.
 
 **Example with TanStack Router:**
 
 ```ts
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import react from '@vitejs/plugin-react-swc'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import { lingui } from '@lingui/vite-plugin'
 
@@ -71,9 +62,7 @@ export default defineConfig({
       routeFileIgnorePattern: 'locales/',
     }),
     react({
-      babel: {
-        plugins: ['@lingui/babel-plugin-lingui-macro'],
-      },
+      plugins: [['@lingui/swc-plugin', {}]],
     }),
     lingui(),
   ],
@@ -82,7 +71,7 @@ export default defineConfig({
 
 **First-run ordering.** On a clean clone, run `vite build` (or start `vite dev` once) before `tsc -b` / `tsc --noEmit`. The TanStack Router plugin generates `src/routeTree.gen.ts` on first Vite run; `tsc` fails if the generated file does not yet exist. If the project's `npm run build` currently runs `tsc -b && vite build`, reorder to `vite build && tsc --noEmit` (or add a pre-build `vite build --mode dev` step) so the route tree is present before type-checking.
 
-## Provider Setup (Step 5)
+## Provider Setup
 
 The setup depends on whether the project uses per-page catalogs (file-based routing) or a single global catalog.
 
@@ -674,6 +663,8 @@ Vite projects have an `index.html` at the project root with a static `<html lang
 - Remove any hardcoded `dir` attribute (e.g., `dir="ltr"`). The `activateLocale()` function sets `dir` dynamically, and a hardcoded value would flash incorrect direction for RTL locales.
 
 Describe the exact change to the user before making it (e.g., 'I will update `<html lang="en">` to `<html lang="es">` in `index.html` to match the source locale').
+
+---
 
 ### Single catalog (plain SPA without file-based routing)
 

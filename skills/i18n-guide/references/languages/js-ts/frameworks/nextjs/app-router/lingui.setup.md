@@ -4,7 +4,7 @@ This covers Next.js 13+ projects using the App Router with React Server Componen
 
 ## Packages
 
-In addition to the core packages from Step 2, install:
+In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/macro`, `@lingui/cli`), install:
 
 | Package | Type | Purpose |
 |---------|------|---------|
@@ -23,7 +23,7 @@ npm install -D @lingui/cli @lingui/swc-plugin
 
 Note: No `@lingui/vite-plugin` — Next.js has its own build pipeline.
 
-## Build Tool Integration (Step 4)
+## Build Tool Integration
 
 Add the SWC plugin to `next.config.js` (or `next.config.mjs` / `next.config.ts`):
 
@@ -57,7 +57,7 @@ If the project uses Babel instead of SWC, add the plugin to `.babelrc`:
 }
 ```
 
-## Provider Setup (Step 5)
+## Provider Setup
 
 The App Router needs three pieces: an i18n instance factory, a client provider component, and the root layout wiring. It also needs locale-based routing and middleware.
 
