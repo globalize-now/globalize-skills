@@ -79,7 +79,7 @@ build: {
 
 ### PO loader when `catalogFormat === 'po'`
 
-Create `src/i18n/poLoader.ts` using the same body as the Vite SPA variant (see `vue-setup/references/vite-spa.md` § PO loader — copy verbatim). Then register it in `quasar.config.ts` as an additional Vite plugin, **before** `@intlify/unplugin-vue-i18n/vite`:
+Create `src/i18n/poLoader.ts` using the same body as the Vite SPA variant (see `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md` § PO loader — copy verbatim). Then register it in `quasar.config.ts` as an additional Vite plugin, **before** `@intlify/unplugin-vue-i18n/vite`:
 
 ```ts
 // quasar.config.ts  (PO variant)
@@ -226,6 +226,6 @@ import LanguageSwitcher from 'src/components/LanguageSwitcher.vue'
 
 ## Router integration
 
-If the Quasar project uses `vue-router` with locale-prefixed routes (Strategies 1 / 2 from the Vite SPA variant), apply the same `router.beforeEach` + `localePath` helper pattern from `references/vite-spa.md`. Quasar's router setup lives in `src/router/index.ts` — the mechanics are identical to plain Vite + vue-router.
+If the Quasar project uses `vue-router` with locale-prefixed routes (Strategies 1 / 2 from the Vite SPA variant), apply the same `router.beforeEach` + `localePath` helper pattern from `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`. Quasar's router setup lives in `src/router/index.ts` — the mechanics are identical to plain Vite + vue-router.
 
 If the project uses no URL routing (Strategy 3), skip the router changes; the switcher above is sufficient.

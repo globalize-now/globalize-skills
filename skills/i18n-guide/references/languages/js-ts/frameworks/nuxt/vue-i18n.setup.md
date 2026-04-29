@@ -76,7 +76,7 @@ Create the loader module. Path depends on Nuxt major:
 - **Nuxt 4**: `i18n/poLoader.ts`
 - **Nuxt 3**: `poLoader.ts` at project root (alongside `i18n.config.ts`)
 
-The loader body is identical to the Vite SPA variant (see `references/vite-spa.md` § PO loader). Copy it verbatim — it's framework-agnostic (uses only Vite's `Plugin` type and `node:fs`).
+The loader body is identical to the Vite SPA variant (see `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md` § PO loader). Copy it verbatim — it's framework-agnostic (uses only Vite's `Plugin` type and `node:fs`).
 
 Then wire it through `nuxt.config.ts` via `vite.plugins` — **not** `modules` (it's a Vite plugin, not a Nuxt module):
 

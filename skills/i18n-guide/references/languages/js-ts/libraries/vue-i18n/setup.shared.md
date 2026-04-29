@@ -1,16 +1,3 @@
----
-name: vue-setup
-description: >-
-  Set up vue-i18n internationalization in a Vue 3 project. Use this skill when
-  the user explicitly mentions Vue, vue-i18n, @intlify, Nuxt i18n, or
-  @nuxtjs/i18n — or when the i18n-guide skill hands off to it after recommending
-  vue-i18n. Supports Vite SPA (with or without Vue Router), Nuxt 3/4 (SSR via
-  @nuxtjs/i18n), and Quasar (experimental). This skill handles the full setup:
-  package installation, build tool wiring, provider creation, catalog scaffolding,
-  language switcher, and coding-rules import. It does NOT cover converting
-  existing hardcoded strings — that's a separate concern (vue-convert, planned).
----
-
 # vue-i18n Setup
 
 `vue-i18n` v11 (Intlify) is the dominant i18n library for Vue 3. This skill configures it with the Composition API (`createI18n({ legacy: false })`, `useI18n()` in `<script setup>`) and enables ICU MessageFormat — matching the rest of this repo's message-format stance and avoiding vue-i18n's pipe-plural syntax, which bakes English-style plurals into source strings.
@@ -102,8 +89,8 @@ In unguided mode, apply the defaults below without prompting. Log each default c
 | **Source locale** | Existing `<html lang="...">` if found; otherwise `en` | Matches what the app already ships. |
 | **Target locale** | User-specified if given in the initial prompt; otherwise `es` | One additional locale is enough to validate the pipeline. |
 | **Catalog format** | JSON | Zero-config — no `poLoader` plugin, no Nuxt ICU pre-compile surprises. PO remains opt-in if the user explicitly picks it. |
-| **Vite-SPA locale routing strategy** (`references/vite-spa.md`, when `vue-router` is in deps) | "Unprefixed default locale" — source-locale URLs stay bare, target locales get a prefix (`/es/about`) | Preserves existing URLs. |
-| **Nuxt routing strategy** (`references/nuxt.md`, when Nuxt is detected) | `prefix_except_default` | Matches both `@nuxtjs/i18n`'s own default and the Vite-SPA default for consistency. |
+| **Vite-SPA locale routing strategy** (`references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`, when `vue-router` is in deps) | "Unprefixed default locale" — source-locale URLs stay bare, target locales get a prefix (`/es/about`) | Preserves existing URLs. |
+| **Nuxt routing strategy** (`references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md`, when Nuxt is detected) | `prefix_except_default` | Matches both `@nuxtjs/i18n`'s own default and the Vite-SPA default for consistency. |
 | **Default currency** (Step 3 `numberFormats` seeding) | Inferred from source locale (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`, `fr-FR` → `EUR`, `es-ES` → `EUR`, `ja-JP` → `JPY`) with `USD` fallback | Seed a working currency format so `n(amount, 'currency')` works out of the box. |
 | **`main.ts` / provider wrapping** | Apply silently | Consent gate suspended in unguided mode per the rule above. |
 | **Optional steps** (CI/CD, test wrapper) | Included | Unless the user named them to skip at mode-selection time. |
@@ -168,9 +155,9 @@ Wait for the user to confirm before proceeding. This is a warning, not a hard st
 
 Based on the detection, pick the right variant reference file:
 
-- **Nuxt detected** (`nuxt` in deps) → read `references/nuxt.md`
-- **Quasar detected** (`quasar` in deps) → read `references/quasar.md`. **This variant is experimental in v1.** Before continuing, tell the user: "I detected Quasar. The Quasar variant is experimental in this skill — it follows the Quasar boot-file pattern but hasn't been extensively tested. Proceed, or would you prefer to stop and set up manually using the Quasar i18n docs?" Wait for explicit confirmation.
-- **Vite SPA** (neither Nuxt nor Quasar, but `vite` + `vue` present) → read `references/vite-spa.md`
+- **Nuxt detected** (`nuxt` in deps) → read `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md`
+- **Quasar detected** (`quasar` in deps) → read `references/languages/js-ts/frameworks/quasar/vue-i18n.setup.md`. **This variant is experimental in v1.** Before continuing, tell the user: "I detected Quasar. The Quasar variant is experimental in this skill — it follows the Quasar boot-file pattern but hasn't been extensively tested. Proceed, or would you prefer to stop and set up manually using the Quasar i18n docs?" Wait for explicit confirmation.
+- **Vite SPA** (neither Nuxt nor Quasar, but `vite` + `vue` present) → read `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`
 
 Then continue with Steps 2–8 below, using the variant-specific instructions from the reference file for Steps 4, 5, and 6.
 
@@ -414,7 +401,7 @@ Follow the variant-specific reference file. The reference file presents a **loca
 The `<html>` element needs both `lang` and `dir` attributes for correct rendering of Arabic, Hebrew, Persian, Urdu, etc. The `getDirection()` helper created in Step 3 covers this. The reference files show where to call `setLocale()` / `getDirection()` for each variant:
 
 - **Vite SPA / Quasar**: called from `main.ts` / boot file after `app.use(i18n)`, and from the language switcher.
-- **Nuxt**: use the `useLocaleHead()` composable which returns both `lang` and `dir` attributes in a Ref; apply them via `useHead()` in `app.vue`. See `references/nuxt.md`.
+- **Nuxt**: use the `useLocaleHead()` composable which returns both `lang` and `dir` attributes in a Ref; apply them via `useHead()` in `app.vue`. See `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md`.
 
 ### `<html lang>` migration
 
@@ -484,7 +471,7 @@ Seed each file with a couple of example keys so the app can boot without a catal
 }
 ```
 
-> **Nuxt exception — ship a non-ICU seed.** With `@nuxtjs/i18n` + `bundle.runtimeOnly: false` (the default this skill emits), `unplugin-vue-i18n` pre-compiles the lazy locale JSON at build time using its **default**, non-ICU compiler — *before* the custom `messageCompiler` registered in `i18n.config.ts` runs. A seed containing `{count, plural, one {...} other {...}}` will fail the build with `error code: 2`. For Nuxt, drop the `messages` entry from the seed (keep only `welcome`). See `references/nuxt.md` § ICU seed upgrade for how to re-enable build-time ICU once the catalog is actually in use.
+> **Nuxt exception — ship a non-ICU seed.** With `@nuxtjs/i18n` + `bundle.runtimeOnly: false` (the default this skill emits), `unplugin-vue-i18n` pre-compiles the lazy locale JSON at build time using its **default**, non-ICU compiler — *before* the custom `messageCompiler` registered in `i18n.config.ts` runs. A seed containing `{count, plural, one {...} other {...}}` will fail the build with `error code: 2`. For Nuxt, drop the `messages` entry from the seed (keep only `welcome`). See `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md` § ICU seed upgrade for how to re-enable build-time ICU once the catalog is actually in use.
 
 ```json
 {
@@ -623,7 +610,7 @@ const LOCALES_DIR = 'src/i18n/locales'  // adjust per variant
 const files = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.po'))
 
 function entryKey(msgid, ctx) {
-  return ctx ? `${ctx} ${msgid}` : msgid
+  return ctx ? `${ctx}${msgid}` : msgid
 }
 
 const catalogs = Object.fromEntries(files.map((f) => {
@@ -642,7 +629,7 @@ let hadIssue = false
 for (const [locale, keys] of Object.entries(catalogs)) {
   const missing = [...source].filter((k) => !keys.has(k))
   if (missing.length > 0) {
-    console.error(`[i18n] ${locale} missing ${missing.length} entry/entries: ${missing.slice(0, 5).map((k) => k.replace(' ', ' / ')).join(', ')}${missing.length > 5 ? '…' : ''}`)
+    console.error(`[i18n] ${locale} missing ${missing.length} entry/entries: ${missing.slice(0, 5).map((k) => k.replace('', ' / ')).join(', ')}${missing.length > 5 ? '…' : ''}`)
     hadIssue = true
   }
 }
@@ -726,7 +713,7 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
   t('items', { count: 3 })  // ICU: {count, plural, one {# item} other {# items}}
   ```
 - **Missing `dir` attribute / LTR-only CSS in RTL locales** — the `<html>` element must have `dir="rtl"` for Arabic, Hebrew, Persian, Urdu, etc. The `getDirection()` helper covers this. Equally important: CSS must use logical properties (`margin-inline-start` instead of `margin-left`, `padding-inline-end` instead of `padding-right`, `inset-inline-start` instead of `left`). Physical properties don't flip in RTL and require a full CSS audit. Run the `css-i18n` skill for a CSS audit and conversion.
-- **Links navigate to wrong locale** — with `@nuxtjs/i18n`, always use `<NuxtLink>` (not raw `<a>`) for internal paths; the module rewrites `to` props based on the active locale and routing strategy. For Vite SPA with vue-router's Strategy 1 or 2, every `<RouterLink :to>` must go through the `localePath()` helper in `references/vite-spa.md`.
+- **Links navigate to wrong locale** — with `@nuxtjs/i18n`, always use `<NuxtLink>` (not raw `<a>`) for internal paths; the module rewrites `to` props based on the active locale and routing strategy. For Vite SPA with vue-router's Strategy 1 or 2, every `<RouterLink :to>` must go through the `localePath()` helper in `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`.
 - **Nuxt: `vueI18n` config not picked up** — the `vueI18n` path in `nuxt.config.ts` must match the actual file location. Nuxt 4 convention puts the config inside the `i18n/` directory (`i18n: { vueI18n: './i18n/i18n.config.ts' }`); Nuxt 3 convention puts it at project root (`i18n: { vueI18n: './i18n.config.ts' }`). If your config isn't applying, double-check the path.
 - **SFC `<i18n>` custom blocks not recognized** — confirm `@intlify/unplugin-vue-i18n` is listed in `vite.config.ts` `plugins` (or equivalent); the plugin is what activates SFC `<i18n>` blocks. Without it, Vue treats them as unknown elements.
 - **Hydration mismatch on SSR (Nuxt)** — the server renders in one locale, the client hydrates and detects a different preferred locale, causing a mismatch. Use `useLocaleHead()` for `<html lang>` / `<html dir>` and avoid reading `navigator.language` during hydration; let `@nuxtjs/i18n`'s browser-detection middleware handle it.

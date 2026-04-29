@@ -93,7 +93,7 @@ Same pattern for `$q.dialog({ title, message, ok, cancel })`.
 
 ## Router and locale prefixes
 
-Quasar's `src/router/index.ts` follows the same patterns as a plain Vite SPA with `vue-router`. If `vue-setup` wired Strategy 1 or 2 with a `localePath` helper, apply the same `<RouterLink>` rules as `references/vite-spa.md` — wrap only the visible text, warn on raw string paths, never rewrite the `to` prop yourself.
+Quasar's `src/router/index.ts` follows the same patterns as a plain Vite SPA with `vue-router`. If `vue-setup` wired Strategy 1 or 2 with a `localePath` helper, apply the same `<RouterLink>` rules as `references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md` — wrap only the visible text, warn on raw string paths, never rewrite the `to` prop yourself.
 
 Quasar SPAs that don't use URL-based locale prefixing (Strategy 3) have no routing-related wrapping concerns. The language switcher from `vue-setup` drives `setLocale()` directly.
 
@@ -109,10 +109,10 @@ For user-visible numbers and currencies *outside* Quasar's date/time pickers, us
 
 ## SSR mode
 
-If the Quasar project uses `ssr` mode (detected via `quasar.config.ts` having `ssr: { prodPort: ... }` or `ssr: true`), `t()` runs on the server during page render. The same SSR-safety caveats from `references/nuxt.md` apply:
+If the Quasar project uses `ssr` mode (detected via `quasar.config.ts` having `ssr: { prodPort: ... }` or `ssr: true`), `t()` runs on the server during page render. The same SSR-safety caveats from `references/languages/js-ts/frameworks/nuxt/vue-i18n.convert.md` apply:
 
 - Don't read browser APIs (`navigator.language`, `localStorage`) during setup.
-- Don't set the locale synchronously during server render; let the boot file handle it from `ssrContext` (see `vue-setup/references/quasar.md` for the SSR-aware boot file).
+- Don't set the locale synchronously during server render; let the boot file handle it from `ssrContext` (see `references/languages/js-ts/frameworks/quasar/vue-i18n.setup.md` for the SSR-aware boot file).
 - Watch for hydration mismatches in conditional `t()` output.
 
 For SPA mode (the default), none of this matters — client-only.

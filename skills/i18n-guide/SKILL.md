@@ -74,17 +74,18 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > ```json
 > {
->   "framework": "next" | "vite" | "tanstack-start" | "cra" | "unknown",
->   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "none",
+>   "framework": "next" | "vite" | "tanstack-start" | "nuxt" | "quasar" | "cra" | "unknown",
+>   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "vue-router" | "none",
 >   "compiler": "swc" | "babel",
 >   "react": true | false,
+>   "vue": true | false,
 >   "typescript": true | false,
 >   "packageManager": "npm" | "yarn" | "pnpm" | "bun",
 >   "sourceDir": "src" | "app" | string,
 >   "routeEntries": ["src/app/**/page.tsx", ...] | null,
 >   "git": { "isRepo": true | false, "branch": string | null, "remote": string | null },
 >   "existing": {
->     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "none",
+>     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "none",
 >     "configured": true | false,
 >     "providerWired": true | false,
 >     "catalogsScaffolded": true | false,
@@ -105,14 +106,16 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > | Field | How to detect |
 > |---|---|
-> | `framework` | `next` in deps → next. `@tanstack/react-start` in deps → tanstack-start. `vite` in devDeps → vite. `react-scripts` in deps → cra. |
-> | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps. |
-> | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → babel. |
+> | `framework` | `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. |
+> | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps. Vue Router: `vue-router` in deps (Vite SPA / Quasar). |
+> | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. |
+> | `react` | `react` in deps or devDeps. |
+> | `vue` | `vue` in deps or devDeps. |
 > | `packageManager` | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
 > | `routeEntries` | App Router: `<root>/src/app/**/page.tsx`. TanStack file-based: `<root>/src/routes/**/*.tsx`. React Router v7 framework mode: `<root>/app/routes/**/*.tsx`. None if no file-based routing detected. |
 > | `existing.library` | First match in deps/devDeps from the union of i18n libraries listed above. |
-> | `existing.configured` | `lingui.config.*` present AND macro plugin wired in build config; OR `next-intl` config present AND plugin wired. |
-> | `existing.providerWired` | Layout/main file imports and renders `I18nProvider` (Lingui) or `NextIntlClientProvider` (next-intl). |
+> | `existing.configured` | `lingui.config.*` present AND macro plugin wired in build config; OR `next-intl` config present AND plugin wired; OR (Vue) `createI18n(` present in `src/i18n/index.*` (Vite/Quasar) or `defineI18nConfig(` in `i18n.config.*` (Nuxt) AND `messageCompiler` wired. |
+> | `existing.providerWired` | Layout/main file imports and renders `I18nProvider` (Lingui) or `NextIntlClientProvider` (next-intl); OR (Vue) `app.use(i18n)` in `main.*` (Vite) / boot file registered (Quasar) / `@nuxtjs/i18n` listed in `modules` (Nuxt). |
 > | `existing.catalogsScaffolded` | Locale directories with at least one message file exist. |
 > | `existing.stringsWrapped` | Glob source tree, sample up to 50 files, count files with bare JSX text vs. files importing macros: > 80% imported → "yes", > 20% → "partial", else → "no". |
 > | `candidateFiles` | Glob `src/**/*.{tsx,ts,jsx,js}`, exclude tests/configs/`.d.ts`, grep each for: bare JSX text (`>Word<`), user-visible attrs (`placeholder=`, `aria-label=`, `title=`, `alt=`), exported user-facing string literals. Return files with ≥1 match, sorted by match count desc. |
@@ -126,11 +129,11 @@ Read `detection.json`. Apply these rules top-to-bottom. If any matches, **STOP**
 
 | Condition | Stop message |
 |---|---|
-| `react === false` | "i18n-guide currently supports React-based projects only. This project uses {framework}. No supported library available." |
+| `react === false` AND `vue === false` | "i18n-guide currently supports React-based and Vue-based projects only. This project uses {framework}. No supported library available." |
 | `framework === "cra"` | "Create React App is no longer supported by this skill. Migrate to Vite or Next.js, then re-run." |
-| `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
+| `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
 | `framework === "next"` AND `router === "pages"` AND user wants Lingui | (Surface only after library choice in 1.5) "Lingui setup does not currently cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router." |
-| Custom build pipeline (no `vite.config`, `next.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js." |
+| Custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar." |
 
 ### 1.3 Resolve supported stacks from manifest
 
@@ -158,7 +161,9 @@ Show the user the list of supported variants from 1.3, with the recommendation m
 |---|---|---|
 | `framework === "next"` | **next-intl** | Purpose-built for Next.js; first-class App Router (RSC + middleware) and Pages Router support. Uses ICU MessageFormat. No compile step. |
 | `framework === "next"` AND user wants compile-time extraction | **Lingui** (alternative) | Compile-time macros, zero-runtime-overhead translations. |
-| anything else (vite, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
+| `framework === "nuxt"` | **vue-i18n via @nuxtjs/i18n** | The Nuxt module wraps vue-i18n with SSR-aware routing, lazy-loaded locale catalogs, and locale meta via `useLocaleHead`. The canonical Nuxt choice. |
+| `framework === "quasar"` OR (`vue === true` AND `framework === "vite"`) | **vue-i18n** | The official Intlify library and de-facto standard across Vue 3 projects. Composition API + ICU via custom `messageCompiler`. |
+| anything else (vite + react, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
 
 Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt.
 

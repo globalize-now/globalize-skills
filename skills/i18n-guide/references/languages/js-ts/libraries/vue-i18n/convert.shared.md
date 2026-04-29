@@ -1,20 +1,3 @@
----
-name: vue-convert
-description: >-
-  Wrap hardcoded UI strings with vue-i18n calls (`t()`, `<i18n-t>`, `n()`, `d()`)
-  in a Vue 3 project that already has vue-i18n set up. Use this skill when the
-  user asks to "wrap strings", "find hardcoded text", "internationalize
-  existing components", "make the UI translatable", "detect localization gaps",
-  "find unwrapped strings", or "convert strings for translation". Also use
-  when the user mentions missing `useI18n()` / `t()` usage in existing code or
-  bare text in `.vue` templates. This is a one-time batch job — for wrapping
-  strings as new code is written, the `vue-code` rules apply. This skill does
-  NOT translate content into other languages — it only makes strings
-  translatable. It does NOT install packages or create config — run
-  `vue-setup` first if vue-i18n is not yet configured. Supports both JSON and
-  PO catalog formats (detected from the existing setup).
----
-
 # vue-i18n String Wrapping
 
 This skill finds hardcoded user-facing strings in a Vue 3 project and wraps them with the right vue-i18n API — `{{ t('key') }}` in templates, `:attr="t('key')"` on attributes, `<i18n-t>` for rich text, `n()` / `d()` for numbers and dates. It also identifies localization gaps: numbers, currencies, dates, and plurals that need locale-aware handling.
@@ -102,10 +85,10 @@ Record `apiStyle` explicitly — it drives which files get wrapped:
 
 Based on `framework` and `catalogFormat`, read the relevant reference files:
 
-- **Vite SPA** → `references/vite-spa.md`
-- **Nuxt** → `references/nuxt.md`
-- **Quasar** → `references/quasar.md`
-- **`catalogFormat === 'po'`** → also read `references/catalog-format-po.md` for PO-specific entry format, `msgctxt` handling, merge algorithm, and subagent output shape.
+- **Vite SPA** → `references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md`
+- **Nuxt** → `references/languages/js-ts/frameworks/nuxt/vue-i18n.convert.md`
+- **Quasar** → `references/languages/js-ts/frameworks/quasar/vue-i18n.convert.md`
+- **`catalogFormat === 'po'`** → also read `references/languages/js-ts/libraries/vue-i18n/po-format.convert.md` for PO-specific entry format, `msgctxt` handling, merge algorithm, and subagent output shape.
 
 ---
 
@@ -306,7 +289,7 @@ Review these and wrap only if they appear in the UI:
 
 ICU MessageFormat handles plurals, gender selection, and ordinal positions. This is the most commonly-misused feature — get it right the first time. Never use vue-i18n's native pipe-plural syntax (`"one | many"`); it bakes English plural rules into source strings.
 
-**Framework gate — check before writing.** If Step 1 detected `framework === 'nuxt'` AND `catalogFormat === 'json'` AND the project uses `@nuxtjs/i18n` with the default `langDir` + `lazy` setup, DO NOT write ICU `plural` / `select` / `selectordinal` keywords into the JSON catalog. Nuxt's default JSON pre-compiler (via `@intlify/unplugin-vue-i18n`) cannot parse ICU keywords at build time and fails the entire locale file — users see the breakage the first time they ship a plural. Route ICU messages to SFC `<i18n>` custom blocks in the consuming component instead, and keep JSON entries interpolation-only (`{count}`, `{name}`). See `references/nuxt.md` § "When you hit ICU" for the decision recipe and a copy-paste example. The escape hatches (static imports, build-config changes) all require user consent — surface them, do not apply silently.
+**Framework gate — check before writing.** If Step 1 detected `framework === 'nuxt'` AND `catalogFormat === 'json'` AND the project uses `@nuxtjs/i18n` with the default `langDir` + `lazy` setup, DO NOT write ICU `plural` / `select` / `selectordinal` keywords into the JSON catalog. Nuxt's default JSON pre-compiler (via `@intlify/unplugin-vue-i18n`) cannot parse ICU keywords at build time and fails the entire locale file — users see the breakage the first time they ship a plural. Route ICU messages to SFC `<i18n>` custom blocks in the consuming component instead, and keep JSON entries interpolation-only (`{count}`, `{name}`). See `references/languages/js-ts/frameworks/nuxt/vue-i18n.convert.md` § "When you hit ICU" for the decision recipe and a copy-paste example. The escape hatches (static imports, build-config changes) all require user consent — surface them, do not apply silently.
 
 ### Plurals
 
@@ -453,7 +436,7 @@ Write entries into `locales/{locale}.json` as a nested object:
 
 ### When `catalogFormat === 'po'`
 
-Write entries as PO blocks with `msgid` = dot-path. See `references/catalog-format-po.md` for the full entry format, ICU-in-msgstr examples, and merge algorithm.
+Write entries as PO blocks with `msgid` = dot-path. See `references/languages/js-ts/libraries/vue-i18n/po-format.convert.md` for the full entry format, ICU-in-msgstr examples, and merge algorithm.
 
 Each new entry includes:
 - `msgid` = dot-path (`HomePage.title`, `Common.save`)
@@ -557,7 +540,7 @@ For each string, run the Step 7 ambiguity checklist and write the comment (`$<ke
 ### Adding entries to catalog files
 
 - **JSON**: merge new keys into the existing nested object in `locales/{locale}.json`. Source locale gets actual text; other locales get a copy of the source text as a placeholder.
-- **PO**: append new entries to `locales/{locale}.po`. Follow `references/catalog-format-po.md` § Adding Entries for exact formatting. Preserve the PO header block at the top of each file. Every entry needs `msgid`, `msgstr`, `#.` description (if the ambiguity rule triggered), and `#:` reference. Target-locale files get the source text as `msgstr` placeholder and keep `#.` / `#:` identical across locales.
+- **PO**: append new entries to `locales/{locale}.po`. Follow `references/languages/js-ts/libraries/vue-i18n/po-format.convert.md` § Adding Entries for exact formatting. Preserve the PO header block at the top of each file. Every entry needs `msgid`, `msgstr`, `#.` description (if the ambiguity rule triggered), and `#:` reference. Target-locale files get the source text as `msgstr` placeholder and keep `#.` / `#:` identical across locales.
 
 ### Verification after sequential wrapping
 
@@ -630,7 +613,7 @@ Namespace rules (Step 7):
 Read `{path to framework reference, e.g. references/nuxt.md}` for variant-specific
 patterns (SSR safety, locale-aware links, metadata) before wrapping.
 {If catalogFormat === 'po'}
-Also read `references/catalog-format-po.md` for the PO entry format and output shape.
+Also read `references/languages/js-ts/libraries/vue-i18n/po-format.convert.md` for the PO entry format and output shape.
 {end if}
 
 ## Your Files (process in this order)
@@ -738,7 +721,7 @@ references/catalog-format-po.md for detailed rules.
 
 **When `catalogFormat === 'po'`:**
 
-Follow the merge algorithm in `references/catalog-format-po.md` § Merge Algorithm. Summary:
+Follow the merge algorithm in `references/languages/js-ts/libraries/vue-i18n/po-format.convert.md` § Merge Algorithm. Summary:
 1. Concatenate all subagent entry arrays.
 2. Deduplicate by `(msgid, msgctxt)` pair. On duplicates, keep the more descriptive `description`; union `#:` references.
 3. For each unique entry:

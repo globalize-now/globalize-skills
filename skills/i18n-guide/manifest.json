@@ -86,8 +86,8 @@
       }
     },
     {
-      "variant": "tanstack-start-lingui",
-      "match": { "framework": "tanstack-start", "library": "lingui" },
+      "variant": "tanstack-start-babel-lingui",
+      "match": { "framework": "tanstack-start", "compiler": "babel", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
         "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
@@ -97,6 +97,92 @@
         "setup": ["references/languages/js-ts/frameworks/tanstack-start/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
         "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "tanstack-start-swc-lingui",
+      "match": { "framework": "tanstack-start", "compiler": "swc", "library": "lingui" },
+      "supportLevel": "stable",
+      "appliesAlsoTo": [
+        "create-tanstack-start scaffolds installing @vitejs/plugin-react@6 (which dropped the babel option)"
+      ],
+      "packages": {
+        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
+        "dev": ["@lingui/cli", "@lingui/swc-plugin"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/tanstack-start/swc/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "vite-vue-i18n",
+      "match": { "framework": "vite", "library": "vue-i18n" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["vue-i18n", "intl-messageformat"],
+        "dev": ["@intlify/unplugin-vue-i18n"]
+      },
+      "references": {
+        "setup": [
+          "references/languages/js-ts/libraries/vue-i18n/setup.shared.md",
+          "references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md"
+        ],
+        "convert": [
+          "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
+          "references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md"
+        ],
+        "code": ["references/languages/js-ts/libraries/vue-i18n/code.md"],
+        "optional": {
+          "po-format-convert": ["references/languages/js-ts/libraries/vue-i18n/po-format.convert.md"]
+        }
+      }
+    },
+    {
+      "variant": "nuxt-vue-i18n",
+      "match": { "framework": "nuxt", "library": "vue-i18n" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@nuxtjs/i18n", "intl-messageformat"],
+        "dev": []
+      },
+      "references": {
+        "setup": [
+          "references/languages/js-ts/libraries/vue-i18n/setup.shared.md",
+          "references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md"
+        ],
+        "convert": [
+          "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
+          "references/languages/js-ts/frameworks/nuxt/vue-i18n.convert.md"
+        ],
+        "code": ["references/languages/js-ts/libraries/vue-i18n/code.md"],
+        "optional": {
+          "po-format-convert": ["references/languages/js-ts/libraries/vue-i18n/po-format.convert.md"]
+        }
+      }
+    },
+    {
+      "variant": "quasar-vue-i18n",
+      "match": { "framework": "quasar", "library": "vue-i18n" },
+      "supportLevel": "experimental",
+      "packages": {
+        "runtime": ["vue-i18n", "intl-messageformat"],
+        "dev": ["@intlify/unplugin-vue-i18n"]
+      },
+      "references": {
+        "setup": [
+          "references/languages/js-ts/libraries/vue-i18n/setup.shared.md",
+          "references/languages/js-ts/frameworks/quasar/vue-i18n.setup.md"
+        ],
+        "convert": [
+          "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
+          "references/languages/js-ts/frameworks/quasar/vue-i18n.convert.md"
+        ],
+        "code": ["references/languages/js-ts/libraries/vue-i18n/code.md"],
+        "optional": {
+          "po-format-convert": ["references/languages/js-ts/libraries/vue-i18n/po-format.convert.md"]
+        }
       }
     }
   ],
@@ -110,8 +196,8 @@
       "reason": "Create React App is no longer supported by this skill. Migrate to Vite or Next.js."
     },
     {
-      "match": { "react": false },
-      "reason": "These skills currently target React-based projects only."
+      "match": { "react": false, "vue": false },
+      "reason": "These skills currently target React-based and Vue-based projects only."
     }
   ]
 }
