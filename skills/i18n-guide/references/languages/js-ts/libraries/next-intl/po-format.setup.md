@@ -4,6 +4,40 @@ PO-specific variants for `next-intl` setup. Each section below corresponds to a 
 
 PO support is **experimental** in next-intl ≥ 4.5 and is enabled via the `experimental.messages` option on `createNextIntlPlugin`. A Turbopack/Webpack loader compiles `.po` into a plain JS object at build time — no `po2json` or pre-build step is required.
 
+---
+
+## § Pre-flight: bundler & module system
+
+**Run this check before editing `next.config.*`.** The PO loader path interacts with Turbopack in ways that have caused real-world setup failures, particularly on CommonJS projects. Detecting bundler + module system up front lets the skill steer the user to a working combination instead of debugging mid-setup.
+
+1. **Detect module system.** Read the project's `package.json` and the existing Next.js config file:
+   - `next.config.mjs` or `next.config.ts` → ESM.
+   - `next.config.cjs` → CJS.
+   - `next.config.js` → ESM iff `package.json` has `"type": "module"`, otherwise CJS (Node default).
+2. **Detect Turbopack usage.** Read `package.json` `scripts` — flag any of `next dev`, `next build`, or `next start` that pass `--turbopack` (or the older `--turbo`).
+3. **Decide.** Apply the matrix below:
+
+   | Module system | Turbopack in scripts? | Action |
+   |---|---|---|
+   | ESM | yes | Proceed with PO loader as documented. |
+   | ESM | no | Proceed with PO loader as documented (webpack path). |
+   | **CJS** | **yes** | **Stop and present the user a choice (see below).** |
+   | CJS | no | Proceed with PO loader (webpack path); no warning needed. |
+
+**If CJS + `--turbopack`:** the experimental PO loader has been observed to fail in this combination during setup runs. The fix is to either drop the `--turbopack` flag (use webpack — well-supported) or migrate the config to ESM (`next.config.mjs` / `next.config.ts`). Show the user this choice before writing any config:
+
+> Your project uses a CommonJS Next.js config and runs `next dev` / `next build` with `--turbopack`. The next-intl experimental PO loader has been observed to fail in this combination. Pick one:
+>
+> 1. **Drop `--turbopack`** — remove the flag from `package.json` scripts. Webpack handles the PO loader reliably. Lowest-friction option; matches what most next-intl PO users run today.
+> 2. **Convert config to ESM** — rename `next.config.js` to `next.config.mjs` and change `module.exports = ...` to `export default ...`. Keeps Turbopack but is a wider edit.
+> 3. **Switch catalog format to JSON** — skip the experimental PO loader entirely. Simpler, but loses PO's translator metadata (`#.` descriptions, `#:` source refs, `msgctxt`).
+
+**You MUST wait for the user to choose before proceeding.** Do not silently default.
+
+> **Confidence note:** next-intl's docs do not formally document the CJS + Turbopack failure mode. The guidance here is based on observed setup-time breakage and known general Turbopack issues with `createNextIntlPlugin` (e.g. amannn/next-intl#1779, #1838). If a future next-intl release fixes Turbopack + CJS for the PO loader, this gate can relax.
+
+---
+
 PO carries translator-facing metadata that JSON cannot:
 
 - `#.` — description comments (intent of the message, audience, tone notes)

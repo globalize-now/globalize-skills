@@ -121,7 +121,7 @@ export function LinguiClientProvider({
 **Before proceeding, check for existing locale routing:**
 
 - Does a `[locale]/` or `[locale]/` directory already exist under `src/app/`? If yes, use the existing structure — do not restructure.
-- Does `src/middleware.ts` or `middleware.ts` already exist? If yes, read it. Record this — the middleware section below must handle it.
+- Does `src/middleware.ts`, `middleware.ts`, `src/proxy.ts`, or `proxy.ts` already exist? If yes, read it. Record this — the middleware section below must handle it. **`proxy.ts` is the Next.js 16+ rename of `middleware.ts`** — both are the same integration point; never create a second file alongside an existing one.
 
 **If no existing locale routing exists, STOP and present this to the user:**
 
@@ -369,12 +369,15 @@ Each page must call `loadPageCatalog` and `setI18n` before rendering any transla
 
 **Only needed if the user chose strategy 1 or 2.** If they chose option 3 (hardcoded locale), skip this section entirely.
 
-**If `src/middleware.ts` or `middleware.ts` already exists:** Read the existing middleware. Do NOT overwrite it. Instead:
-- If it already handles locale routing, adapt the locale detection logic to work with Lingui's locale list and move on.
-- If it handles other concerns (auth, headers, rewrites), you MUST merge the locale routing into the existing middleware rather than replacing it. Show the user the merged version and ask for confirmation before writing.
-- If the middleware is complex and you cannot safely merge, explain what it does and ask the user to review your proposed merge.
+**File name depends on Next.js major.** On **Next.js 16+**, the file must be named **`proxy.ts`** (the Next 16 rename of `middleware.ts`). On **Next.js 14/15**, keep the name `middleware.ts`. Both files live at the same location with the same contents shown below — only the filename changes. Emitting `middleware.ts` on Next 16 produces a deprecation warning today; the rename is expected to become hard in a later release. Read `next` from the project's `package.json` to determine the major version before creating or editing this file.
 
-**If no middleware exists**, create the middleware variant that matches the user's chosen strategy.
+**If any of `src/middleware.ts`, `middleware.ts`, `src/proxy.ts`, or `proxy.ts` already exists**: Read the existing file. Do NOT overwrite it, and do NOT create a sibling — `proxy.ts` and `middleware.ts` are the same integration point under different Next.js majors, so a project that already has one must not gain the other. Instead:
+- If it already handles locale routing, adapt the locale detection logic to work with Lingui's locale list and move on.
+- If it handles other concerns (auth, headers, rewrites), you MUST merge the locale routing into the existing file rather than replacing it. Show the user the merged version and ask for confirmation before writing.
+- If the existing file is complex and you cannot safely merge, explain what it does and ask the user to review your proposed merge.
+- If the project is on Next 16+ but the existing file is named `middleware.ts`, leave the name alone for now — renaming is a separate concern from locale routing and should not be bundled into this step.
+
+**If no middleware/proxy file exists**, create the file matching the user's Next.js major (`src/proxy.ts` on Next 16+, otherwise `src/middleware.ts`) using the variant for the user's chosen strategy below.
 
 Note: `@lingui/detect-locale` is a client-side library — it's not used in middleware since this runs on the server.
 
@@ -383,7 +386,7 @@ Note: `@lingui/detect-locale` is a client-side library — it's not used in midd
 Bare paths (`/about`) serve the source locale directly — the middleware rewrites the request internally to `/{sourceLocale}/about` without changing the URL. Prefixed paths (`/fr/about`) pass through unchanged. The user navigates between locales via a language picker that links to prefixed paths.
 
 ```ts
-// src/middleware.ts — Strategy 1: unprefixed source locale
+// src/middleware.ts (Next 14/15) or src/proxy.ts (Next 16+) — Strategy 1: unprefixed source locale
 import { NextRequest, NextResponse } from 'next/server'
 import { locales, sourceLocale } from './i18n/locales'
 
@@ -414,7 +417,7 @@ With this strategy, `/about` always shows source locale content. Users switch la
 Every locale has a prefix (`/en/about`, `/fr/about`). Bare paths permanently redirect to the source locale. The 301 status is safe here because the redirect target is always the same (source locale), not detection-based.
 
 ```ts
-// src/middleware.ts — Strategy 2: all locales prefixed
+// src/middleware.ts (Next 14/15) or src/proxy.ts (Next 16+) — Strategy 2: all locales prefixed
 import { NextRequest, NextResponse } from 'next/server'
 import { locales, sourceLocale } from './i18n/locales'
 
