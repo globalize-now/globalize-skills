@@ -62,8 +62,8 @@
         "Plain Vite + React + SWC SPA"
       ],
       "packages": {
-        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
-        "dev": ["@lingui/cli", "@lingui/swc-plugin"]
+        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro", "@lingui/detect-locale"],
+        "dev": ["@lingui/cli", "@lingui/swc-plugin", "@lingui/vite-plugin"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/vite/react-swc/lingui.setup.md"],
@@ -76,8 +76,8 @@
       "match": { "framework": "vite", "compiler": "babel", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
-        "dev": ["@lingui/cli", "@lingui/babel-plugin-lingui-macro"]
+        "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro", "@lingui/detect-locale"],
+        "dev": ["@lingui/cli", "@lingui/babel-plugin-lingui-macro", "@lingui/vite-plugin"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md"],
@@ -91,7 +91,7 @@
       "supportLevel": "stable",
       "packages": {
         "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
-        "dev": ["@lingui/cli", "@lingui/babel-plugin-lingui-macro"]
+        "dev": ["@lingui/cli", "@lingui/babel-plugin-lingui-macro", "@lingui/vite-plugin"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/tanstack-start/lingui.setup.md"],
@@ -108,7 +108,7 @@
       ],
       "packages": {
         "runtime": ["@lingui/core", "@lingui/react", "@lingui/macro"],
-        "dev": ["@lingui/cli", "@lingui/swc-plugin"]
+        "dev": ["@lingui/cli", "@lingui/swc-plugin", "@lingui/vite-plugin", "@vitejs/plugin-react-swc"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/tanstack-start/swc/lingui.setup.md"],
@@ -121,7 +121,7 @@
       "match": { "framework": "vite", "library": "vue-i18n" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["vue-i18n", "intl-messageformat"],
+        "runtime": ["vue-i18n@^11", "intl-messageformat"],
         "dev": ["@intlify/unplugin-vue-i18n"]
       },
       "references": {
@@ -144,7 +144,7 @@
       "match": { "framework": "nuxt", "library": "vue-i18n" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@nuxtjs/i18n", "intl-messageformat"],
+        "runtime": ["@nuxtjs/i18n@^10", "intl-messageformat"],
         "dev": []
       },
       "references": {
@@ -167,7 +167,7 @@
       "match": { "framework": "quasar", "library": "vue-i18n" },
       "supportLevel": "experimental",
       "packages": {
-        "runtime": ["vue-i18n", "intl-messageformat"],
+        "runtime": ["vue-i18n@^11", "intl-messageformat"],
         "dev": ["@intlify/unplugin-vue-i18n"]
       },
       "references": {

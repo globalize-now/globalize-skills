@@ -21,7 +21,7 @@ This skill drives the full i18n journey through four phases:
 
 | Phase | Goal |
 |---|---|
-| 1 — Inspect & decide | Detect stack, ask all user questions, generate an executable plan |
+| 1 — Inspect and decide | Detect stack, ask all user questions, generate an executable plan |
 | 2 — Setup | Install + configure the chosen library |
 | 3 — Convert | Wrap hardcoded strings, extract + compile catalogs |
 | 4 — Globalize-now (optional) | Connect a translation platform |
@@ -67,7 +67,7 @@ Proceed accordingly.
 
 ---
 
-## Phase 1 — Inspect & Decide
+## Phase 1 — Inspect and Decide
 
 Phase 1 ends with a fully populated `.globalize/` (detection, decisions, plan, manifest snapshot) and the user's "go" before any work happens. Every user prompt this skill ever asks lives in Phase 1 — Phases 2/3/4 are pure execution.
 
@@ -263,10 +263,28 @@ Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceed
 
 ## Phase 2 — Setup
 
-Single setup subagent. Orchestrator pre-creates the progress file and dispatches in the background.
+Single setup subagent. Orchestrator installs packages on the main thread first, then pre-creates the progress file and dispatches the subagent in the background.
 
 > **User-facing message** (at Phase 2 start):
-> "Starting Phase 2 — setup. I'm dispatching one background worker that will install the library, wire your build config, set up the provider, scaffold catalog folders for your locales, and verify with a typecheck and build. I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
+> "Starting Phase 2 — setup. First I'll install the i18n packages on my main thread so your lockfile stays in sync, then I'll dispatch one background worker that wires your build config, sets up the provider, scaffolds catalog folders for your locales, and verifies with a typecheck and build. I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
+
+### 2.0 Install packages (main thread)
+
+Read `manifest-snapshot.json`'s `packages.runtime` and `packages.dev`. Run the install commands in the foreground using the package manager from `detection.json`. Stream output to the user.
+
+| Package manager | Runtime command | Dev command |
+|---|---|---|
+| `npm` | `npm install <pkgs>` | `npm install -D <pkgs>` |
+| `yarn` | `yarn add <pkgs>` | `yarn add -D <pkgs>` |
+| `pnpm` | `pnpm add <pkgs>` | `pnpm add -D <pkgs>` |
+| `bun` | `bun add <pkgs>` | `bun add -D <pkgs>` |
+
+Skip the runtime or dev command if its package list is empty. If the install command fails (network error, registry rejection, lockfile conflict), stop the run with the error — do not advance to 2.1.
+
+Running on the main thread keeps the install outside the subagent sandbox, so the user's lockfile stays in sync. The setup subagent in 2.2 will not re-install these packages.
+
+> **User-facing message** (before running):
+> "Installing the i18n packages on my main thread first so your lockfile stays in sync — I'll run `{install command}` and stream the output."
 
 ### 2.1 Pre-create progress file
 
@@ -290,6 +308,8 @@ Subagent prompt skeleton:
 > Read these reference files for variant-specific instructions:
 > - {paths from manifest-snapshot.references.setup, joined}
 > - Coding rules to install (if applicable): {manifest-snapshot.references.code joined}
+>
+> **Packages already installed.** The orchestrator ran the package install on the main thread (Phase 2.0) for the manifest's `packages.runtime` and `packages.dev` before dispatching you. Do **not** run `npm install` / `yarn add` / `pnpm add` / `bun add` for those packages. If a reference's setup instructions list an install command for them, treat it as already done and move on. Only flag an extra install if the reference explicitly calls for a package that is **not** in the manifest's `packages` (e.g., a pinned remediation version after a build failure or an opt-in extra) — in that case, write `status: "needs_decision"` with a `needsDecision: { step: "extra_install", question: "An extra package install is needed: <command>. Run it on the main thread?", options: ["yes", "skip"] }` and exit so the orchestrator runs it on the main thread.
 >
 > **Progress reporting:** After each step transition, atomically update `.globalize/progress/setup.json` (write `<file>.tmp` then `mv`). Set `status: "running"` on first update; populate `completed`, `current`, `currentDetail`, `filesCreated`, `filesModified`, `updatedAt`.
 >
@@ -457,9 +477,11 @@ References:
 - {paths joined from manifest.references.setup}
 - {paths joined from manifest.references.code}
 
-Steps:
+Orchestrator-owned steps (main thread, before subagent dispatch):
+- [ ] install_packages_main_thread
+
+Subagent steps:
 - [ ] checkout_branch
-- [ ] install_packages
 - [ ] create_config
 - [ ] build_tool_integration
 - [ ] provider_wiring
