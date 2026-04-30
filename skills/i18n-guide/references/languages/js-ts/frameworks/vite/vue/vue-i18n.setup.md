@@ -15,8 +15,8 @@ Install:
 **Example (npm):**
 
 ```bash
-npm install vue-i18n@^11 intl-messageformat
-npm install -D @intlify/unplugin-vue-i18n
+npm install 'vue-i18n@^11' 'intl-messageformat@^11'
+npm install -D '@intlify/unplugin-vue-i18n@^11'
 ```
 
 Use the project's detected package manager (pnpm / yarn / bun) instead of `npm` if applicable.

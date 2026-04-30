@@ -16,7 +16,7 @@ Install:
 **Pin to `@nuxtjs/i18n@^10`.** v10 simplified the lazy-loading contract (removed the top-level `lazy` option and consolidated config around per-locale `file:` entries) and is the shape the snippets below emit. Older v9 usage is documented separately at the end of this file — prefer upgrading over pinning the legacy shape.
 
 ```bash
-npm install @nuxtjs/i18n@^10 intl-messageformat
+npm install '@nuxtjs/i18n@^10' 'intl-messageformat@^11'
 ```
 
 Use the project's detected package manager (pnpm / yarn / bun) instead of `npm` if applicable.

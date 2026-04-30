@@ -222,7 +222,7 @@ For `left:` and `right:` as positioning properties, verify the element has `posi
 For automated conversion during build, consider `postcss-logical`:
 
 ```bash
-npm install postcss-logical --save-dev
+npm install 'postcss-logical@^9' --save-dev
 ```
 
 ```js

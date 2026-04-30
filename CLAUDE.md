@@ -29,6 +29,7 @@ Skills currently in this repo:
 - **SKILL.md frontmatter**: Required fields are `name` and `description`. Description explains when the skill should trigger.
 - **References live inside the skill**: Variant-specific instructions, manifest files, and other supporting docs go in `<skill>/references/`. Internal nesting inside `references/` is unconstrained — organize by stack, language, framework, etc. as the skill needs.
 - **Detection-first**: Skills that modify projects should detect the target's framework, compiler, router, language, and package manager before taking action.
+- **Pin installs to a major**: Every package install a skill emits must specify a SemVer-major caret range (`pkg@^N`, or `pkg@^0.M` for pre-1.0). This applies to `npm install` / `yarn add` / `pnpm add` / `bun add`, every package name in `manifest.json`, every `npx <pkg>@^N <args>` invocation (unpinned `npx` always fetches latest), and any `npx create-*` scaffold call. Wrap pinned package strings in single quotes in shell snippets (`'pkg@^N'`) so zsh's `EXTENDED_GLOB` doesn't eat the caret. Update the pin deliberately when bumping the skill's supported major. Exceptions: (1) when a build-tool-coupled exact pin is required (e.g. `@lingui/swc-plugin` to match Next.js `swc_core`), document the override in the skill's troubleshooting prose; (2) packages whose cadence the user manages deliberately and intentionally leaves uncapped — currently `@globalize-now/cli-client` (pre-1.0; the user's own CLI).
 
 ## Installing a Skill
 

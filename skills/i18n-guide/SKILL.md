@@ -279,6 +279,8 @@ Read `manifest-snapshot.json`'s `packages.runtime` and `packages.dev`. Run the i
 | `pnpm` | `pnpm add <pkgs>` | `pnpm add -D <pkgs>` |
 | `bun` | `bun add <pkgs>` | `bun add -D <pkgs>` |
 
+**Wrap each `<pkgs>` entry in single quotes** when constructing the shell command — the manifest pins use `^` (e.g. `next-intl@^4`), and zsh interprets unquoted `^` as a glob negation operator under `EXTENDED_GLOB` (common on macOS via oh-my-zsh). Emit `npm install 'next-intl@^4'` rather than `npm install next-intl@^4`. The single quotes are inert under bash/dash and prevent zsh expansion.
+
 Skip the runtime or dev command if its package list is empty. If the install command fails (network error, registry rejection, lockfile conflict), stop the run with the error — do not advance to 2.1.
 
 Running on the main thread keeps the install outside the subagent sandbox, so the user's lockfile stays in sync. The setup subagent in 2.2 will not re-install these packages.

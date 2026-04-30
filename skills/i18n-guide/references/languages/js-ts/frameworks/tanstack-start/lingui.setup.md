@@ -16,8 +16,8 @@ In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@ling
 **Example (npm):**
 
 ```bash
-npm install @lingui/core @lingui/react @lingui/macro
-npm install -D @lingui/cli @lingui/babel-plugin-lingui-macro @lingui/vite-plugin
+npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/macro@^5'
+npm install -D '@lingui/cli@^6' '@lingui/babel-plugin-lingui-macro@^6' '@lingui/vite-plugin@^6'
 ```
 
 > **No `@lingui/detect-locale`.** That library only works in the browser (`navigator`, `localStorage`, `window.location`). Under SSR it would throw on the server or return a wrong value, producing a hydration mismatch. Start resolves locale from the request headers and cookie instead — see "Server Middleware" below.

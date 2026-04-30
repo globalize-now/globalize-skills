@@ -26,25 +26,25 @@ Pick the correct `next-intl` version based on the detected Next.js version: Next
 **Example (npm):**
 
 ```bash
-npm install next-intl
+npm install 'next-intl@^4'
 ```
 
 **Example (pnpm):**
 
 ```bash
-pnpm add next-intl
+pnpm add 'next-intl@^4'
 ```
 
 **Example (yarn):**
 
 ```bash
-yarn add next-intl
+yarn add 'next-intl@^4'
 ```
 
 **Example (bun):**
 
 ```bash
-bun add next-intl
+bun add 'next-intl@^4'
 ```
 
 ## Routing Configuration

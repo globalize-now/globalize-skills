@@ -137,7 +137,7 @@ All generated files in this setup phase use `.ts` extensions and TypeScript synt
 If `typescript` is **not** in devDeps and no `tsconfig.json` exists at project root, tell the user:
 
 > This project looks like plain JavaScript (no `typescript` in devDeps, no `tsconfig.json`). This setup creates `.ts` files with type annotations — Vite will still compile them, but they'll be stylistically out of place. Options:
-> 1. Add TypeScript to the project first (`npm install -D typescript` plus a minimal `tsconfig.json`), then re-run.
+> 1. Add TypeScript to the project first (`npm install -D 'typescript@^5'` plus a minimal `tsconfig.json`), then re-run.
 > 2. Continue — I'll generate `.ts` files; you can convert them to `.js` (or `.js` + JSDoc) after.
 > 3. Stop.
 
@@ -210,15 +210,17 @@ Pin `vue-i18n` to `^11` (Vite / Quasar) or `@nuxtjs/i18n` to its current major (
 
 ### Additional package when `catalogFormat === 'po'`
 
-Install `gettext-parser` as a **dev** dependency for all variants:
+Install `gettext-parser` as a **dev** dependency for all variants. **Do not hardcode a semver range in this setup phase.** Run `npm view gettext-parser version` at the time of install, take the major, and install with that pin (single-quoted to keep zsh's `EXTENDED_GLOB` from eating the `^`):
 
 ```bash
-npm install -D gettext-parser
+# 1. Discover the current major
+npm view gettext-parser version    # e.g. 9.0.2
+
+# 2. Install pinned to that major (substitute the major you got)
+npm install -D 'gettext-parser@^9'
 ```
 
-This is the PO parser used by the build-time `poLoader` Vite plugin installed in Step 4. It runs only at build time — nothing gettext-related ships in the runtime bundle.
-
-**Do not hardcode a semver range in this setup phase.** Run `npm view gettext-parser version` at the time of install and pin to the current major (e.g. `^8` if that's what `npm view` reports). The library has stable `.po.parse()` API surface that this setup phase depends on — parsing `.po` files to the `{ translations: { '': { msgid: { msgstr: [...] } } } }` shape — and that interface has been consistent across majors, but pinning to a known-good major keeps unexpected breakage out.
+This is the PO parser used by the build-time `poLoader` Vite plugin installed in Step 4. It runs only at build time — nothing gettext-related ships in the runtime bundle. The library has a stable `.po.parse()` API surface that this setup phase depends on — parsing `.po` files to the `{ translations: { '': { msgid: { msgstr: [...] } } } }` shape — and that interface has been consistent across majors, but pinning to a known-good major keeps unexpected breakage out.
 
 ---
 

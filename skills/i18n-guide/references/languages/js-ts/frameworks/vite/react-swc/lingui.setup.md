@@ -15,8 +15,8 @@ In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@ling
 **Example (npm):**
 
 ```bash
-npm install @lingui/core @lingui/react @lingui/macro @lingui/detect-locale
-npm install -D @lingui/cli @lingui/swc-plugin @lingui/vite-plugin
+npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/macro@^5' '@lingui/detect-locale@^6'
+npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6' '@lingui/vite-plugin@^6'
 ```
 
 **Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema or plugin invocation error, look up the compatible version at https://plugins.swc.rs and pin it exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. See "SWC plugin version mismatch" in Common Gotchas.

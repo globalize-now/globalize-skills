@@ -58,30 +58,30 @@ Only one package is required:
 
 Unlike LinguiJS (which requires `@lingui/swc-plugin` separately), next-intl bundles everything — routing, middleware, server/client APIs — in a single package.
 
-Pick the correct `next-intl` version based on the detected Next.js version: Next.js 14 → `next-intl@^3`; Next.js 15+ → `next-intl@^4` (current). If unsure, install `next-intl` without a version — npm will resolve to the latest compatible.
+Pick the correct `next-intl` version based on the detected Next.js version: Next.js 14 → `next-intl@^3`; Next.js 15+ → `next-intl@^4` (current). The examples below pin to `^4`; substitute `^3` if the project is on Next.js 14.
 
 **Example (npm):**
 
 ```bash
-npm install next-intl
+npm install 'next-intl@^4'
 ```
 
 **Example (pnpm):**
 
 ```bash
-pnpm add next-intl
+pnpm add 'next-intl@^4'
 ```
 
 **Example (yarn):**
 
 ```bash
-yarn add next-intl
+yarn add 'next-intl@^4'
 ```
 
 **Example (bun):**
 
 ```bash
-bun add next-intl
+bun add 'next-intl@^4'
 ```
 
 ## Routing Configuration
