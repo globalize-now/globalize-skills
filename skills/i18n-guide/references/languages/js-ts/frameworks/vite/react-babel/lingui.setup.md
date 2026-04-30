@@ -1021,3 +1021,9 @@ import { LanguageSwitcher } from './components/LanguageSwitcher'
 If the project has a shared header/navigation component, place the switcher there instead of directly in the provider wrapper.
 
 **Styling**: The examples use inline styles as a baseline. Adapt the styling to match the project's CSS approach (Tailwind, CSS Modules, etc.) and the visual style of the surrounding navigation.
+
+---
+
+## Optional add-ons
+
+If the user selected any optional add-ons in `SKILL.md §1.10` (coding rules `@import`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from `references/languages/js-ts/libraries/lingui/setup.add-ons.md`. Skip add-ons the user did not select. Skip this section entirely if no add-ons were selected.

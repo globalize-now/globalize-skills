@@ -27,7 +27,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md"],
         "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.convert.md"],
-        "code": [],
+        "code": ["references/languages/js-ts/libraries/next-intl/code.md"],
         "optional": {
           "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
           "po-format-convert": ["references/languages/js-ts/libraries/next-intl/po-format.convert.md"]
@@ -45,7 +45,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md"],
         "convert": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.convert.md"],
-        "code": [],
+        "code": ["references/languages/js-ts/libraries/next-intl/code.md"],
         "optional": {
           "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
           "po-format-convert": ["references/languages/js-ts/libraries/next-intl/po-format.convert.md"]

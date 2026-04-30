@@ -684,3 +684,9 @@ export const sendConfirmationEmail = createServerFn({ method: 'POST' }).handler(
 
 - **First extract fails: `Could not resolve import(...)` or "No matches for the glob in `./locales/${locale}.ts`"**: the per-route dynamic imports must resolve at extract time, but on first run no `locales/` directories exist yet. **This is now a required setup step, not a gotcha** — see Section 5a ("Before first extract: seed route-scoped catalog stubs") above. If you hit either error and landed here via a search, you skipped the seeding step.
 - **`@lingui/detect-locale` errors on the server**: if the package got installed (e.g., copied from the Vite SPA guide), its `fromStorage`/`fromNavigator` detectors throw during SSR because `localStorage` and `navigator` don't exist. Uninstall it — the server middleware above replaces it.
+
+---
+
+## Optional add-ons
+
+If the user selected any optional add-ons in `SKILL.md §1.10` (coding rules `@import`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from `references/languages/js-ts/libraries/lingui/setup.add-ons.md`. Skip add-ons the user did not select. Skip this section entirely if no add-ons were selected.

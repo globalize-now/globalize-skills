@@ -574,3 +574,9 @@ function PriceDisplay({price}: {price: number}) {
 | `useTimeZone` | `next-intl` | Get configured timezone |
 
 All imports come from `next-intl` (not `next-intl/server` — that is App Router only).
+
+---
+
+## Optional add-ons
+
+If the user selected any optional add-ons in `SKILL.md §1.10` (coding rules `@import`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from `references/languages/js-ts/libraries/next-intl/setup.add-ons.md`. Skip add-ons the user did not select. Skip this section entirely if no add-ons were selected.
