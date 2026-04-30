@@ -54,15 +54,25 @@ Created in the **target project root** (the project being internationalized). Ev
 
 If `.globalize/` does not exist in the target project, create it and append `/.globalize/` to the project's `.gitignore` (create the file if missing). Confirm with the user only if `.gitignore` exists and already has rules — show the diff before appending.
 
+> **User-facing message** (when actually creating the folder):
+> "Created `.globalize/` in your project root and added it to `.gitignore`. This folder holds local progress files, decisions, and plans so we can resume mid-run and so you can audit what was decided. It stays out of git."
+
 ### Resumability
 
-If `.globalize/` exists when the orchestrator starts, read `plan.md` and `progress/*.json` to determine state. If a plan is already in flight (some phases incomplete), tell the user: "Detected an in-progress i18n setup at `.globalize/`. Resume from <last completed step>, or start fresh?" and proceed accordingly.
+If `.globalize/` exists when the orchestrator starts, read `plan.md` and `progress/*.json` to determine state. If a plan is already in flight (some phases incomplete), tell the user:
+
+> "Found an in-progress i18n setup at `.globalize/`. Last completed step: `<step>`. Want me to resume from there, or start over with a fresh plan?"
+
+Proceed accordingly.
 
 ---
 
 ## Phase 1 — Inspect & Decide
 
 Phase 1 ends with a fully populated `.globalize/` (detection, decisions, plan, manifest snapshot) and the user's "go" before any work happens. Every user prompt this skill ever asks lives in Phase 1 — Phases 2/3/4 are pure execution.
+
+> **User-facing message** (orchestrator kickoff, before 1.1):
+> "Hey — I'll walk you through internationalizing this project in four phases: inspect, set up the library, wrap your hardcoded strings, and (optionally) connect a translation platform. First I'll do a read-only scan of your project — framework, router, existing i18n setup, files with translatable text. No changes yet. After that I'll ask a small set of questions to shape the plan."
 
 ### 1.1 Inspect subagent
 
@@ -123,9 +133,17 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > Write the JSON file and exit. Do not engage in conversation.
 
+> **User-facing message** (after the inspect subagent returns and `detection.json` is written):
+> "Scan done. Detected: **{framework}** + **{router}** ({compiler} compiler, {packageManager}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
+>
+> If `existing.library !== "none"`, also surface:
+> "Heads up — you already have `{existing.library}` in your dependencies. If it's compatible, we'll continue with it; if not, I'll flag it in the next step."
+
 ### 1.2 Apply compatibility hard-stops
 
 Read `detection.json`. Apply these rules top-to-bottom. If any matches, **STOP** the orchestrator with the corresponding message — do not proceed to 1.3.
+
+When stopping, prefix the message with `Compatibility check — found a blocker:` so the user sees a clear framing rather than an abrupt error.
 
 | Condition | Stop message |
 |---|---|
@@ -145,15 +163,18 @@ If the filtered list is empty, surface a STOP with: "Your stack is supported in 
 
 If `git.isRepo === true` AND `git.branch` is one of `main`, `master`, `develop`:
 
-> You're on `{branch}`. This setup will modify several files. I'd recommend creating a dedicated branch first so you can review or revert the changes easily:
+> You're on `{branch}`. Setup will modify several files, so I'd recommend a dedicated branch — easier to review or revert later:
 > ```
 > git checkout -b chore/i18n-setup
 > ```
-> Want me to create this branch as part of Phase 2, stay on `{branch}`, or use a different name?
+> Want me to create this branch when Phase 2 starts, stay on `{branch}`, or use a different name? (No git commands run yet — just answering the question.)
 
 Record the answer in `decisions`.
 
 ### 1.5 Library choice
+
+> **User-facing message** (before showing options):
+> "Picking the i18n library. Based on **{framework}** + **{router}**, my recommendation is **{recommended-library}** — {one-line rationale from the table below}. You can override if you have a strong preference."
 
 Show the user the list of supported variants from 1.3, with the recommendation marked. Recommendation rules (apply first match):
 
@@ -169,6 +190,9 @@ Use AskUserQuestion if multiple variants apply. If only one variant matches, sur
 
 ### 1.6 Journey scope
 
+> **User-facing message** (before asking):
+> "Which phases do you want to run? I've pre-checked the ones that make sense given what's already in the project."
+
 Ask which phases to run. Defaults derived from `existing`:
 
 - If `existing.configured === false` → setup is suggested
@@ -178,6 +202,9 @@ Ask which phases to run. Defaults derived from `existing`:
 Use AskUserQuestion with three multi-select options (setup / convert / connect translation platform) and the inferred defaults pre-checked.
 
 ### 1.7 Setup choices
+
+> **User-facing message** (before asking):
+> "A few setup details. Locales drive which catalog folders we scaffold and which CLI flags we pass; the routing strategy determines how locale shows up in URLs; setup mode is just how chatty I should be while running Phase 2."
 
 If `setup` is in scope, collect:
 
@@ -190,11 +217,17 @@ Record under `decisions.setup`.
 
 ### 1.8 Convert choices
 
+> **User-facing message** (before asking):
+> "What's this app about? One-sentence answer is fine. I'll pass it to the wrapping workers in Phase 3 so the translator comments they add have the right context (e.g., '[Cart]', '[Onboarding tooltip]')."
+
 If `convert` is in scope, ask the user to confirm the **app domain**. Infer from `package.json` description, README, route names, or component names. Default suggestion + freeform override.
 
 The domain string flows into wrap-subagent prompts so they write better translator comments.
 
 ### 1.9 Globalize-now choices
+
+> **User-facing message** (before asking):
+> "Translation-platform setup uses Globalize.now. I just need a project name and which git provider hosts your repo — both have sensible defaults from your `package.json` and git remote."
 
 If `connect translation platform` is in scope, collect:
 
@@ -203,9 +236,15 @@ If `connect translation platform` is in scope, collect:
 
 ### 1.10 Optional steps
 
+> **User-facing message** (before asking):
+> "Optional add-ons. None of these are required, but the passive coding rules (an `@import` line in your `CLAUDE.md`) are recommended — they keep me from re-introducing hardcoded strings on future edits."
+
 Multi-select for setup-time optionals: ESLint plugin, CI/CD integration (extract+compile in build), test setup wrapper, install passive coding rules (`@import` line in target `CLAUDE.md`).
 
 ### 1.11 Generate `plan.md` + `manifest-snapshot.json` + `decisions.md`
+
+> **User-facing message** (before writing):
+> "Got everything I need. Writing your plan to `.globalize/plan.md` and your choices to `.globalize/decisions.md` so this run is auditable and resumable."
 
 Write the three artifacts to `.globalize/`. See "Plan and decisions formats" below for shape.
 
@@ -213,13 +252,21 @@ Copy the chosen manifest entry verbatim to `.globalize/manifest-snapshot.json` s
 
 ### 1.12 Render plan + final go
 
-Show `plan.md` to the user as a checklist. Ask: "Ready to execute? (yes / cancel / edit)". Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceeds to Phase 2.
+Show `plan.md` to the user as a checklist. Ask:
+
+> "Here's the plan. Ready to execute? (**yes** / **cancel** / **edit**)
+> Once you say yes, I won't pause for more questions unless a subagent gets stuck or finishes a phase."
+
+Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceeds to Phase 2.
 
 ---
 
 ## Phase 2 — Setup
 
 Single setup subagent. Orchestrator pre-creates the progress file and dispatches in the background.
+
+> **User-facing message** (at Phase 2 start):
+> "Starting Phase 2 — setup. I'm dispatching one background worker that will install the library, wire your build config, set up the provider, scaffold catalog folders for your locales, and verify with a typecheck and build. I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
 
 ### 2.1 Pre-create progress file
 
@@ -256,9 +303,12 @@ While `progress/setup.json` is in `running` state, wake every 30–60 seconds, r
 
 ### 2.4 On completion
 
-- `succeeded` → archive `progress/setup.json` to `progress/archive/<timestamp>/setup.json`, render summary (files created, files modified, verification result), advance to Phase 3.
-- `failed` → archive, render error, ask user how to proceed (retry, edit plan, abort).
-- `needs_decision` → surface the question to the user, capture answer, append to `decisions.md`, re-dispatch the same subagent (it reads existing `progress/setup.json` and resumes from `completed`).
+- `succeeded` → archive `progress/setup.json` to `progress/archive/<timestamp>/setup.json`, render summary (files created, files modified, verification result), advance to Phase 3. User-facing wrap-up:
+  > "Setup verified — typecheck and build are clean. Files created: {N}, files modified: {M}. Moving on to Phase 3 — wrapping your hardcoded strings."
+- `failed` → archive, render error, ask user how to proceed (retry, edit plan, abort). User-facing wrap-up:
+  > "Setup hit an error during `{step}`: {one-line error summary}. Want me to retry, edit the plan, or stop here?"
+- `needs_decision` → surface the question to the user, capture answer, append to `decisions.md`, re-dispatch the same subagent (it reads existing `progress/setup.json` and resumes from `completed`). User-facing framing:
+  > "The setup worker paused — it needs you to decide on `{question}`. Once you answer I'll send it back to finish from where it left off."
 
 ### Phase 2 collapse-case
 
@@ -269,6 +319,9 @@ If `existing.configured === true`, `plan.md` reduces Phase 2 to: `verify_config`
 ## Phase 3 — Convert
 
 Multiple wrap subagents in parallel, then one verify subagent.
+
+> **User-facing message** (at Phase 3 start):
+> "Starting Phase 3 — converting hardcoded strings. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, and adds short translator comments where context isn't obvious. After they all finish, a final verify worker runs extract + compile + build to make sure everything still type-checks and the catalog is clean."
 
 ### 3.1 Pre-create progress files
 
@@ -316,9 +369,15 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 
 After verify succeeds, parse the extracted catalog to compute word count. Show the user:
 
-> Catalog: {totalMessages} messages, ~{wordCount} words. Translating into {N} target locales costs roughly ~${estimate} via Globalize.now.
+> "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now."
 
-If `decisions.scope.globalize === true`, advance to Phase 4. Otherwise, end with a one-line "Run `i18n-guide` again with scope=globalize to set up translation later" hint.
+If `decisions.scope.globalize === true`, advance to Phase 4 with:
+
+> "Moving on to Phase 4 — connecting Globalize.now."
+
+Otherwise, end with:
+
+> "Skipping the translation-platform step for now. Re-run `i18n-guide` with `connect translation platform` checked when you're ready to wire it up."
 
 ### Phase 3 collapse-cases
 
@@ -330,6 +389,9 @@ If `decisions.scope.globalize === true`, advance to Phase 4. Otherwise, end with
 ## Phase 4 — Globalize-now (optional)
 
 Auth must stay on the main thread (interactive). Project + repo creation runs in a subagent.
+
+> **User-facing message** (at Phase 4 start):
+> "Phase 4 — connecting Globalize.now. The first three steps run here in the foreground because they need you: installing the CLI, signing in (a browser window will open for device-flow auth), and confirming your org. After that, a background worker creates the project, configures languages, connects your repo, and sets the catalog file patterns."
 
 ### 4.1 Install CLI (main thread)
 
@@ -361,7 +423,9 @@ Plan: `create_project`, `configure_languages`, `connect_repo`, `configure_patter
 
 ### 4.6 Poll, surface, finish
 
-Standard polling. On completion, show project URL and a one-line summary.
+Standard polling. On completion, show project URL and a one-line summary:
+
+> "All set. Project created: **{projectUrl}**. Repo connected, catalog patterns wired. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI directly) for ongoing translation work — pulling translations, tracking status, requesting new languages."
 
 ---
 
