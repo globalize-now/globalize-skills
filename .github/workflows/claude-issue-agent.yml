@@ -44,6 +44,8 @@ jobs:
           fetch-depth: 1
 
       - name: Run Claude
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: anthropics/claude-code-action@v1
         with:
           # Set ONE of these as a repo secret. OAuth uses your Claude Pro/Max
@@ -57,4 +59,4 @@ jobs:
           prompt: "Read CLAUDE.md in the repo root and follow the issue-triage playbook for the issue/comment that triggered this run."
           claude_args: |
             --max-turns 25
-            --allowedTools "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*),Bash(pnpm install),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint)"
+            --allowedTools "Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh issue list:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr edit:*),Bash(gh label list:*),Bash(gh search:*),Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*),Bash(pnpm install),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint)"

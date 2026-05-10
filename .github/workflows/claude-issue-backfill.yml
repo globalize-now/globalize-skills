@@ -69,16 +69,32 @@ jobs:
           fetch-depth: 1
 
       - name: Run Claude on issue #${{ matrix.issue }}
+        env:
+          # gh CLI inside the agent uses this token for all GitHub calls.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # IMPORTANT: in workflow_dispatch / automation mode the action does
+          # NOT auto-post a comment to the issue. Claude must do it explicitly
+          # via the gh CLI — that's why we (a) allow gh in --allowedTools and
+          # (b) tell the prompt to use it.
           prompt: |
-            Read CLAUDE.md in the repo root, then triage open issue
-            #${{ matrix.issue }} in ${{ github.repository }}. This is a backfill
-            sweep, so the issue may already have comments — review them before
-            acting. Apply Phase 1–3 of the playbook (research → respond). Do
-            not open a PR in this run; wait for an explicit `@claude go`.
+            You are running in automation mode against issue
+            #${{ matrix.issue }} in ${{ github.repository }}.
+
+            Steps you MUST follow:
+            1. `gh issue view ${{ matrix.issue }} --comments` to read the issue and existing comments.
+            2. Read CLAUDE.md in the repo root for the triage playbook.
+            3. Explore the repo as the playbook says.
+            4. Apply Phase 1–3 of the playbook (research → respond).
+            5. Post your response by calling:
+                  gh issue comment ${{ matrix.issue }} --body-file <path-to-md>
+               or `--body "..."` for short replies. Do NOT skip this step — in
+               automation mode no comment is posted unless you call gh yourself.
+            6. Do NOT open a PR in this run. Wait for an explicit `@claude go`
+               on the next conversational turn.
           claude_args: |
             --max-turns 25
-            --allowedTools "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*),Bash(pnpm install),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint)"
+            --allowedTools "Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh issue list:*),Bash(gh label list:*),Bash(gh search:*),Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*),Bash(pnpm install),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint)"
