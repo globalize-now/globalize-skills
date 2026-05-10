@@ -1,0 +1,60 @@
+name: Claude Issue Agent
+
+# Gated on the "ready" label. The agent only engages with an issue once you've
+# applied the `ready` label to it.
+# - issues: labeled (label == ready)        -> agent runs automatically
+# - issue_comment: @claude AND has "ready"  -> conversational continuation
+# - Remove the `ready` label to pause the agent on an issue.
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  agent:
+    # Two paths in:
+    #  1. The `ready` label was just applied to an issue.
+    #  2. An @claude comment on an issue that already carries the `ready` label.
+    # PR comments are skipped (the action handles those separately if you wire it up).
+    if: |
+      (github.event_name == 'issues'
+        && github.event.action == 'labeled'
+        && github.event.label.name == 'ready') ||
+      (github.event_name == 'issue_comment'
+        && github.event.issue.pull_request == null
+        && contains(github.event.comment.body, '@claude')
+        && contains(toJSON(github.event.issue.labels.*.name), '"ready"'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Set ONE of these as a repo secret. OAuth uses your Claude Pro/Max
+          # subscription (no per-token billing); API key bills per-token.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Always give the agent the same instruction: load the playbook and act
+          # accordingly. The action automatically passes the triggering issue +
+          # comment as context, so the playbook's "Phase 4 — follow-up" rules
+          # cover @claude replies on existing threads.
+          prompt: "Read CLAUDE.md in the repo root and follow the issue-triage playbook for the issue/comment that triggered this run."
+          claude_args: |
+            --max-turns 25
+            --allowedTools "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*),Bash(pnpm install),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint)"
