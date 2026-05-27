@@ -84,7 +84,7 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > ```json
 > {
->   "framework": "next" | "vite" | "tanstack-start" | "nuxt" | "quasar" | "cra" | "unknown",
+>   "framework": "next" | "vite" | "tanstack-start" | "remix" | "react-router-framework" | "nuxt" | "quasar" | "cra" | "unknown",
 >   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "vue-router" | "none",
 >   "compiler": "swc" | "babel",
 >   "react": true | false,
@@ -116,13 +116,13 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > | Field | How to detect |
 > |---|---|
-> | `framework` | `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. |
-> | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps. Vue Router: `vue-router` in deps (Vite SPA / Quasar). |
-> | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. |
+> | `framework` | Evaluate in this order, first match wins: `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. Any `@remix-run/*` runtime package in deps → remix. `react-router` in deps AND `@react-router/dev` in devDeps AND a `react-router.config.{ts,js}` file at the repo root → react-router-framework. `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. (Order matters: Remix v2 and React Router v7 framework mode both have `vite` in devDeps, so they must be checked before the `vite` fallback. React Router v7 SPA mode — `react-router` without `@react-router/dev` — correctly falls through to `vite` with `router: "react-router"`.) |
+> | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps (also the value reported for `framework: "remix"` and `framework: "react-router-framework"`, since both use react-router internally; this is informational only, no matcher predicates on it for those frameworks). Vue Router: `vue-router` in deps (Vite SPA / Quasar). |
+> | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. Remix v2 and React Router v7 framework mode → swc if `@vitejs/plugin-react-swc` is in devDeps; babel otherwise (both default to Babel via `@vitejs/plugin-react`). |
 > | `react` | `react` in deps or devDeps. |
 > | `vue` | `vue` in deps or devDeps. |
 > | `packageManager` | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
-> | `routeEntries` | App Router: `<root>/src/app/**/page.tsx`. TanStack file-based: `<root>/src/routes/**/*.tsx`. React Router v7 framework mode: `<root>/app/routes/**/*.tsx`. None if no file-based routing detected. |
+> | `routeEntries` | App Router: `<root>/src/app/**/page.tsx`. TanStack file-based: `<root>/src/routes/**/*.tsx`. Remix v2 or React Router v7 framework mode: `<root>/app/routes/**/*.{tsx,jsx,ts,js}`. None if no file-based routing detected. |
 > | `existing.library` | First match in deps/devDeps from the union of i18n libraries listed above. |
 > | `existing.configured` | `lingui.config.*` present AND macro plugin wired in build config; OR `next-intl` config present AND plugin wired; OR (Vue) `createI18n(` present in `src/i18n/index.*` (Vite/Quasar) or `defineI18nConfig(` in `i18n.config.*` (Nuxt) AND `messageCompiler` wired. |
 > | `existing.providerWired` | Layout/main file imports and renders `I18nProvider` (Lingui) or `NextIntlClientProvider` (next-intl); OR (Vue) `app.use(i18n)` in `main.*` (Vite) / boot file registered (Quasar) / `@nuxtjs/i18n` listed in `modules` (Nuxt). |
@@ -151,6 +151,8 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 | `framework === "cra"` | "Create React App is no longer supported by this skill. Migrate to Vite or Next.js, then re-run." |
 | `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
 | `framework === "next"` AND `router === "pages"` AND user wants Lingui | (Surface only after library choice in 1.5) "Lingui setup does not currently cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router." |
+| `@remix-run/react` in deps with major version `< 2` (i.e. Remix v1) | "Remix v1 is no longer supported by this skill. Upgrade to Remix v2 (`@remix-run/*` ≥ 2) or migrate to React Router v7 framework mode, then re-run." |
+| `framework === "remix"` AND (`@remix-run/dev` major.minor `< 2.7` OR `vite` not in devDeps) | "This Remix v2 project uses the classic compiler (pre-Vite). Lingui requires the Vite-based build. Upgrade to `@remix-run/dev` ≥ 2.7 and follow Remix's classic-compiler → Vite migration, then re-run." |
 | Custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar." |
 
 ### 1.3 Resolve supported stacks from manifest
@@ -184,6 +186,8 @@ Show the user the list of supported variants from 1.3, with the recommendation m
 | `framework === "next"` AND user wants compile-time extraction | **Lingui** (alternative) | Compile-time macros, zero-runtime-overhead translations. |
 | `framework === "nuxt"` | **vue-i18n via @nuxtjs/i18n** | The Nuxt module wraps vue-i18n with SSR-aware routing, lazy-loaded locale catalogs, and locale meta via `useLocaleHead`. The canonical Nuxt choice. |
 | `framework === "quasar"` OR (`vue === true` AND `framework === "vite"`) | **vue-i18n** | The official Intlify library and de-facto standard across Vue 3 projects. Composition API + ICU via custom `messageCompiler`. |
+| `framework === "remix"` | **Lingui** | Remix v2 (≥ 2.7, Vite-based) ships with no first-party i18n primitive. Lingui plugs in via `@lingui/vite-plugin`, gives compile-time extraction, and aligns with Remix's per-route `loader` pattern (dynamic catalog import per route). |
+| `framework === "react-router-framework"` | **Lingui** | React Router v7 framework mode is the same shape: Vite + `loader` + root `<html>` rendering. Lingui's per-route catalogs map cleanly onto the routes config. |
 | anything else (vite + react, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
 
 Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt.

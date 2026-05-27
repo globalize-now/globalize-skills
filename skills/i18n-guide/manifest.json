@@ -117,6 +117,65 @@
       }
     },
     {
+      "variant": "remix-babel-lingui",
+      "match": { "framework": "remix", "compiler": "babel", "library": "lingui" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/remix/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "remix-swc-lingui",
+      "match": { "framework": "remix", "compiler": "swc", "library": "lingui" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/remix/swc/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "react-router-framework-babel-lingui",
+      "match": { "framework": "react-router-framework", "compiler": "babel", "library": "lingui" },
+      "supportLevel": "stable",
+      "appliesAlsoTo": [
+        "The default React Router v7 scaffold does not install @vitejs/plugin-react — the reactRouter() plugin handles React internally. @vitejs/plugin-react@^5 is pinned (not ^6) because v6 dropped the babel.plugins option required for Lingui's Babel macro transform."
+      ],
+      "packages": {
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react@^5"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/react-router-framework/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
+      "variant": "react-router-framework-swc-lingui",
+      "match": { "framework": "react-router-framework", "compiler": "swc", "library": "lingui" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/react-router-framework/swc/lingui.setup.md"],
+        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+      }
+    },
+    {
       "variant": "vite-vue-i18n",
       "match": { "framework": "vite", "library": "vue-i18n" },
       "supportLevel": "stable",
