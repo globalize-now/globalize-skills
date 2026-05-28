@@ -338,7 +338,7 @@ While `progress/setup.json` is in `running` state, wake every 30–60 seconds, r
 
 ### Phase 2 collapse-case
 
-If `existing.configured === true`, `plan.md` reduces Phase 2 to: `verify_config`, `verify_provider`, `add_missing_locale_dirs`, `extract_compile`, `build_verification`. Same dispatch pattern.
+If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, and `build_verification`. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale. Same dispatch pattern.
 
 ---
 
@@ -493,7 +493,7 @@ Subagent steps:
 - [ ] provider_wiring
 - [ ] language_switcher
 - [ ] scaffold_catalogs
-- [ ] extract_compile
+- [ ] extract_compile   <!-- compile-time libraries only (Lingui); runtime-catalog libraries (next-intl, vue-i18n) consume the scaffolded catalogs directly — omit this step -->
 - [ ] install_coding_rules
 - [ ] {optional steps if opted in}
 - [ ] build_verification
