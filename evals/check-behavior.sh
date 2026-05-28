@@ -112,10 +112,17 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
   fi
 
   # Check that core project files weren't deleted. A file that disappears from
-  # one path but reappears under another (same basename) is a MOVE — legitimate
-  # during a locale restructure (e.g. app/page.tsx -> app/[locale]/page.tsx) —
-  # and is reported as a warning. A basename that vanishes entirely is a real
-  # deletion and fails.
+  # one path but whose original content reappears as a NEWLY created file
+  # elsewhere is a MOVE — legitimate during a locale restructure (e.g.
+  # app/page.tsx -> app/[locale]/page.tsx) — and is reported as a warning. A
+  # file whose content does not reappear is a real deletion and fails.
+  #
+  # Detection is content-aware: a deleted file counts as moved only if some new
+  # file is byte-identical to its backup, or — allowing for edits applied during
+  # the move — shares the same basename and a majority of its non-blank content
+  # lines. Comparing against NEW files only (not the whole after-snapshot)
+  # prevents an unrelated surviving file with a common basename like page.tsx or
+  # index.tsx from masking a real deletion.
   DELETED_FILES=$(comm -23 "$FILES_BEFORE" "$FILES_AFTER")
   if [ -z "$DELETED_FILES" ]; then
     pass "No original files were deleted"
@@ -125,7 +132,31 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
     while IFS= read -r f; do
       [ -z "$f" ] && continue
       base=$(basename "$f")
-      if grep -qF "/$base" "$FILES_AFTER"; then
+      orig="$BACKUP_DIR/$f"
+      moved=false
+      if [ -f "$orig" ]; then
+        orig_distinct=$(awk 'NF' "$orig" 2>/dev/null | sort -u | wc -l | tr -d ' ')
+        while IFS= read -r nf; do
+          [ -z "$nf" ] && continue
+          [ -f "$nf" ] || continue
+          # A byte-identical copy anywhere is unambiguously the same file.
+          if cmp -s "$orig" "$nf"; then moved=true; break; fi
+          # Otherwise require the same basename and majority content overlap.
+          [ "$(basename "$nf")" = "$base" ] || continue
+          if [ "$orig_distinct" -gt 0 ]; then
+            common=$(comm -12 <(awk 'NF' "$orig" | sort -u) <(awk 'NF' "$nf" | sort -u) | wc -l | tr -d ' ')
+            if [ "$common" -ge $(( (orig_distinct + 1) / 2 )) ]; then moved=true; break; fi
+          fi
+        done <<< "$NEW_FILES"
+      else
+        # No backup copy to compare against — fall back to a basename match
+        # against NEW files only (still narrower than the whole after-snapshot).
+        while IFS= read -r nf; do
+          [ -z "$nf" ] && continue
+          [ "$(basename "$nf")" = "$base" ] && { moved=true; break; }
+        done <<< "$NEW_FILES"
+      fi
+      if $moved; then
         MOVES="$MOVES$f"$'\n'
       else
         REAL_DELETIONS="$REAL_DELETIONS$f"$'\n'
@@ -133,7 +164,7 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
     done <<< "$DELETED_FILES"
 
     if [ -n "$MOVES" ]; then
-      warn "Files moved (same basename present elsewhere — likely locale restructure):"
+      warn "Files moved (content reappears as a new file — likely locale restructure):"
       echo "$MOVES" | while read -r f; do [ -n "$f" ] && echo "      ~ $f"; done
     fi
     if [ -n "$REAL_DELETIONS" ]; then
