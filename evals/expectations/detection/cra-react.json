@@ -1,0 +1,22 @@
+{
+  "match": {
+    "framework": "cra",
+    "react": true,
+    "vue": false
+  },
+  "ignore": [
+    "router",
+    "compiler",
+    "typescript",
+    "packageManager",
+    "sourceDir",
+    "routeEntries",
+    "git",
+    "existing",
+    "candidateFiles",
+    "localeSignals"
+  ],
+  "softAssert": {
+    "candidateFilesMinCount": 0
+  }
+}

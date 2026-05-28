@@ -111,13 +111,37 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
     echo "$UNEXPECTED" | while read -r f; do echo "      ? $f"; done
   fi
 
-  # Check that core project files weren't deleted
+  # Check that core project files weren't deleted. A file that disappears from
+  # one path but reappears under another (same basename) is a MOVE — legitimate
+  # during a locale restructure (e.g. app/page.tsx -> app/[locale]/page.tsx) —
+  # and is reported as a warning. A basename that vanishes entirely is a real
+  # deletion and fails.
   DELETED_FILES=$(comm -23 "$FILES_BEFORE" "$FILES_AFTER")
   if [ -z "$DELETED_FILES" ]; then
     pass "No original files were deleted"
   else
-    fail "Original files were deleted:"
-    echo "$DELETED_FILES" | while read -r f; do echo "      - $f"; done
+    REAL_DELETIONS=""
+    MOVES=""
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      base=$(basename "$f")
+      if grep -qF "/$base" "$FILES_AFTER"; then
+        MOVES="$MOVES$f"$'\n'
+      else
+        REAL_DELETIONS="$REAL_DELETIONS$f"$'\n'
+      fi
+    done <<< "$DELETED_FILES"
+
+    if [ -n "$MOVES" ]; then
+      warn "Files moved (same basename present elsewhere — likely locale restructure):"
+      echo "$MOVES" | while read -r f; do [ -n "$f" ] && echo "      ~ $f"; done
+    fi
+    if [ -n "$REAL_DELETIONS" ]; then
+      fail "Original files were deleted:"
+      echo "$REAL_DELETIONS" | while read -r f; do [ -n "$f" ] && echo "      - $f"; done
+    else
+      pass "No original files were truly deleted (moves only)"
+    fi
   fi
 else
   warn "File snapshots not available for diff analysis"

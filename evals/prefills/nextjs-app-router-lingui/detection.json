@@ -1,0 +1,28 @@
+{
+  "framework": "next",
+  "router": "app",
+  "compiler": "swc",
+  "react": true,
+  "vue": false,
+  "typescript": true,
+  "packageManager": "npm",
+  "sourceDir": "app",
+  "routeEntries": ["app/page.tsx"],
+  "git": { "isRepo": false, "branch": null, "remote": null },
+  "existing": {
+    "library": "none",
+    "configured": false,
+    "providerWired": false,
+    "catalogsScaffolded": false,
+    "stringsWrapped": "no"
+  },
+  "candidateFiles": [
+    { "path": "app/page.tsx", "matchCount": 10 },
+    { "path": "app/layout.tsx", "matchCount": 2 }
+  ],
+  "localeSignals": {
+    "existingLocaleDirs": [],
+    "envHints": [],
+    "readmeHints": []
+  }
+}
