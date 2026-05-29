@@ -118,11 +118,15 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
   # file whose content does not reappear is a real deletion and fails.
   #
   # Detection is content-aware: a deleted file counts as moved only if some new
-  # file is byte-identical to its backup, or — allowing for edits applied during
-  # the move — shares the same basename and a majority of its non-blank content
-  # lines. Comparing against NEW files only (not the whole after-snapshot)
-  # prevents an unrelated surviving file with a common basename like page.tsx or
-  # index.tsx from masking a real deletion.
+  # file is byte-identical to its NON-EMPTY backup, or — allowing for edits
+  # applied during the move — shares the same basename and a majority of its
+  # non-blank content lines. (Empty backups skip the byte-identical fast-path:
+  # all empty files are byte-identical, so a deleted .gitkeep plus any new empty
+  # stub would otherwise mask a real deletion.) Comparing against NEW files only
+  # (not the whole after-snapshot) narrows — but does not eliminate — the chance
+  # that a surviving file with a common basename like page.tsx or index.tsx
+  # masks a real deletion: a content-overlap or basename match against a NEW
+  # file can still be a coincidence (a known precision/recall limit).
   DELETED_FILES=$(comm -23 "$FILES_BEFORE" "$FILES_AFTER")
   if [ -z "$DELETED_FILES" ]; then
     pass "No original files were deleted"
@@ -139,8 +143,12 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
         while IFS= read -r nf; do
           [ -z "$nf" ] && continue
           [ -f "$nf" ] || continue
-          # A byte-identical copy anywhere is unambiguously the same file.
-          if cmp -s "$orig" "$nf"; then moved=true; break; fi
+          # A byte-identical copy anywhere is unambiguously the same file — but
+          # only for non-empty backups (every empty file is byte-identical, so
+          # an empty backup would match any new empty stub). Empty backups fall
+          # through to the basename+overlap path, which (orig_distinct == 0)
+          # never matches, so a deleted empty file is reported as a real deletion.
+          if [ -s "$orig" ] && cmp -s "$orig" "$nf"; then moved=true; break; fi
           # Otherwise require the same basename and majority content overlap.
           [ "$(basename "$nf")" = "$base" ] || continue
           if [ "$orig_distinct" -gt 0 ]; then
@@ -150,7 +158,11 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
         done <<< "$NEW_FILES"
       else
         # No backup copy to compare against — fall back to a basename match
-        # against NEW files only (still narrower than the whole after-snapshot).
+        # against NEW files only. This path matches on basename ALONE, so it can
+        # still class a real deletion as a move when an unrelated new file shares
+        # the basename (the same masking the backup path's content check guards
+        # against). It is near-dead in practice: Layer B always provides a full
+        # rsync backup, so the branch above is taken instead.
         while IFS= read -r nf; do
           [ -z "$nf" ] && continue
           [ "$(basename "$nf")" = "$base" ] && { moved=true; break; }

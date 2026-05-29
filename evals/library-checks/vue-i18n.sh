@@ -135,9 +135,15 @@ done < <(find . \( -path ./node_modules -o -path ./.nuxt -o -path ./.output -o -
 
 check_locale() {
   local code="$1" label="$2"
-  # A catalog file named <code>.json is itself proof the locale is configured.
+  # A catalog file named <code>.json or <code>.po is itself proof the locale is
+  # configured (the skill emits .po under the PO catalog format — see
+  # vue-i18n/setup.shared.md Step 7).
   if [ -n "$LOCALES_DIR" ] && [ -f "$LOCALES_DIR/$code.json" ]; then
     pass "$label locale '$code' has a catalog ($LOCALES_DIR/$code.json)"
+    return
+  fi
+  if [ -n "$LOCALES_DIR" ] && [ -f "$LOCALES_DIR/$code.po" ]; then
+    pass "$label locale '$code' has a catalog ($LOCALES_DIR/$code.po)"
     return
   fi
   if [ ${#LOCALE_SOURCES[@]} -gt 0 ] && grep -REq "[\"']${code}[\"']" "${LOCALE_SOURCES[@]}" 2>/dev/null; then
@@ -151,11 +157,14 @@ check_locale en "Source"
 check_locale es "Target"
 check_locale fr "Target"
 
-# 1.4 Catalog files parse as valid JSON (node is available).
+# 1.4 Catalog files present, and the .json ones parse as valid JSON (node is
+# available). The skill emits .po under the PO catalog format; .po is compiled
+# by the build-time loader, so we require existence but don't JSON-parse it.
 if [ -n "$LOCALES_DIR" ]; then
+  CATALOG_COUNT=$(find "$LOCALES_DIR" \( -name '*.json' -o -name '*.po' \) 2>/dev/null | wc -l | tr -d ' ')
   JSON_COUNT=$(find "$LOCALES_DIR" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$JSON_COUNT" -ge 1 ]; then
-    pass "JSON catalog files present ($JSON_COUNT files)"
+  if [ "$CATALOG_COUNT" -ge 1 ]; then
+    pass "Catalog files present ($CATALOG_COUNT files)"
     BAD_JSON=0
     while IFS= read -r catalog; do
       [ -z "$catalog" ] && continue
@@ -164,11 +173,11 @@ if [ -n "$LOCALES_DIR" ]; then
         BAD_JSON=$((BAD_JSON + 1))
       fi
     done < <(find "$LOCALES_DIR" -name '*.json' 2>/dev/null)
-    if [ "$BAD_JSON" -eq 0 ]; then
-      pass "All catalog files parse as valid JSON"
+    if [ "$BAD_JSON" -eq 0 ] && [ "$JSON_COUNT" -ge 1 ]; then
+      pass "All JSON catalog files parse as valid JSON"
     fi
   else
-    fail "No .json catalog files found in $LOCALES_DIR"
+    fail "No .json or .po catalog files found in $LOCALES_DIR"
   fi
 fi
 
@@ -202,10 +211,10 @@ fi
 
 # 1.6 Project builds (no extract/compile step — vue-i18n is runtime-only).
 echo "  Running npm run build..."
-if npm run build 2>&1 | tail -1 | grep -q -i "error"; then
-  fail "npm run build failed"
-else
+if npm run build > "$(mktemp)" 2>&1; then
   pass "npm run build succeeded"
+else
+  fail "npm run build failed"
 fi
 
 # ─── Layer 2: Code Quality ───
@@ -216,10 +225,10 @@ echo "--- Layer 2: Code Quality ---"
 # 2.1 TypeScript passes (for TS projects)
 if [ -f tsconfig.json ]; then
   echo "  Running tsc --noEmit..."
-  if npx tsc --noEmit 2>&1 | grep -q "error TS"; then
-    fail "TypeScript type errors found"
-  else
+  if npx tsc --noEmit > /dev/null 2>&1; then
     pass "TypeScript types pass"
+  else
+    fail "TypeScript type errors found"
   fi
 fi
 
@@ -247,11 +256,11 @@ I18N_FILES=$(find . \( -path ./node_modules -o -path ./.nuxt -o -path ./.output 
   \( -name '*.ts' -o -name '*.vue' -o -name '*.js' \) -print 2>/dev/null | \
   xargs grep -l -i "i18n\|useI18n\|messageCompiler\|i18n-t" 2>/dev/null || true)
 if [ -n "$I18N_FILES" ]; then
-  ANY_COUNT=$(echo "$I18N_FILES" | xargs grep -c ": any" 2>/dev/null | grep -v ":0$" | wc -l | tr -d ' ')
-  if [ "$ANY_COUNT" -eq 0 ]; then
+  ANY_FILES=$(echo "$I18N_FILES" | xargs grep -lF ": any" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$ANY_FILES" -eq 0 ]; then
     pass "No 'any' types in i18n files"
   else
-    warn "'any' type found in $ANY_COUNT i18n file(s)"
+    warn "'any' type found in $ANY_FILES i18n file(s)"
   fi
 fi
 
@@ -292,8 +301,11 @@ case "$VARIANT" in
     else
       fail "@intlify/unplugin-vue-i18n not found in quasar.config.*"
     fi
-    # Boot file registered in quasar.config boot: [...] array.
-    if [ -n "$QUASAR_CONFIG" ] && grep -Eq "boot:.*['\"]i18n['\"]|['\"]i18n['\"]" "$QUASAR_CONFIG" 2>/dev/null; then
+    # Boot file registered in quasar.config boot: [...] array. Anchor 'i18n' to
+    # the boot: line (matches the reference's `boot: ['i18n']` form) — a bare
+    # quoted-i18n alternative would match a quoted i18n anywhere in the config
+    # and could never fail.
+    if [ -n "$QUASAR_CONFIG" ] && grep -Eq "boot:.*['\"]i18n['\"]" "$QUASAR_CONFIG" 2>/dev/null; then
       pass "i18n boot file registered in $QUASAR_CONFIG"
     else
       fail "i18n not registered in quasar.config boot array"

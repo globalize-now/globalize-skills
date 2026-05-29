@@ -89,17 +89,24 @@ else
   fail "messages/ catalog directory not found at project root"
 fi
 
+# The skill emits either messages/<locale>.json (default) or messages/<locale>.po
+# (PO catalog format — see next-intl/po-format.setup.md). Accept either: JSON-parse
+# the .json shape, require existence for the .po shape (the loader compiles PO at
+# build time, so a structural check here would duplicate the build gate).
 check_catalog() {
   local code="$1" label="$2"
-  local file="messages/${code}.json"
-  if [ -f "$file" ]; then
-    if node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$file" 2>/dev/null; then
+  local json="messages/${code}.json"
+  local po="messages/${code}.po"
+  if [ -f "$json" ]; then
+    if node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$json" 2>/dev/null; then
       pass "$label catalog messages/${code}.json is valid JSON"
     else
       fail "$label catalog messages/${code}.json is not valid JSON"
     fi
+  elif [ -f "$po" ]; then
+    pass "$label catalog messages/${code}.po exists (PO catalog format)"
   else
-    fail "$label catalog messages/${code}.json not found"
+    fail "$label catalog messages/${code}.json or messages/${code}.po not found"
   fi
 }
 
@@ -118,10 +125,10 @@ fi
 # 1.6 Project builds (next-intl has no extract/compile — the build is the
 # functional gate). Mirror lingui.sh's build check.
 echo "  Running npm run build..."
-if npm run build 2>&1 | tail -1 | grep -q -i "error"; then
-  fail "npm run build failed"
-else
+if npm run build > "$(mktemp)" 2>&1; then
   pass "npm run build succeeded"
+else
+  fail "npm run build failed"
 fi
 
 # ─── Layer 2: Code Quality ───
@@ -132,10 +139,10 @@ echo "--- Layer 2: Code Quality ---"
 # 2.1 TypeScript passes (for TS projects)
 if [ -f tsconfig.json ]; then
   echo "  Running tsc --noEmit..."
-  if npx tsc --noEmit 2>&1 | grep -q "error TS"; then
-    fail "TypeScript type errors found"
-  else
+  if npx tsc --noEmit > /dev/null 2>&1; then
     pass "TypeScript types pass"
+  else
+    fail "TypeScript type errors found"
   fi
 fi
 
@@ -153,11 +160,11 @@ fi
 # the skill may use app/ or src/ depending on framework).
 I18N_FILES=$(find . -path ./node_modules -prune -o -path ./.next -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print 2>/dev/null | xargs grep -l -E "next-intl|NextIntlClientProvider|useTranslations|getTranslations|getRequestConfig|defineRouting" 2>/dev/null || true)
 if [ -n "$I18N_FILES" ]; then
-  ANY_COUNT=$(echo "$I18N_FILES" | xargs grep -c ": any" 2>/dev/null | grep -v ":0$" | wc -l | tr -d ' ')
-  if [ "$ANY_COUNT" -eq 0 ]; then
+  ANY_FILES=$(echo "$I18N_FILES" | xargs grep -lF ": any" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$ANY_FILES" -eq 0 ]; then
     pass "No 'any' types in i18n files"
   else
-    warn "'any' type found in $ANY_COUNT i18n file(s)"
+    warn "'any' type found in $ANY_FILES i18n file(s)"
   fi
 fi
 
@@ -168,8 +175,19 @@ echo "--- Variant-Specific Checks: $VARIANT ---"
 
 case "$VARIANT" in
   nextjs-app-router-next-intl)
+    # Detect the locale-prefix strategy from routing.ts. With localePrefix:
+    # 'never' the skill creates neither a middleware/proxy nor a [locale] segment
+    # — the provider goes in the existing root layout (see next-intl.setup.md
+    # § "With localePrefix: 'never'"). Relax those two checks in that case.
+    LOCALE_PREFIX=""
+    if [ ${#ROUTING_FILES[@]} -gt 0 ] && grep -Eq "localePrefix:[[:space:]]*['\"]never['\"]" "${ROUTING_FILES[@]}" 2>/dev/null; then
+      LOCALE_PREFIX="never"
+    fi
+
     # Locale router: Next <16 uses middleware.ts; Next 16+ renamed it to proxy.ts
-    if [ -f src/middleware.ts ] || [ -f middleware.ts ] || [ -f src/proxy.ts ] || [ -f proxy.ts ]; then
+    if [ "$LOCALE_PREFIX" = "never" ]; then
+      pass "localePrefix: 'never' — no locale router required (check skipped)"
+    elif [ -f src/middleware.ts ] || [ -f middleware.ts ] || [ -f src/proxy.ts ] || [ -f proxy.ts ]; then
       pass "Locale router (middleware.ts / proxy.ts) exists"
     else
       fail "Locale router not found (expected middleware.ts or proxy.ts)"
@@ -177,7 +195,9 @@ case "$VARIANT" in
 
     # Dynamic locale segment: [locale]. Prune node_modules and .next so build
     # artifacts don't produce false matches.
-    if find . -path './node_modules/*' -prune -o -path './.next/*' -prune -o -path '*/\[locale\]*' -print | grep -q .; then
+    if [ "$LOCALE_PREFIX" = "never" ]; then
+      pass "localePrefix: 'never' — no [locale] segment expected (check skipped)"
+    elif find . -path './node_modules/*' -prune -o -path './.next/*' -prune -o -path '*/\[locale\]*' -print | grep -q .; then
       pass "Dynamic locale route segment ([locale]) exists"
     else
       fail "Dynamic locale route segment ([locale]) not found"

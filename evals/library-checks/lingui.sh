@@ -109,12 +109,13 @@ else
   pass "lingui compile succeeded"
 fi
 
-# 1.7 Project builds
+# 1.7 Project builds (branch on exit status — parsing output for "error" both
+# missed real failures and false-FAILed on "0 errors" summaries).
 echo "  Running npm run build..."
-if npm run build 2>&1 | tail -1 | grep -q -i "error"; then
-  fail "npm run build failed"
-else
+if npm run build > "$(mktemp)" 2>&1; then
   pass "npm run build succeeded"
+else
+  fail "npm run build failed"
 fi
 
 # ─── Layer 2: Code Quality ───
@@ -125,10 +126,10 @@ echo "--- Layer 2: Code Quality ---"
 # 2.1 TypeScript passes (for TS projects)
 if [ -f tsconfig.json ]; then
   echo "  Running tsc --noEmit..."
-  if npx tsc --noEmit 2>&1 | grep -q "error TS"; then
-    fail "TypeScript type errors found"
-  else
+  if npx tsc --noEmit > /dev/null 2>&1; then
     pass "TypeScript types pass"
+  else
+    fail "TypeScript type errors found"
   fi
 fi
 
@@ -154,11 +155,11 @@ fi
 # the skill may use app/ or src/ depending on framework).
 I18N_FILES=$(find . -path ./node_modules -prune -o -path ./.next -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print 2>/dev/null | xargs grep -l -i "i18n\|lingui\|Trans\|useLingui" 2>/dev/null || true)
 if [ -n "$I18N_FILES" ]; then
-  ANY_COUNT=$(echo "$I18N_FILES" | xargs grep -c ": any" 2>/dev/null | grep -v ":0$" | wc -l | tr -d ' ')
-  if [ "$ANY_COUNT" -eq 0 ]; then
+  ANY_FILES=$(echo "$I18N_FILES" | xargs grep -lF ": any" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$ANY_FILES" -eq 0 ]; then
     pass "No 'any' types in i18n files"
   else
-    warn "'any' type found in $ANY_COUNT i18n file(s)"
+    warn "'any' type found in $ANY_FILES i18n file(s)"
   fi
 fi
 
