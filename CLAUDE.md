@@ -37,10 +37,10 @@ Skills can be installed via the [`npx skills`](https://github.com/vercel-labs/sk
 
 ```bash
 # Install a single skill into the current project
-npx skills add globalize/globalization-skills --skill i18n-guide -a claude-code
+npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code
 
 # Or install all skills from this repo
-npx skills add globalize/globalization-skills -a claude-code
+npx skills add globalize-now/globalize-skills -a claude-code
 ```
 
 Manual install also works — copy the skill directory directly:

@@ -6,35 +6,16 @@ The repo follows the [Agent Skills](https://github.com/vercel-labs/skills) open 
 
 ## Installation
 
-### Interactive (recommended)
+### `npx skills` (recommended)
 
-```bash
-npx globalize-skills
-```
-
-### Direct install
-
-```bash
-# Install a single skill (auto-detects Claude Code, Codex, Cursor)
-npx globalize-skills add i18n-guide
-
-# Target a specific agent
-npx globalize-skills add i18n-guide --agent claude-code
-
-# List available skills
-npx globalize-skills list
-```
-
-### Standard `npx skills` CLI
-
-This repo is also installable via the [`npx skills`](https://github.com/vercel-labs/skills) CLI:
+Install via the standard [`npx skills`](https://github.com/vercel-labs/skills) CLI:
 
 ```bash
 # Install a single skill into the current project
-npx skills add Globalize-now/globalize-skills --skill i18n-guide -a claude-code
+npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code
 
 # Install all skills
-npx skills add Globalize-now/globalize-skills -a claude-code
+npx skills add globalize-now/globalize-skills -a claude-code
 ```
 
 ### Manual install

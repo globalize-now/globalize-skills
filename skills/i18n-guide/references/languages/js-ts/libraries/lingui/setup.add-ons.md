@@ -19,7 +19,7 @@ Claude Code doesn't reliably auto-trigger passive "coding rules" references duri
 Verify `.claude/skills/i18n-guide/references/languages/js-ts/libraries/lingui/code.md` exists.
 
 - **If it exists**: proceed.
-- **If it is missing — guided mode**: tell the user the `i18n-guide` skill is not installed in their project and stop this add-on. The fix is to reinstall it (`npx skills add globalize/globalization-skills --skill i18n-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — guided mode**: tell the user the `i18n-guide` skill is not installed in their project and stop this add-on. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code`). Don't attempt to recreate the file.
 - **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ lingui coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
 
 Check whether `CLAUDE.md` exists at the project root.
