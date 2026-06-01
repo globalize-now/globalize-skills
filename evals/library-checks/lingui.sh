@@ -6,8 +6,8 @@ set -uo pipefail
 # Runs 3 layers of verification against a project where the i18n-guide skill
 # set up Lingui.
 
-WORKDIR="${1:?Usage: verify-lingui-setup.sh <project-dir> <fixture-name> [variant]}"
-FIXTURE="${2:?Usage: verify-lingui-setup.sh <project-dir> <fixture-name> [variant]}"
+WORKDIR="${1:?Usage: lingui.sh <project-dir> <fixture-name> [variant]}"
+FIXTURE="${2:?Usage: lingui.sh <project-dir> <fixture-name> [variant]}"
 VARIANT="${3:-$FIXTURE}"
 
 cd "$WORKDIR"

@@ -173,7 +173,7 @@ Refresh prefills when the manifest's package pins or plan step ids change.
 
 ## Layer B Verification
 
-`verify-setup.sh` reads the fixture's `library` and dispatches to `library-checks/<library>.sh`. Currently `lingui.sh` is implemented (it started as a copy of the legacy `verify-lingui-setup.sh` but has since been updated to match the current skill's output — locales in an imported module, per-page catalogs, optional ESLint add-on, `app/` source dir, Next 16 `proxy.ts` / `[locale]` routing). `next-intl.sh` and `vue-i18n.sh` are added as those variants come online.
+`verify-setup.sh` reads the fixture's `library` and dispatches to `library-checks/<library>.sh`. Currently `lingui.sh` is implemented (locales in an imported module, per-page catalogs, optional ESLint add-on, `app/` source dir, Next 16 `proxy.ts` / `[locale]` routing). `next-intl.sh` and `vue-i18n.sh` are added as those variants come online.
 
 Each library checker runs three layers:
 
@@ -200,7 +200,3 @@ WARN: Soft issues — content-sensitive or informational
 ```
 
 When a run fails, re-run with `KEEP_WORKDIR=1`, then inspect `.globalize/` (detection, plan), `.eval-agent-output.txt` (what the skill said), and the modified project files in the work dir.
-
-## Legacy harness
-
-`run-eval.sh`, `run-all.sh`, and `run-eval-convert.sh` predate the two-layer split and the `i18n-guide` orchestrator refactor. They remain for reference and are superseded by `run-eval-layer-a.sh` / `run-eval-layer-b.sh`.
