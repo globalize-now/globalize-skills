@@ -111,13 +111,80 @@ if [ -f "$FILES_BEFORE" ] && [ -f "$FILES_AFTER" ]; then
     echo "$UNEXPECTED" | while read -r f; do echo "      ? $f"; done
   fi
 
-  # Check that core project files weren't deleted
+  # Check that core project files weren't deleted. A file that disappears from
+  # one path but whose original content reappears as a NEWLY created file
+  # elsewhere is a MOVE — legitimate during a locale restructure (e.g.
+  # app/page.tsx -> app/[locale]/page.tsx) — and is reported as a warning. A
+  # file whose content does not reappear is a real deletion and fails.
+  #
+  # Detection is content-aware: a deleted file counts as moved only if some new
+  # file is byte-identical to its NON-EMPTY backup, or — allowing for edits
+  # applied during the move — shares the same basename and a majority of its
+  # non-blank content lines. (Empty backups skip the byte-identical fast-path:
+  # all empty files are byte-identical, so a deleted .gitkeep plus any new empty
+  # stub would otherwise mask a real deletion.) Comparing against NEW files only
+  # (not the whole after-snapshot) narrows — but does not eliminate — the chance
+  # that a surviving file with a common basename like page.tsx or index.tsx
+  # masks a real deletion: a content-overlap or basename match against a NEW
+  # file can still be a coincidence (a known precision/recall limit).
   DELETED_FILES=$(comm -23 "$FILES_BEFORE" "$FILES_AFTER")
   if [ -z "$DELETED_FILES" ]; then
     pass "No original files were deleted"
   else
-    fail "Original files were deleted:"
-    echo "$DELETED_FILES" | while read -r f; do echo "      - $f"; done
+    REAL_DELETIONS=""
+    MOVES=""
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      base=$(basename "$f")
+      orig="$BACKUP_DIR/$f"
+      moved=false
+      if [ -f "$orig" ]; then
+        orig_distinct=$(awk 'NF' "$orig" 2>/dev/null | sort -u | wc -l | tr -d ' ')
+        while IFS= read -r nf; do
+          [ -z "$nf" ] && continue
+          [ -f "$nf" ] || continue
+          # A byte-identical copy anywhere is unambiguously the same file — but
+          # only for non-empty backups (every empty file is byte-identical, so
+          # an empty backup would match any new empty stub). Empty backups fall
+          # through to the basename+overlap path, which (orig_distinct == 0)
+          # never matches, so a deleted empty file is reported as a real deletion.
+          if [ -s "$orig" ] && cmp -s "$orig" "$nf"; then moved=true; break; fi
+          # Otherwise require the same basename and majority content overlap.
+          [ "$(basename "$nf")" = "$base" ] || continue
+          if [ "$orig_distinct" -gt 0 ]; then
+            common=$(comm -12 <(awk 'NF' "$orig" | sort -u) <(awk 'NF' "$nf" | sort -u) | wc -l | tr -d ' ')
+            if [ "$common" -ge $(( (orig_distinct + 1) / 2 )) ]; then moved=true; break; fi
+          fi
+        done <<< "$NEW_FILES"
+      else
+        # No backup copy to compare against — fall back to a basename match
+        # against NEW files only. This path matches on basename ALONE, so it can
+        # still class a real deletion as a move when an unrelated new file shares
+        # the basename (the same masking the backup path's content check guards
+        # against). It is near-dead in practice: Layer B always provides a full
+        # rsync backup, so the branch above is taken instead.
+        while IFS= read -r nf; do
+          [ -z "$nf" ] && continue
+          [ "$(basename "$nf")" = "$base" ] && { moved=true; break; }
+        done <<< "$NEW_FILES"
+      fi
+      if $moved; then
+        MOVES="$MOVES$f"$'\n'
+      else
+        REAL_DELETIONS="$REAL_DELETIONS$f"$'\n'
+      fi
+    done <<< "$DELETED_FILES"
+
+    if [ -n "$MOVES" ]; then
+      warn "Files moved (content reappears as a new file — likely locale restructure):"
+      echo "$MOVES" | while read -r f; do [ -n "$f" ] && echo "      ~ $f"; done
+    fi
+    if [ -n "$REAL_DELETIONS" ]; then
+      fail "Original files were deleted:"
+      echo "$REAL_DELETIONS" | while read -r f; do [ -n "$f" ] && echo "      - $f"; done
+    else
+      pass "No original files were truly deleted (moves only)"
+    fi
   fi
 else
   warn "File snapshots not available for diff analysis"

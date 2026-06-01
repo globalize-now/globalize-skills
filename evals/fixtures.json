@@ -1,23 +1,61 @@
 {
-  "nextjs-app-router": {
+  "nextjs-app-router-lingui": {
+    "category": "positive",
     "type": "local",
     "path": "fixtures/nextjs-app-router",
-    "variant": "nextjs-app-router"
+    "library": "lingui",
+    "variant": "nextjs-app-router-lingui",
+    "prefill": "evals/prefills/nextjs-app-router-lingui",
+    "expectedDetection": "evals/expectations/detection/nextjs-app-router-lingui.json",
+    "expectedPlan": "evals/expectations/plan/nextjs-app-router-lingui.json"
+  },
+  "cra-react": {
+    "category": "hard-stop",
+    "type": "local",
+    "path": "fixtures/hard-stop/cra-react",
+    "library": null,
+    "variant": null,
+    "expectedDetection": "evals/expectations/detection/cra-react.json",
+    "expectedHardStop": "evals/expectations/hard-stop/cra-react.json"
+  },
+  "nextjs-app-router-next-intl-configured": {
+    "category": "collapse",
+    "type": "derived",
+    "base": "fixtures/nextjs-app-router",
+    "overlay": "fixtures/collapse/nextjs-app-router-next-intl-configured",
+    "library": "next-intl",
+    "variant": "nextjs-app-router-next-intl",
+    "expectedDetection": "evals/expectations/detection/nextjs-app-router-next-intl-configured.json",
+    "expectedPlan": "evals/expectations/plan/nextjs-app-router-next-intl-configured.json"
+  },
+
+  "nextjs-app-router": {
+    "category": "positive",
+    "type": "local",
+    "path": "fixtures/nextjs-app-router",
+    "library": "lingui",
+    "variant": "nextjs-app-router-lingui"
   },
   "vite-swc": {
+    "category": "positive",
     "type": "local",
     "path": "fixtures/vite-swc",
-    "variant": "vite-swc"
+    "library": "lingui",
+    "variant": "vite-swc-lingui"
   },
   "vite-babel": {
+    "category": "positive",
     "type": "local",
     "path": "fixtures/vite-babel",
-    "variant": "vite-babel"
+    "library": "lingui",
+    "variant": "vite-babel-lingui"
   },
   "shadcn-admin": {
+    "category": "positive",
     "type": "git",
     "repo": "https://github.com/satnaing/shadcn-admin.git",
     "commit": "a750f776f952997b6488714cdffde4badaa6c3e6",
-    "variant": "vite-swc"
+    "library": "lingui",
+    "variant": "vite-swc-lingui"
   }
 }

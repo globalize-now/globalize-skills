@@ -1,0 +1,22 @@
+{
+  "match": {
+    "framework": "next",
+    "router": "app",
+    "compiler": "swc",
+    "react": true,
+    "vue": false,
+    "typescript": true,
+    "packageManager": "npm",
+    "existing": {
+      "library": "none",
+      "configured": false,
+      "providerWired": false,
+      "catalogsScaffolded": false,
+      "stringsWrapped": "no"
+    }
+  },
+  "ignore": ["candidateFiles", "routeEntries", "git", "localeSignals", "sourceDir"],
+  "softAssert": {
+    "candidateFilesMinCount": 1
+  }
+}

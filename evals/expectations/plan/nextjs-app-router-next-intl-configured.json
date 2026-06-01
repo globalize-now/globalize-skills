@@ -1,0 +1,8 @@
+{
+  "variant": "nextjs-app-router-next-intl",
+  "library": "next-intl",
+  "phasesIncluded": ["setup"],
+  "phase2StepsContain": ["build_verification"],
+  "phase2StepsContainPattern": ["verify_"],
+  "phase2StepsAbsent": ["create_config"]
+}

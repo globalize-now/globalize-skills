@@ -1,0 +1,11 @@
+{
+  "messageContains": "Create React App is no longer supported",
+  "mustNotCreate": [
+    ".globalize/plan.md",
+    ".globalize/manifest-snapshot.json"
+  ],
+  "mustCreate": [
+    ".globalize/detection.json"
+  ],
+  "depsMustBeUnchanged": true
+}

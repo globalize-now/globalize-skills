@@ -1,0 +1,7 @@
+{
+  "name": "i18n-guide",
+  "version": "1.0.0",
+  "description": "Detect, set up, convert, and connect a translation platform for any supported i18n stack. Drives the full localization journey through four phases (inspect, setup, convert, globalize-now) with subagent execution and shared progress tracking.",
+  "tags": ["i18n", "internationalization", "localization", "lingui", "next-intl", "translations"],
+  "supportedAgents": ["claude-code"]
+}

@@ -3,3 +3,7 @@ node_modules
 .worktrees
 mcp-server/dist
 mcp-server/src/api-types.ts
+
+# Library-version-check artifacts (root only; not evals/library-checks/)
+/library-checks/
+/.library-check/

@@ -1,0 +1,14 @@
+{
+  "variant": "nextjs-app-router-lingui",
+  "match": { "framework": "next", "router": "app", "library": "lingui" },
+  "supportLevel": "stable",
+  "packages": {
+    "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+    "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6"]
+  },
+  "references": {
+    "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md"],
+    "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.convert.md"],
+    "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+  }
+}
