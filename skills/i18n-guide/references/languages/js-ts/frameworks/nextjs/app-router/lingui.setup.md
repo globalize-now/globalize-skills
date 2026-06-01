@@ -4,7 +4,7 @@ This covers Next.js 13+ projects using the App Router with React Server Componen
 
 ## Packages
 
-In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/macro`, `@lingui/cli`), install:
+In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/cli`), install:
 
 | Package | Type | Purpose |
 |---------|------|---------|
@@ -15,7 +15,7 @@ If the project has a `.babelrc`, use `@lingui/babel-plugin-lingui-macro` instead
 **Example (npm):**
 
 ```bash
-npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/macro@^5'
+npm install '@lingui/core@^6' '@lingui/react@^6'
 npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6'
 ```
 

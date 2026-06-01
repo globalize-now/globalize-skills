@@ -8,7 +8,7 @@ This covers projects built on [Remix v2](https://remix.run/) (`@remix-run/*` ≥
 
 The orchestrator pre-installed the manifest's runtime and dev packages on its main thread (Phase 2.0) before dispatching you. Treat them as already on disk — do **not** re-run `npm install` / `pnpm add` for them. The set is:
 
-- Runtime: `@lingui/core@^6`, `@lingui/react@^6`, `@lingui/macro@^5`
+- Runtime: `@lingui/core@^6`, `@lingui/react@^6`
 - Dev: `@lingui/cli@^6`, `@lingui/babel-plugin-lingui-macro@^6`, `@lingui/vite-plugin@^6`
 
 The reasoning behind these pins: Lingui 6 is the current major (paired with React 18/19 and the new `@lingui/react/macro` import path), the `@lingui/babel-plugin-lingui-macro` 6 release expands the macros under Babel, and `@lingui/vite-plugin@^6` is the Vite-side companion that compiles `.po` catalogs into the runtime `.ts` modules each route loads. No `@lingui/detect-locale` — that library is browser-only (`navigator`, `localStorage`, `window.location`) and would throw on the server or produce hydration mismatches under SSR. Remix resolves locale from request headers and a cookie instead, on the server side, before any client code runs.

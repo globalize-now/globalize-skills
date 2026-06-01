@@ -14,7 +14,6 @@ The orchestrator (Phase 2.0) pre-installed these on the main thread before dispa
 |---------|------|---------|
 | `@lingui/core` | runtime | i18n engine |
 | `@lingui/react` | runtime | `I18nProvider`, `Trans`, `useLingui` |
-| `@lingui/macro` | runtime | Macro source imports |
 | `@lingui/cli` | dev | `lingui extract` / `lingui compile` |
 | `@lingui/babel-plugin-lingui-macro` | dev | Babel macro transform |
 | `@lingui/vite-plugin` | dev | Vite integration for catalog compilation |
@@ -832,7 +831,7 @@ If `lingui extract` fails with `Could not resolve import(...)`, revisit Section 
 If `npm run build` fails with `Trans is not defined` or similar, the macro transform isn't running. Verify:
 - `@vitejs/plugin-react@^5` is installed (Section 1 — pre-installed by the orchestrator).
 - `vite.config.ts` has the exact plugin order from Section 2: `reactRouter()`, then `react({ babel: { plugins: ['@lingui/babel-plugin-lingui-macro'] } })`, then `lingui()`.
-- The macro import is `import { Trans } from '@lingui/react/macro'` (not `@lingui/macro`, which is for non-React macros like `t`).
+- The macro import is `import { Trans } from '@lingui/react/macro'` (not the deprecated `@lingui/macro`; non-React macros like `t` come from `@lingui/core/macro`).
 
 ## 13. Optional add-ons
 

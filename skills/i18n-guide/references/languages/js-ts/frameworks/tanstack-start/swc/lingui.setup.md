@@ -20,7 +20,7 @@ In addition to the core packages from Step 2, install:
 **Example (npm):**
 
 ```bash
-npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/macro@^5'
+npm install '@lingui/core@^6' '@lingui/react@^6'
 npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6' '@lingui/vite-plugin@^6' '@vitejs/plugin-react-swc@^4'
 npm uninstall @vitejs/plugin-react   # only if it was present
 ```

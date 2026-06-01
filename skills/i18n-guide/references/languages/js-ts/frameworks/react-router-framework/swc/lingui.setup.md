@@ -14,7 +14,6 @@ The orchestrator (Phase 2.0) pre-installed these on the main thread before dispa
 |---------|------|---------|
 | `@lingui/core` | runtime | i18n engine |
 | `@lingui/react` | runtime | `I18nProvider`, `Trans`, `useLingui` |
-| `@lingui/macro` | runtime | Macro source imports |
 | `@lingui/cli` | dev | `lingui extract` / `lingui compile` |
 | `@lingui/swc-plugin` | dev | SWC macro transform |
 | `@lingui/vite-plugin` | dev | Vite integration for catalog compilation |
@@ -832,7 +831,7 @@ If `npm run build` fails with `Trans is not defined` or `<Trans>` renders as raw
 - `vite.config.ts` has the exact plugin order from Section 2: `reactRouter()`, then `react({ plugins: [['@lingui/swc-plugin', {}]] })`, then `lingui()`.
 - The SWC plugin is passed as a tuple `['@lingui/swc-plugin', {}]` (string + options object), not a bare string — bare strings are silently ignored.
 - `@lingui/swc-plugin`'s `swc_core` version matches the one shipped by `@vitejs/plugin-react-swc` — see the version-pinning note in Section 1.
-- The macro import is `import { Trans } from '@lingui/react/macro'` (not `@lingui/macro`, which is for non-React macros like `t`).
+- The macro import is `import { Trans } from '@lingui/react/macro'` (not the deprecated `@lingui/macro`; non-React macros like `t` come from `@lingui/core/macro`).
 
 ## 13. Optional add-ons
 

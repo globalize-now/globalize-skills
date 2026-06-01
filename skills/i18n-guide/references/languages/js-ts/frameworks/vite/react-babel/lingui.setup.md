@@ -13,7 +13,7 @@ This covers Vite projects using `@vitejs/plugin-react` (Babel-based, without the
 
 ## Packages
 
-In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/macro`, `@lingui/cli`), install:
+In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/cli`), install:
 
 | Package | Type | Purpose |
 |---------|------|---------|
@@ -24,7 +24,7 @@ In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@ling
 **Example (npm):**
 
 ```bash
-npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/macro@^5' '@lingui/detect-locale@^6'
+npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/detect-locale@^6'
 npm install -D '@lingui/cli@^6' '@lingui/babel-plugin-lingui-macro@^6' '@lingui/vite-plugin@^6'
 ```
 

@@ -10,7 +10,7 @@ This covers projects built on [Remix v2](https://remix.run/) (`@remix-run/*` ≥
 
 The orchestrator pre-installed the manifest's runtime and dev packages on its main thread (Phase 2.0) before dispatching you. Treat them as already on disk — do **not** re-run `npm install` / `pnpm add` for them. The set is:
 
-- Runtime: `@lingui/core@^6`, `@lingui/react@^6`, `@lingui/macro@^5`
+- Runtime: `@lingui/core@^6`, `@lingui/react@^6`
 - Dev: `@lingui/cli@^6`, `@lingui/swc-plugin@^6`, `@lingui/vite-plugin@^6`, `@vitejs/plugin-react-swc@^4`
 
 The reasoning behind these pins: Lingui 6 is the current major (paired with React 18/19 and the new `@lingui/react/macro` import path), `@lingui/swc-plugin@^6` expands the macros under SWC, `@lingui/vite-plugin@^6` is the Vite-side companion that compiles `.po` catalogs into the runtime `.ts` modules each route loads, and `@vitejs/plugin-react-swc@^4` is the current LTS major of the SWC React plugin. The swap from `@vitejs/plugin-react` (Babel) to `@vitejs/plugin-react-swc` is what makes the SWC variant possible — the latter accepts a `plugins` option that wires arbitrary SWC plugins (including Lingui's) into the React transform.

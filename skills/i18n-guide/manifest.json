@@ -7,7 +7,7 @@
       "match": { "framework": "next", "router": "app", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6"]
       },
       "references": {
@@ -62,7 +62,7 @@
         "Plain Vite + React + SWC SPA"
       ],
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5", "@lingui/detect-locale@^6"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/detect-locale@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6"]
       },
       "references": {
@@ -76,7 +76,7 @@
       "match": { "framework": "vite", "compiler": "babel", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5", "@lingui/detect-locale@^6"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/detect-locale@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
       },
       "references": {
@@ -90,7 +90,7 @@
       "match": { "framework": "tanstack-start", "compiler": "babel", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
       },
       "references": {
@@ -107,7 +107,7 @@
         "create-tanstack-start scaffolds installing @vitejs/plugin-react@6 (which dropped the babel option)"
       ],
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
       },
       "references": {
@@ -121,7 +121,7 @@
       "match": { "framework": "remix", "compiler": "babel", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
       },
       "references": {
@@ -135,7 +135,7 @@
       "match": { "framework": "remix", "compiler": "swc", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
       },
       "references": {
@@ -152,7 +152,7 @@
         "The default React Router v7 scaffold does not install @vitejs/plugin-react — the reactRouter() plugin handles React internally. @vitejs/plugin-react@^5 is pinned (not ^6) because v6 dropped the babel.plugins option required for Lingui's Babel macro transform."
       ],
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react@^5"]
       },
       "references": {
@@ -166,7 +166,7 @@
       "match": { "framework": "react-router-framework", "compiler": "swc", "library": "lingui" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
       },
       "references": {
