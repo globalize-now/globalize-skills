@@ -84,18 +84,19 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > ```json
 > {
->   "framework": "next" | "vite" | "tanstack-start" | "remix" | "react-router-framework" | "nuxt" | "quasar" | "cra" | "unknown",
->   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "vue-router" | "none",
+>   "framework": "next" | "vite" | "tanstack-start" | "remix" | "react-router-framework" | "nuxt" | "quasar" | "sveltekit" | "cra" | "unknown",
+>   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "vue-router" | "sveltekit" | "none",
 >   "compiler": "swc" | "babel",
 >   "react": true | false,
 >   "vue": true | false,
+>   "svelte": true | false,
 >   "typescript": true | false,
 >   "packageManager": "npm" | "yarn" | "pnpm" | "bun",
 >   "sourceDir": "src" | "app" | string,
 >   "routeEntries": ["src/app/**/page.tsx", ...] | null,
 >   "git": { "isRepo": true | false, "branch": string | null, "remote": string | null },
 >   "existing": {
->     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "none",
+>     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "none",
 >     "configured": true | false,
 >     "providerWired": true | false,
 >     "catalogsScaffolded": true | false,
@@ -116,19 +117,20 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > | Field | How to detect |
 > |---|---|
-> | `framework` | Evaluate in this order, first match wins: `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. Any `@remix-run/*` runtime package in deps → remix. `react-router` in deps AND `@react-router/dev` in devDeps AND a `react-router.config.{ts,js}` file at the repo root → react-router-framework. `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. (Order matters: Remix v2 and React Router v7 framework mode both have `vite` in devDeps, so they must be checked before the `vite` fallback. React Router v7 SPA mode — `react-router` without `@react-router/dev` — correctly falls through to `vite` with `router: "react-router"`.) |
-> | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps (also the value reported for `framework: "remix"` and `framework: "react-router-framework"`, since both use react-router internally; this is informational only, no matcher predicates on it for those frameworks). Vue Router: `vue-router` in deps (Vite SPA / Quasar). |
-> | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. Remix v2 and React Router v7 framework mode → swc if `@vitejs/plugin-react-swc` is in devDeps; babel otherwise (both default to Babel via `@vitejs/plugin-react`). |
+> | `framework` | Evaluate in this order, first match wins: `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. Any `@remix-run/*` runtime package in deps → remix. `react-router` in deps AND `@react-router/dev` in devDeps AND a `react-router.config.{ts,js}` file at the repo root → react-router-framework. `@sveltejs/kit` in deps or devDeps → sveltekit. `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. (Order matters: Remix v2, React Router v7 framework mode, and SvelteKit all ship `vite` in devDeps, so they must be checked before the `vite` fallback. React Router v7 SPA mode — `react-router` without `@react-router/dev` — correctly falls through to `vite` with `router: "react-router"`.) |
+> | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps (also the value reported for `framework: "remix"` and `framework: "react-router-framework"`, since both use react-router internally; this is informational only, no matcher predicates on it for those frameworks). Vue Router: `vue-router` in deps (Vite SPA / Quasar). SvelteKit: `framework === "sveltekit"` — file-based routing under `src/routes/`. |
+> | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. Remix v2 and React Router v7 framework mode → swc if `@vitejs/plugin-react-swc` is in devDeps; babel otherwise (both default to Babel via `@vitejs/plugin-react`). SvelteKit uses neither — the Svelte compiler runs through Vite (esbuild), and none of the rules above match — so the field is a don't-care for SvelteKit; report whatever the heuristic yields (it will not match any rule) and treat the value as not meaningful: the SvelteKit manifest entry does not key on `compiler`. |
 > | `react` | `react` in deps or devDeps. |
 > | `vue` | `vue` in deps or devDeps. |
+> | `svelte` | `svelte` in deps or devDeps. |
 > | `packageManager` | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
-> | `routeEntries` | App Router: `<root>/src/app/**/page.tsx`. TanStack file-based: `<root>/src/routes/**/*.tsx`. Remix v2 or React Router v7 framework mode: `<root>/app/routes/**/*.{tsx,jsx,ts,js}`. None if no file-based routing detected. |
+> | `routeEntries` | App Router: `<root>/src/app/**/page.tsx`. TanStack file-based: `<root>/src/routes/**/*.tsx`. Remix v2 or React Router v7 framework mode: `<root>/app/routes/**/*.{tsx,jsx,ts,js}`. SvelteKit: `<root>/src/routes/**/*.svelte`. None if no file-based routing detected. |
 > | `existing.library` | First match in deps/devDeps from the union of i18n libraries listed above. |
-> | `existing.configured` | `lingui.config.*` present AND macro plugin wired in build config; OR `next-intl` config present AND plugin wired; OR (Vue) `createI18n(` present in `src/i18n/index.*` (Vite/Quasar) or `defineI18nConfig(` in `i18n.config.*` (Nuxt) AND `messageCompiler` wired. |
-> | `existing.providerWired` | Layout/main file imports and renders `I18nProvider` (Lingui) or `NextIntlClientProvider` (next-intl); OR (Vue) `app.use(i18n)` in `main.*` (Vite) / boot file registered (Quasar) / `@nuxtjs/i18n` listed in `modules` (Nuxt). |
+> | `existing.configured` | `lingui.config.*` present AND macro plugin wired in build config; OR `next-intl` config present AND plugin wired; OR (Vue) `createI18n(` present in `src/i18n/index.*` (Vite/Quasar) or `defineI18nConfig(` in `i18n.config.*` (Nuxt) AND `messageCompiler` wired; OR (Paraglide) `project.inlang/settings.json` present AND `paraglideVitePlugin` in `vite.config.*`. |
+> | `existing.providerWired` | Layout/main file imports and renders `I18nProvider` (Lingui) or `NextIntlClientProvider` (next-intl); OR (Vue) `app.use(i18n)` in `main.*` (Vite) / boot file registered (Quasar) / `@nuxtjs/i18n` listed in `modules` (Nuxt); OR (Paraglide) `paraglideMiddleware` in `src/hooks.server.ts`. |
 > | `existing.catalogsScaffolded` | Locale directories with at least one message file exist. |
-> | `existing.stringsWrapped` | Glob source tree, sample up to 50 files, count files with bare JSX text vs. files importing macros: > 80% imported → "yes", > 20% → "partial", else → "no". |
-> | `candidateFiles` | Glob `src/**/*.{tsx,ts,jsx,js}`, exclude tests/configs/`.d.ts`, grep each for: bare JSX text (`>Word<`), user-visible attrs (`placeholder=`, `aria-label=`, `title=`, `alt=`), exported user-facing string literals. Return files with ≥1 match, sorted by match count desc. |
+> | `existing.stringsWrapped` | Glob source tree (`.{tsx,jsx,js,svelte}`), sample up to 50 files, count files with bare markup text vs. files importing macros/message functions (for Paraglide, `import { m } from '$lib/paraglide/messages.js'`): > 80% imported → "yes", > 20% → "partial", else → "no". |
+> | `candidateFiles` | Glob `src/**/*.{tsx,ts,jsx,js,svelte}`, exclude tests/configs/`.d.ts`, grep each for: bare markup text (`>Word<`, including Svelte template text), user-visible attrs (`placeholder=`, `aria-label=`, `title=`, `alt=`), exported user-facing string literals. Return files with ≥1 match, sorted by match count desc. |
 > | `localeSignals` | List existing locale dirs (e.g., `src/locales/`), env vars matching `*LOCALE*`, README mentions of language names. |
 >
 > Write the JSON file and exit. Do not engage in conversation.
@@ -147,13 +149,20 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 
 | Condition | Stop message |
 |---|---|
-| `react === false` AND `vue === false` | "i18n-guide currently supports React-based and Vue-based projects only. This project uses {framework}. No supported library available." |
+| `react === false` AND `vue === false` AND `svelte === false` | "i18n-guide currently supports React-based, Vue-based, and Svelte-based projects only. This project uses {framework}. No supported library available." |
 | `framework === "cra"` | "Create React App is no longer supported by this skill. Migrate to Vite or Next.js, then re-run." |
 | `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
 | `framework === "next"` AND `router === "pages"` AND user wants Lingui | (Surface only after library choice in 1.5) "Lingui setup does not currently cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router." |
 | `@remix-run/react` in deps with major version `< 2` (i.e. Remix v1) | "Remix v1 is no longer supported by this skill. Upgrade to Remix v2 (`@remix-run/*` ≥ 2) or migrate to React Router v7 framework mode, then re-run." |
 | `framework === "remix"` AND (`@remix-run/dev` major.minor `< 2.7` OR `vite` not in devDeps) | "This Remix v2 project uses the classic compiler (pre-Vite). Lingui requires the Vite-based build. Upgrade to `@remix-run/dev` ≥ 2.7 and follow Remix's classic-compiler → Vite migration, then re-run." |
+| `framework === "sveltekit"` AND `@sveltejs/kit` major.minor `< 2.3` | "Paraglide's URL-based locale routing relies on SvelteKit's `reroute` hook, added in `@sveltejs/kit` 2.3.0 — your project is on an older version. Upgrade to SvelteKit ≥ 2.3, then re-run. (If you must stay below 2.3, a different, deprecated routing approach is required that this skill does not cover.)" |
+| `svelte === true` AND `framework !== "sveltekit"` | "This skill currently supports Svelte only through SvelteKit (the Paraglide setup relies on SvelteKit's hooks and routing). A plain Vite + Svelte SPA is not yet supported. Adopt SvelteKit, or wait for SPA support, then re-run." |
 | Custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar." |
+
+These are not hard-stops, but note for the Paraglide path:
+
+- If `existing.library === "paraglide"` AND `existing.configured === true`, do **not** run a from-scratch setup — route Phase 2 to the collapse / already-configured case (see "Phase 2 collapse-case").
+- If `@inlang/paraglide-sveltekit` (the Paraglide 1.x SvelteKit adapter) is in deps, this is a **migration**, not a fresh setup: Paraglide 2.x replaced the dedicated adapter with the framework-agnostic `reroute` + `handle` model. Flag it to the user before proceeding; the setup reference covers the migration steps.
 
 ### 1.3 Resolve supported stacks from manifest
 
@@ -188,6 +197,7 @@ Show the user the list of supported variants from 1.3, with the recommendation m
 | `framework === "quasar"` OR (`vue === true` AND `framework === "vite"`) | **vue-i18n** | The official Intlify library and de-facto standard across Vue 3 projects. Composition API + ICU via custom `messageCompiler`. |
 | `framework === "remix"` | **Lingui** | Remix v2 (≥ 2.7, Vite-based) ships with no first-party i18n primitive. Lingui plugs in via `@lingui/vite-plugin`, gives compile-time extraction, and aligns with Remix's per-route `loader` pattern (dynamic catalog import per route). |
 | `framework === "react-router-framework"` | **Lingui** | React Router v7 framework mode is the same shape: Vite + `loader` + root `<html>` rendering. Lingui's per-route catalogs map cleanly onto the routes config. |
+| `framework === "sveltekit"` | **Paraglide JS** | First-party Svelte CLI add-on (`sv add paraglide`); compiler-based with tree-shaken messages; SSR-correct via AsyncLocalStorage; integrates through `reroute` + `handle` hooks. |
 | anything else (vite + react, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
 
 Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt.
@@ -226,7 +236,7 @@ Record under `decisions.setup`.
 
 If `convert` is in scope, ask the user to confirm the **app domain**. Infer from `package.json` description, README, route names, or component names. Default suggestion + freeform override.
 
-The domain string flows into wrap-subagent prompts so they write better translator comments.
+The domain string flows into wrap-subagent prompts so they write better translator comments. For Paraglide (which has no translator-comment field), the app domain instead informs *key naming* — it helps the wrap subagent choose descriptive, context-encoding keys (e.g. `cart_remove_button`), the only disambiguation lever available.
 
 ### 1.9 Globalize-now choices
 
@@ -338,7 +348,7 @@ While `progress/setup.json` is in `running` state, wake every 30–60 seconds, r
 
 ### Phase 2 collapse-case
 
-If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, and `build_verification`. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale. Same dispatch pattern.
+If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, and `build_verification`. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale; a **compile-from-catalog** library (Paraglide) re-runs `paraglide_compile` (`npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`) to regenerate `src/lib/paraglide/` from the hand-authored `messages/{locale}.json` catalogs. Same dispatch pattern.
 
 ---
 
@@ -364,7 +374,7 @@ Send all wrap subagents in **a single Agent tool message** so they launch in par
 >
 > Read these reference files for macro guidance: {paths from manifest-snapshot.references.convert}.
 >
-> For each file: identify translatable strings, wrap with the correct macro, add translator comments inline per the rules in the reference. Update `.globalize/progress/wrap-N.json` after each file (atomic write). Do NOT run `extract` or `compile` — that runs once after all wrap subagents complete.
+> For each file: identify translatable strings, wrap with the correct macro, add translator comments inline per the rules in the reference. (Paraglide is the exception: it is key-authored with no translator-comment field — instead of wrapping with a macro and adding comments, author a descriptive, context-encoding key plus its JSON catalog entry and replace the string with the `m.key()` call. Do NOT add comments; descriptive key naming is the only disambiguation lever. The convert reference covers the detail.) Update `.globalize/progress/wrap-N.json` after each file (atomic write). Do NOT run `extract` or `compile` — that runs once after all wrap subagents complete.
 >
 > Ambiguity protocol and progress schema as in Phase 2.
 
@@ -382,14 +392,21 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 
 > You are verifying the convert phase. Read `.globalize/decisions.md` for catalog format and locales. Read manifest snapshot for library.
 >
-> Plan steps: extract_clean, compile, build_check, comment_review_pass.
+> Plan steps depend on the library's catalog model:
+> - **Compile-time extraction (Lingui)** and **runtime-catalog (next-intl/vue-i18n)**: extract_clean, compile, build_check, comment_review_pass.
+> - **Compile-from-catalog (Paraglide)**: paraglide_compile, build_check. There is **no extract step** (keys are authored by hand, not extracted) and **no comment_review_pass** (inlang/ICU has no translator-comment field).
 >
+> For Lingui / next-intl / vue-i18n:
 > 1. Run `npx lingui extract --clean` (Lingui) or `npx next-intl extract` if applicable. Capture errors. Atomically update `progress/verify.json` after this step.
 > 2. Run `npx lingui compile` (with `--typescript` if TS). Capture errors.
 > 3. Run the project's typecheck and build command. Capture pass/fail.
 > 4. Read the extracted catalog. For entries lacking translator comments where the heuristic in the reference says one should exist (single-/two-word phrases, action labels without object, domain-sensitive terms), edit the source file to add the missing comment.
 >
-> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`.
+> For Paraglide:
+> 1. Run `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide` (both flags; single-quoted pin so zsh's `EXTENDED_GLOB` does not eat the caret). Capture errors. Atomically update `progress/verify.json` after this step.
+> 2. Run the project's typecheck and build command. Capture pass/fail. (No extract step and no comment-review pass — skip them.)
+>
+> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`. For Paraglide, set `extractOk` and `commentsAdded` to `null` (not applicable) and report compile success under `compileOk`.
 
 ### 3.6 Cost estimate (Phase 3 → 4 bridge)
 
@@ -493,7 +510,8 @@ Subagent steps:
 - [ ] provider_wiring
 - [ ] language_switcher
 - [ ] scaffold_catalogs
-- [ ] extract_compile   <!-- compile-time libraries only (Lingui); runtime-catalog libraries (next-intl, vue-i18n) consume the scaffolded catalogs directly — omit this step -->
+- [ ] extract_compile   <!-- compile-time libraries only (Lingui); runtime-catalog libraries (next-intl, vue-i18n) consume the scaffolded catalogs directly — omit this step. Compile-from-catalog libraries (Paraglide) use `paraglide_compile` instead — see below. -->
+- [ ] paraglide_compile   <!-- compile-from-catalog libraries only (Paraglide): `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`; replaces extract_compile, omit for all other libraries -->
 - [ ] install_coding_rules
 - [ ] {optional steps if opted in}
 - [ ] build_verification
@@ -507,10 +525,15 @@ Partitions: {N} wrap subagents covering {file count} files
 …
 
 ### verify
+<!-- compile-time extraction (Lingui) and runtime-catalog (next-intl, vue-i18n): -->
 - [ ] extract_clean
 - [ ] compile
 - [ ] build_check
 - [ ] comment_review_pass
+<!-- compile-from-catalog (Paraglide) instead: no extract step, no comment_review_pass (inlang/ICU has no comment field):
+- [ ] paraglide_compile
+- [ ] build_check
+-->
 
 ## Phase 4 — Globalize-now
 Steps:

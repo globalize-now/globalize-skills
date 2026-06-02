@@ -243,6 +243,23 @@
           "po-format-convert": ["references/languages/js-ts/libraries/vue-i18n/po-format.convert.md"]
         }
       }
+    },
+    {
+      "variant": "sveltekit-paraglide",
+      "match": { "framework": "sveltekit", "library": "paraglide" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": ["@inlang/paraglide-js@^2"],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md"],
+        "convert": ["references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md"],
+        "code": ["references/languages/js-ts/libraries/paraglide/code.md"],
+        "optional": {
+          "setup-add-ons": ["references/languages/js-ts/libraries/paraglide/setup.add-ons.md"]
+        }
+      }
     }
   ],
   "incompatibleStacks": [
@@ -255,8 +272,8 @@
       "reason": "Create React App is no longer supported by this skill. Migrate to Vite or Next.js."
     },
     {
-      "match": { "react": false, "vue": false },
-      "reason": "These skills currently target React-based and Vue-based projects only."
+      "match": { "react": false, "vue": false, "svelte": false },
+      "reason": "These skills currently target React-based, Vue-based, and Svelte-based projects only."
     }
   ]
 }
