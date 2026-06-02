@@ -94,6 +94,7 @@ Scan for known i18n config files to auto-detect source and target languages. Use
 |--------|--------------|-----------------|
 | **LinguiJS** | `lingui.config.ts` or `lingui.config.js` exists | `sourceLocale` → source language, `locales` array → all languages |
 | **next-intl** | `src/i18n/routing.ts` or `i18n/routing.ts` exists | `defaultLocale` → source language, `locales` array → all languages |
+| **Paraglide** | `project.inlang/settings.json` exists (and/or `@inlang/paraglide-js` in `package.json` deps) | `baseLocale` → source language, `locales` array → all languages |
 | **i18next** | `i18next` in `package.json` deps + config file (`i18n.ts`, `i18n.js`, `i18next.config.*`) | `lng` or `fallbackLng` → source language, `supportedLngs` → all languages |
 | **react-intl** | `react-intl` or `@formatjs/intl` in `package.json` deps | Check for `defaultLocale` in config; scan `lang/` or `translations/` directories |
 | **Locale directories** | Directories named `locales/`, `messages/`, `translations/`, `lang/` | Subdirectory names or JSON file names (e.g., `en.json`, `fr.json`) indicate available locales |
@@ -118,6 +119,7 @@ During detection, also determine the **locale file path pattern** — a path tem
 | **LinguiJS** (single catalog) | Read `catalogs[0].path` from config. Strip `<rootDir>/` prefix. Append `.po`. Example: `src/locales/{locale}/messages.po` |
 | **LinguiJS** (per-page catalogs) | Read `catalogs[0].path`. Replace `{entryDir}`/`{entryName}` with `**/*` wildcards, keep `{locale}`. Example: `src/app/{locale}/**/*.po` |
 | **next-intl** | Check `messages/` directory. Flat JSON files per locale → `messages/{locale}.json`. Subdirectories with multiple namespace files → `messages/{locale}/{namespace}.json` |
+| **Paraglide** | Default message catalog is flat per locale. Example: `messages/{locale}.json` |
 | **i18next** | Read `backend.loadPath` from config. Replace `{{lng}}` → `{locale}`, `{{ns}}` → `{namespace}`. Example: `locales/{locale}/{namespace}.json` |
 | **react-intl** | No standard config key. Derive from directory scanning below. |
 | **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
@@ -132,6 +134,7 @@ When a locale path pattern is determined, also determine the **file format**. Th
 |--------|----------------|
 | **LinguiJS** | `po` |
 | **next-intl** | `json-nested` (next-intl uses nested key structure) |
+| **Paraglide** | `json-flat` (flat key → ICU string; inlang catalogs carry no translator comments) |
 | **i18next** | `json-nested` by default. If `keySeparator: false` in config, use `json-flat`. |
 | **react-intl** | Inspect file content (see JSON detection below) |
 | **`.po` / `.pot` files** | `po` |
