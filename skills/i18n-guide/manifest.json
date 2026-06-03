@@ -257,7 +257,10 @@
         "convert": ["references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md"],
         "code": ["references/languages/js-ts/libraries/paraglide/code.md"],
         "optional": {
-          "setup-add-ons": ["references/languages/js-ts/libraries/paraglide/setup.add-ons.md"]
+          "setup-add-ons": ["references/languages/js-ts/libraries/paraglide/setup.add-ons.md"],
+          "json-format-setup": ["references/languages/js-ts/libraries/paraglide/json-format.setup.md"],
+          "json-format-convert": ["references/languages/js-ts/libraries/paraglide/json-format.convert.md"],
+          "json-format-code": ["references/languages/js-ts/libraries/paraglide/json-format.code.md"]
         }
       }
     }
