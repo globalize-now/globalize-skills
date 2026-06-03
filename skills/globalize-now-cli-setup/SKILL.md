@@ -119,7 +119,7 @@ During detection, also determine the **locale file path pattern** — a path tem
 | **LinguiJS** (single catalog) | Read `catalogs[0].path` from config. Strip `<rootDir>/` prefix. Append `.po`. Example: `src/locales/{locale}/messages.po` |
 | **LinguiJS** (per-page catalogs) | Read `catalogs[0].path`. Replace `{entryDir}`/`{entryName}` with `**/*` wildcards, keep `{locale}`. Example: `src/app/{locale}/**/*.po` |
 | **next-intl** | Check `messages/` directory. Flat JSON files per locale → `messages/{locale}.json`. Subdirectories with multiple namespace files → `messages/{locale}/{namespace}.json` |
-| **Paraglide** | Flat message catalog per locale. `messages/{locale}.json` for the default ICU-JSON format; `messages/{locale}.po` if the project uses the PO format (`@globalize-now/paraglidejs-po-format` in `package.json` / a `plugin.globalizeNow.po` key in `project.inlang/settings.json`, or `messages/*.po` files present) |
+| **Paraglide** | Flat message catalog per locale. `messages/{locale}.po` for the PO format (the i18n-guide default — a `plugin.globalizeNow.po` key in `project.inlang/settings.json`, or `messages/*.po` files present); `messages/{locale}.json` for the ICU-JSON format (`plugin.inlang.icu-messageformat-1`, or `messages/*.json`) |
 | **i18next** | Read `backend.loadPath` from config. Replace `{{lng}}` → `{locale}`, `{{ns}}` → `{namespace}`. Example: `locales/{locale}/{namespace}.json` |
 | **react-intl** | No standard config key. Derive from directory scanning below. |
 | **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
@@ -134,7 +134,7 @@ When a locale path pattern is determined, also determine the **file format**. Th
 |--------|----------------|
 | **LinguiJS** | `po` |
 | **next-intl** | `json-nested` (next-intl uses nested key structure) |
-| **Paraglide** | `json-flat` for `messages/*.json` (flat key → ICU string; ICU-JSON catalogs carry no translator comments). `po` if `messages/*.po` are present (PO format via `@globalize-now/paraglidejs-po-format`) — PO carries `#.` translator comments |
+| **Paraglide** | `po` if `messages/*.po` are present (the i18n-guide default — PO format via `@globalize-now/paraglidejs-po-format`, carries `#.` translator comments). `json-flat` for `messages/*.json` (ICU-JSON; flat key → ICU string, no translator comments) |
 | **i18next** | `json-nested` by default. If `keySeparator: false` in config, use `json-flat`. |
 | **react-intl** | Inspect file content (see JSON detection below) |
 | **`.po` / `.pot` files** | `po` |

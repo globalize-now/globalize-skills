@@ -12,7 +12,7 @@ Paraglide paths are fixed by the core setup: catalogs live in `messages/{locale}
 
 ## Add-on 1: Coding rules (`@import`)
 
-> **Pick the file that matches the catalog format.** This add-on wires in `code.md` (the **ICU-JSON** coding rules). If `decisions.setup.catalogFormat === "po"`, substitute **`po-format.code.md`** for `code.md` in **every** path below — same directory, same `@import` mechanics; it carries the PO authoring rules (`#.` comments, `msgid`/`msgstr`). Wire in exactly one of the two, never both (they would conflict).
+> **Pick the file that matches the catalog format.** This add-on wires in `code.md` (the **default PO** coding rules — `#.` comments, `msgid`/`msgstr`). If `decisions.setup.catalogFormat === "json"`, substitute **`json-format.code.md`** for `code.md` in **every** path below — same directory, same `@import` mechanics; it carries the ICU-JSON authoring rules (key→ICU JSON, no comments). Wire in exactly one of the two, never both (they would conflict).
 
 The Paraglide coding rules at `references/languages/js-ts/libraries/paraglide/code.md` contain the rules for authoring strings, numbers, currencies, dates, and plurals correctly as new code is written, plus the descriptive-key guidance and the SSR request-scoped-locale rules. They ship as part of the `i18n-guide` skill, so the file already lives at `.claude/skills/i18n-guide/references/languages/js-ts/libraries/paraglide/code.md` in the target project.
 
@@ -39,7 +39,7 @@ If the exact `@` line is already present, skip silently — this add-on is idemp
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
 
-Verify: in a fresh session, ask Claude "how should I author a plural string in this project?" — the answer should reference an ICU `plural` value in `messages/{locale}.json` called through `m`, not a JS conditional.
+Verify: in a fresh session, ask Claude "how should I author a plural string in this project?" — the answer should reference an ICU `plural` body in a `messages/{locale}.po` entry (or `messages/{locale}.json` on the ICU-JSON format) called through `m`, not a JS conditional.
 
 ---
 
@@ -74,10 +74,10 @@ There is no generic "no hardcoded JSX/markup strings" ESLint rule that works rel
 
 ## Add-on 3: CI/CD integration
 
-Paraglide is **compiler-based with no extract step** — messages are hand-authored into `messages/{locale}.json` and the compiler turns them into the runtime `m` object. So the Lingui-style "extract → diff" flow does not apply. The CI integration here has two parts:
+Paraglide is **compiler-based with no extract step** — messages are hand-authored into `messages/{locale}.po` (default format) and the compiler turns them into the runtime `m` object. So the Lingui-style "extract → diff" flow does not apply. The CI integration here has two parts:
 
 1. **Compile** — regenerate the runtime output so the build consumes up-to-date message functions.
-2. **Catalog consistency (drift) check** — fail the build if a non-base locale file is missing keys present in the base locale (someone added a key to `messages/en.json` but didn't add it to the others), so untranslated keys surface in review instead of rendering as fallbacks in production.
+2. **Catalog consistency (drift) check** — fail the build if a non-base locale file is missing keys present in the base locale (someone added a key to `messages/en.po` but didn't add it to the others), so untranslated keys surface in review instead of rendering as fallbacks in production.
 
 ### Compile command
 
@@ -91,57 +91,10 @@ npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/
 
 ### Drift check
 
-The drift check is a small custom script — there is **no Paraglide subcommand for it**. It compares the key set of every `messages/{locale}.json` against the base locale and exits non-zero on any mismatch. Create `scripts/check-i18n-catalogs.mjs`:
+The drift check is a small custom script — there is **no Paraglide subcommand for it**. It compares the key set of every locale catalog against the base locale and exits non-zero on any mismatch. On the default **PO** format the keys are `msgid` values; the skill authors PO entries one-key-per-`msgid` on a single line, so a dependency-free line scan is enough. Create `scripts/check-i18n-catalogs.mjs`:
 
 ```js
-// scripts/check-i18n-catalogs.mjs
-import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
-
-const MESSAGES_DIR = 'messages'
-const BASE_LOCALE = 'en' // set to the project's baseLocale from project.inlang/settings.json
-
-const keysOf = (locale) => {
-  const raw = JSON.parse(readFileSync(join(MESSAGES_DIR, `${locale}.json`), 'utf8'))
-  return new Set(Object.keys(raw).filter((k) => k !== '$schema'))
-}
-
-const baseKeys = keysOf(BASE_LOCALE)
-const locales = readdirSync(MESSAGES_DIR)
-  .filter((f) => f.endsWith('.json'))
-  .map((f) => f.replace(/\.json$/, ''))
-
-let failed = false
-for (const locale of locales) {
-  if (locale === BASE_LOCALE) continue
-  const keys = keysOf(locale)
-  const missing = [...baseKeys].filter((k) => !keys.has(k))
-  const extra = [...keys].filter((k) => !baseKeys.has(k))
-  if (missing.length || extra.length) {
-    failed = true
-    console.error(`✗ messages/${locale}.json out of sync with ${BASE_LOCALE}`)
-    if (missing.length) console.error(`  missing keys: ${missing.join(', ')}`)
-    if (extra.length) console.error(`  extra keys:   ${extra.join(', ')}`)
-  }
-}
-
-if (failed) {
-  console.error('\nCatalog drift detected. Add the missing keys (the translation platform fills the values).')
-  process.exit(1)
-}
-console.log('✓ all locale catalogs are in sync with the base locale')
-```
-
-Set `BASE_LOCALE` to the project's actual `baseLocale` from `project.inlang/settings.json`.
-
-**On "ICU parses":** you do not need a separate ICU parser in this script. The ICU1 plugin parses every catalog at compile time, so running the compile command above in CI already fails on malformed ICU. Let compile cover ICU validity; the drift script only needs to enforce key parity. Do not pull in an extra ICU-parser dependency for this.
-
-### PO catalog format (`catalogFormat === "po"`)
-
-If the project uses the PO catalog format, the catalogs are `messages/{locale}.po` (not `.json`), so the drift script must compare `msgid` sets instead of JSON keys. The skill authors PO entries one-key-per-`msgid` on a single line, so a dependency-free line scan is enough — replace `keysOf` and the locale glob in the script above:
-
-```js
-// scripts/check-i18n-catalogs.mjs  (PO variant)
+// scripts/check-i18n-catalogs.mjs  (PO — default)
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -164,15 +117,53 @@ const keysOf = (locale) => {
   return keys
 }
 
+const baseKeys = keysOf(BASE_LOCALE)
 const locales = readdirSync(MESSAGES_DIR)
   .filter((f) => f.endsWith('.po'))
   .map((f) => f.replace(/\.po$/, ''))
-// …rest of the script (baseKeys, the per-locale missing/extra comparison, exit codes) is unchanged.
+
+let failed = false
+for (const locale of locales) {
+  if (locale === BASE_LOCALE) continue
+  const keys = keysOf(locale)
+  const missing = [...baseKeys].filter((k) => !keys.has(k))
+  const extra = [...keys].filter((k) => !baseKeys.has(k))
+  if (missing.length || extra.length) {
+    failed = true
+    console.error(`✗ messages/${locale}.po out of sync with ${BASE_LOCALE}`)
+    if (missing.length) console.error(`  missing keys: ${missing.join(', ')}`)
+    if (extra.length) console.error(`  extra keys:   ${extra.join(', ')}`)
+  }
+}
+
+if (failed) {
+  console.error('\nCatalog drift detected. Add the missing keys (the translation platform fills the values).')
+  process.exit(1)
+}
+console.log('✓ all locale catalogs are in sync with the base locale')
 ```
 
-This assumes the skill's authoring style (single-line `msgid` keys). If a TMS has reformatted the `.po` (wrapped lines, reordered entries), parse with `gettext-parser` instead — but that adds a devDependency, so only reach for it if the line scan proves insufficient.
+Set `BASE_LOCALE` to the project's actual `baseLocale` from `project.inlang/settings.json`. The line scan assumes the skill's authoring style (single-line `msgid` keys); if a TMS has reformatted the `.po` (wrapped lines, reordered entries), parse with `gettext-parser` instead — but that adds a devDependency, so only reach for it if the line scan proves insufficient.
 
-**Critical — compile does NOT validate ICU under PO.** The "compile covers ICU validity" note above is **false** for the PO plugin in `icu` mode: a malformed ICU `msgstr` is imported **verbatim as literal text with no error**, so `paraglide compile` succeeds and the broken string ships. There is no build-time guard. Keep a render-level check in CI (or at minimum in the convert/verify step) — assert a known plural renders its selected form, not the raw `{count, plural, …}` source.
+**Critical — compile does NOT validate ICU under PO.** Unlike the ICU-JSON plugin, the PO plugin in `icu` mode imports a malformed ICU `msgstr` **verbatim as literal text with no error**, so `paraglide compile` succeeds and the broken string ships. There is no build-time guard for ICU validity. Keep a render-level check in CI (or at minimum in the convert/verify step) — assert a known plural renders its selected form, not the raw `{count, plural, …}` source. The drift script above only enforces key parity.
+
+#### ICU-JSON catalog format (`catalogFormat === "json"`)
+
+If the project uses the ICU-JSON format, the catalogs are `messages/{locale}.json`, so the drift script compares JSON keys. Replace `keysOf` and the locale glob:
+
+```js
+const keysOf = (locale) => {
+  const raw = JSON.parse(readFileSync(join(MESSAGES_DIR, `${locale}.json`), 'utf8'))
+  return new Set(Object.keys(raw).filter((k) => k !== '$schema'))
+}
+
+const locales = readdirSync(MESSAGES_DIR)
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => f.replace(/\.json$/, ''))
+// …rest of the script (baseKeys, the per-locale comparison, exit codes) is unchanged, swapping `.po` → `.json` in the error message.
+```
+
+**On ICU-JSON, compile covers ICU validity:** the ICU1 plugin parses every catalog at compile time, so running the compile command above in CI already fails on malformed ICU (no separate ICU parser or render check needed — the drift script only enforces key parity). This is the one safety net the PO format lacks.
 
 ### `package.json` scripts
 

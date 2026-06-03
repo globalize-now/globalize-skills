@@ -1,12 +1,15 @@
 # SvelteKit + Paraglide: String Wrapping Patterns
 
-This covers converting hardcoded UI strings in an existing **SvelteKit 2.x + Svelte 5 + Paraglide 2.x** codebase into Paraglide messages. The build plugin, middleware, and routing are assumed already wired (see `paraglide.setup.md`). The per-edit authoring rules — plurals, numbers/dates, what-not-to-wrap — live in `references/languages/js-ts/libraries/paraglide/code.md`; this file is the **mechanics of finding and converting existing literals**.
+This covers converting hardcoded UI strings in an existing **SvelteKit 2.x + Svelte 5 + Paraglide 2.x** codebase into Paraglide messages, using the **default PO (gettext) catalog format** (`@globalize-now/paraglidejs-po-format`, `messageFormat: "icu"`). The build plugin, middleware, and routing are assumed already wired (see `paraglide.setup.md`). The per-edit authoring rules — plurals, numbers/dates, what-not-to-wrap — live in `references/languages/js-ts/libraries/paraglide/code.md`; this file is the **mechanics of finding and converting existing literals**.
+
+> **ICU-JSON catalog format?** If `decisions.setup.catalogFormat === "json"`, the catalog entries are JSON key-values and translator comments are not available — apply `references/languages/js-ts/libraries/paraglide/json-format.convert.md`, which overrides the entry shape and the comment rule below. The call sites (`m.key(...)`) are identical across both formats.
 
 Paraglide is **key-authored and compile-from-catalog** — there is no extraction step and no macro. **Do NOT run any extractor.** For each hardcoded string, the conversion loop is:
 
-1. **Choose a descriptive, context-encoding key** — `cart_remove_button`, not `remove`. The key is the translator's only signal about where the string lives (see "Key naming" below).
-2. **Add `"key": "<text or ICU string>"`** to the base catalog `messages/{baseLocale}.json` (e.g. `messages/en.json`).
-3. **Replace the literal** in the component with `{m.key()}` (or `m.key({ ... })`).
+1. **Choose a descriptive, context-encoding key** — `cart_remove_button`, not `remove`. (See "Key naming" below.)
+2. **Add a `#.` translator comment** describing the string's intent / audience / tone — this is the reason to use PO and a top translation-quality lever. Optionally add `#:` source references.
+3. **Add the entry** to the base catalog `messages/{baseLocale}.po` (e.g. `messages/en.po`) as `msgid "<key>"` / `msgstr "<text or ICU body>"`.
+4. **Replace the literal** in the component with `{m.key()}` (or `m.key({ ... })`).
 
 Import the message object once per file that calls it:
 
@@ -14,9 +17,7 @@ Import the message object once per file that calls it:
 import { m } from '$lib/paraglide/messages.js'
 ```
 
-**Do NOT add translator comments** *(ICU-JSON format only)*. The inlang/ICU JSON data model has no comment, context, or description field — there is nowhere to put one and it will not round-trip. Key naming is the only disambiguation lever.
-
-> **PO catalog format:** if `decisions.setup.catalogFormat === "po"`, this is reversed — `.po` entries carry `#.` translator comments, which you **should** write. Follow `references/languages/js-ts/libraries/paraglide/po-format.convert.md` instead of the JSON examples below; it overrides the catalog shape (`msgid`/`msgstr` instead of JSON key-values) and the comment rule. Call sites (`m.key(...)`) are identical.
+**Order inside a `.po` entry:** comment lines (`#.`, `#:`) first, then `msgid`, then `msgstr`.
 
 ---
 
@@ -33,12 +34,15 @@ Plain text in a `.svelte` template becomes a `{m.key()}` call.
 <p>{m.dashboard_empty_state()}</p>
 ```
 
-```json
-// messages/en.json
-{
-  "dashboard_title": "Dashboard",
-  "dashboard_empty_state": "Nothing here yet."
-}
+```po
+# messages/en.po
+#. Heading at the top of the main dashboard
+msgid "dashboard_title"
+msgstr "Dashboard"
+
+#. Shown on the dashboard when the user has no data yet
+msgid "dashboard_empty_state"
+msgstr "Nothing here yet."
 ```
 
 ---
@@ -68,10 +72,10 @@ Replace a string-concatenated or template-literal value with a `{placeholder}` i
 <p>{m.greeting({ name: user.name })}</p>
 ```
 
-```json
-{
-  "greeting": "Hello, {name}!"
-}
+```po
+#. Greeting on the dashboard, addressed to the signed-in user
+msgid "greeting"
+msgstr "Hello, {name}!"
 ```
 
 Wrap the **whole sentence** as one message — never concatenate a translated fragment with a literal (`m.greeting_prefix() + user.name`), which bakes one language's word order into the code.
@@ -80,12 +84,12 @@ Wrap the **whole sentence** as one message — never concatenate a translated fr
 
 ## Plurals and select
 
-Any string whose wording changes with a number or a category (gender, status, type) is ICU **inside the message value**, not a JS conditional. Do not pick between two messages with a ternary.
+Any string whose wording changes with a number or a category (gender, status, type) is ICU **inside the `msgstr`**, not a JS conditional. Do not pick between two messages with a ternary.
 
-```json
-{
-  "cart_item_count": "{count, plural, one {# item} other {# items}}"
-}
+```po
+#. Cart item count badge in the header
+msgid "cart_item_count"
+msgstr "{count, plural, one {# item} other {# items}}"
 ```
 
 ```svelte
@@ -155,12 +159,18 @@ The correct shape is to store the **message function** and invoke it during rend
 </nav>
 ```
 
-```json
-{
-  "nav_dashboard": "Dashboard",
-  "nav_users": "Users",
-  "nav_settings": "Settings"
-}
+```po
+#. Top-nav link to the dashboard
+msgid "nav_dashboard"
+msgstr "Dashboard"
+
+#. Top-nav link to the users list
+msgid "nav_users"
+msgstr "Users"
+
+#. Top-nav link to settings
+msgid "nav_settings"
+msgstr "Settings"
 ```
 
 The same rule applies in `.ts` / `.svelte.ts` helper modules: export the message **functions** (or call them inside the function that runs per request), never their resolved strings stored at module load.
@@ -207,23 +217,56 @@ new Intl.NumberFormat(getLocale(), { style: 'currency', currency: 'USD' }).forma
 new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium' }).format(new Date(timestamp))
 ```
 
-When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), and hardcoded date formats (`'MM/DD/YYYY'`). Details in `paraglide/code.md`.
+When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), and hardcoded date formats (`'MM/DD/YYYY'`). Details in `paraglide/code.md`. (ICU `number` skeletons inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup — prefer `Intl` for dates/times.)
 
 ---
 
-## Key naming — the only disambiguation lever
+## Translator comments — write them
 
-Since there are no translator comments, the key name carries all the context a translator gets. Encode the UI location and intent, especially for bare single words:
+Unlike the ICU-JSON format, the PO catalog carries translator comments. **Add a `#.` comment to every entry** you create — a one-line note on intent, audience, or tone. Models use it to disambiguate formality and meaning; Globalize reads it straight from the `.po`.
 
-```json
-{
-  "cart_remove_button": "Remove",
-  "filter_remove_button": "Remove",
-  "nav_home_link": "Home"
-}
+A good `#.` comment answers one of: *Where does this appear? Who reads it? What tone?*
+
+| Bad | Good |
+|-----|------|
+| `#. Welcome` | `#. Homepage hero heading shown to signed-out visitors` |
+| `#. Button` | `#. Primary CTA on the pricing page — drives sign-up` |
+| `#. Save` | `#. Save button in the document editor toolbar — not Save As` |
+
+(The plugin drops `#.` from the compiled inlang model, but it persists in the `.po` Globalize imports — that round-trip is the point.)
+
+---
+
+## `msgctxt` — available but discouraged
+
+The plugin folds `msgctxt` into the bundle id as `"<msgctxt>::<msgid>"`, which yields a key like `direction::cart_right` — **not** reachable via `m.` dot-access (you'd have to call `m["direction::cart_right"]()`). **Prefer distinct descriptive keys** instead (`cart_direction_right`, `quiz_answer_correct`), each with its own `#.` comment. Reserve `msgctxt` for cases an external PO toolchain forces on you.
+
+---
+
+## ICU-mode caveats / footguns
+
+- **Escaping is ICU apostrophe-based, not backslash.** `'{'` renders a literal `{`; `''` renders a literal `'`. Bites elision languages — French `l'{article}` must be `l''{article}` so the `{article}` placeholder survives.
+- **`<b>…</b>` and other HTML in a `msgstr` is literal text**, not markup. Keep markup in the template and interpolate plain values.
+- **ICU exact matches (`=0`, `=1`) are dropped** to CLDR keyword branches (`one`, `other`, …). Author the keyword branches.
+- **A malformed ICU `msgstr` is silently imported as literal text — no build error.** A typo'd plural ships the raw `{count, plural, …}` source. Verify rendered output (see "After conversion").
+
+---
+
+## Key naming — descriptive keys still matter
+
+Even with `#.` comments, keep descriptive, context-encoding keys. Encode the UI location and intent, especially for bare single words:
+
+```po
+#. Remove button in the shopping cart line item
+msgid "cart_remove_button"
+msgstr "Remove"
+
+#. Remove button in the search-filter chips
+msgid "filter_remove_button"
+msgstr "Remove"
 ```
 
-Use `cart_remove_button`, not `remove`; two different "Remove" buttons need distinct keys so they can diverge across languages. Make keys specific for ambiguous words, bare action labels, and domain-sensitive terms.
+Use `cart_remove_button`, not `remove`; two different "Remove" buttons need distinct keys so they can diverge across languages.
 
 ---
 
@@ -235,7 +278,7 @@ Do not give catalog keys to non-UI text — CSS class names, `console`/debug str
 
 ## After conversion
 
-The Vite plugin recompiles `messages/{locale}.json` → `src/lib/paraglide/` automatically on save while the dev server runs, so the new `m.key()` calls become available without a manual step. If the dev server is not running, compile once:
+The Vite plugin recompiles `messages/{locale}.po` → `src/lib/paraglide/` automatically on save while the dev server runs, so the new `m.key()` calls become available without a manual step. If the dev server is not running, compile once:
 
 ```bash
 npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide
@@ -245,4 +288,5 @@ Then verify:
 
 1. The dev server boots and the converted pages render the expected text in the base locale.
 2. Switching locale via the language switcher changes the visible copy with no missing-key warnings in the console.
-3. The production build (`npm run build`, or the detected manager's equivalent) completes — a malformed ICU value or a key present in code but absent from the base catalog surfaces here.
+3. **A plural renders as CLDR logic, not raw ICU.** Render a plural at `count: 5` (and `1`) and confirm the output is `5 items` / `1 item`, not the literal `{count, plural, …}` source. Raw ICU showing through means `"messageFormat": "icu"` is missing from the plugin config or the `msgstr` is malformed — both fail silently at import, so this is the only check that catches them.
+4. The production build (`npm run build`, or the detected manager's equivalent) completes.
