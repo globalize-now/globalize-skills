@@ -14,7 +14,9 @@ Import the message object once per file that calls it:
 import { m } from '$lib/paraglide/messages.js'
 ```
 
-**Do NOT add translator comments.** The inlang/ICU data model has no comment, context, or description field — there is nowhere to put one and it will not round-trip. Key naming is the only disambiguation lever.
+**Do NOT add translator comments** *(ICU-JSON format only)*. The inlang/ICU JSON data model has no comment, context, or description field — there is nowhere to put one and it will not round-trip. Key naming is the only disambiguation lever.
+
+> **PO catalog format:** if `decisions.setup.catalogFormat === "po"`, this is reversed — `.po` entries carry `#.` translator comments, which you **should** write. Follow `references/languages/js-ts/libraries/paraglide/po-format.convert.md` instead of the JSON examples below; it overrides the catalog shape (`msgid`/`msgstr` instead of JSON key-values) and the comment rule. Call sites (`m.key(...)`) are identical.
 
 ---
 

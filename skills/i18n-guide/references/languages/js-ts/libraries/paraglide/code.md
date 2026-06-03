@@ -195,9 +195,11 @@ Do not give these catalog keys — they are not user-visible UI text:
 
 ---
 
-## Translator comments — not supported (deferred)
+## Translator comments — not supported on this (ICU-JSON) format
 
-Unlike Lingui or next-intl, the inlang/ICU message format has **no translator-comment, context, or description field** — the inlang data model does not carry one. Do **not** attempt to attach `comment:`, `context:`, or any description metadata to a message; there is nowhere for it to go, and it will not round-trip.
+> These coding rules are for the **ICU-JSON** catalog format. If your project uses the **PO (gettext)** catalog format, the rules differ — `.po` carries `#.` translator comments and you should write them — and a different passive-rules file applies: `references/languages/js-ts/libraries/paraglide/po-format.code.md`. The project's `CLAUDE.md` `@import` points at whichever one matches the chosen format.
+
+Unlike Lingui or next-intl, the inlang/ICU **JSON** message format has **no translator-comment, context, or description field** — the inlang data model does not carry one. Do **not** attempt to attach `comment:`, `context:`, or any description metadata to a JSON message; there is nowhere for it to go, and it will not round-trip.
 
 The only disambiguation lever is a **descriptive key name**. When a bare word could be read multiple ways, encode the context in the key:
 

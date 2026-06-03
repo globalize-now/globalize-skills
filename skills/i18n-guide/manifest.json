@@ -257,7 +257,10 @@
         "convert": ["references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md"],
         "code": ["references/languages/js-ts/libraries/paraglide/code.md"],
         "optional": {
-          "setup-add-ons": ["references/languages/js-ts/libraries/paraglide/setup.add-ons.md"]
+          "setup-add-ons": ["references/languages/js-ts/libraries/paraglide/setup.add-ons.md"],
+          "po-format-setup": ["references/languages/js-ts/libraries/paraglide/po-format.setup.md"],
+          "po-format-convert": ["references/languages/js-ts/libraries/paraglide/po-format.convert.md"],
+          "po-format-code": ["references/languages/js-ts/libraries/paraglide/po-format.code.md"]
         }
       }
     }

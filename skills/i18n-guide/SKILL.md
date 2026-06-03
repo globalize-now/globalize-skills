@@ -226,6 +226,7 @@ If `setup` is in scope, collect:
 - **Source locale** — default to `localeSignals` first existing or `en`
 - **Target locales** — multi-input. Suggest from `localeSignals.existingLocaleDirs` and README hints
 - **Routing strategy** — only if file-based routing is detected; ask: prefix-based (`/en/...`) or domain-based or none
+- **Catalog format** *(Paraglide only)* — **PO (gettext)** vs **ICU-JSON**. For a **fresh** Paraglide setup, default to **PO** — a `.po` catalog carries `#.` translator comments that flow to the Globalize platform (the single biggest quality lever for AI translation), which the ICU-JSON model cannot. For an **already-configured** Paraglide project (existing `messages/*.json`), offer to **convert to PO** — a lossless migration, since both formats use ICU bodies (see "Phase 2 collapse-case" → migration) — or keep ICU-JSON. Record as `decisions.setup.catalogFormat` (`"po"` | `"json"`). Omit for non-Paraglide libraries (next-intl's optional PO is selected the same way but is out of scope here).
 
 Record under `decisions.setup`.
 
@@ -236,7 +237,7 @@ Record under `decisions.setup`.
 
 If `convert` is in scope, ask the user to confirm the **app domain**. Infer from `package.json` description, README, route names, or component names. Default suggestion + freeform override.
 
-The domain string flows into wrap-subagent prompts so they write better translator comments. For Paraglide (which has no translator-comment field), the app domain instead informs *key naming* — it helps the wrap subagent choose descriptive, context-encoding keys (e.g. `cart_remove_button`), the only disambiguation lever available.
+The domain string flows into wrap-subagent prompts so they write better translator comments. For Paraglide on the **ICU-JSON** catalog format (which has no translator-comment field), the app domain instead informs *key naming* — it helps the wrap subagent choose descriptive, context-encoding keys (e.g. `cart_remove_button`), the only disambiguation lever available. For Paraglide on the **PO** catalog format (`decisions.setup.catalogFormat === "po"`), `.po` entries carry `#.` translator comments, so the domain informs comments **and** key naming, exactly as for Lingui/next-intl.
 
 ### 1.9 Globalize-now choices
 
@@ -348,7 +349,9 @@ While `progress/setup.json` is in `running` state, wake every 30–60 seconds, r
 
 ### Phase 2 collapse-case
 
-If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, and `build_verification`. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale; a **compile-from-catalog** library (Paraglide) re-runs `paraglide_compile` (`npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`) to regenerate `src/lib/paraglide/` from the hand-authored `messages/{locale}.json` catalogs. Same dispatch pattern.
+If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, and `build_verification`. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale; a **compile-from-catalog** library (Paraglide) re-runs `paraglide_compile` (`npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`) to regenerate `src/lib/paraglide/` from the hand-authored `messages/{locale}.{json,po}` catalogs. Same dispatch pattern.
+
+**Paraglide ICU-JSON → PO migration collapse-case.** If `existing.library === "paraglide"`, `existing.configured === true`, the project currently has `messages/*.json` (ICU-JSON / `@inlang/plugin-icu1`), and the user chose `decisions.setup.catalogFormat === "po"`, Phase 2 is a **format migration**, not a from-scratch setup. The plan steps are: `migrate_settings` (swap the icu1 module + key for the PO module + `plugin.globalizeNow.po` with `"messageFormat": "icu"`), `migrate_catalogs` (rewrite each `messages/{locale}.json` → `messages/{locale}.po` — lossless: `"key": "ICU body"` → `msgid "key"` / `msgstr "ICU body"`, carrying interpolation/plural/select verbatim; add the `msgid ""` header block; delete the old `.json`), `paraglide_compile`, and `build_verification`. The migration is driven by the **Migration** section of `references/languages/js-ts/libraries/paraglide/po-format.setup.md`. The per-file `migrate_catalogs` rewrite is independent across locales, so dispatch it as parallel background subagents (one per `messages/{locale}.json`). After migrating, run the plural-render check from the PO setup reference's **Verify** step — a missing `"messageFormat": "icu"` or a botched ICU escape fails **silently** (renders raw ICU), so the build passing is not sufficient.
 
 ---
 
@@ -374,7 +377,7 @@ Send all wrap subagents in **a single Agent tool message** so they launch in par
 >
 > Read these reference files for macro guidance: {paths from manifest-snapshot.references.convert}.
 >
-> For each file: identify translatable strings, wrap with the correct macro, add translator comments inline per the rules in the reference. (Paraglide is the exception: it is key-authored with no translator-comment field — instead of wrapping with a macro and adding comments, author a descriptive, context-encoding key plus its JSON catalog entry and replace the string with the `m.key()` call. Do NOT add comments; descriptive key naming is the only disambiguation lever. The convert reference covers the detail.) Update `.globalize/progress/wrap-N.json` after each file (atomic write). Do NOT run `extract` or `compile` — that runs once after all wrap subagents complete.
+> For each file: identify translatable strings, wrap with the correct macro, add translator comments inline per the rules in the reference. (Paraglide is key-authored with no macro — instead of wrapping, author a descriptive, context-encoding key plus its catalog entry and replace the string with the `m.key()` call. **On the ICU-JSON catalog format**, the inlang/ICU JSON model has no translator-comment field, so do NOT add comments — descriptive key naming is the only disambiguation lever. **On the PO catalog format** (`decisions.setup.catalogFormat === "po"`), author the entry into `messages/{baseLocale}.po` as `#.` comment + `msgid "key"` + `msgstr "ICU body"` — `.po` carries `#.` comments, so DO add them, following `references/languages/js-ts/libraries/paraglide/po-format.convert.md` instead of the JSON convert reference.) Update `.globalize/progress/wrap-N.json` after each file (atomic write). Do NOT run `extract` or `compile` — that runs once after all wrap subagents complete.
 >
 > Ambiguity protocol and progress schema as in Phase 2.
 
@@ -394,7 +397,7 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 >
 > Plan steps depend on the library's catalog model:
 > - **Compile-time extraction (Lingui)** and **runtime-catalog (next-intl/vue-i18n)**: extract_clean, compile, build_check, comment_review_pass.
-> - **Compile-from-catalog (Paraglide)**: paraglide_compile, build_check. There is **no extract step** (keys are authored by hand, not extracted) and **no comment_review_pass** (inlang/ICU has no translator-comment field).
+> - **Compile-from-catalog (Paraglide)**: paraglide_compile, build_check. There is **no extract step** (keys are authored by hand, not extracted). On the **ICU-JSON** format there is **no comment_review_pass** (the inlang/ICU JSON model has no translator-comment field); on the **PO** format (`catalogFormat === "po"`) `.po` carries `#.` comments, so a comment_review_pass over the base `.po` **does** apply, plus an ICU plural-render sanity check (see below).
 >
 > For Lingui / next-intl / vue-i18n:
 > 1. Run `npx lingui extract --clean` (Lingui) or `npx next-intl extract` if applicable. Capture errors. Atomically update `progress/verify.json` after this step.
@@ -404,9 +407,9 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 >
 > For Paraglide:
 > 1. Run `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide` (both flags; single-quoted pin so zsh's `EXTENDED_GLOB` does not eat the caret). Capture errors. Atomically update `progress/verify.json` after this step.
-> 2. Run the project's typecheck and build command. Capture pass/fail. (No extract step and no comment-review pass — skip them.)
+> 2. Run the project's typecheck and build command. Capture pass/fail. (No extract step.) **ICU-JSON format:** skip the comment-review pass. **PO format (`catalogFormat === "po"`):** (a) inspect a compiled plural message (`src/lib/paraglide/messages/<key>.js`) to confirm it emits CLDR `registry.plural(...)` branches and **not** the raw `{count, plural, …}` source as a literal — raw source means `"messageFormat": "icu"` is missing or an `msgstr` is malformed (both fail silently); (b) run a comment-review pass over the base `messages/{baseLocale}.po`, adding `#.` comments where the reference's heuristic says one should exist.
 >
-> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`. For Paraglide, set `extractOk` and `commentsAdded` to `null` (not applicable) and report compile success under `compileOk`.
+> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`. For Paraglide, set `extractOk` to `null`; set `commentsAdded` to `null` on ICU-JSON and to the count added on PO; report compile success under `compileOk`.
 
 ### 3.6 Cost estimate (Phase 3 → 4 bridge)
 
@@ -460,7 +463,7 @@ Plan: `create_project`, `configure_languages`, `connect_repo`, `configure_patter
 > 1. `globalize project create --name "{name}" --source {sourceLocale} --targets {targetLocales}` — capture project ID and URL.
 > 2. `globalize project languages list` — verify all targets accepted.
 > 3. `globalize repo connect --provider {gh|gl} --repo {owner/repo}` — wire repo.
-> 4. `globalize repo patterns set --source {catalogPath} --output {targetCatalogPattern}` — configure paths from Phase 3 verify result.
+> 4. `globalize repo patterns set --source {catalogPath} --output {targetCatalogPattern}` — configure paths from Phase 3 verify result. The **file format** follows the catalog: for Paraglide with `decisions.setup.catalogFormat === "po"` it is `po` and the catalog path is `messages/{locale}.po`; otherwise it is the library default (`json-flat` at `messages/{locale}.json` for Paraglide ICU-JSON, `po` for Lingui, etc.). Pass the format with the pattern if the CLI form in use takes an explicit `fileFormat` (see `globalize-now-cli-use`).
 >
 > Update `progress/globalize.json` after each step. Final `result` includes `{ projectId, projectUrl, repoConnected, patternsConfigured }`.
 
@@ -616,7 +619,7 @@ Prefix-based
 
 Reference files under `references/languages/.../*.md` walk through their variant's setup or convert work linearly via section headings (e.g., "Packages", "Build Tool Integration", "Provider Setup", "Language Switcher"). Follow them in document order — section headings are the authoritative ordering, not the orchestrator's plan step IDs (those are higher-level phase markers used by the polling loop).
 
-Some references include catalog-format sub-references (e.g., `references/languages/js-ts/libraries/next-intl/po-format.setup.md`). When the user has chosen the alternate format, substitute that reference's snippets in place of the JSON examples — the variant reference itself flags the substitution points.
+Some references include catalog-format sub-references (e.g., `references/languages/js-ts/libraries/next-intl/po-format.setup.md`, and for Paraglide `references/languages/js-ts/libraries/paraglide/po-format.{setup,convert,code}.md`). When the user has chosen the alternate format, substitute that reference's snippets in place of the default examples — the variant reference itself flags the substitution points. For Paraglide specifically: when `decisions.setup.catalogFormat === "po"`, the setup subagent applies `po-format.setup.md` over `frameworks/sveltekit/paraglide.setup.md`, the wrap subagents apply `po-format.convert.md` over `frameworks/sveltekit/paraglide.convert.md`, and the coding-rules add-on installs `po-format.code.md` instead of `code.md` (see the add-ons reference).
 
 If a reference's instructions appear to require user input that wasn't collected in Phase 1, do not improvise: write `status: "needs_decision"` to your progress file and exit so the orchestrator can ask.
 
