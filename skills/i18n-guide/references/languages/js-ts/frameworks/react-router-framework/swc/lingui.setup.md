@@ -17,6 +17,7 @@ The orchestrator (Phase 2.0) pre-installed these on the main thread before dispa
 | `@lingui/cli` | dev | `lingui extract` / `lingui compile` |
 | `@lingui/swc-plugin` | dev | SWC macro transform |
 | `@lingui/vite-plugin` | dev | Vite integration for catalog compilation |
+| `@lingui/format-po` | dev | PO catalog formatter — `lingui.config.ts` imports `formatter()` from it (Lingui 6 removed the `format: 'po'` string) |
 | `@vitejs/plugin-react-swc` | dev | React SWC plugin host for the Lingui SWC plugin |
 
 Treat the install step as already done. Do **not** re-run `npm install` / `yarn add` / `pnpm add` / `bun add` for those packages.
@@ -68,6 +69,7 @@ Create `lingui.config.ts` at the project root. The catalog path follows React Ro
 ```ts
 // lingui.config.ts
 import type { LinguiConfig } from '@lingui/conf'
+import { formatter } from '@lingui/format-po'
 import { sourceLocale, locales } from './app/i18n/locales'
 
 const config: LinguiConfig = {
@@ -80,7 +82,7 @@ const config: LinguiConfig = {
       exclude: ['**/node_modules/**', '**/locales/**', '**/+types/**'],
     },
   ],
-  format: 'po',
+  format: formatter(),
   compileNamespace: 'ts',
 }
 

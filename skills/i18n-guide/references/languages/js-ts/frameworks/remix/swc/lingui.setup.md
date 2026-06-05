@@ -11,9 +11,9 @@ This covers projects built on [Remix v2](https://remix.run/) (`@remix-run/*` ≥
 The orchestrator pre-installed the manifest's runtime and dev packages on its main thread (Phase 2.0) before dispatching you. Treat them as already on disk — do **not** re-run `npm install` / `pnpm add` for them. The set is:
 
 - Runtime: `@lingui/core@^6`, `@lingui/react@^6`
-- Dev: `@lingui/cli@^6`, `@lingui/swc-plugin@^6`, `@lingui/vite-plugin@^6`, `@vitejs/plugin-react-swc@^4`
+- Dev: `@lingui/cli@^6`, `@lingui/swc-plugin@^6`, `@lingui/vite-plugin@^6`, `@lingui/format-po@^6`, `@vitejs/plugin-react-swc@^4`
 
-The reasoning behind these pins: Lingui 6 is the current major (paired with React 18/19 and the new `@lingui/react/macro` import path), `@lingui/swc-plugin@^6` expands the macros under SWC, `@lingui/vite-plugin@^6` is the Vite-side companion that compiles `.po` catalogs into the runtime `.ts` modules each route loads, and `@vitejs/plugin-react-swc@^4` is the current LTS major of the SWC React plugin. The swap from `@vitejs/plugin-react` (Babel) to `@vitejs/plugin-react-swc` is what makes the SWC variant possible — the latter accepts a `plugins` option that wires arbitrary SWC plugins (including Lingui's) into the React transform.
+The reasoning behind these pins: Lingui 6 is the current major (paired with React 18/19 and the new `@lingui/react/macro` import path), `@lingui/swc-plugin@^6` expands the macros under SWC, `@lingui/vite-plugin@^6` is the Vite-side companion that compiles `.po` catalogs into the runtime `.ts` modules each route loads, `@lingui/format-po@^6` supplies the PO formatter (in Lingui 6 the formatter moved into its own package, so `lingui.config.ts` imports `formatter()` from it — the old `format: 'po'` string was removed and now throws at config load), and `@vitejs/plugin-react-swc@^4` is the current LTS major of the SWC React plugin. The swap from `@vitejs/plugin-react` (Babel) to `@vitejs/plugin-react-swc` is what makes the SWC variant possible — the latter accepts a `plugins` option that wires arbitrary SWC plugins (including Lingui's) into the React transform.
 
 No `@lingui/detect-locale` — that library is browser-only (`navigator`, `localStorage`, `window.location`) and would throw on the server or produce hydration mismatches under SSR. Remix resolves locale from request headers and a cookie instead, on the server side, before any client code runs.
 
@@ -56,6 +56,7 @@ Create `lingui.config.ts` at the project root:
 ```ts
 // lingui.config.ts
 import { defineConfig } from '@lingui/cli'
+import { formatter } from '@lingui/format-po'
 
 export default defineConfig({
   sourceLocale: 'en',
@@ -66,7 +67,7 @@ export default defineConfig({
       include: ['app'],
     },
   ],
-  format: 'po',
+  format: formatter(),
   compileNamespace: 'ts',
 })
 ```
