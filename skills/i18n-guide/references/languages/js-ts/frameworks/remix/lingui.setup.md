@@ -9,9 +9,9 @@ This covers projects built on [Remix v2](https://remix.run/) (`@remix-run/*` ≥
 The orchestrator pre-installed the manifest's runtime and dev packages on its main thread (Phase 2.0) before dispatching you. Treat them as already on disk — do **not** re-run `npm install` / `pnpm add` for them. The set is:
 
 - Runtime: `@lingui/core@^6`, `@lingui/react@^6`
-- Dev: `@lingui/cli@^6`, `@lingui/babel-plugin-lingui-macro@^6`, `@lingui/vite-plugin@^6`
+- Dev: `@lingui/cli@^6`, `@lingui/babel-plugin-lingui-macro@^6`, `@lingui/vite-plugin@^6`, `@lingui/format-po@^6`
 
-The reasoning behind these pins: Lingui 6 is the current major (paired with React 18/19 and the new `@lingui/react/macro` import path), the `@lingui/babel-plugin-lingui-macro` 6 release expands the macros under Babel, and `@lingui/vite-plugin@^6` is the Vite-side companion that compiles `.po` catalogs into the runtime `.ts` modules each route loads. No `@lingui/detect-locale` — that library is browser-only (`navigator`, `localStorage`, `window.location`) and would throw on the server or produce hydration mismatches under SSR. Remix resolves locale from request headers and a cookie instead, on the server side, before any client code runs.
+The reasoning behind these pins: Lingui 6 is the current major (paired with React 18/19 and the new `@lingui/react/macro` import path), the `@lingui/babel-plugin-lingui-macro` 6 release expands the macros under Babel, and `@lingui/vite-plugin@^6` is the Vite-side companion that compiles `.po` catalogs into the runtime `.ts` modules each route loads. `@lingui/format-po@^6` supplies the PO formatter: in Lingui 6 the formatter moved into its own package, so `lingui.config.ts` imports `formatter()` from it — the old `format: 'po'` string was removed and now throws at config load. No `@lingui/detect-locale` — that library is browser-only (`navigator`, `localStorage`, `window.location`) and would throw on the server or produce hydration mismatches under SSR. Remix resolves locale from request headers and a cookie instead, on the server side, before any client code runs.
 
 > **`@vitejs/plugin-react` major.** The Babel variant requires `@vitejs/plugin-react` v5 (the current LTS major), which still exposes the `babel.plugins` option used below. v6 dropped that option, so a project on `@vitejs/plugin-react@6` must use the SWC sibling reference (`remix/swc/lingui.setup.md`) instead. If you detect `@vitejs/plugin-react@6` here, write `status: "needs_decision"` with `needsDecision: { step: "react_plugin_major_mismatch", question: "This project has @vitejs/plugin-react@6, which dropped the babel.plugins option needed by the Babel-Lingui setup. Switch to the SWC variant (recommended) or pin @vitejs/plugin-react to v5?", options: ["switch_to_swc", "pin_react_plugin_v5"] }` and exit.
 
@@ -52,6 +52,7 @@ Create `lingui.config.ts` at the project root:
 ```ts
 // lingui.config.ts
 import { defineConfig } from '@lingui/cli'
+import { formatter } from '@lingui/format-po'
 
 export default defineConfig({
   sourceLocale: 'en',
@@ -62,7 +63,7 @@ export default defineConfig({
       include: ['app'],
     },
   ],
-  format: 'po',
+  format: formatter(),
   compileNamespace: 'ts',
 })
 ```

@@ -122,7 +122,7 @@
       "supportLevel": "stable",
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
+        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/remix/lingui.setup.md"],
@@ -136,7 +136,7 @@
       "supportLevel": "stable",
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
+        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6", "@vitejs/plugin-react-swc@^4"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/remix/swc/lingui.setup.md"],
@@ -153,7 +153,7 @@
       ],
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react@^5"]
+        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6", "@vitejs/plugin-react@^5"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/react-router-framework/lingui.setup.md"],
@@ -167,7 +167,7 @@
       "supportLevel": "stable",
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
+        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6", "@vitejs/plugin-react-swc@^4"]
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/react-router-framework/swc/lingui.setup.md"],
