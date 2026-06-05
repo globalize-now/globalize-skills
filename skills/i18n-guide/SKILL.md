@@ -287,6 +287,8 @@ Single setup subagent. Orchestrator installs packages on the main thread first, 
 
 Read `manifest-snapshot.json`'s `packages.runtime` and `packages.dev`. Run the install commands in the foreground using the package manager from `detection.json`. Stream output to the user.
 
+> **Lingui (v6+) requires Node ≥ 22.19 or ≥ 24** — it ships ESM-only and fails to load on older Node. If the resolved stack installs `@lingui/*`, check the project's Node version (`node -v`, plus any `.nvmrc` / `engines` field) before installing. If it's older, tell the user and pause rather than installing a runtime they can't run.
+
 | Package manager | Runtime command | Dev command |
 |---|---|---|
 | `npm` | `npm install <pkgs>` | `npm install -D <pkgs>` |

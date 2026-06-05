@@ -71,6 +71,7 @@ Is this a client component ('use client')?
 | `useLingui()` → `t`, `i18n` | `@lingui/react/macro` |
 | `msg` | `@lingui/core/macro` |
 | `t` (standalone) | `@lingui/core/macro` |
+| `ph` (name a placeholder) | `@lingui/core/macro` |
 | `setI18n` | `@lingui/react/server` |
 
 > Use `@lingui/react/macro` — not the deprecated `@lingui/macro`.
@@ -97,9 +98,35 @@ function Field() {
 
 **Interpolation:**
 ```tsx
-<Trans>Hello, {user.name}!</Trans>
-t`Welcome back, ${user.name}!`
+<Trans>Hello, {name}!</Trans>
+t`Welcome back, ${name}!`
 ```
+
+### Naming placeholders
+
+Lingui only auto-names a placeholder when the interpolated value is a **bare variable** (`${name}` → `{name}`). **Any other expression** — a property access (`user.name`), a function or method call (`getName()`, `i18n.number(amount)`), `new Date()`, or a computed expression — extracts as a positional **`{0}`**, which tells the translator nothing about what the value is. This holds in both `t` and `<Trans>`.
+
+Fix it one of two ways:
+
+- **Assign to a local variable first** — simplest when the value is used once:
+  ```tsx
+  const name = user.name
+  t`Welcome back, ${name}!`          // → "Welcome back, {name}!"  (not {0})
+  ```
+- **Wrap with `ph()`** — names the placeholder inline, no extra variable. Import `ph` from `@lingui/core/macro` (even inside JSX):
+  ```tsx
+  import { ph } from '@lingui/core/macro'
+
+  // ❌ "Total: {0}" — no context for the translator
+  t`Total: ${i18n.number(amount, { style: 'currency', currency: 'USD' })}`
+  // ✅ "Total: {total}"
+  t`Total: ${ph({ total: i18n.number(amount, { style: 'currency', currency: 'USD' }) })}`
+
+  // Works in the JSX macros too (<Trans>, <Plural>, <Select>, <SelectOrdinal>):
+  <Trans>Welcome back, {ph({ username: getUser().name })}!</Trans>
+  ```
+
+`ph()` is a compile-time macro — it sets the placeholder name in the extracted message and leaves no runtime call behind.
 
 **Constants outside components (same file):**
 ```tsx
@@ -175,6 +202,8 @@ function EventDate({ timestamp }: { timestamp: number }) {
   return <time>{i18n.date(new Date(timestamp), { dateStyle: 'medium' })}</time>
 }
 ```
+
+> **Interpolating a formatted value into a sentence?** `i18n.number(...)` / `i18n.date(...)` are function calls, so `` t`Total: ${i18n.number(amount)}` `` extracts as `{0}`. Name it with `ph()` (see [Naming placeholders](#naming-placeholders)): `` t`Total: ${ph({ total: i18n.number(amount) })}` ``.
 
 In Next.js App Router server components, get `i18n` from `getI18nInstance(locale)` directly:
 
@@ -277,7 +306,7 @@ If the app's domain is known from context (prior conversation, CLAUDE.md, or obv
 
 - **Single words or two-word phrases** that could have multiple meanings in the source language. The test: *could a translator read this word differently without seeing the UI?*
 - **Action labels without a visible object**: "Remove", "Add", "Delete" — the comment should say what is being acted on (e.g., "Remove item from cart")
-- **Strings with placeholders where the placeholder meaning isn't obvious**: `{count} remaining` — remaining what? `Hello, {name}` — is name a person, a project, a pet?
+- **Strings with placeholders where the placeholder meaning isn't obvious**: `{count} remaining` — remaining what? `Hello, {name}` — is name a person, a project, a pet? If the placeholder is a positional `{0}` (any non-bare expression — see [Naming placeholders](#naming-placeholders)), name it with `ph()` first, then comment only if the *named* value is still ambiguous.
 - **Domain-sensitive terms**: words whose meaning depends on the app's domain. E.g., in a music app, "Track" means a song; in a shipping app, it means package tracking.
 
 **Should comment** (add unless meaning is obvious from surrounding message):
