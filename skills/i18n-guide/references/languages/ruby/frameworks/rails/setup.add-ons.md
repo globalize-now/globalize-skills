@@ -53,7 +53,7 @@ Add to the development group in `Gemfile` (if not already present from the conve
 
 ```ruby
 group :development do
-  gem "erb_lint", "~> 0.5", require: false
+  gem "erb_lint", "~> 0.9", require: false
 end
 ```
 

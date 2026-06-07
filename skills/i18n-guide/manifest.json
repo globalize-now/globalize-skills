@@ -274,7 +274,7 @@
       },
       "gems": {
         "runtime": ["rails-i18n ~> 8.1"],
-        "dev": ["i18n-tasks ~> 1.0", "erb_lint ~> 0.5", "rubocop-i18n ~> 3.3"]
+        "dev": ["i18n-tasks ~> 1.0", "erb_lint ~> 0.9", "rubocop-i18n ~> 3.3"]
       },
       "references": {
         "setup": ["references/languages/ruby/frameworks/rails/rails.setup.md"],

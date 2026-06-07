@@ -26,7 +26,7 @@ Add `erb_lint` to the development group in `Gemfile`:
 
 ```ruby
 group :development do
-  gem "erb_lint", "~> 0.5", require: false
+  gem "erb_lint", "~> 0.9", require: false
 end
 ```
 
