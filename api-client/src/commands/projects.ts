@@ -54,6 +54,38 @@ export async function deleteProject(client: ApiClient, id: string) {
   return data ?? { deleted: true };
 }
 
+export async function getProjectRefs(client: ApiClient, id: string) {
+  const { data, error, response } = await client.GET("/api/projects/{id}/refs", {
+    params: { path: { id } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function listProjectScorecards(client: ApiClient, limit?: number) {
+  const { data, error, response } = await client.GET("/api/projects/scorecards", {
+    params: { query: limit !== undefined ? { limit } : {} },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function getProjectBudget(client: ApiClient, id: string) {
+  const { data, error, response } = await client.GET("/api/projects/{id}/budget", {
+    params: { path: { id } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function rotateWebhookSecret(client: ApiClient, id: string) {
+  const { data, error, response } = await client.POST("/api/projects/{id}/webhook-secret/rotate", {
+    params: { path: { id } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
 export function register(group: Command, getClient: ClientFactory): void {
   group
     .command("list")
@@ -168,6 +200,62 @@ export function register(group: Command, getClient: ClientFactory): void {
       try {
         const client = await getClient();
         output(await deleteProject(client, cmdOpts.id), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("refs")
+    .description("List refs tracked by the project")
+    .requiredOption("--id <id>", "Project UUID")
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(await getProjectRefs(client, cmdOpts.id), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("scorecards")
+    .description("Get project scorecards for dashboard")
+    .option("--limit <n>", "Maximum number of scorecards", parseInt)
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(await listProjectScorecards(client, cmdOpts.limit), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("budget")
+    .description("Get project budget")
+    .requiredOption("--id <id>", "Project UUID")
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(await getProjectBudget(client, cmdOpts.id), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("rotate-webhook-secret")
+    .description("Rotate webhook secret")
+    .requiredOption("--id <id>", "Project UUID")
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(await rotateWebhookSecret(client, cmdOpts.id), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }

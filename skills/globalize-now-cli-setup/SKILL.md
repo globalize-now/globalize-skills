@@ -128,7 +128,7 @@ If no pattern can be determined locally, record as absent — Step 6 will attemp
 
 ### File format
 
-When a locale path pattern is determined, also determine the **file format**. The `fileFormat` value must be one of: `json-flat`, `json-nested`, `xliff`, `xliff-2`, `xliff-1.2`, `yaml`, `po`.
+When a locale path pattern is determined, also determine the **file format**. The `fileFormat` value must be one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`.
 
 | Source | fileFormat value |
 |--------|----------------|
@@ -138,8 +138,11 @@ When a locale path pattern is determined, also determine the **file format**. Th
 | **i18next** | `json-nested` by default. If `keySeparator: false` in config, use `json-flat`. |
 | **react-intl** | Inspect file content (see JSON detection below) |
 | **`.po` / `.pot` files** | `po` |
-| **`.xliff` files** | `xliff` — if you can inspect the file, check the `version` attribute: `2.0` → `xliff-2`, `1.2` → `xliff-1.2` |
-| **`.yaml` / `.yml` files** | `yaml` |
+| **`.xliff` files** | `xliff-1` — if you can inspect the file, check the `version` attribute: `2.0` → `xliff-2`, `1.x` → `xliff-1` |
+| **`.yaml` / `.yml` files** | `yaml-rails` (Rails-style locale-rooted YAML) |
+| **`.arb` files** | `arb` (Flutter Application Resource Bundle) |
+| **`.xcstrings` files** | `xcstrings` (Apple String Catalog) |
+| **`strings.xml` files** | `android-strings` (Android string resources) |
 | **`.json` files** | Inspect content: if all top-level values are strings (`{"greeting": "Hello", "bye": "Goodbye"}`), use `json-flat`. If top-level values contain objects (`{"home": {"greeting": "Hello"}}`), use `json-nested`. |
 
 If the file format cannot be determined locally, record as absent — Step 6 server-side detection may provide it.
@@ -489,7 +492,7 @@ npx @globalize-now/cli-client repositories create \
   --json
 ```
 
-`<FORMAT>` must be exactly one of: `json-flat`, `json-nested`, `xliff`, `xliff-2`, `xliff-1.2`, `yaml`, `po`. Do not use other values (e.g. `json` alone is invalid). Refer to the "File format" table in Step 1 for how to determine the correct value.
+`<FORMAT>` must be exactly one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`. Do not use other values (e.g. `json`, `xliff`, or `yaml` alone are invalid). Refer to the "File format" table in Step 1 for how to determine the correct value.
 
 If no patterns were detected (neither in Step 1 nor in 6d-gitlab/6e), omit the `--patterns` flag. The `--import-mode` and `--import-scope` flags are optional (default to `ignore` and `new_keys_only`).
 

@@ -2,6 +2,7 @@ import { Command, Option } from "commander";
 import type { ApiClient } from "../client.js";
 import { extractError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
+import type { FileFormat } from "../file-formats.js";
 
 type ClientFactory = () => Promise<ApiClient>;
 
@@ -22,7 +23,7 @@ export async function createRepository(
     branches?: string[];
     patterns?: {
       pattern: string;
-      fileFormat: "json-flat" | "json-nested" | "xliff" | "xliff-2" | "xliff-1.2" | "yaml" | "po";
+      fileFormat: FileFormat;
     }[];
     githubInstallationId?: string;
     gitlabConnectionId?: string;
@@ -90,6 +91,30 @@ export async function detectRepository(client: ApiClient, id: string) {
 export async function listRepositoryBranches(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/repositories/{id}/branches", {
     params: { path: { id } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function discoverRepository(client: ApiClient, id: string) {
+  const { data, error, response } = await client.POST("/api/repositories/{id}/discover", {
+    params: { path: { id } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function translateRepository(
+  client: ApiClient,
+  id: string,
+  options: {
+    branch?: string;
+    deliveryMode?: "push" | "pr";
+  },
+) {
+  const { data, error, response } = await client.POST("/api/repositories/{id}/translate", {
+    params: { path: { id } },
+    body: { branch: options.branch, deliveryMode: options.deliveryMode },
   });
   if (error) throw new Error(extractError(response, error));
   return data!;
@@ -214,6 +239,42 @@ export function register(group: Command, getClient: ClientFactory): void {
       try {
         const client = await getClient();
         output(await listRepositoryBranches(client, cmdOpts.id), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("discover")
+    .description("Discover translation files")
+    .requiredOption("--id <id>", "Repository UUID")
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(await discoverRepository(client, cmdOpts.id), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("translate")
+    .description("Trigger on-demand translation")
+    .requiredOption("--id <id>", "Repository UUID")
+    .option("--branch <branch>", "Branch to translate")
+    .addOption(new Option("--delivery-mode <mode>", "Delivery mode").choices(["push", "pr"]))
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(
+          await translateRepository(client, cmdOpts.id, {
+            branch: cmdOpts.branch,
+            deliveryMode: cmdOpts.deliveryMode,
+          }),
+          opts,
+        );
       } catch (e) {
         outputError((e as Error).message, opts);
       }

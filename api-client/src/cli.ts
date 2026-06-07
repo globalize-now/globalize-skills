@@ -17,6 +17,10 @@ import { register as registerMembers } from "./commands/members.js";
 import { register as registerGithub } from "./commands/github.js";
 import { register as registerGitlab } from "./commands/gitlab.js";
 import { register as registerPatterns } from "./commands/patterns.js";
+import { register as registerJobs } from "./commands/jobs.js";
+import { register as registerNamespaces } from "./commands/namespaces.js";
+import { register as registerTranslationMemory } from "./commands/translation-memory.js";
+import { register as registerBilling } from "./commands/billing.js";
 import { register as registerAuth } from "./commands/auth.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -63,6 +67,14 @@ const groups = [
   { name: "github", description: "GitHub App installation and repositories", register: registerGithub },
   { name: "gitlab", description: "GitLab connection and repositories", register: registerGitlab },
   { name: "patterns", description: "Manage repository locale path patterns", register: registerPatterns },
+  { name: "jobs", description: "Manage translation jobs", register: registerJobs },
+  { name: "namespaces", description: "Manage project namespaces", register: registerNamespaces },
+  {
+    name: "translation-memory",
+    description: "Browse and manage translation memory",
+    register: registerTranslationMemory,
+  },
+  { name: "billing", description: "View billing balance and ledger", register: registerBilling },
 ] as const;
 
 for (const { name, description, register } of groups) {
