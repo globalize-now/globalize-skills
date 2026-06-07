@@ -11,14 +11,6 @@ export async function listOrgs(client: ApiClient) {
   return data!;
 }
 
-export async function createOrg(client: ApiClient, name: string) {
-  const { data, error, response } = await client.POST("/api/orgs", {
-    body: { name },
-  });
-  if (error) throw new Error(extractError(response, error));
-  return data!;
-}
-
 export async function deleteOrg(client: ApiClient, orgId: string) {
   const { data, error, response } = await client.DELETE("/api/orgs/{orgId}", {
     params: { path: { orgId } },
@@ -36,20 +28,6 @@ export function register(group: Command, getClient: ClientFactory): void {
       try {
         const client = await getClient();
         output(await listOrgs(client), opts);
-      } catch (e) {
-        outputError((e as Error).message, opts);
-      }
-    });
-
-  group
-    .command("create")
-    .description("Create an organisation")
-    .requiredOption("--name <name>", "Organisation name")
-    .action(async (cmdOpts, cmd) => {
-      const opts: OutputOptions = cmd.optsWithGlobals();
-      try {
-        const client = await getClient();
-        output(await createOrg(client, cmdOpts.name), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }

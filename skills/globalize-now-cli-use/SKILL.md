@@ -389,7 +389,7 @@ npx @globalize-now/cli-client patterns create \
   --json
 ```
 
-Supported file formats: `json-flat`, `json-nested`, `xliff`, `xliff-2`, `xliff-1.2`, `yaml`, `po`.
+Supported file formats: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`.
 
 **Update** a pattern:
 
@@ -502,19 +502,20 @@ These commands are less commonly needed from an agent but are available when req
 
 ```bash
 npx @globalize-now/cli-client orgs list --json
-npx @globalize-now/cli-client orgs create --name "My Org" --json
 npx @globalize-now/cli-client orgs delete --id <ORG_ID> --json
 ```
+
+> **Note:** There is no `orgs create` command. Creating an organisation requires an interactive (Clerk) session and is done in the web app — it is not available via API key. The CLI can list and delete orgs, and manage everything inside them.
 
 ### Members
 
 ```bash
 npx @globalize-now/cli-client members list --org-id <ORG_ID> --json
-npx @globalize-now/cli-client members invite --org-id <ORG_ID> --clerk-user-id <UID> --json
+npx @globalize-now/cli-client members invite --org-id <ORG_ID> --email <EMAIL> --json
 npx @globalize-now/cli-client members remove --org-id <ORG_ID> --membership-id <ID> --json
 ```
 
-Optional `--role` flag on `invite`: `admin` or `member` (default: `member`).
+Members are invited **by email address** (`--email`). Optional `--role` flag on `invite`: `admin` or `member` (default: `member`).
 
 ### API Keys
 
@@ -543,17 +544,21 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 
 | Command | Required flags | Optional flags |
 |---------|---------------|----------------|
-| `auth login` | *(interactive)* | |
+| `auth login` | *(interactive)* | `--no-wait` |
+| `auth complete` | `--device-code`, `--code-verifier` | `--interval`, `--expires-in` |
 | `auth status` | | |
 | `auth logout` | | |
 | `orgs list` | | |
-| `orgs create` | `--name` | |
 | `orgs delete` | `--id` | |
 | `projects list` | | |
 | `projects create` | `--name`, `--source-language` (ID), `--target-languages` (IDs) | |
 | `projects update` | `--id` | `--name`, `--source-language`, `--target-languages`, `--config` (JSON) |
 | `projects get` | `--id` | |
 | `projects delete` | `--id` | |
+| `projects refs` | `--id` | |
+| `projects scorecards` | | `--limit` |
+| `projects budget` | `--id` | |
+| `projects rotate-webhook-secret` | `--id` | |
 | `languages list` | | |
 | `languages get` | `--id` | |
 | `project-languages list` | `--project-id` | |
@@ -565,11 +570,14 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `repositories delete` | `--id` | |
 | `repositories detect` | `--id` | |
 | `repositories branches` | `--id` | |
+| `repositories discover` | `--id` | |
+| `repositories translate` | `--id` | `--branch`, `--delivery-mode` (`push`\|`pr`) |
 | `patterns list` | `--repository-id` | |
 | `patterns create` | `--repository-id`, `--pattern`, `--file-format` | `--position` |
 | `patterns update` | `--repository-id`, `--pattern-id` | `--pattern`, `--file-format` |
 | `patterns delete` | `--repository-id`, `--pattern-id` | |
 | `patterns reorder` | `--repository-id`, `--pattern-id`, `--position` | |
+| `patterns bulk` | `--repository-id`, `--patterns` (JSON) | |
 | `github install` | | `--no-wait` |
 | `github install-status` | `--nonce` | |
 | `github installations` | | |
@@ -589,12 +597,96 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `style-guides list` | `--project-id` | |
 | `style-guides upsert` | `--project-id`, `--language-id`, `--instructions` | |
 | `style-guides delete` | `--project-id`, `--language-id` | |
+| `style-guides generate` | `--project-id`, `--language-id` | |
+| `style-guides apply` | `--project-id`, `--language-id`, `--generation-id`, `--instructions` | `--context`, `--invalidate-tm` |
+| `style-guides quota` | `--project-id` | |
 | `api-keys list` | `--org-id` | |
 | `api-keys create` | `--org-id`, `--name` | |
 | `api-keys revoke` | `--org-id`, `--key-id` | |
 | `members list` | `--org-id` | |
-| `members invite` | `--org-id`, `--clerk-user-id` | `--role` |
+| `members invite` | `--org-id`, `--email` | `--role` |
 | `members remove` | `--org-id`, `--membership-id` | |
+| `namespaces list` | `--project-id` | |
+| `namespaces update` | `--project-id`, `--namespace-id`, `--name` | |
+| `namespaces delete` | `--project-id`, `--namespace-id` | |
+| `translation-memory list` | `--project-id` | `--query`, `--source-language-id`, `--target-language-id`, `--limit`, `--cursor` |
+| `translation-memory delete` | `--project-id`, `--entry-id` | |
+| `translation-memory count` | `--project-id` | `--target-language-id` |
+| `translation-memory fresh-count` | `--project-id`, `--target-language-id` | |
+| `jobs list` | | `--project-id`, `--status`, `--limit`, `--offset` |
+| `jobs get` | `--id` | |
+| `jobs start` | `--id` | |
+| `jobs retry` | `--id` | |
+| `jobs stats` | `--id` | |
+| `jobs qa-report` | `--id` | |
+| `jobs qa-dismiss` | `--id`, `--unit-id`, `--check-type` | `--reason`, `--note` |
+| `jobs qa-undismiss` | `--id`, `--unit-id`, `--check-type` | |
+| `jobs export` | `--id` | `--target-lang` |
+| `jobs units` | `--job-id`, `--target-project-language-id` | `--filter`, `--search`, `--limit`, `--cursor` |
+| `jobs unit-get` | `--job-id`, `--unit-id` | |
+| `jobs files` | `--id` | `--limit`, `--cursor` |
+| `jobs redeliver` | `--id` | |
+| `billing balance` | | |
+| `billing ledger` | | `--type`, `--grouped`, `--limit`, `--cursor` |
+
+---
+
+## Additional Commands: Jobs, Namespaces, Translation Memory & Billing
+
+These command groups manage translation work and account state beyond initial setup. They are less commonly needed during onboarding but available whenever requested.
+
+### Jobs
+
+Translation jobs run a project's pipeline. Inspect, start, retry, and export them:
+
+```bash
+npx @globalize-now/cli-client jobs list --project-id <PROJECT_ID> --json
+npx @globalize-now/cli-client jobs get --id <JOB_ID> --json
+npx @globalize-now/cli-client jobs start --id <JOB_ID> --json
+npx @globalize-now/cli-client jobs stats --id <JOB_ID> --json
+npx @globalize-now/cli-client jobs qa-report --id <JOB_ID> --json
+```
+
+QA findings on a job can be dismissed and restored. `--check-type` identifies the QA check (e.g. `placeholder`, `length`, `terminology`, `formatting`), and `--unit-id` the affected translation unit:
+
+```bash
+npx @globalize-now/cli-client jobs qa-dismiss --id <JOB_ID> --unit-id <UNIT_ID> --check-type <CHECK> --json
+npx @globalize-now/cli-client jobs qa-undismiss --id <JOB_ID> --unit-id <UNIT_ID> --check-type <CHECK> --json
+```
+
+### Namespaces
+
+Namespaces group keys within a project (e.g. per feature or page):
+
+```bash
+npx @globalize-now/cli-client namespaces list --project-id <PROJECT_ID> --json
+npx @globalize-now/cli-client namespaces update --project-id <PROJECT_ID> --namespace-id <NS_ID> --name "common" --json
+npx @globalize-now/cli-client namespaces delete --project-id <PROJECT_ID> --namespace-id <NS_ID> --json
+```
+
+There is no `namespaces create` command — namespaces are created automatically as keys are imported.
+
+### Translation memory
+
+Translation memory (TM) stores prior translations for reuse. `--source-language-id` / `--target-language-id` are **project language UUIDs** (from `project-languages list`):
+
+```bash
+npx @globalize-now/cli-client translation-memory list --project-id <PROJECT_ID> --target-language-id <PROJECT_LANGUAGE_ID> --json
+npx @globalize-now/cli-client translation-memory count --project-id <PROJECT_ID> --json
+npx @globalize-now/cli-client translation-memory fresh-count --project-id <PROJECT_ID> --target-language-id <PROJECT_LANGUAGE_ID> --json
+npx @globalize-now/cli-client translation-memory delete --project-id <PROJECT_ID> --entry-id <ENTRY_ID> --json
+```
+
+### Billing
+
+Read the organisation's credit balance and ledger:
+
+```bash
+npx @globalize-now/cli-client billing balance --json
+npx @globalize-now/cli-client billing ledger --json
+```
+
+`billing balance` resolves the organisation from your API key. Checkout and portal flows are web-only (not available via API key).
 
 ---
 

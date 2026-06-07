@@ -13,10 +13,10 @@ export async function listMembers(client: ApiClient, orgId: string) {
   return data!;
 }
 
-export async function inviteMember(client: ApiClient, orgId: string, clerkUserId: string, role?: "admin" | "member") {
+export async function inviteMember(client: ApiClient, orgId: string, email: string, role?: "admin" | "member") {
   const { data, error, response } = await client.POST("/api/orgs/{orgId}/members", {
     params: { path: { orgId } },
-    body: { clerkUserId, role },
+    body: { email, role },
   });
   if (error) throw new Error(extractError(response, error));
   return data!;
@@ -47,15 +47,15 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("invite")
-    .description("Invite a member to an organisation")
+    .description("Invite a member to an organisation by email")
     .requiredOption("--org-id <id>", "Organisation UUID")
-    .requiredOption("--clerk-user-id <uid>", "Clerk user ID")
+    .requiredOption("--email <email>", "Email address of the person to invite")
     .addOption(new Option("--role <role>", "Role (default: member)").choices(["admin", "member"]))
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
-        output(await inviteMember(client, cmdOpts.orgId, cmdOpts.clerkUserId, cmdOpts.role), opts);
+        output(await inviteMember(client, cmdOpts.orgId, cmdOpts.email, cmdOpts.role), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }
