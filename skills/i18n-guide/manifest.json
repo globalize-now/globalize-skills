@@ -279,7 +279,10 @@
       "references": {
         "setup": ["references/languages/ruby/frameworks/rails/rails.setup.md"],
         "convert": ["references/languages/ruby/frameworks/rails/rails.convert.md"],
-        "code": ["references/languages/ruby/frameworks/rails/rails.code.md"]
+        "code": ["references/languages/ruby/frameworks/rails/rails.code.md"],
+        "optional": {
+          "setup-add-ons": ["references/languages/ruby/frameworks/rails/setup.add-ons.md"]
+        }
       }
     }
   ],

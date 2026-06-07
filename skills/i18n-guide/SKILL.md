@@ -80,23 +80,25 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 
 > You are inspecting a project to gather i18n setup context. Read-only — do not modify any files.
 >
-> Read the project's `package.json`, build config files (`vite.config.*`, `next.config.*`, `.babelrc`), and survey the source tree. Output **only** a single JSON object matching this schema, written to `.globalize/detection.json`:
+> First decide the project **language**: if a `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` is present, this is a **Ruby** project — read the Ruby signals below instead of the JS ones. Otherwise read the project's `package.json`, build config files (`vite.config.*`, `next.config.*`, `.babelrc`), and survey the source tree — this is a **js-ts** project. Output **only** a single JSON object matching this schema, written to `.globalize/detection.json`:
 >
 > ```json
 > {
->   "framework": "next" | "vite" | "tanstack-start" | "remix" | "react-router-framework" | "nuxt" | "quasar" | "sveltekit" | "cra" | "unknown",
+>   "language": "js-ts" | "ruby" | "unknown",
+>   "framework": "next" | "vite" | "tanstack-start" | "remix" | "react-router-framework" | "nuxt" | "quasar" | "sveltekit" | "cra" | "rails" | "unknown",
 >   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "vue-router" | "sveltekit" | "none",
 >   "compiler": "swc" | "babel",
 >   "react": true | false,
 >   "vue": true | false,
 >   "svelte": true | false,
 >   "typescript": true | false,
->   "packageManager": "npm" | "yarn" | "pnpm" | "bun",
+>   "packageManager": "npm" | "yarn" | "pnpm" | "bun" | "bundler",
+>   "version": string | null,
 >   "sourceDir": "src" | "app" | string,
 >   "routeEntries": ["src/app/**/page.tsx", ...] | null,
 >   "git": { "isRepo": true | false, "branch": string | null, "remote": string | null },
 >   "existing": {
->     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "none",
+>     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "rails-i18n" | "none",
 >     "configured": true | false,
 >     "providerWired": true | false,
 >     "catalogsScaffolded": true | false,
@@ -117,6 +119,7 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > | Field | How to detect |
 > |---|---|
+> | `language` | `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` present → `ruby`. Otherwise, a `package.json` present → `js-ts`. Neither → `unknown`. (All JS-path detection rules below apply only when `language === "js-ts"`; the Ruby signals table applies only when `language === "ruby"`.) |
 > | `framework` | Evaluate in this order, first match wins: `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. Any `@remix-run/*` runtime package in deps → remix. `react-router` in deps AND `@react-router/dev` in devDeps AND a `react-router.config.{ts,js}` file at the repo root → react-router-framework. `@sveltejs/kit` in deps or devDeps → sveltekit. `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. (Order matters: Remix v2, React Router v7 framework mode, and SvelteKit all ship `vite` in devDeps, so they must be checked before the `vite` fallback. React Router v7 SPA mode — `react-router` without `@react-router/dev` — correctly falls through to `vite` with `router: "react-router"`.) |
 > | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps (also the value reported for `framework: "remix"` and `framework: "react-router-framework"`, since both use react-router internally; this is informational only, no matcher predicates on it for those frameworks). Vue Router: `vue-router` in deps (Vite SPA / Quasar). SvelteKit: `framework === "sveltekit"` — file-based routing under `src/routes/`. |
 > | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. Remix v2 and React Router v7 framework mode → swc if `@vitejs/plugin-react-swc` is in devDeps; babel otherwise (both default to Babel via `@vitejs/plugin-react`). SvelteKit uses neither — the Svelte compiler runs through Vite (esbuild), and none of the rules above match — so the field is a don't-care for SvelteKit; report whatever the heuristic yields (it will not match any rule) and treat the value as not meaningful: the SvelteKit manifest entry does not key on `compiler`. |
@@ -133,10 +136,29 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 > | `candidateFiles` | Glob `src/**/*.{tsx,ts,jsx,js,svelte}`, exclude tests/configs/`.d.ts`, grep each for: bare markup text (`>Word<`, including Svelte template text), user-visible attrs (`placeholder=`, `aria-label=`, `title=`, `alt=`), exported user-facing string literals. Return files with ≥1 match, sorted by match count desc. |
 > | `localeSignals` | List existing locale dirs (e.g., `src/locales/`), env vars matching `*LOCALE*`, README mentions of language names. |
 >
+> **Ruby / Rails detection rules** (apply only when `language === "ruby"`; the JS rules above do not apply):
+>
+> | Field | How to detect |
+> |---|---|
+> | `framework` | `rails` gem in `Gemfile`/`Gemfile.lock`, OR `bin/rails`, OR `config/application.rb` → `rails`. Otherwise `unknown` (non-Rails Ruby — Sinatra, Hanami, plain `i18n` gem — is not supported; see 1.2). |
+> | `packageManager` | `bundler` (Rails projects use Bundler + `Gemfile`). |
+> | `version` | Parse `Gemfile.lock`: the line `rails (N.M.x)` → extract `N.M` (e.g. `"8.1"`). Used for the soft EOL warning in 1.2 and the `rails-i18n` pin. `null` if not resolvable. |
+> | `router` | `none` (Rails routing is not modeled here; the `version` field is what the Rails path keys on). |
+> | `existing.library` | `rails-i18n` in `Gemfile`/`Gemfile.lock` → `rails-i18n`; else `none`. (Rails' built-in `I18n` API is always present; `rails-i18n` adds CLDR plural data.) |
+> | `existing.configured` | `config.i18n.*` keys (e.g. `default_locale`, `available_locales`) set in `config/application.rb` or a `config/initializers/*.rb`. |
+> | `existing.providerWired` | An `around_action`/`switch_locale` or `I18n.with_locale` locale switcher present in `app/controllers/application_controller.rb`. |
+> | `existing.catalogsScaffolded` | `config/locales/*.{yml,rb}` present with at least one populated, non-stub locale file (note split layouts — `devise.en.yml`, nested dirs — all auto-loaded by Rails). |
+> | `existing.stringsWrapped` | Glob `app/views/**/*.erb`, `app/controllers/**/*.rb`, sample up to 50 files, count files using `t(`/`l(` helpers vs. files with bare user-visible text: > 80% using helpers → "yes", > 20% → "partial", else → "no". |
+> | `candidateFiles` | Glob `app/views/**/*.erb`, `app/controllers/**/*.rb`, `app/mailers/**/*.rb`, `app/models/**/*.rb`; grep for bare user-visible text and string literals not already wrapped in `t(`/`l(`. Return files with ≥1 match, sorted by match count desc. |
+> | `localeSignals` | List `config/locales/` files and the locale codes present; `config.i18n.default_locale`/`available_locales` values; README mentions of language names. |
+>
+> **Name-collision guardrail (Ruby):** the gems `globalize`, `mobility`, and `traco` translate **DB/model content** (per-row data like a product's `name`), NOT UI strings, and are entirely **unrelated to Globalize.now**. Do **not** treat `globalize` (the gem) as the Globalize.now platform. If any is present in `Gemfile`/`Gemfile.lock`, record it in `localeSignals.readmeHints` (or a free-form note) as a detect-and-warn signal — it must never trigger UI-string i18n logic and is surfaced to the user in 1.2 but is non-blocking.
+>
 > Write the JSON file and exit. Do not engage in conversation.
 
 > **User-facing message** (after the inspect subagent returns and `detection.json` is written):
-> "Scan done. Detected: **{framework}** + **{router}** ({compiler} compiler, {packageManager}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
+> For `language !== "ruby"` (JS/TS): "Scan done. Detected: **{framework}** + **{router}** ({compiler} compiler, {packageManager}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
+> For `language === "ruby"` (Rails — `router` is "none" and `compiler` is not meaningful, so omit them): "Scan done. Detected: **rails** (bundler). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
 >
 > If `existing.library !== "none"`, also surface:
 > "Heads up — you already have `{existing.library}` in your dependencies. If it's compatible, we'll continue with it; if not, I'll flag it in the next step."
@@ -149,7 +171,7 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 
 | Condition | Stop message |
 |---|---|
-| `react === false` AND `vue === false` AND `svelte === false` | "i18n-guide currently supports React-based, Vue-based, and Svelte-based projects only. This project uses {framework}. No supported library available." |
+| `language !== "ruby"` AND `react === false` AND `vue === false` AND `svelte === false` | "i18n-guide currently supports React-based, Vue-based, and Svelte-based projects only. This project uses {framework}. No supported library available." |
 | `framework === "cra"` | "Create React App is no longer supported by this skill. Migrate to Vite or Next.js, then re-run." |
 | `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
 | `framework === "next"` AND `router === "pages"` AND user wants Lingui | (Surface only after library choice in 1.5) "Lingui setup does not currently cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router." |
@@ -157,7 +179,18 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 | `framework === "remix"` AND (`@remix-run/dev` major.minor `< 2.7` OR `vite` not in devDeps) | "This Remix v2 project uses the classic compiler (pre-Vite). Lingui requires the Vite-based build. Upgrade to `@remix-run/dev` ≥ 2.7 and follow Remix's classic-compiler → Vite migration, then re-run." |
 | `framework === "sveltekit"` AND `@sveltejs/kit` major.minor `< 2.3` | "Paraglide's URL-based locale routing relies on SvelteKit's `reroute` hook, added in `@sveltejs/kit` 2.3.0 — your project is on an older version. Upgrade to SvelteKit ≥ 2.3, then re-run. (If you must stay below 2.3, a different, deprecated routing approach is required that this skill does not cover.)" |
 | `svelte === true` AND `framework !== "sveltekit"` | "This skill currently supports Svelte only through SvelteKit (the Paraglide setup relies on SvelteKit's hooks and routing). A plain Vite + Svelte SPA is not yet supported. Adopt SvelteKit, or wait for SPA support, then re-run." |
-| Custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar." |
+| `language !== "ruby"` AND custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar." |
+
+**Ruby / Rails compatibility rules** (apply only when `language === "ruby"`; the two guarded JS rows above — React/Vue/Svelte and custom-build-pipeline — are exempted for Ruby via their `language !== "ruby"` guard, so a Rails project does not falsely STOP there):
+
+| Condition | Action |
+|---|---|
+| `language === "ruby"` AND `framework !== "rails"` | **STOP.** "i18n-guide currently supports Ruby only through Rails (built-in `I18n` API + locale-rooted YAML). Non-Rails Ruby (Sinatra, Hanami, plain `i18n` gem) is not supported. Point me at a Rails app, or use the `i18n` gem docs directly." |
+| `gettext_i18n_rails` OR `fast_gettext` in `Gemfile`/`Gemfile.lock` | **STOP.** "This project uses `gettext_i18n_rails` — the catalog format is PO, not YAML. The v1 Rails path supports locale-rooted YAML only; the PO/gettext overlay for Rails is not yet supported. Proceed manually, or wait for the PO overlay." |
+
+**Name-collision warning (Ruby, non-blocking):** if `globalize`, `mobility`, or `traco` was detected (the model/DB-content translation gems — unrelated to Globalize.now), surface but do **not** stop: "I found `{gem}` in your Gemfile. It translates DB/model content (per-row data), not UI strings, and is unrelated to Globalize.now. The i18n setup won't touch it, and its content won't be in the connected catalog. Proceeding with UI-string i18n." Never conflate the `globalize` gem with the Globalize.now platform.
+
+**Soft EOL warning (Ruby, non-blocking — NO emission gating):** if `language === "ruby"` AND the detected Rails `version` is `7.1` or earlier: "This project is on Rails {version}, which reached end-of-life. The Rails path supports 6.1 → 8.1 at the same code level (no version-gated i18n branches) — the emitted code is identical — but running EOL Rails in production isn't recommended. Consider upgrading. Proceeding." The default target is Rails 8.1; support runs down to 6.1. There is **no** version-gated emission for Rails (clean contrast with the JS framework version branches above).
 
 These are not hard-stops, but note for the Paraglide path:
 
@@ -167,6 +200,18 @@ These are not hard-stops, but note for the Paraglide path:
 ### 1.3 Resolve supported stacks from manifest
 
 Read `manifest.json`. Filter `stacks[]` entries whose `match` predicate is satisfied by `detection`. The result is the set of `(library, variant)` options the user can choose from in 1.5.
+
+**Matcher predicate (load-bearing).** A `match` object mixes two kinds of keys, handled differently — every `match` key names a same-named `detection` field **except `library`**, which has no detection counterpart:
+
+- **Structural keys** — `framework`, `router`, `compiler`, and any other detection-state key an entry declares — must each equal the same-named field in `detection`. (Example: `nextjs-app-router-*` entries declare `framework: "next"`, `router: "app"`.)
+- **`language`** is structural but special-cased:
+  - If `match.language` is **present**, it must equal `detection.language` (so `rails-yaml`, which declares `match.language: "ruby"`, matches **only** when `detection.language === "ruby"`).
+  - If `match.language` is **absent**, treat it as `"js-ts"` — i.e. the entry matches only when `detection.language === "js-ts"`. All existing JS entries omit `language`, so they keep matching exactly as before and are inert for Ruby projects.
+- **`library`** is **not** a structural predicate. It is the **identifier of the variant/option** the entry offers — surfaced as a choice in §1.5. It is **never** matched against `detection.existing.library` (there is no top-level `detection.library`). `detection.existing.library` describes prior setup state and is used only by the §1.2 stops and the §1.6 / Phase 2 already-configured handling — it never filters the candidate set. This is why two entries can share identical structural keys and differ only in `library` (e.g. `nextjs-app-router-lingui` and `nextjs-app-router-next-intl`, both `framework: "next", router: "app"`): a fresh Next app-router project (`existing.library: "none"`) matches **both**, and the {lingui, next-intl} pair is surfaced as the §1.5 choice.
+
+This keeps the Ruby and JS entry sets disjoint by `language`: a Ruby detection can match only `rails-yaml`; a `js-ts` detection can match only the JS entries (never `rails-yaml`).
+
+**Net effect.** A fresh Next app-router project yields **{lingui, next-intl}** candidates → §1.5 offers the choice. A fresh Rails project (`existing.library: "none"`) yields exactly **{rails-yaml}** → §1.5 confirms "Rails built-in I18n (YAML)". A fresh `js-ts` detection never yields `rails-yaml` (its `match.language: "ruby"` fails).
 
 If the filtered list is empty, surface a STOP with: "Your stack is supported in principle but no manifest entry currently matches. Detected: {summary}. File an issue or pick a different setup."
 
@@ -198,6 +243,7 @@ Show the user the list of supported variants from 1.3, with the recommendation m
 | `framework === "remix"` | **Lingui** | Remix v2 (≥ 2.7, Vite-based) ships with no first-party i18n primitive. Lingui plugs in via `@lingui/vite-plugin`, gives compile-time extraction, and aligns with Remix's per-route `loader` pattern (dynamic catalog import per route). |
 | `framework === "react-router-framework"` | **Lingui** | React Router v7 framework mode is the same shape: Vite + `loader` + root `<html>` rendering. Lingui's per-route catalogs map cleanly onto the routes config. |
 | `framework === "sveltekit"` | **Paraglide JS** | First-party Svelte CLI add-on (`sv add paraglide`); compiler-based with tree-shaken messages; SSR-correct via AsyncLocalStorage; integrates through `reroute` + `handle` hooks. |
+| `framework === "rails"` | **Rails built-in I18n (YAML)** | Rails ships a full `I18n` stack (`t`/`l` helpers, locale-rooted YAML at `config/locales/`, `%{name}` interpolation, CLDR plurals via `rails-i18n`); no third-party UI-string library needed. |
 | anything else (vite + react, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
 
 Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt.
@@ -298,7 +344,7 @@ Read `manifest-snapshot.json`'s `packages.runtime` and `packages.dev`. Run the i
 
 **Wrap each `<pkgs>` entry in single quotes** when constructing the shell command — the manifest pins use `^` (e.g. `next-intl@^4`), and zsh interprets unquoted `^` as a glob negation operator under `EXTENDED_GLOB` (common on macOS via oh-my-zsh). Emit `npm install 'next-intl@^4'` rather than `npm install next-intl@^4`. The single quotes are inert under bash/dash and prevent zsh expansion.
 
-Skip the runtime or dev command if its package list is empty. If the install command fails (network error, registry rejection, lockfile conflict), stop the run with the error — do not advance to 2.1.
+Skip the runtime or dev command if its package list is empty. For `packageManager === "bundler"` (Rails), both package lists are empty by design — gem installation is delegated to the setup subagent via `rails.setup.md` Step 2 (`bundle install`); the §2.0 install step is intentionally a no-op for Rails, not an error. If the install command fails (network error, registry rejection, lockfile conflict), stop the run with the error — do not advance to 2.1.
 
 Running on the main thread keeps the install outside the subagent sandbox, so the user's lockfile stays in sync. The setup subagent in 2.2 will not re-install these packages.
 
@@ -465,7 +511,7 @@ Plan: `create_project`, `configure_languages`, `connect_repo`, `configure_patter
 > 1. `globalize project create --name "{name}" --source {sourceLocale} --targets {targetLocales}` — capture project ID and URL.
 > 2. `globalize project languages list` — verify all targets accepted.
 > 3. `globalize repo connect --provider {gh|gl} --repo {owner/repo}` — wire repo.
-> 4. `globalize repo patterns set --source {catalogPath} --output {targetCatalogPattern}` — configure paths from Phase 3 verify result. The **file format** follows the catalog: for Paraglide it is `po` with catalog path `messages/{locale}.po` by default; if `decisions.setup.catalogFormat === "json"` it is `json-flat` at `messages/{locale}.json`. (Other libraries: `po` for Lingui, `json-nested` for next-intl, etc.) Pass the format with the pattern if the CLI form in use takes an explicit `fileFormat` (see `globalize-now-cli-use`).
+> 4. `globalize repo patterns set --source {catalogPath} --output {targetCatalogPattern}` — configure paths from Phase 3 verify result. The **file format** follows the catalog: for Paraglide it is `po` with catalog path `messages/{locale}.po` by default; if `decisions.setup.catalogFormat === "json"` it is `json-flat` at `messages/{locale}.json`. (Other libraries: `po` for Lingui, `json-nested` for next-intl, etc.) For **Rails** (`detection.language === "ruby"`, `framework === "rails"`) the format is **`yaml-rails`** with catalog path `config/locales/{locale}.yml`, source locale `en` or the detected `default_locale` (`config.i18n.default_locale`). Rails locale codes are already hyphenated (`pt-BR.yml`, `zh-TW.yml`) — pass them through verbatim with **no** underscore normalization. Pass the format with the pattern if the CLI form in use takes an explicit `fileFormat` (see `globalize-now-cli-use`).
 >
 > Update `progress/globalize.json` after each step. Final `result` includes `{ projectId, projectUrl, repoConnected, patternsConfigured }`.
 
