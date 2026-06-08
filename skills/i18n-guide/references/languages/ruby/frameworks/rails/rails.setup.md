@@ -285,7 +285,7 @@ before_action { I18n.locale = params[:locale] || I18n.default_locale }
 
 The locale switcher above reads `params[:locale]`, which requires the locale to appear in the request parameters. The idiomatic Rails approach is to embed the locale in the URL path (e.g. `/en/books`, `/es/books`).
 
-**Ask the user (guided mode) / apply by default (unguided mode):**
+**When run via the `i18n-guide` orchestrator, this choice is already collected in Phase 1** (`SKILL.md` §1.7 asks it explicitly for Rails and records it under `decisions.setup`) — read the decision and apply it; do **not** re-ask. When this reference is used standalone — **ask the user (guided mode) / apply by default (unguided mode):**
 
 > **Would you like to add URL-based locale routing?** This embeds the locale code in the URL path — e.g. `/en/books`, `/es/books`. It requires wrapping your routes in a scope and overriding `default_url_options`.
 
@@ -296,13 +296,19 @@ If yes (or unguided default), make these two additions:
 ```ruby
 # config/routes.rb
 Rails.application.routes.draw do
+  # Infrastructure routes stay OUTSIDE the locale scope — a health probe must
+  # hit /up, not /:locale/up. Same for any non-localized mount.
+  get "up" => "rails/health#show", as: :rails_health_check
+
   scope "/:locale" do
-    # your existing routes go here
+    # your existing user-facing routes go here
     root "home#index"
     resources :books
   end
 end
 ```
+
+**Keep non-localized routes outside `scope "/:locale"`:** the Rails health-check route (`/up`, present by default in Rails 7.1+), plus any monitoring, webhook, or API mounts that have no locale dimension, must stay outside the scope — otherwise a bare `GET /up` probe becomes `GET /:locale/up` and 404s. Wrap only the user-facing routes. If the app already defines `/up` (or other infrastructure routes), leave them where they are and wrap only the routes below them.
 
 **`ApplicationController`** — override `default_url_options` to propagate the active locale into all generated URLs automatically. This is a Rails public hook and must be placed **before** the `private` keyword — not inside the private section alongside `switch_locale`:
 

@@ -123,6 +123,8 @@ bundle exec rubocop --only I18n app/controllers/ app/mailers/ app/helpers/ app/m
 
 Rails uses **`i18n-tasks`** for catalog hygiene — it audits existing `t()` call sites for missing keys, unused keys, and non-canonical YAML ordering. `i18n-tasks health` is the composite gate: it runs `missing` + `unused` together and exits non-zero if either fails. The CI integration runs this gate on every PR that touches locale files or application code (new `t()` calls with missing YAML keys are exactly what `health` catches in source paths).
 
+> **Ownership note:** when the **convert phase** runs, it already installs `i18n-tasks` and scaffolds `config/i18n-tasks.yml` — it owns the gate's tooling (see `rails.convert.md` Step 4). Add-on 3's primary contribution is the **CI workflow** below. The gem + config install here is kept **idempotent** so a *setup-only + CI* run (convert not in scope) still gets the tooling; when convert already installed it, this step is a silent no-op.
+
 Add `i18n-tasks` to the development/test group in `Gemfile` (if not already present — idempotent, safe if a later phase also adds it):
 
 ```ruby
@@ -172,10 +174,14 @@ bundle exec i18n-tasks normalize
 After `health` passes, use the normalize-then-diff idiom to verify locale files are in canonical order (catches ordering drift introduced by hand-edits or TMS exports):
 
 ```bash
-bundle exec i18n-tasks normalize && git diff --exit-code config/locales/
+bundle exec i18n-tasks normalize && git add --intent-to-add config/locales/ && git diff --exit-code config/locales/
 ```
 
 This runs `normalize` (which rewrites YAML to canonical key order) and then checks that no diff was produced — if a file was out of order, `normalize` will have changed it and `git diff --exit-code` fails the step.
+
+> **Untracked files:** a plain `git diff --exit-code` sees only **tracked** files. Freshly-scaffolded target stubs (`de.yml`, `fr.yml`, …) are untracked on a first run, so drift in them would slip past unnoticed. The `git add --intent-to-add config/locales/` above registers untracked files so the diff sees them. (On CI after `actions/checkout` the committed locale files are already tracked, so `--intent-to-add` is a harmless no-op there while making local runs sound.)
+>
+> **Exit code through a pipe:** do not pipe this command into a filter (`… | grep …`) and then read `$?` — the pipe reports the *last* command's exit status, not `i18n-tasks`'. A piped `normalize`/`health` can read as green when it actually failed. Read `${PIPESTATUS[0]}`, or run the command unpiped.
 
 ### GitHub Actions workflow
 
@@ -204,7 +210,7 @@ jobs:
       - name: Check catalog health (missing + unused keys)
         run: bundle exec i18n-tasks health
       - name: Check locale files are in canonical order
-        run: bundle exec i18n-tasks normalize && git diff --exit-code config/locales/
+        run: bundle exec i18n-tasks normalize && git add --intent-to-add config/locales/ && git diff --exit-code config/locales/
 ```
 
 The `paths` filter on `app/**` ensures that new `t()` call sites with no matching YAML key — which is exactly what `health` catches — also trigger the workflow, not just changes to `config/locales/`. Adjust `ruby-version: .ruby-version` to match the project's Ruby version file (`.ruby-version`, `.tool-versions`, or inline in `Gemfile`).

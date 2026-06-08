@@ -254,7 +254,7 @@ en:
 All rules for `%{name}` interpolation, `_html` key naming, and localized formatting are in `rails.code.md`. Apply them during wrapping — do not re-derive them per string. Quick reference:
 
 - **Interpolation:** `t('key', name: user.name)` against `"Hello, %{name}!"` — never build sentences by Ruby string concatenation or `#{}` interpolation of a raw string.
-- **HTML markup:** key ending in `_html` (e.g. `terms_html`) — Rails marks the result `html_safe`; interpolated variables are still HTML-escaped by Rails, so you do not escape them manually.
+- **HTML markup:** key ending in `_html` (e.g. `terms_html`) — Rails marks the result `html_safe`; interpolated variables are still HTML-escaped by Rails, so you do not escape them manually. When the value contains **double-quoted** HTML attributes (`href="/privacy"`), author it as a **single-quoted** YAML scalar so the inner `"` need no escaping (see `rails.code.md` → "HTML-safe keys").
 - **Dates and times:** `l(article.published_at, format: :short)` — `l()` localizes `Date`, `DateTime`, and `Time` objects only. Passing a number to `l()` raises `I18n::ArgumentError`.
 - **Numbers and currency:** use Action View helpers — `number_to_currency(price)`, `number_with_delimiter(count)`, `number_with_precision(rate)`. These are backed by `rails-i18n`'s `number.*` YAML keys. Do **not** pass numeric values to `l()`.
 
@@ -262,7 +262,9 @@ All rules for `%{name}` interpolation, `_html` key naming, and localized formatt
 
 ## Step 4: Audit and normalize with `i18n-tasks`
 
-After wrapping, use `i18n-tasks` to audit the catalog. Add to `Gemfile`:
+After wrapping, use `i18n-tasks` to audit the catalog. **This install is owned by the convert phase** — the verify step adds the gem and scaffolds `config/i18n-tasks.yml` if they are not already present, so the audit tooling is guaranteed available when the gate runs. (The CI add-on in `setup.add-ons.md` Add-on 3 reuses the same gem + config idempotently; it does not re-install when convert already did.)
+
+Add to `Gemfile`:
 
 ```ruby
 group :development, :test do
@@ -295,26 +297,27 @@ ignore_missing:
   - 'errors.messages.*'
 ```
 
-Run the audit commands in order:
+Run the audit commands. **The base-locale completeness check is the gate; the rest are cleanup or informational:**
 
 ```bash
-# Show keys used in code but missing from locale files
-bundle exec i18n-tasks missing
+# GATE — keys used in code but missing from the BASE locale (must be empty)
+bundle exec i18n-tasks missing -t used
 
-# Show keys present in locale files but never used in code
+# Informational — keys in the base locale missing from TARGET locales
+# (expected: target stubs are filled later by the TMS — never a gate)
+bundle exec i18n-tasks missing -t diff
+
+# Cleanup — keys in YAML never referenced by a t() call
 bundle exec i18n-tasks unused
-
-# Rewrite locale files in canonical key order
-bundle exec i18n-tasks normalize
 ```
 
-Resolve all `missing` and `unused` findings before proceeding to the connect phase:
+- **`missing -t used` (the gate)** — a `t('some.key')` call exists in code but no entry exists in the base locale. This must report no keys before connecting: add the entry to the source-locale file. This is the only catalog check that should *fail* the convert phase. **Judge by the reported keys, not the exit code** — `i18n-tasks missing` is a report command that may exit `0` even with findings (only `i18n-tasks health` is contracted to exit non-zero). For a scriptable check, `bundle exec i18n-tasks missing -t used -f keys` prints one key per line; empty output = pass.
+- **`missing -t diff` (informational)** — a key exists in the base locale but not in a target (`es.yml`, …). Expected for keys not yet translated; the connect phase / TMS fills these. Never fail the convert phase on it.
+- **`unused` (cleanup)** — a YAML entry exists but no `t()` call references it. Delete genuinely-orphaned keys (including any scaffold seed keys the setup phase added that the app never wired up, e.g. `site.title`), or fix a wrong key path (check lazy-lookup path mirroring). Cleaning these keeps the later CI `i18n-tasks health` gate clean.
 
-- **Missing keys** — a `t('some.key')` call exists in code but no YAML entry was created. Add the entry to the source-locale file.
-- **Unused keys** — a YAML entry exists but no `t()` call references it. Either it's a leftover from a removed feature (delete it) or the key path is wrong (check lazy-lookup path mirroring).
-- **After normalize** — commit the reordered YAML files. This is the canonical representation Globalize will see.
-
-`i18n-tasks missing` also covers target locales — if `es.yml` has no entry for a key that `en.yml` has, it appears as missing. That is expected for keys not yet translated; but ensure every key exists in the source locale before connecting.
+> **Do not run `i18n-tasks normalize` during convert.** It rewrites the catalog to alphabetical key order, destroying the human-readable reading order in which strings were just authored — and a freshly-authored catalog is never alphabetical, so a `normalize && git diff` check would false-fail on correct first-convert output. Leave the catalog in authored order. Canonical ordering is a CI / connect-time concern, applied by the CI integration (`setup.add-ons.md` Add-on 3), not by convert.
+>
+> **Do not gate on `i18n-tasks health` here.** `health` runs all-locale `missing` + `unused` together; on a freshly-converted project it red-flags the (by-design) empty target stubs and any not-yet-cleaned seed key. Use the scoped `missing -t used` gate above instead. `health` is the right gate for ongoing CI (Add-on 3), once targets are populated.
 
 ---
 
@@ -329,15 +332,17 @@ bundle exec erblint --lint-all --enable-linters HardCodedString app/views/
 # 2. Discover hardcoded strings in Ruby files
 bundle exec rubocop --only I18n app/controllers/ app/mailers/ app/helpers/ app/models/
 
-# 3. After wrapping — audit missing/unused catalog keys
-bundle exec i18n-tasks missing
+# 3. After wrapping — GATE: every used key must exist in the base locale (must be empty)
+bundle exec i18n-tasks missing -t used
 
-# 4. Audit unused keys
+# 4. Informational — target-locale gaps (expected; filled by the TMS, not a gate)
+bundle exec i18n-tasks missing -t diff
+
+# 5. Cleanup — delete orphaned/unused keys (incl. leftover scaffold seeds)
 bundle exec i18n-tasks unused
-
-# 5. Normalize locale files to canonical order
-bundle exec i18n-tasks normalize
 ```
+
+Do **not** run `i18n-tasks normalize` as part of convert (it destroys authored reading order and would false-fail a drift check on correct first-convert output). Canonical ordering is applied later by the CI integration — see `setup.add-ons.md` Add-on 3.
 
 ---
 
@@ -352,7 +357,7 @@ bundle exec i18n-tasks normalize
 
 ## After conversion
 
-With `i18n-tasks missing`, `unused`, and `normalize` all clean:
+With the base-locale completeness gate clean (`i18n-tasks missing -t used` empty) and orphaned keys cleaned up (`unused`):
 
 1. Verify the application renders correctly in the source locale — spot-check converted pages.
 2. If `raise_on_missing_translations = true` is set in `config/environments/test.rb` (configured by the setup phase), run the test suite: any missing key raises immediately.

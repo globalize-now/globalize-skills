@@ -116,6 +116,16 @@ en:
 <%= t('notice.terms_html') %>
 ```
 
+**YAML quoting:** if the markup uses **double-quoted** attributes (`<a href="/privacy">`), author the value as a **single-quoted** YAML scalar so the inner `"` need no escaping:
+
+```yaml
+en:
+  notice:
+    privacy_html: '<a href="/privacy">Privacy Policy</a>'
+```
+
+Single-quoted HTML attributes inside a double-quoted scalar (as in the `terms_html` example above) also work — pick one convention and stay consistent. The trap to avoid is a double-quoted YAML scalar wrapping double-quoted attributes, which forces escaping every inner `"`.
+
 **Interpolated variables are always HTML-escaped even inside `_html` keys** — this is the mechanism that makes interpolation safe against XSS. You do not need to (and must not) escape values manually.
 
 ```ruby
@@ -160,6 +170,31 @@ CLDR categories that may appear for other languages: `zero`, `one`, `two`, `few`
 # Wrong — ternary between two messages breaks languages with more than two plural forms
 count == 1 ? t('inbox.one_message') : t('inbox.many_messages')
 ```
+
+---
+
+## Gender / select — map to sibling sub-keys in Ruby (no ICU `select`)
+
+Rails I18n has **no ICU `select` primitive** (unlike next-intl / Lingui / Paraglide). For gender- or category-based message selection, map the selector value to a sibling sub-key and resolve it in Ruby:
+
+```ruby
+# Pick the sub-key from the selector value; fall back to the neutral default
+t("profile.show.reply.#{user.gender}", default: t("profile.show.reply.other"))
+```
+
+```yaml
+en:
+  profile:
+    show:
+      reply:
+        female: "She replied to your comment."
+        male: "He replied to your comment."
+        other: "They replied to your comment."
+```
+
+Always include an `other` (or neutral default) sub-key and fall back to it for unknown or `nil` selector values, as the `:default` above does.
+
+**Never reach for a CLDR plural group** (`one`/`other`) for non-count selection — plural categories are count-driven and will mis-select on a gender/category value. Gender and category selection is a separate concern, handled by explicit sub-keys as above.
 
 ---
 
