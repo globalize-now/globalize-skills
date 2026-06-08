@@ -391,6 +391,18 @@ npx @globalize-now/cli-client patterns create \
 
 Supported file formats: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`.
 
+**Single-file formats (no `{locale}` segment).** Most formats use one file per locale, so the pattern carries a `{locale}` placeholder (`locales/{locale}/*.json`). The **`xcstrings`** format (Apple String Catalog) is different: a single multi-locale file holds every locale, so the pattern is the catalog path itself with **no `{locale}` segment** — e.g.
+
+```bash
+npx @globalize-now/cli-client patterns create \
+  --repository-id <REPO_ID> \
+  --pattern "Localizable.xcstrings" \
+  --file-format xcstrings \
+  --json
+```
+
+Use `"**/*.xcstrings"` instead when the project has multiple catalog tables/directories.
+
 **Update** a pattern:
 
 ```bash

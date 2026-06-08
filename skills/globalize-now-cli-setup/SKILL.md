@@ -111,7 +111,7 @@ If none of the above signals are found, record "no localization setup detected."
 
 During detection, also determine the **locale file path pattern** — a path template showing where locale files live. Supported placeholders and wildcards:
 
-- `{locale}` — locale code (required)
+- `{locale}` — locale code. Required for **per-locale file layouts** (one file per language). **Omitted** for a **single multi-locale file** such as an Apple String Catalog (`xcstrings`), where one file holds every locale — the pattern is the file path itself, with no `{locale}` segment.
 - `{namespace}` — namespace name (optional, for multi-namespace setups)
 - `*` and `**` — wildcards for matching multiple files/directories
 
@@ -124,6 +124,7 @@ During detection, also determine the **locale file path pattern** — a path tem
 | **i18next** | Read `backend.loadPath` from config. Replace `{{lng}}` → `{locale}`, `{{ns}}` → `{namespace}`. Example: `locales/{locale}/{namespace}.json` |
 | **react-intl** | No standard config key. Derive from directory scanning below. |
 | **Rails** | Pattern is always `config/locales/{locale}.yml`. Note in detection output that Rails projects may also have split files (e.g. `config/locales/devise.en.yml`) or subdirectories — the pattern targets the primary per-locale files. |
+| **Apple String Catalog** (`.xcstrings`) | A **single multi-locale file** holds every locale, so there is **no `{locale}` segment**. The pattern is the catalog path itself: `Localizable.xcstrings` (the default table), or `**/*.xcstrings` when there are multiple tables/directories (e.g. `InfoPlist.xcstrings`, a per-storyboard `Main.xcstrings`). `fileFormat: xcstrings`; the source language is the catalog's `sourceLanguage` / Info.plist `CFBundleDevelopmentRegion`. The `{locale}` "required" rule above does not apply to this format. |
 | **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
 
 If no pattern can be determined locally, record as absent — Step 6 will attempt server-side detection.
