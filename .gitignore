@@ -9,3 +9,6 @@ mcp-server/src/api-types.ts
 /.library-check/
 .claude/scheduled_tasks.lock
 
+# Generated research / report artifacts
+/reports/
+

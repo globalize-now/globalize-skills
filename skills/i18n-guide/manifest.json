@@ -263,6 +263,28 @@
           "json-format-code": ["references/languages/js-ts/libraries/paraglide/json-format.code.md"]
         }
       }
+    },
+    {
+      "variant": "rails-yaml",
+      "match": { "language": "ruby", "framework": "rails", "library": "rails-i18n" },
+      "supportLevel": "stable",
+      "packages": {
+        "runtime": [],
+        "dev": []
+      },
+      "gems": {
+        "_comment": "Informational only; rails.setup.md derives the real ~> N.M pin from the detected Rails version. Not consumed by the npm-shaped Phase-2 install.",
+        "runtime": ["rails-i18n ~> 8.1"],
+        "dev": ["i18n-tasks ~> 1.0", "erb_lint ~> 0.9", "rubocop-i18n ~> 3.3"]
+      },
+      "references": {
+        "setup": ["references/languages/ruby/frameworks/rails/rails.setup.md"],
+        "convert": ["references/languages/ruby/frameworks/rails/rails.convert.md"],
+        "code": ["references/languages/ruby/frameworks/rails/rails.code.md"],
+        "optional": {
+          "setup-add-ons": ["references/languages/ruby/frameworks/rails/setup.add-ons.md"]
+        }
+      }
     }
   ],
   "incompatibleStacks": [

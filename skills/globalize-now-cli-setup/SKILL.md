@@ -98,6 +98,7 @@ Scan for known i18n config files to auto-detect source and target languages. Use
 | **i18next** | `i18next` in `package.json` deps + config file (`i18n.ts`, `i18n.js`, `i18next.config.*`) | `lng` or `fallbackLng` → source language, `supportedLngs` → all languages |
 | **react-intl** | `react-intl` or `@formatjs/intl` in `package.json` deps | Check for `defaultLocale` in config; scan `lang/` or `translations/` directories |
 | **Locale directories** | Directories named `locales/`, `messages/`, `translations/`, `lang/` | Subdirectory names or JSON file names (e.g., `en.json`, `fr.json`) indicate available locales |
+| **Rails** | `config/locales/` directory exists with locale-named `.yml` files (e.g. `en.yml`, `pt-BR.yml`). Optionally, parse `config/application.rb` for `config.i18n.default_locale`. | `config.i18n.default_locale` (or `en` if absent) → source language; all other locale codes in `config/locales/*.yml` filenames → target languages. Locale codes may be hyphenated (`pt-BR`, `zh-TW`) — pass through verbatim. |
 | **Locale files** | `*.po`, `*.pot`, `*.xliff`, `*.json` files in locale-like paths | File/directory names map to locale codes |
 
 **Detection priority**: Config files (explicit locale lists) take precedence over directory/file scanning (inferred locales).
@@ -122,6 +123,7 @@ During detection, also determine the **locale file path pattern** — a path tem
 | **Paraglide** | Flat message catalog per locale. `messages/{locale}.po` for the PO format (the i18n-guide default — a `plugin.globalizeNow.po` key in `project.inlang/settings.json`, or `messages/*.po` files present); `messages/{locale}.json` for the ICU-JSON format (`plugin.inlang.icu-messageformat-1`, or `messages/*.json`) |
 | **i18next** | Read `backend.loadPath` from config. Replace `{{lng}}` → `{locale}`, `{{ns}}` → `{namespace}`. Example: `locales/{locale}/{namespace}.json` |
 | **react-intl** | No standard config key. Derive from directory scanning below. |
+| **Rails** | Pattern is always `config/locales/{locale}.yml`. Note in detection output that Rails projects may also have split files (e.g. `config/locales/devise.en.yml`) or subdirectories — the pattern targets the primary per-locale files. |
 | **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
 
 If no pattern can be determined locally, record as absent — Step 6 will attempt server-side detection.
