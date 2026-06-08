@@ -161,7 +161,14 @@ Expected: `FAIL`.
   - **Literal-key default** (with the English-edit-orphans-translations caveat) + symbolic-key + `defaultValue` opt-in.
   - **Interpolation = C-style specifiers** (`%@`, `%lld`, positional `%1$@`); Swift interpolation is converted on extraction.
   - **Plurals authored as catalog `variations.plural.<category>`** (CLDR) — **never ICU.** Show the verified JSON shape (a `%lld rooms` entry with `one`/`other` under `localizations.<src>.variations.plural`, from Task 8 / spec §"Key platform facts"). Note targets can carry **more** CLDR categories than the source (e.g. Russian `one/few/many/other` from English `one/other`).
-  - **Populate + verify the catalog:** a normal Xcode build with `SWIFT_EMIT_LOC_STRINGS = YES` populates it. The Xcode-absent / CLI path: `xcrun xcstringstool extract <sources> --modern-localizable-strings [--legacy-localizable-strings] | xcrun xcstringstool sync <catalog>` (lightweight parsing — no type checking, so the compiler build remains authoritative), then `xcrun xcstringstool print <catalog>` / JSON-parse to confirm validity and key coverage. Confirm exact flags with `xcrun xcstringstool extract --help` if the Xcode version differs (floor: Xcode 15; verified on 26.4.1).
+  - **Populate + verify the catalog:** a normal Xcode build with `SWIFT_EMIT_LOC_STRINGS = YES` populates it. The Xcode-absent / CLI path is **three steps, not a pipe** (verified on Xcode 26.4.1): `extract` writes `.stringsdata` files to an `--output-directory`, then `sync` merges them into the catalog, then `print` lists keys:
+    ```bash
+    DIR=$(mktemp -d)
+    xcrun xcstringstool extract <sources.swift> --SwiftUI --modern-localizable-strings [--legacy-localizable-strings] --output-directory "$DIR"
+    xcrun xcstringstool sync <catalog>.xcstrings --stringsdata "$DIR"/*.stringsdata
+    xcrun xcstringstool print <catalog>.xcstrings
+    ```
+    This is lightweight parsing (no type checking), so the compiler build remains authoritative. **Flag note:** `--modern-localizable-strings` covers `String(localized:)`/`AttributedString(localized:)`/`LocalizedStringResource` only; SwiftUI `Text("…")` literals need **`--SwiftUI`** (or `--SwiftUI-Text`; do not mix the two). Add `--legacy-localizable-strings` to also ingest `NSLocalizedString`. Confirm flags with `xcrun xcstringstool extract --help` if the Xcode version differs (floor: Xcode 15).
   - **Key-as-source norm:** when the key *is* the source string, there is no explicit source `value`; the entry carries no `extractionState`/`localizations`, just an optional `comment`.
   - **Do-not-touch:** `Text(verbatim:)`, non-UI strings/identifiers, `Package.swift`/`Info.plist` keys themselves (Info.plist *values* localize via `InfoPlist.xcstrings`, out of v1 default scope).
   - **Run steps** (exact `xcrun xcstringstool …` commands as above).
@@ -320,7 +327,7 @@ Expected: `react-scripts` count noted; **`language !== "ruby"` count = 2** (the 
 
   **(i) §2.0 install — no-op for Swift.** Extend the existing bundler no-op note: for `language === "swift"` both package lists are empty by design (native localization ships with the SDK), so §2.0 is a no-op for Swift too — not an error.
 
-  **(j) §2.2 + §3.5 verify — catalog-integrity check.** Apple has no `tsc`/`build`. Add a Swift arm that swaps in a catalog-integrity check: `xcrun xcstringstool extract <sources> --modern-localizable-strings [--legacy-localizable-strings]` over candidate sources → `xcrun xcstringstool sync <catalog>` → `xcrun xcstringstool print`/JSON-parse to confirm the catalog is valid and covers used keys. Map into the existing `verificationResult` shape: set JS-only `typecheck`/`build` to `null`; record the catalog-integrity pass/fail. **Graceful degradation:** if `xcrun xcstringstool` is absent (no Xcode), author + static-JSON-validate the catalog (parse it as JSON, check `sourceLanguage`/`strings`/`version`) and mark build-verify **deferred** (not failed). §3 convert: wrap subagents make strings localizable per `string-catalog.convert.md`; **no extract/compile codemod step** (build-time / `xcstringstool` populates).
+  **(j) §2.2 + §3.5 verify — catalog-integrity check.** Apple has no `tsc`/`build`. Add a Swift arm that swaps in a catalog-integrity check using the verified three-step CLI form (NOT a pipe): `xcrun xcstringstool extract <sources> --SwiftUI --modern-localizable-strings [--legacy-localizable-strings] --output-directory <dir>` → `xcrun xcstringstool sync <catalog> --stringsdata <dir>/*.stringsdata` → `xcrun xcstringstool print <catalog>`/JSON-parse to confirm the catalog is valid and covers used keys. Map into the existing `verificationResult` shape: set JS-only `typecheck`/`build` to `null`; record the catalog-integrity pass/fail. **Graceful degradation:** if `xcrun xcstringstool` is absent (no Xcode), author + static-JSON-validate the catalog (parse it as JSON, check `sourceLanguage`/`strings`/`version`) and mark build-verify **deferred** (not failed). §3 convert: wrap subagents make strings localizable per `string-catalog.convert.md`; **no extract/compile codemod step** (build-time / `xcstringstool` populates).
 
   **(k) §4.5 Phase-4 mapping (the fileFormat lives HERE).** In the Phase-4 prose around `SKILL.md:525` (the "the **file format** follows the catalog: … `po` for Lingui, `json-nested` for next-intl … `yaml-rails` for Rails" enumeration), add the **Swift arm**: `detection.language === "swift"` → **`fileFormat: "xcstrings"`** with a **single-file pattern and NO `{locale}` segment** — the source and output are the *same file*: `Localizable.xcstrings` (or `**/*.xcstrings` when multiple tables/dirs). Source locale = the catalog `sourceLanguage` / detected development region (`CFBundleDevelopmentRegion`). The importer reads/writes every locale inside the one file. Note this is the first format with no per-locale `{locale}` pattern.
 
@@ -450,7 +457,9 @@ Expected: `xcstringstool OK (Xcode 26.x)`. If absent, skip Arm A and record buil
 ```bash
 cd "$(mktemp -d)"
 # minimal source + empty catalog, then extract|sync, then print
-xcrun xcstringstool extract Sample.swift --modern-localizable-strings | xcrun xcstringstool sync Localizable.xcstrings
+DIR=$(mktemp -d)
+xcrun xcstringstool extract Sample.swift --SwiftUI --modern-localizable-strings --output-directory "$DIR"
+xcrun xcstringstool sync Localizable.xcstrings --stringsdata "$DIR"/*.stringsdata
 xcrun xcstringstool print Localizable.xcstrings
 python3 -m json.tool Localizable.xcstrings >/dev/null && echo "valid JSON"
 ```
