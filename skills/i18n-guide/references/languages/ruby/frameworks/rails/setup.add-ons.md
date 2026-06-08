@@ -49,7 +49,7 @@ Rails i18n linting covers two distinct surfaces: **ERB views** and **Ruby files*
 
 `erb_lint`'s `HardCodedString` cop is the established ERB hardcoded-string finder. It has the rule and i18n autocorrect — it is the functional tool for ERB i18n discovery and ongoing guard. Caveat: `erb_lint` is effectively archived (last release January 2025; Shopify and GitHub are migrating off it), but `HardCodedString` works and there is no replacement that offers the same i18n rule today.
 
-Add to the development group in `Gemfile` (if not already present from the convert phase):
+Add to the development group in `Gemfile` (if not already present — idempotent, safe if a later phase also adds it):
 
 ```ruby
 group :development do
@@ -68,7 +68,7 @@ linters:
     enabled: true
 ```
 
-`EnableDefaultLinters: false` keeps only `HardCodedString` active. If `.erb_lint.yml` already exists from the convert phase, check that `HardCodedString` is enabled — skip the file creation if so.
+`EnableDefaultLinters: false` keeps only `HardCodedString` active. If `.erb_lint.yml` already exists, check that `HardCodedString` is enabled — skip the file creation if so.
 
 **Ruby files — `rubocop-i18n`:**
 
@@ -123,7 +123,7 @@ bundle exec rubocop --only I18n app/controllers/ app/mailers/ app/helpers/ app/m
 
 Rails uses **`i18n-tasks`** for catalog hygiene — it audits existing `t()` call sites for missing keys, unused keys, and non-canonical YAML ordering. `i18n-tasks health` is the composite gate: it runs `missing` + `unused` together and exits non-zero if either fails. The CI integration runs this gate on every PR that touches locale files or application code (new `t()` calls with missing YAML keys are exactly what `health` catches in source paths).
 
-Add `i18n-tasks` to the development/test group in `Gemfile` (if not already present from the convert phase):
+Add `i18n-tasks` to the development/test group in `Gemfile` (if not already present — idempotent, safe if a later phase also adds it):
 
 ```ruby
 group :development, :test do
@@ -156,7 +156,7 @@ ignore_missing:
   - 'errors.messages.*'
 ```
 
-If `config/i18n-tasks.yml` already exists from the convert phase, skip file creation.
+If `config/i18n-tasks.yml` already exists, skip file creation.
 
 ### Run the audit locally
 
