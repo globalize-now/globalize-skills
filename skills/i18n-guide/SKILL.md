@@ -280,7 +280,7 @@ Show the user the list of supported variants from 1.3, with the recommendation m
 | `language === "swift"` | **Apple String Catalog (built-in)** | Apple ships a full localization stack (String Catalogs, `String(localized:)`/`Text` literals, `.stringsdict`/`variations` plurals via CLDR) built into the SDK — no third-party library or install needed. |
 | anything else (vite + react, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
 
-Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt. For `language === "swift"` exactly one iOS variant matches (see §1.3 hand-trace), so the choice is surfaced as a **confirmation** of the Apple String Catalog, not a multi-option prompt.
+Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt. For `language === "swift"` exactly one iOS variant matches (see §1.3 hand-trace), so the choice is surfaced as a **confirmation** of the Apple String Catalog, not a multi-option prompt. The iOS variants are `supportLevel: "experimental"` — when confirming, tell the user so: e.g. "Setting up the Apple String Catalog path (built into the SDK — no install). Heads up: iOS/`.xcstrings` support is **experimental** — the live Globalize.now round-trip for this format hasn't been verified end-to-end yet, so double-check the Phase-4 connection."
 
 ### 1.6 Journey scope
 
