@@ -80,11 +80,11 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 
 > You are inspecting a project to gather i18n setup context. Read-only — do not modify any files.
 >
-> First decide the project **language**: if a `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` is present, this is a **Ruby** project — read the Ruby signals below instead of the JS ones. Otherwise read the project's `package.json`, build config files (`vite.config.*`, `next.config.*`, `.babelrc`), and survey the source tree — this is a **js-ts** project. Output **only** a single JSON object matching this schema, written to `.globalize/detection.json`:
+> First decide the project **language**, in this order: if a `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` is present, this is a **Ruby** project — read the Ruby signals below instead of the JS ones. ELSE if a root `package.json` is present, this is a **js-ts** project — read the project's `package.json`, build config files (`vite.config.*`, `next.config.*`, `.babelrc`), and survey the source tree (note: a root `package.json` beats native-Apple signals, so React Native / Capacitor / Flutter projects route to **js-ts**, NOT native iOS). ELSE if any of `*.xcodeproj`/`*.xcworkspace`/`Package.swift`/`*.swift` is present, this is a **swift** project — read the Swift signals table below. Otherwise the language is **unknown**. Output **only** a single JSON object matching this schema, written to `.globalize/detection.json`:
 >
 > ```json
 > {
->   "language": "js-ts" | "ruby" | "unknown",
+>   "language": "js-ts" | "ruby" | "swift" | "unknown",
 >   "framework": "next" | "vite" | "tanstack-start" | "remix" | "react-router-framework" | "nuxt" | "quasar" | "sveltekit" | "cra" | "rails" | "unknown",
 >   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "vue-router" | "sveltekit" | "none",
 >   "compiler": "swc" | "babel",
@@ -93,12 +93,15 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >   "svelte": true | false,
 >   "typescript": true | false,
 >   "packageManager": "npm" | "yarn" | "pnpm" | "bun" | "bundler",
+>   "platform": "ios" | "macos" | null,
+>   "buildSystem": "xcode" | "spm" | null,
+>   "uiFramework": "swiftui" | "uikit" | null,
 >   "version": string | null,
 >   "sourceDir": "src" | "app" | string,
 >   "routeEntries": ["src/app/**/page.tsx", ...] | null,
 >   "git": { "isRepo": true | false, "branch": string | null, "remote": string | null },
 >   "existing": {
->     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "rails-i18n" | "none",
+>     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "rails-i18n" | "string-catalog" | "none",
 >     "configured": true | false,
 >     "providerWired": true | false,
 >     "catalogsScaffolded": true | false,
@@ -119,7 +122,7 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > | Field | How to detect |
 > |---|---|
-> | `language` | `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` present → `ruby`. Otherwise, a `package.json` present → `js-ts`. Neither → `unknown`. (All JS-path detection rules below apply only when `language === "js-ts"`; the Ruby signals table applies only when `language === "ruby"`.) |
+> | `language` | `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` present → `ruby`. Otherwise, a `package.json` present → `js-ts`. Otherwise, `*.xcodeproj`/`*.xcworkspace`/`Package.swift`/`*.swift` present → `swift` (read the Swift/Apple detection rules below, not these). Neither → `unknown`. (All JS-path detection rules below apply only when `language === "js-ts"`; the Ruby signals table applies only when `language === "ruby"`; the Swift/Apple table only when `language === "swift"`.) |
 > | `framework` | Evaluate in this order, first match wins: `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. Any `@remix-run/*` runtime package in deps → remix. `react-router` in deps AND `@react-router/dev` in devDeps AND a `react-router.config.{ts,js}` file at the repo root → react-router-framework. `@sveltejs/kit` in deps or devDeps → sveltekit. `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. (Order matters: Remix v2, React Router v7 framework mode, and SvelteKit all ship `vite` in devDeps, so they must be checked before the `vite` fallback. React Router v7 SPA mode — `react-router` without `@react-router/dev` — correctly falls through to `vite` with `router: "react-router"`.) |
 > | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps (also the value reported for `framework: "remix"` and `framework: "react-router-framework"`, since both use react-router internally; this is informational only, no matcher predicates on it for those frameworks). Vue Router: `vue-router` in deps (Vite SPA / Quasar). SvelteKit: `framework === "sveltekit"` — file-based routing under `src/routes/`. |
 > | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. Remix v2 and React Router v7 framework mode → swc if `@vitejs/plugin-react-swc` is in devDeps; babel otherwise (both default to Babel via `@vitejs/plugin-react`). SvelteKit uses neither — the Svelte compiler runs through Vite (esbuild), and none of the rules above match — so the field is a don't-care for SvelteKit; report whatever the heuristic yields (it will not match any rule) and treat the value as not meaningful: the SvelteKit manifest entry does not key on `compiler`. |
@@ -154,11 +157,31 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >
 > **Name-collision guardrail (Ruby):** the gems `globalize`, `mobility`, and `traco` translate **DB/model content** (per-row data like a product's `name`), NOT UI strings, and are entirely **unrelated to Globalize.now**. Do **not** treat `globalize` (the gem) as the Globalize.now platform. If any is present in `Gemfile`/`Gemfile.lock`, record it in `localeSignals.readmeHints` (or a free-form note) as a detect-and-warn signal — it must never trigger UI-string i18n logic and is surfaced to the user in 1.2 but is non-blocking.
 >
+> **Swift / Apple (iOS) detection rules** (apply only when `language === "swift"`; the JS and Ruby rules above do not apply):
+>
+> | Field | How to detect |
+> |---|---|
+> | `language` | `*.xcodeproj`/`*.xcworkspace`, `Package.swift`, or `*.swift` present → `swift`. (Only reached when there is no Gemfile-rails and no root `package.json` — a root `package.json` routes React Native / Capacitor / Flutter to `js-ts` first.) |
+> | `framework` / `router` / `compiler` / `react` / `vue` / `svelte` / `typescript` | Not meaningful for native Apple — set `framework: "unknown"`, `router: "none"`, and leave `compiler`/`react`/`vue`/`svelte` as `null`/`false`. No iOS manifest variant keys on any of them (iOS variants key on `language`/`buildSystem`/`platform`/`uiFramework`). |
+> | `buildSystem` | `Package.swift` present and NO `.xcodeproj`/`.xcworkspace` → `spm`. `.xcodeproj`/`.xcworkspace` present → `xcode`. |
+> | `uiFramework` | The `@main` entry point decides: a file with `import SwiftUI` + a `struct …: App` + `@main` → `swiftui` (even if it also uses a `UIApplicationDelegateAdaptor`). `@UIApplicationMain`/AppDelegate/SceneDelegate (a type conforming to `UIApplicationDelegate`/`UIResponder`) and/or `.storyboard`/`.xib` files with no SwiftUI `App` → `uikit`. Genuine ambiguity → default `swiftui`. An SPM library with no app entry point → `null`. NEVER emit `"mixed"` (it is unroutable). |
+> | `platform` | iOS deployment target / `IPHONEOS_DEPLOYMENT_TARGET` / iOS SDK → `ios` (the default for an app target). SPM library → `null`. |
+> | `packageManager` | `null` (Swift has no npm-style package manager; SPM is the build system and is recorded under `buildSystem`). |
+> | `existing.library` | A `.xcstrings` present anywhere → `string-catalog`; else `none`. |
+> | `existing.configured` | A `.xcstrings` present. |
+> | `existing.catalogsScaffolded` | A `.xcstrings` present (same signal). |
+> | `existing.stringsWrapped` | Sample `*.swift` files: > 80% of user-visible literals using `String(localized:` / `Text("…")` literals vs. bare user-visible `String` literals → "yes", > 20% → "partial", else → "no". |
+> | `candidateFiles` | Glob `**/*.swift` (exclude tests and `Package.swift`), grep each for user-visible string literals not already in `String(localized:` / `Text(` / `NSLocalizedString(`. Return files with ≥1 match, sorted by match count desc. |
+> | `localeSignals` | `.lproj` dirs; Info.plist `CFBundleLocalizations` / `CFBundleDevelopmentRegion`; existing `.strings`/`.stringsdict`/`.xcstrings` files; README language mentions. |
+>
+> For a `swift` detection, `platform`, `buildSystem`, and `uiFramework` MUST be populated (never left undefined) — the §1.3 matcher checks these structural keys by equality, and an undefined field never matches an iOS variant. For `js-ts` and `ruby` detections, all three are `null`.
+>
 > Write the JSON file and exit. Do not engage in conversation.
 
 > **User-facing message** (after the inspect subagent returns and `detection.json` is written):
-> For `language !== "ruby"` (JS/TS): "Scan done. Detected: **{framework}** + **{router}** ({compiler} compiler, {packageManager}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
+> For `language === "js-ts"` (JS/TS): "Scan done. Detected: **{framework}** + **{router}** ({compiler} compiler, {packageManager}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
 > For `language === "ruby"` (Rails — `router` is "none" and `compiler` is not meaningful, so omit them): "Scan done. Detected: **rails** (bundler). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
+> For `language === "swift"` (iOS — router/compiler are not meaningful, so omit them): "Scan done. Detected: **iOS** (**{uiFramework}**, **{buildSystem}**). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings. Next, a few questions to shape the setup plan."
 >
 > If `existing.library !== "none"`, also surface:
 > "Heads up — you already have `{existing.library}` in your dependencies. If it's compatible, we'll continue with it; if not, I'll flag it in the next step."
@@ -171,7 +194,7 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 
 | Condition | Stop message |
 |---|---|
-| `language !== "ruby"` AND `react === false` AND `vue === false` AND `svelte === false` | "i18n-guide currently supports React-based, Vue-based, and Svelte-based projects only. This project uses {framework}. No supported library available." |
+| `language === "js-ts"` AND `react === false` AND `vue === false` AND `svelte === false` | "i18n-guide currently supports React-based, Vue-based, and Svelte-based projects only. This project uses {framework}. No supported library available." |
 | `framework === "cra"` | "Create React App is no longer supported by this skill. Migrate to Vite or Next.js, then re-run." |
 | `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
 | `framework === "next"` AND `router === "pages"` AND user wants Lingui | (Surface only after library choice in 1.5) "Lingui setup does not currently cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router." |
@@ -179,9 +202,9 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 | `framework === "remix"` AND (`@remix-run/dev` major.minor `< 2.7` OR `vite` not in devDeps) | "This Remix v2 project uses the classic compiler (pre-Vite). Lingui requires the Vite-based build. Upgrade to `@remix-run/dev` ≥ 2.7 and follow Remix's classic-compiler → Vite migration, then re-run." |
 | `framework === "sveltekit"` AND `@sveltejs/kit` major.minor `< 2.3` | "Paraglide's URL-based locale routing relies on SvelteKit's `reroute` hook, added in `@sveltejs/kit` 2.3.0 — your project is on an older version. Upgrade to SvelteKit ≥ 2.3, then re-run. (If you must stay below 2.3, a different, deprecated routing approach is required that this skill does not cover.)" |
 | `svelte === true` AND `framework !== "sveltekit"` | "This skill currently supports Svelte only through SvelteKit (the Paraglide setup relies on SvelteKit's hooks and routing). A plain Vite + Svelte SPA is not yet supported. Adopt SvelteKit, or wait for SPA support, then re-run." |
-| `language !== "ruby"` AND custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar." |
+| `language === "js-ts"` AND custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar." |
 
-**Ruby / Rails compatibility rules** (apply only when `language === "ruby"`; the two guarded JS rows above — React/Vue/Svelte and custom-build-pipeline — are exempted for Ruby via their `language !== "ruby"` guard, so a Rails project does not falsely STOP there):
+**Ruby / Rails compatibility rules** (apply only when `language === "ruby"`; the two guarded JS rows above — React/Vue/Svelte and custom-build-pipeline — are exempted for non-JS languages (Ruby and Swift) via their `language === "js-ts"` guard, so neither a Rails nor a Swift/iOS project falsely STOPs there):
 
 | Condition | Action |
 |---|---|
@@ -197,6 +220,13 @@ These are not hard-stops, but note for the Paraglide path:
 - If `existing.library === "paraglide"` AND `existing.configured === true`, do **not** run a from-scratch setup — route Phase 2 to the collapse / already-configured case (see "Phase 2 collapse-case").
 - If `@inlang/paraglide-sveltekit` (the Paraglide 1.x SvelteKit adapter) is in deps, this is a **migration**, not a fresh setup: Paraglide 2.x replaced the dedicated adapter with the framework-agnostic `reroute` + `handle` model. Flag it to the user before proceeding; the setup reference covers the migration steps.
 
+**Swift / Apple (iOS) compatibility rules** (apply only when `language === "swift"`; the two flipped JS rows above are exempted for Swift via their `language === "js-ts"` guard):
+
+| Condition | Action |
+|---|---|
+| `language === "swift"` AND a `.xcstrings` cannot be created and none exists (legacy `.strings`-only on a pre-Xcode-15 toolchain with no migration path) | **Note (non-blocking where possible).** Offer the **Edit ▸ Convert to String Catalog** migration; only STOP if there is genuinely no path to a catalog. |
+| `language === "swift"` AND a non-iOS Apple target out of v1 scope (macOS/watchOS/tvOS) with no iOS app and no Swift package | **STOP (scope).** "v1 of the iOS String Catalog path targets iOS apps and Swift packages. {platform} is out of scope — the shared catalog mechanics may still apply manually." |
+
 ### 1.3 Resolve supported stacks from manifest
 
 Read `manifest.json`. Filter `stacks[]` entries whose `match` predicate is satisfied by `detection`. The result is the set of `(library, variant)` options the user can choose from in 1.5.
@@ -208,10 +238,13 @@ Read `manifest.json`. Filter `stacks[]` entries whose `match` predicate is satis
   - If `match.language` is **present**, it must equal `detection.language` (so `rails-yaml`, which declares `match.language: "ruby"`, matches **only** when `detection.language === "ruby"`).
   - If `match.language` is **absent**, treat it as `"js-ts"` — i.e. the entry matches only when `detection.language === "js-ts"`. All existing JS entries omit `language`, so they keep matching exactly as before and are inert for Ruby projects.
 - **`library`** is **not** a structural predicate. It is the **identifier of the variant/option** the entry offers — surfaced as a choice in §1.5. It is **never** matched against `detection.existing.library` (there is no top-level `detection.library`). `detection.existing.library` describes prior setup state and is used only by the §1.2 stops and the §1.6 / Phase 2 already-configured handling — it never filters the candidate set. This is why two entries can share identical structural keys and differ only in `library` (e.g. `nextjs-app-router-lingui` and `nextjs-app-router-next-intl`, both `framework: "next", router: "app"`): a fresh Next app-router project (`existing.library: "none"`) matches **both**, and the {lingui, next-intl} pair is surfaced as the §1.5 choice.
+- **`platform`, `buildSystem`, `uiFramework`** are ordinary **structural keys** (each must equal the same-named `detection` field) that discriminate *among* the iOS variants — NOT a new special-cased matcher axis (only `language`'s absent⇒`js-ts` default is special). A `match.language: "swift"` matches only `detection.language === "swift"`, keeping the Swift, JS, and Ruby entry sets disjoint. No matcher-logic change beyond treating these three as plain structural keys.
 
-This keeps the Ruby and JS entry sets disjoint by `language`: a Ruby detection can match only `rails-yaml`; a `js-ts` detection can match only the JS entries (never `rails-yaml`).
+This keeps the Ruby and JS entry sets disjoint by `language`: a Ruby detection can match only `rails-yaml`; a `js-ts` detection can match only the JS entries (never `rails-yaml`); a `swift` detection can match only the iOS variants.
 
-**Net effect.** A fresh Next app-router project yields **{lingui, next-intl}** candidates → §1.5 offers the choice. A fresh Rails project (`existing.library: "none"`) yields exactly **{rails-yaml}** → §1.5 confirms "Rails built-in I18n (YAML)". A fresh `js-ts` detection never yields `rails-yaml` (its `match.language: "ruby"` fails).
+**Hand-trace (iOS).** A `{swift, xcode, ios, swiftui}` detection selects **only** `ios-swiftui-string-catalog`: `ios-uikit-string-catalog` fails on `uiFramework` (uikit≠swiftui), `ios-spm-string-catalog` fails on `buildSystem` (spm≠xcode), every JS entry fails on absent⇒`js-ts` (≠swift), and `rails-yaml` fails on `language` (ruby≠swift). A `{swift, spm}` detection (buildSystem `spm`, no app entry point) selects **only** `ios-spm-string-catalog`: the two app variants fail on `buildSystem` (xcode≠spm).
+
+**Net effect.** A fresh Next app-router project yields **{lingui, next-intl}** candidates → §1.5 offers the choice. A fresh Rails project (`existing.library: "none"`) yields exactly **{rails-yaml}** → §1.5 confirms "Rails built-in I18n (YAML)". A fresh iOS project yields exactly **one** iOS variant → §1.5 confirms it (no multi-option prompt). A fresh `js-ts` detection never yields `rails-yaml` or an iOS variant (their `match.language` fails).
 
 If the filtered list is empty, surface a STOP with: "Your stack is supported in principle but no manifest entry currently matches. Detected: {summary}. File an issue or pick a different setup."
 
@@ -244,9 +277,10 @@ Show the user the list of supported variants from 1.3, with the recommendation m
 | `framework === "react-router-framework"` | **Lingui** | React Router v7 framework mode is the same shape: Vite + `loader` + root `<html>` rendering. Lingui's per-route catalogs map cleanly onto the routes config. |
 | `framework === "sveltekit"` | **Paraglide JS** | First-party Svelte CLI add-on (`sv add paraglide`); compiler-based with tree-shaken messages; SSR-correct via AsyncLocalStorage; integrates through `reroute` + `handle` hooks. |
 | `framework === "rails"` | **Rails built-in I18n (YAML)** | Rails ships a full `I18n` stack (`t`/`l` helpers, locale-rooted YAML at `config/locales/`, `%{name}` interpolation, CLDR plurals via `rails-i18n`); no third-party UI-string library needed. |
+| `language === "swift"` | **Apple String Catalog (built-in)** | Apple ships a full localization stack (String Catalogs, `String(localized:)`/`Text` literals, `.stringsdict`/`variations` plurals via CLDR) built into the SDK — no third-party library or install needed. |
 | anything else (vite + react, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
 
-Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt.
+Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt. For `language === "swift"` exactly one iOS variant matches (see §1.3 hand-trace), so the choice is surfaced as a **confirmation** of the Apple String Catalog, not a multi-option prompt.
 
 ### 1.6 Journey scope
 
@@ -327,7 +361,7 @@ Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceed
 Single setup subagent. Orchestrator installs packages on the main thread first, then pre-creates the progress file and dispatches the subagent in the background.
 
 > **User-facing message** (at Phase 2 start):
-> "Starting Phase 2 — setup. {for JS/TS: `First I'll install the i18n packages on my main thread so your lockfile stays in sync, then I'll dispatch one background worker that wires your build config, sets up the provider, scaffolds catalog folders for your locales, and verifies with a typecheck and build.`; for Rails: `I'll dispatch one background worker that installs the i18n gems with Bundler, wires `config/application.rb`, scaffolds `config/locales/` for your locales, sets up the locale switcher in `ApplicationController`, and verifies by booting the app and parsing the source catalog.`} I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
+> "Starting Phase 2 — setup. {for JS/TS: `First I'll install the i18n packages on my main thread so your lockfile stays in sync, then I'll dispatch one background worker that wires your build config, sets up the provider, scaffolds catalog folders for your locales, and verifies with a typecheck and build.`; for Rails: `I'll dispatch one background worker that installs the i18n gems with Bundler, wires `config/application.rb`, scaffolds `config/locales/` for your locales, sets up the locale switcher in `ApplicationController`, and verifies by booting the app and parsing the source catalog.`; for Swift: `No packages to install — Apple's localization stack ships with the SDK. I'll dispatch one background worker that creates the String Catalog (`Localizable.xcstrings`), enables build-time string extraction (`SWIFT_EMIT_LOC_STRINGS`), registers your locales, and verifies the catalog is valid.`} I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
 
 ### 2.0 Install packages (main thread)
 
@@ -344,7 +378,7 @@ Read `manifest-snapshot.json`'s `packages.runtime` and `packages.dev`. Run the i
 
 **Wrap each `<pkgs>` entry in single quotes** when constructing the shell command — the manifest pins use `^` (e.g. `next-intl@^4`), and zsh interprets unquoted `^` as a glob negation operator under `EXTENDED_GLOB` (common on macOS via oh-my-zsh). Emit `npm install 'next-intl@^4'` rather than `npm install next-intl@^4`. The single quotes are inert under bash/dash and prevent zsh expansion.
 
-Skip the runtime or dev command if its package list is empty. For `packageManager === "bundler"` (Rails), both package lists are empty by design — gem installation is delegated to the setup subagent via `rails.setup.md` Step 2 (`bundle install`); the §2.0 install step is intentionally a no-op for Rails, not an error. If the install command fails (network error, registry rejection, lockfile conflict), stop the run with the error — do not advance to 2.1.
+Skip the runtime or dev command if its package list is empty. For `packageManager === "bundler"` (Rails), both package lists are empty by design — gem installation is delegated to the setup subagent via `rails.setup.md` Step 2 (`bundle install`); the §2.0 install step is intentionally a no-op for Rails, not an error. For `language === "swift"` both package lists are also empty by design (native localization ships with the SDK — there is no third-party package to install), so §2.0 is a no-op for Swift too, not an error. If the install command fails (network error, registry rejection, lockfile conflict), stop the run with the error — do not advance to 2.1.
 
 Running on the main thread keeps the install outside the subagent sandbox, so the user's lockfile stays in sync. The setup subagent in 2.2 will not re-install these packages.
 
@@ -383,6 +417,15 @@ Subagent prompt skeleton:
 > **Verification:** After all steps, run the project's typecheck (`tsc --noEmit` if TypeScript) and build command. Capture pass/fail in `result.verificationResult`. Set `status: "succeeded"` or `"failed"` accordingly.
 >
 > **Rails (`language === "ruby"` / `framework === "rails"`):** Rails has no typecheck and no build step, so instead run a **boot/smoke** check that proves the app boots and the i18n stack loads. Run `bin/rails runner 'I18n.t("site.title", default: "ok"); puts "i18n ok"'` (or `bin/rails about` as a lighter boot probe) and confirm it exits 0 and prints `i18n ok`. Then confirm the source-locale catalog parses: load `config/locales/{default_locale}.yml` and verify it is valid YAML (a malformed catalog is a setup failure). Map the result into the existing `verificationResult` shape: set the JS-only `typecheck` and `build` fields to `null` (not applicable to Rails), and record the boot/smoke pass/fail and YAML-parse pass/fail. Set `status: "succeeded"` only if both the boot/smoke and the catalog parse pass; otherwise `"failed"`.
+>
+> **Swift / Apple (`language === "swift"`):** Swift/Apple has no `tsc` and no JS build step, so instead run a **catalog-integrity check** using the headless `xcstringstool` three-step form (NOT a pipe):
+> ```
+> DIR=$(mktemp -d)
+> xcrun xcstringstool extract <sources> --SwiftUI --modern-localizable-strings [--legacy-localizable-strings] --output-directory "$DIR"
+> xcrun xcstringstool sync <catalog> --stringsdata "$DIR"/*.stringsdata
+> xcrun xcstringstool print <catalog>
+> ```
+> This confirms the catalog is valid JSON and covers the used keys. Map into the existing `verificationResult` shape: set the JS-only `typecheck` and `build` fields to `null` (not applicable to Swift), and record the catalog-integrity pass/fail. **Graceful degradation:** if `xcrun xcstringstool` is absent (no Xcode toolchain — e.g. a non-Apple CI machine), author + static-JSON-validate the catalog instead (parse the `.xcstrings` as JSON; check it has `sourceLanguage`, `strings`, and `version`) and mark build-verify **deferred** (NOT failed) — the build-time `SWIFT_EMIT_LOC_STRINGS = YES` extraction (or a later `xcstringstool` run on macOS) will populate it. Set `status: "succeeded"` if the catalog-integrity check passes (or static-JSON-validate passes with build-verify deferred); `"failed"` only on a genuine integrity failure.
 
 ### 2.3 Poll progress
 
@@ -391,7 +434,7 @@ While `progress/setup.json` is in `running` state, wake every 30–60 seconds, r
 ### 2.4 On completion
 
 - `succeeded` → archive `progress/setup.json` to `progress/archive/<timestamp>/setup.json`, render summary (files created, files modified, verification result), advance to Phase 3. User-facing wrap-up:
-  > "Setup verified — {for JS/TS: `typecheck and build are clean`; for Rails: `the app boots and the i18n config loads`}. Files created: {N}, files modified: {M}. Moving on to Phase 3 — wrapping your hardcoded strings."
+  > "Setup verified — {for JS/TS: `typecheck and build are clean`; for Rails: `the app boots and the i18n config loads`; for Swift: `the String Catalog is valid and registered`}. Files created: {N}, files modified: {M}. Moving on to Phase 3 — wrapping your hardcoded strings."
 - `failed` → archive, render error, ask user how to proceed (retry, edit plan, abort). User-facing wrap-up:
   > "Setup hit an error during `{step}`: {one-line error summary}. Want me to retry, edit the plan, or stop here?"
 - `needs_decision` → surface the question to the user, capture answer, append to `decisions.md`, re-dispatch the same subagent (it reads existing `progress/setup.json` and resumes from `completed`). User-facing framing:
@@ -410,7 +453,7 @@ If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-com
 Multiple wrap subagents in parallel, then one verify subagent.
 
 > **User-facing message** (at Phase 3 start):
-> "Starting Phase 3 — converting hardcoded strings. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, and adds short translator comments where context isn't obvious. After they all finish, a final verify worker {for JS/TS: `runs extract + compile + build to make sure everything still type-checks and the catalog is clean`; for Rails: `checks that every wrapped key has a matching source-locale entry, tidies any leftover scaffold keys, and runs your test suite if you have one`}."
+> "Starting Phase 3 — converting hardcoded strings. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, and adds short translator comments where context isn't obvious. After they all finish, a final verify worker {for JS/TS: `runs extract + compile + build to make sure everything still type-checks and the catalog is clean`; for Rails: `checks that every wrapped key has a matching source-locale entry, tidies any leftover scaffold keys, and runs your test suite if you have one`; for Swift: `runs a catalog-integrity check — confirming the String Catalog is valid JSON and covers the keys your code uses (no extract/compile step; the build populates the catalog)`}."
 
 ### 3.1 Pre-create progress files
 
@@ -449,6 +492,7 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 > - **Compile-time extraction (Lingui)** and **runtime-catalog (next-intl/vue-i18n)**: extract_clean, compile, build_check, comment_review_pass.
 > - **Compile-from-catalog (Paraglide)**: paraglide_compile, build_check. There is **no extract step** (keys are authored by hand, not extracted). On the **default PO** format `.po` carries `#.` comments, so a comment_review_pass over the base `.po` **does** apply, plus an ICU plural-render sanity check (see below). On the **ICU-JSON** format (`catalogFormat === "json"`) there is **no comment_review_pass** (the inlang/ICU JSON model has no translator-comment field).
 > - **Runtime-catalog, no compile (Rails)**: ensure_i18n_tasks, source_completeness_check, unused_cleanup, optional test_suite. There is **no extract step** and **no compile step** (Rails loads `config/locales/*.yml` directly at runtime). The verify gate is **base-locale completeness**: confirm the source-locale YAML parses and that every key used in code has a base-locale entry (`i18n-tasks missing -t used` is empty). Target-locale gaps are expected (stubs deferred to the connect phase) and never fail the gate; orphaned keys are cleaned, not gated. There is **no normalize-drift gate** — the catalog is left in its authored reading order (canonical ordering is a CI / connect-time concern, see `setup.add-ons.md` Add-on 3).
+> - **Single multi-locale catalog, build-time populated (Swift / Apple)**: catalog_integrity_check (no extract/compile codemod step). The wrap subagents make strings localizable per `string-catalog.convert.md`; there is **no extract or compile codemod** — a normal Xcode build with `SWIFT_EMIT_LOC_STRINGS = YES` emits `.stringsdata` that populates `Localizable.xcstrings` (or, headless, `xcrun xcstringstool extract → sync` does the same). The verify gate is **catalog integrity**: the `.xcstrings` is valid JSON and covers the used keys (see the Swift arm below).
 >
 > For Lingui / next-intl / vue-i18n:
 > 1. Run `npx lingui extract --clean` (Lingui) or `npx next-intl extract` if applicable. Capture errors. Atomically update `progress/verify.json` after this step.
@@ -466,9 +510,19 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 > 2. **Unused cleanup (not a gate):** run `bundle exec i18n-tasks unused` and delete genuinely-orphaned scaffold seed keys (e.g. the `site.title` seed the setup phase added that the app never references) from the source catalog, so the shipped catalog — and the later CI `i18n-tasks health` gate — stays clean. This is a cleanup action, not a pass/fail gate. Do **not** run `i18n-tasks normalize` here: leave the catalog in its authored reading order (canonical ordering is handled by CI Add-on 3). Confirm the catalogs parse and cover every configured locale.
 > 3. **If a test suite is present** (`spec/` with RSpec, or `test/` for Minitest): run it. With `config.i18n.raise_on_missing_translations = true` set in `config/environments/test.rb` (configured by the setup phase), any missing key raises immediately, so a green suite confirms catalog coverage. Capture pass/fail. If no suite is present, skip this step.
 >
+> For Swift / Apple:
+> 1. **Catalog-integrity gate (no extract/compile codemod step).** The wrap subagents already made strings localizable per `string-catalog.convert.md`; there is no separate extract or compile codemod (build-time `SWIFT_EMIT_LOC_STRINGS = YES` / `xcstringstool` populates the catalog). Run the headless three-step form (NOT a pipe) to confirm the catalog is valid and covers the used keys:
+>    ```
+>    DIR=$(mktemp -d)
+>    xcrun xcstringstool extract <sources> --SwiftUI --modern-localizable-strings [--legacy-localizable-strings] --output-directory "$DIR"
+>    xcrun xcstringstool sync <catalog> --stringsdata "$DIR"/*.stringsdata
+>    xcrun xcstringstool print <catalog>
+>    ```
+>    Capture pass/fail. Atomically update `progress/verify.json` after this step. **Graceful degradation:** if `xcrun xcstringstool` is absent (no Xcode toolchain), author + static-JSON-validate the catalog instead (parse the `.xcstrings` as JSON; check `sourceLanguage`, `strings`, `version`) and mark build-verify **deferred** (NOT failed) — a later macOS build / `xcstringstool` run populates it. Authoritative commands: `references/languages/ios/native/string-catalog.convert.md`.
+>
 > Authoritative commands: `references/languages/ruby/frameworks/rails/rails.convert.md` Steps 4-5 and `references/languages/ruby/frameworks/rails/setup.add-ons.md` Add-on 3.
 >
-> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`. For Paraglide, set `extractOk` to `null`; set `commentsAdded` to the count added on the default PO format and to `null` on ICU-JSON; report compile success under `compileOk`. For Rails, set `extractOk` to `null` (no extraction — keys are hand-authored in YAML); report the base-locale completeness result (`i18n-tasks missing -t used` empty) under `compileOk` (Rails' catalog-integrity gate stands in for compile; a gate skipped because `bundle install` failed reports as `null` with the error noted in `errors`); set `buildOk` to the test-suite result when a suite ran, else `null` (Rails has no build step); set `commentsAdded` to `null`. For Rails, `catalogPath` is `config/locales/{default_locale}.yml` and `totalMessages` is the key count in that file (Rails has no extraction step to count from).
+> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`. For Paraglide, set `extractOk` to `null`; set `commentsAdded` to the count added on the default PO format and to `null` on ICU-JSON; report compile success under `compileOk`. For Rails, set `extractOk` to `null` (no extraction — keys are hand-authored in YAML); report the base-locale completeness result (`i18n-tasks missing -t used` empty) under `compileOk` (Rails' catalog-integrity gate stands in for compile; a gate skipped because `bundle install` failed reports as `null` with the error noted in `errors`); set `buildOk` to the test-suite result when a suite ran, else `null` (Rails has no build step); set `commentsAdded` to `null`. For Rails, `catalogPath` is `config/locales/{default_locale}.yml` and `totalMessages` is the key count in that file (Rails has no extraction step to count from). For Swift, set `extractOk` to `null` (no extraction codemod — keys land via build-time `SWIFT_EMIT_LOC_STRINGS`/`xcstringstool`); report the catalog-integrity result under `compileOk` (and `null` with build-verify-deferred noted in `errors` when `xcstringstool` is absent and only static-JSON-validate ran); set `buildOk` to `null` (no JS build step); set `commentsAdded` to `null`. For Swift, `catalogPath` is the `.xcstrings` (e.g. `Localizable.xcstrings`) and `totalMessages` is the key count in `strings`.
 
 ### 3.6 Cost estimate (Phase 3 → 4 bridge)
 
@@ -522,7 +576,7 @@ Plan: `create_project`, `configure_languages`, `connect_repo`, `configure_patter
 > 1. `globalize project create --name "{name}" --source {sourceLocale} --targets {targetLocales}` — capture project ID and URL.
 > 2. `globalize project languages list` — verify all targets accepted.
 > 3. `globalize repo connect --provider {gh|gl} --repo {owner/repo}` — wire repo.
-> 4. `globalize repo patterns set --source {catalogPath} --output {targetCatalogPattern}` — configure paths from Phase 3 verify result. The **file format** follows the catalog: for Paraglide it is `po` with catalog path `messages/{locale}.po` by default; if `decisions.setup.catalogFormat === "json"` it is `json-flat` at `messages/{locale}.json`. (Other libraries: `po` for Lingui, `json-nested` for next-intl, etc.) For **Rails** (`detection.language === "ruby"`, `framework === "rails"`) the format is **`yaml-rails`** with catalog path `config/locales/{locale}.yml`, source locale `en` or the detected `default_locale` (`config.i18n.default_locale`). Rails locale codes are already hyphenated (`pt-BR.yml`, `zh-TW.yml`) — pass them through verbatim with **no** underscore normalization. Pass the format with the pattern if the CLI form in use takes an explicit `fileFormat` (see `globalize-now-cli-use`).
+> 4. `globalize repo patterns set --source {catalogPath} --output {targetCatalogPattern}` — configure paths from Phase 3 verify result. The **file format** follows the catalog: for Paraglide it is `po` with catalog path `messages/{locale}.po` by default; if `decisions.setup.catalogFormat === "json"` it is `json-flat` at `messages/{locale}.json`. (Other libraries: `po` for Lingui, `json-nested` for next-intl, etc.) For **Rails** (`detection.language === "ruby"`, `framework === "rails"`) the format is **`yaml-rails`** with catalog path `config/locales/{locale}.yml`, source locale `en` or the detected `default_locale` (`config.i18n.default_locale`). Rails locale codes are already hyphenated (`pt-BR.yml`, `zh-TW.yml`) — pass them through verbatim with **no** underscore normalization. For **Swift / Apple** (`detection.language === "swift"`) the format is **`xcstrings`** with a **single-file pattern and NO `{locale}` segment** — source and output are the **same file**: `Localizable.xcstrings` (or `**/*.xcstrings` when there are multiple catalog tables/dirs). The source locale is the catalog's `sourceLanguage` / the detected development region (`CFBundleDevelopmentRegion`). The importer reads and writes every locale **inside the one file** — this is the **first format with no per-locale `{locale}` pattern** (every other format keys output paths on `{locale}`). Pass the format with the pattern if the CLI form in use takes an explicit `fileFormat` (see `globalize-now-cli-use`).
 >
 > Update `progress/globalize.json` after each step. Final `result` includes `{ projectId, projectUrl, repoConnected, patternsConfigured }`.
 
