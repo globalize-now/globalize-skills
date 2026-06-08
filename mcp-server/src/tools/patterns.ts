@@ -7,6 +7,7 @@ import {
   updatePattern,
   deletePattern,
   reorderPattern,
+  FILE_FORMATS,
 } from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
 
@@ -36,7 +37,7 @@ export function registerPatternTools(server: McpServer, client: ApiClient) {
         repositoryId: z.string().uuid().describe("Repository UUID"),
         pattern: z.string().describe("Locale path pattern (e.g. locales/{locale}/*.json)"),
         fileFormat: z
-          .enum(["json-flat", "json-nested", "xliff", "xliff-2", "xliff-1.2", "yaml", "po"])
+          .enum(FILE_FORMATS)
           .describe("File format"),
         position: z.number().int().min(0).optional().describe("Position in the pattern list"),
       },
@@ -59,7 +60,7 @@ export function registerPatternTools(server: McpServer, client: ApiClient) {
         patternId: z.string().uuid().describe("Pattern UUID"),
         pattern: z.string().optional().describe("Locale path pattern"),
         fileFormat: z
-          .enum(["json-flat", "json-nested", "xliff", "xliff-2", "xliff-1.2", "yaml", "po"])
+          .enum(FILE_FORMATS)
           .optional()
           .describe("File format"),
       },
