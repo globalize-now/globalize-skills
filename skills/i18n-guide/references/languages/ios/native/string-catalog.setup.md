@@ -101,7 +101,7 @@ Read the project structure to determine the shape. There is no `package.json`/lo
 |--------|--------------|
 | **Apple project present** | `*.xcodeproj` / `*.xcworkspace` at or near root, or a `Package.swift` |
 | **Build system** | `*.xcodeproj`/`*.xcworkspace` → Xcode; `Package.swift` (no `.xcodeproj`) → SPM |
-| **UI framework** | SwiftUI = `import SwiftUI` + a `struct …: App` with `@main`; UIKit = `import UIKit` + `…: UIResponder, UIApplicationDelegate` and/or `.storyboard`/`.xib` files; mixed via `UIApplicationDelegateAdaptor` |
+| **UI framework** | The `@main` entry point decides: SwiftUI = `import SwiftUI` + a `struct …: App` with `@main` (this stays SwiftUI even when a `UIApplicationDelegateAdaptor` is also present); UIKit = `@UIApplicationMain`/AppDelegate/SceneDelegate (`import UIKit` + `…: UIResponder, UIApplicationDelegate`) and/or `.storyboard`/`.xib` files with no SwiftUI `App`. This affects only which idioms the convert guidance leads with — catalog mechanics are identical — so genuine ambiguity defaults to SwiftUI rather than a "mixed" classification |
 | **Language** | `*.swift` (Swift) vs `*.m`/`*.h` (Objective-C); note Objective-C-first stacks (Out of Scope) |
 | **Source language / dev region** | Info.plist `CFBundleDevelopmentRegion`; or the project's development region; fall back to `en` |
 | **Available locales** | Info.plist `CFBundleLocalizations`; the Xcode project's known regions / project localizations; and `*.lproj` directory basenames |
