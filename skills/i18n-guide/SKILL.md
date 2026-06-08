@@ -327,7 +327,7 @@ Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceed
 Single setup subagent. Orchestrator installs packages on the main thread first, then pre-creates the progress file and dispatches the subagent in the background.
 
 > **User-facing message** (at Phase 2 start):
-> "Starting Phase 2 — setup. First I'll install the i18n packages on my main thread so your lockfile stays in sync, then I'll dispatch one background worker that wires your build config, sets up the provider, scaffolds catalog folders for your locales, and verifies with a typecheck and build. I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
+> "Starting Phase 2 — setup. {for JS/TS: `First I'll install the i18n packages on my main thread so your lockfile stays in sync, then I'll dispatch one background worker that wires your build config, sets up the provider, scaffolds catalog folders for your locales, and verifies with a typecheck and build.`; for Rails: `I'll dispatch one background worker that installs the i18n gems with Bundler, wires `config/application.rb`, scaffolds `config/locales/` for your locales, sets up the locale switcher in `ApplicationController`, and verifies by booting the app and parsing the source catalog.`} I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
 
 ### 2.0 Install packages (main thread)
 
@@ -410,7 +410,7 @@ If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-com
 Multiple wrap subagents in parallel, then one verify subagent.
 
 > **User-facing message** (at Phase 3 start):
-> "Starting Phase 3 — converting hardcoded strings. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, and adds short translator comments where context isn't obvious. After they all finish, a final verify worker runs extract + compile + build to make sure everything still type-checks and the catalog is clean."
+> "Starting Phase 3 — converting hardcoded strings. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, and adds short translator comments where context isn't obvious. After they all finish, a final verify worker {for JS/TS: `runs extract + compile + build to make sure everything still type-checks and the catalog is clean`; for Rails: `runs `i18n-tasks health` plus a normalize-drift check (and your test suite if you have one) to make sure the catalog is clean`}."
 
 ### 3.1 Pre-create progress files
 
@@ -467,11 +467,11 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 >
 > Authoritative commands: `references/languages/ruby/frameworks/rails/rails.convert.md` Steps 4-5 and `references/languages/ruby/frameworks/rails/setup.add-ons.md` Add-on 3.
 >
-> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`. For Paraglide, set `extractOk` to `null`; set `commentsAdded` to the count added on the default PO format and to `null` on ICU-JSON; report compile success under `compileOk`. For Rails, set `extractOk` to `null` (no extraction — keys are hand-authored in YAML); report the combined `i18n-tasks health` + normalize-drift result under `compileOk` (Rails' catalog-integrity gate stands in for compile); set `buildOk` to the test-suite result when a suite ran, else `null` (Rails has no build step); set `commentsAdded` to `null`.
+> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded }`. For Paraglide, set `extractOk` to `null`; set `commentsAdded` to the count added on the default PO format and to `null` on ICU-JSON; report compile success under `compileOk`. For Rails, set `extractOk` to `null` (no extraction — keys are hand-authored in YAML); report the combined `i18n-tasks health` + normalize-drift result under `compileOk` (Rails' catalog-integrity gate stands in for compile); set `buildOk` to the test-suite result when a suite ran, else `null` (Rails has no build step); set `commentsAdded` to `null`. For Rails, `catalogPath` is `config/locales/{default_locale}.yml` and `totalMessages` is the key count in that file (Rails has no extraction step to count from).
 
 ### 3.6 Cost estimate (Phase 3 → 4 bridge)
 
-After verify succeeds, parse the extracted catalog to compute word count. Show the user:
+After verify succeeds, parse the extracted catalog (JS) / the source-locale YAML (Rails) to compute word count. Show the user:
 
 > "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now."
 
@@ -594,6 +594,11 @@ Partitions: {N} wrap subagents covering {file count} files
 <!-- compile-from-catalog (Paraglide) instead: no extract step, no comment_review_pass (inlang/ICU has no comment field):
 - [ ] paraglide_compile
 - [ ] build_check
+-->
+<!-- runtime-catalog, no compile (Rails) instead: no extract step, no compile step, no build step (Rails loads config/locales/*.yml directly at runtime). test_suite is optional — include only if a spec/ or test/ dir exists (run with raise_on_missing_translations):
+- [ ] health_check
+- [ ] normalize_drift_check
+- [ ] test_suite
 -->
 
 ## Phase 4 — Globalize-now
