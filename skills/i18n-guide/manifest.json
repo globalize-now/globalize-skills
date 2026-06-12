@@ -302,6 +302,48 @@
           "setup-add-ons": ["references/languages/android/native/setup.add-ons.md"]
         }
       }
+    },
+    {
+      "variant": "ios-swiftui-string-catalog",
+      "match": { "language": "swift", "buildSystem": "xcode", "platform": "ios", "uiFramework": "swiftui", "library": "string-catalog" },
+      "supportLevel": "experimental",
+      "packages": {
+        "runtime": [],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/ios/native/string-catalog.setup.md"],
+        "convert": ["references/languages/ios/native/string-catalog.convert.md"],
+        "code": ["references/languages/ios/native/string-catalog.code.md"]
+      }
+    },
+    {
+      "variant": "ios-uikit-string-catalog",
+      "match": { "language": "swift", "buildSystem": "xcode", "platform": "ios", "uiFramework": "uikit", "library": "string-catalog" },
+      "supportLevel": "experimental",
+      "packages": {
+        "runtime": [],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/ios/native/string-catalog.setup.md"],
+        "convert": ["references/languages/ios/native/string-catalog.convert.md"],
+        "code": ["references/languages/ios/native/string-catalog.code.md"]
+      }
+    },
+    {
+      "variant": "ios-spm-string-catalog",
+      "match": { "language": "swift", "buildSystem": "spm", "library": "string-catalog" },
+      "supportLevel": "experimental",
+      "packages": {
+        "runtime": [],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/ios/native/string-catalog.setup.md"],
+        "convert": ["references/languages/ios/native/string-catalog.convert.md"],
+        "code": ["references/languages/ios/native/string-catalog.code.md"]
+      }
     }
   ],
   "incompatibleStacks": [
