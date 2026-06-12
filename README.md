@@ -40,7 +40,7 @@ The skill will be available next time you start a Claude Code conversation.
 | `globalize-now-cli-setup` | Install the Globalize CLI, authenticate, create a translation project, connect a GitHub or GitLab repository. |
 | `globalize-now-cli-use` | Manage existing Globalize translation resources (languages, glossaries, style guides, repositories, team members, API keys). |
 | `css-i18n` | Audit and convert CSS to logical properties for RTL/bidirectional layout support. Library-agnostic — works with Tailwind, CSS Modules, vanilla CSS, CSS-in-JS. |
-| `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental — see install note below. |
+| `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental — see the Lovable install note in the Installation section above. |
 
 ## Repository conventions
 

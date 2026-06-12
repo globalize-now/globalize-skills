@@ -113,7 +113,7 @@ After the user answers, execute the whole plan without further pauses. Only stop
 
 Record the answers — `SOURCE_LOCALE`, the locale list, routing choice, opt-ins — you will substitute them into every snippet below. The snippets use `en` as source and `['en', 'es', 'fr']` as the locale list; replace with the real choices everywhere.
 
-**Narrate structural edits.** Before modifying `vite.config.ts`, `src/main.tsx`, `src/App.tsx`, or `index.html`, state in one chat sentence what will change and why (e.g. "I'm adding the Lingui plugins to vite.config.ts so translations compile at build time"), then make the edit. Don't wait for permission — just narrate.
+**Narrate structural edits.** Before modifying build config or app-entry files — `vite.config.ts`, `src/main.tsx`, `src/App.tsx`, `index.html` on Path A; `vite.config.ts`, `src/router.tsx`, `src/routes/__root.tsx`, `src/start.ts` on Path B — state in one chat sentence what will change and why (e.g. "I'm adding the Lingui plugins to vite.config.ts so translations compile at build time"), then make the edit. Don't wait for permission — just narrate.
 
 ---
 
@@ -350,7 +350,7 @@ Every Lovable project ships shadcn/ui, so build the switcher on the shadcn `Sele
 
 ```tsx
 // src/components/LanguageSwitcher.tsx
-import { useLingui } from '@lingui/react'
+import { useLingui } from '@lingui/react/macro'
 import {
   Select,
   SelectContent,
@@ -484,7 +484,7 @@ Update every existing internal `<Link to="/...">`, `<a href="/...">` (internal p
 
 ```tsx
 // src/components/LanguageSwitcher.tsx (routing variant)
-import { useLingui } from '@lingui/react'
+import { useLingui } from '@lingui/react/macro'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Select,
@@ -750,7 +750,7 @@ Keep everything already in `getRouter()` — the QueryClient, existing `context`
 ```tsx
 // src/routes/__root.tsx (i18n-relevant parts — keep everything else in the file)
 import type { I18n } from '@lingui/core'
-import { useLingui } from '@lingui/react'
+import { useLingui } from '@lingui/react/macro'
 import { createRootRouteWithContext, HeadContent, Scripts } from '@tanstack/react-router'
 import { getDirection } from '@/i18n'
 
@@ -824,7 +824,7 @@ export const setLocaleServerFn = createServerFn({ method: 'POST' })
 
 ```tsx
 // src/components/LanguageSwitcher.tsx
-import { useLingui } from '@lingui/react'
+import { useLingui } from '@lingui/react/macro'
 import {
   Select,
   SelectContent,
@@ -1029,7 +1029,7 @@ import { useLingui } from '@lingui/react/macro'
 import type { MessageDescriptor } from '@lingui/core'
 
 const sidebarItems: Array<{ label: MessageDescriptor; href: string }> = [
-  { label: msg({ message: `Dashboard`, comment: 'Main navigation sidebar' }), href: '/' },
+  { label: msg({ message: 'Dashboard', comment: 'Main navigation sidebar' }), href: '/' },
   { label: msg`Users`, href: '/users' },
   { label: msg`Settings`, href: '/settings' },
 ]
