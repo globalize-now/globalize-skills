@@ -88,7 +88,7 @@ Everything else in Phase 2A is identical.
 
 **Existing i18n library.** If `react-i18next`, `i18next`, `react-intl`, `next-translate`, or any other i18n library is already in `dependencies`: **STOP and ask the user.** Two options: keep the existing library (this skill doesn't apply — its setup, catalogs, and CI are Lingui-specific), or remove the existing library and its usages first, then re-run this skill. Never migrate or rip out an i18n library silently.
 
-**Existing Lingui config.** If a `lingui.config.ts` (or `.js`) already exists, run in **additive mode**: verify the config matches the shape in A3 (PO formatter, `src/locales/{locale}/messages` catalog path), add any locales the user requested that are missing (config + new `.po` files per A7), confirm the provider is wired (A5) and the vite plugins are present (A2) — fix only what's missing — then continue from Phase 3 (make sure the AGENTS.md coding rules are in place) before wrapping strings in Phase 4.
+**Existing Lingui config.** If a `lingui.config.ts` (or `.js`) already exists, run in **additive mode**: verify the config matches the shape in A3 (PO formatter, `src/locales/{locale}/messages` catalog path), add any locales the user requested that are missing (config + new `.po` files per A7), confirm the provider is wired (A5) and the vite plugins are present (A2) — or their Phase 2B equivalents on Path B — fix only what's missing, then continue from Phase 3 (make sure the AGENTS.md coding rules are in place) before wrapping strings in Phase 4.
 
 ### 1.2 Ask
 
@@ -97,7 +97,7 @@ Auto-detect before asking — pull defaults from the project so the user mostly 
 - **Source locale**: the `<html lang="...">` value in `index.html`; any existing `src/locales/<locale>/` directories; default `en`.
 - **Target locales**: any language the user already named in their request ("add Spanish" → `es` is pre-selected); existing locale directories.
 
-Then send **one chat message** with every question and a sensible default pre-selected. Do not drip-feed questions one at a time. Include question 3 only on Path A (Vite SPA) — TanStack Start routing is decided in Phase 2B. Shape it like this:
+Then send **one chat message** with every question and a sensible default pre-selected. Do not drip-feed questions one at a time. Include question 3 only on Path A (Vite SPA) — on Path B locale handling is cookie-based by default (see B6); URL-prefix routing is only added if the user asks. Shape it like this:
 
 > Before I set up translations, a few choices — defaults in bold, just say "go" to accept all:
 >
@@ -198,13 +198,13 @@ const config: LinguiConfig = {
       exclude: ['**/node_modules/**', '**/locales/**'],
     },
   ],
-  format: formatter(),
+  format: formatter({ lineNumbers: false }),
 }
 
 export default config
 ```
 
-Substitute `sourceLocale` and `locales` from the Ask phase. `format: formatter()` from `@lingui/format-po` is required — Lingui 6 removed the `format: 'po'` string form, so a string here fails. The `**/locales/**` exclusion keeps the extractor (in CI) from scanning the catalogs themselves.
+Substitute `sourceLocale` and `locales` from the Ask phase. `format: formatter(...)` from `@lingui/format-po` is required — Lingui 6 removed the `format: 'po'` string form, so a string here fails. `lineNumbers: false` keeps `#:` references to file paths only — line numbers would change on almost every edit and generate a CI catalog-sync commit after every push; paths alone are stable. The `**/locales/**` exclusion keeps the extractor (in CI) from scanning the catalogs themselves.
 
 ### A4. `src/i18n.ts`
 
@@ -651,7 +651,9 @@ export function getLocaleFromRequest(request: Request): string {
     for (const part of cookieHeader.split(';')) {
       const [name, ...rest] = part.trim().split('=')
       if (name === 'locale') {
-        const matched = matchLocale(decodeURIComponent(rest.join('=')))
+        // No decodeURIComponent: locale tags are plain ASCII, and a malformed
+        // or foreign cookie value simply won't match LOCALES.
+        const matched = matchLocale(rest.join('='))
         if (matched) return matched
       }
     }
@@ -741,7 +743,7 @@ export function getRouter() {
 
 Keep everything already in `getRouter()` — the QueryClient, existing `context` entries, `defaultPreload`, etc. Only add the i18n pieces.
 
-> **API drift warning:** `getGlobalStartContext` has been moving between `@tanstack/react-start` versions. If the import doesn't exist in the installed version, check how the installed `@tanstack/react-start` exposes the request-scoped start context (the export name and location have changed across releases) and adapt this one line — the rest of the pattern is unchanged.
+> **API drift warning:** `getGlobalStartContext` has been moving between `@tanstack/react-start` versions. If the import doesn't exist in the installed version, check how the installed `@tanstack/react-start` exposes the request-scoped start context (the export name and location have changed across releases) and adapt this one line — the rest of the pattern is unchanged. The `?.i18n` access also requires the middleware's context type to be registered with Start's type system (the `createStart` registration in step 4); if TypeScript complains about the property, check how the installed version registers request-middleware context types.
 
 **6. `src/routes/__root.tsx`** — extend the route context type with `i18n` and replace the template's hardcoded `<html lang="en">`. The template's root route uses `createRootRouteWithContext` with a `shellComponent` (RootDocument); `Wrap` from step 5 renders above the shell, so `useLingui()` works here:
 
@@ -749,7 +751,7 @@ Keep everything already in `getRouter()` — the QueryClient, existing `context`
 // src/routes/__root.tsx (i18n-relevant parts — keep everything else in the file)
 import type { I18n } from '@lingui/core'
 import { useLingui } from '@lingui/react'
-import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
+import { createRootRouteWithContext, HeadContent, Scripts } from '@tanstack/react-router'
 import { getDirection } from '@/i18n'
 
 // Add `i18n` to the EXISTING context type — e.g. if the template already has
@@ -792,7 +794,7 @@ A URL-prefix variant (`/es/dashboard` via an `src/routes/$locale/` layout route 
 
 Two files. The switcher calls a server function that sets the `locale` cookie, then does a full reload so the server re-renders everything under the new cookie — simple and correct, since i18n state is per-request.
 
-> **Critical file-split rule:** a file that defines `createServerFn` must **not** also use Lingui macros — the macro transform and the server-function extraction conflict and break the build. Keep the server function in its own macro-free file. Inside any server-function handler that needs translated text, use ``i18n._(msg`...`)`` with the request's i18n instance — never bare `t` macros.
+> **Critical file-split rule:** a file that defines `createServerFn` must **not** also use Lingui macros — the macro transform and the server-function extraction conflict and break the build. Keep the server function in its own macro-free file. Inside any server-function handler that needs translated text, use ``i18n._(msg`...`)`` with the request's i18n instance, which arrives via the request-middleware context — e.g. ``handler(async ({ context }) => context.i18n._(msg`Saved`))`` — never bare `t` macros.
 
 **1. `src/modules/lingui/locale-fn.ts`** — the server function (no macros in this file):
 
@@ -811,7 +813,7 @@ export const setLocaleServerFn = createServerFn({ method: 'POST' })
   .handler(async ({ data: locale }) => {
     setResponseHeader(
       'Set-Cookie',
-      `locale=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`,
+      `locale=${locale}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`,
     )
   })
 ```
@@ -872,6 +874,8 @@ Place it in the app's existing header or navigation, matching the surrounding st
 
 Tell the user what to expect: the plumbing is live, but visible text doesn't change until strings are wrapped (Phase 4) and translations arrive (Phase 6).
 
+---
+
 ## Phase 3: Add the coding rules to AGENTS.md
 
 Setup makes translation *possible*; this phase makes it *stick*. Every future edit to this project — by you, in any later chat — must keep new strings wrapped and catalogs updated. Write the rules below into the repo-root `AGENTS.md` so they're always in force.
@@ -880,7 +884,7 @@ Mechanics:
 
 - If `AGENTS.md` doesn't exist, create it containing exactly the block below.
 - If it exists, append the block at the end.
-- The block is wrapped in `<!-- lovable-i18n:rules:start -->` / `<!-- lovable-i18n:rules:end -->` markers. If those markers already exist in the file, **replace** everything between them (inclusive of nothing else) — this makes re-running the skill safe.
+- The block is wrapped in `<!-- lovable-i18n:rules:start -->` / `<!-- lovable-i18n:rules:end -->` markers. If those markers already exist in the file, **replace** everything between them and keep the marker lines themselves — this makes re-running the skill safe.
 - Substitute the real source locale for `en` in the catalog-upkeep section if it differs.
 
 Write this block (everything between and including the markers):
@@ -895,7 +899,7 @@ This app is localized with Lingui. Every user-visible string must be wrapped in 
 
 ```
 Does the wording change with a number ("1 item" / "3 items")?
-  YES → <Plural> in JSX, or t`{count, plural, one {...} other {...}}` elsewhere
+  YES → <Plural> in JSX, or useLingui()'s t`{count, plural, one {...} other {...}}` elsewhere
 
 Is the text rendered in JSX?
   YES → <Trans>text</Trans>
@@ -911,7 +915,7 @@ Is it inside a TanStack Start server-function handler?
   YES → i18n._(msg`text`) with the request's i18n instance — never bare t
 ```
 
-Imports: JSX macros and `useLingui` come from `@lingui/react/macro`; `msg`, `t`, and `ph` come from `@lingui/core/macro`. Never import from the deprecated `@lingui/macro`.
+Imports: JSX macros (`Trans`, `Plural`, `Select`) and `useLingui` come from `@lingui/react/macro`; `msg` and `ph` come from `@lingui/core/macro`. The only `t` you use is the one returned by `useLingui()` — never import `t` from `@lingui/core/macro` (it binds a global i18n instance this app doesn't load), and never import from the deprecated `@lingui/macro`.
 
 ## Patterns
 
@@ -933,7 +937,7 @@ function Field() {
 // In handlers: toast.success(t`Changes saved`)
 ```
 
-Module-scope constants — `msg` defines, `t(descriptor)` resolves at render. Bare ``t`...` `` at module scope evaluates once at import time, in the source locale, and never updates:
+Module-scope constants — `msg` defines, `t(descriptor)` resolves at render. There is no `t` at module scope (`useLingui()` only works inside a component) — never reach for a module-level `t` import to work around that; use `msg`:
 
 ```tsx
 import { msg } from '@lingui/core/macro'
@@ -952,7 +956,7 @@ t`Total: ${ph({ total: i18n.number(amount) })}`   // → "Total: {total}", not "
 
 ```tsx
 <Plural value={count} one="# item" other="# items" />
-// non-JSX: t`{count, plural, one {# item} other {# items}}`
+// non-JSX (t from useLingui()): t`{count, plural, one {# item} other {# items}}`
 ```
 
 - `other` is always required — it's the fallback for every language.
@@ -986,12 +990,14 @@ Use `context` (not `comment`) when the **same text needs different translations*
 
 - Every NEW user-visible string must be wrapped AND appended as an entry to **every** `src/locales/*/messages.po` file — including the source-locale (`en`) file. `msgid` is the exact source text (or full ICU expression); `msgstr` stays **empty** in all files (do not copy the msgid into msgstr — Lingui falls back to the source text at runtime).
 - Never run lingui CLI commands (`extract`, `compile`) — there is no terminal here; a GitHub Actions workflow runs extraction.
-- Never hand-edit `#.` or `#:` comment lines in `.po` files — extraction regenerates them. Translator comments belong in code, via `comment=`.
+- Never modify `#.` or `#:` comment lines on existing `.po` entries — extraction regenerates them (you do write them when appending a NEW entry). Translator comments belong in code, via `comment=`.
 - When adding a new locale: update `locales` in `lingui.config.ts`, update `LOCALES` in `src/i18n.ts`, and scaffold `src/locales/<locale>/messages.po` with a valid PO header.
 <!-- lovable-i18n:rules:end -->
 ````
 
 After writing the file, tell the user in one sentence that the coding rules are now in `AGENTS.md`, so future edits in any chat will keep new text translatable.
+
+---
 
 ## Phase 4: Wrap existing strings
 
@@ -1015,7 +1021,7 @@ Wrap: JSX text, placeholders, `aria-label` / `title` / `alt` attributes, button 
 
 Basics — `<Trans>` for JSX, `useLingui()` + `` t`...` `` for props and handlers — are in the Phase 3 rules. The patterns below are the ones conversion work actually trips over.
 
-**Nav/sidebar data arrays.** Constants at module scope can't call `t` (it would resolve once, at import time, in the source locale). Mark with `msg`, resolve at render:
+**Nav/sidebar data arrays.** Constants at module scope can't call `t` — `useLingui()`'s `t` only exists inside a component. Mark with `msg`, resolve at render:
 
 ```tsx
 import { msg } from '@lingui/core/macro'
@@ -1042,7 +1048,7 @@ function Sidebar() {
 
 The same pattern applies to copy exported from shared modules (`lib/copy.ts`): export `MessageDescriptor` values via `msg`, never raw strings, and resolve with `t(descriptor)` at the call site.
 
-**Form validation (zod and friends).** Schema definitions run outside render — same `msg`-then-resolve pattern:
+**Validation messages.** Schema definitions run outside render — same `msg`-then-resolve pattern:
 
 ```tsx
 import { msg } from '@lingui/core/macro'
@@ -1105,13 +1111,15 @@ This is the moment the Phase 3 comment rules bite: while wrapping, you're lookin
 
 Tell the user what changed: how many files were converted, and that the app is now fully translatable but still shows source-language text until translations arrive.
 
+---
+
 ## PO catalog maintenance protocol
 
-Until the CI workflow (Phase 5) takes over, you maintain the `.po` files by hand. Follow this protocol exactly so your entries are byte-compatible with what `lingui extract` produces — then CI's first run normalizes rather than fights your work.
+Until the CI workflow (Phase 5) takes over, you maintain the `.po` files by hand. Follow this protocol exactly so your entries match what `lingui extract` produces — then CI's first run normalizes rather than fights your work.
 
 ### Entry shape
 
-This is exactly what `lingui extract` writes; match it:
+This is exactly what `lingui extract` writes with this project's config (`lineNumbers: false` in A3 keeps `#:` references to file paths only — no line numbers); match it:
 
 ```po
 #. A translator comment from the comment= prop
@@ -1148,6 +1156,8 @@ If the user asks for translations before Globalize is connected, you may fill th
 ### Sync conflicts
 
 If Lovable reports a GitHub sync conflict on a `.po` file (you and CI/Globalize edited it simultaneously), take the **remote** version — CI and Globalize are the catalog authorities — then re-apply only the entries of yours that are missing from it.
+
+---
 
 ## Phase 5: CI — catalog extraction workflow
 
@@ -1192,6 +1202,8 @@ jobs:
 
 If the project's default branch isn't `main`, adjust `branches:` to match — Lovable syncs with the default branch.
 
+If the run fails at `npm ci` — missing or out-of-sync lockfile — switch that step to `npm install --no-audit --no-fund`; if the repo ships `bun.lockb` or `pnpm-lock.yaml`, use the matching setup action and install command instead.
+
 **If the workflow file fails to sync to GitHub:** Lovable's GitHub App may lack the `workflows` permission, and GitHub rejects pushes that create workflow files without it. In that case, give the user the file path and the full YAML above and ask them to add it via the GitHub web UI (repo → Add file → paste). Everything else proceeds normally.
 
 ### Why it's shaped this way
@@ -1202,6 +1214,8 @@ If the project's default branch isn't `main`, adjust `branches:` to match — Lo
 - **The round-trip is fast.** Lovable auto-commits your edit and syncs it to GitHub → the workflow extracts and normalizes the catalogs → the commit-back lands on the default branch → Lovable's two-way sync pulls it into the project within seconds. From then on, treat catalog formatting as CI-owned (see the PO protocol).
 
 Verify with the user after the next code push: the `i18n-extract` run shows up in the repo's Actions tab, and a `chore(i18n): sync message catalogs` commit appears and flows back into Lovable.
+
+---
 
 ## Phase 6: Connect Globalize.now
 
@@ -1253,12 +1267,14 @@ npx @globalize-now/cli-client repositories create \
 
 **Close the loop.** Once connected, Globalize picks up the catalogs from the repo, translates new entries, and delivers translated `.po` files back via PRs or pushes to the default branch. Lovable's GitHub sync pulls them in, and the language switcher starts showing real translations — no action needed in this chat. The CI workflow ignores locale-only pushes (the `!src/locales/**` path filter), so translation deliveries never trigger extraction loops.
 
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Preview build error mentioning "AST schema mismatch" or "failed to invoke plugin" (Path A) | `@lingui/swc-plugin` compiled against a different `swc_core` than `@vitejs/plugin-react-swc` ships | Look up the compatible version at https://plugins.swc.rs and pin `@lingui/swc-plugin` to that **exact** version (no caret) — see the A1 caveat |
-| Build fails resolving `@lingui/vite-plugin`, or ESM/`ERR_REQUIRE_ESM`-style errors from Lingui packages | The build image's Node is too old for Lingui 6 (ESM-only, needs Node ≥ 22.19) | Pin **all** `@lingui/*` packages to `@^5` instead. Keep `lingui.config.ts` as-is — the `formatter()` form from `@lingui/format-po` works in v5 too |
+| Build fails resolving `@lingui/vite-plugin`, or ESM/`ERR_REQUIRE_ESM`-style errors from Lingui packages | The build image's Node is too old for Lingui 6 (ESM-only, needs Node ≥ 22.19) | Pin **all** `@lingui/*` packages to `@^5` instead. Keep `lingui.config.ts` as-is — the `formatter(...)` form from `@lingui/format-po` works in v5 too |
 | TS error `Cannot find module './locales/en/messages.po'` | Missing the `*.po` module declaration | Add the declaration from A4 (`src/vite-env.d.ts` or `src/po-modules.d.ts`) |
 | Strings render as raw ICU (`{count, plural, ...}`) or stay in the source language after switching | Catalog not loaded for that locale (typo in the dynamic import path, missing `.po` file) or the entry is missing from that locale's catalog | Check the `src/locales/<locale>/messages.po` file exists with a valid header (A7) and contains the entry (PO protocol) |
 | `<Trans>` renders as literal macro output, but the build succeeds (Path A) | SWC plugin registered as a bare string instead of the `['@lingui/swc-plugin', {}]` tuple | Use the tuple shape in `vite.config.ts` (A2) |
@@ -1266,4 +1282,5 @@ npx @globalize-now/cli-client repositories create \
 | (Path B) Duplicated `<title>` / head content after hydration | Known TanStack Router issue (#4279) with localized `head()` strings | Don't localize `head()` / meta strings for now — keep them in the source language (B4) |
 | (Path B) `getGlobalStartContext` not found / not exported | TanStack Start API drift between versions | Check how the installed `@tanstack/react-start` exposes the request-scoped start context and adapt that one line in `src/router.tsx` (B4) |
 | CI workflow never runs | GitHub not connected in Lovable; the workflow file didn't sync (GitHub App lacks the `workflows` permission); or the default branch isn't `main` | Connect GitHub; add the YAML via the GitHub web UI; fix `branches:` in the workflow (Phase 5) |
+| CI run fails at the install step (`npm ci`) | Lockfile missing or out of sync — e.g. the repo ships `bun.lockb` or `pnpm-lock.yaml` instead of `package-lock.json`, or the lockfile lags the added dependencies | Switch the step to `npm install --no-audit --no-fund`, or use the setup action + install command matching the repo's lockfile (Phase 5) |
 | CI commits catalog updates but Lovable doesn't show them | Lovable's sync follows the default branch only | Confirm the workflow pushed to the default branch (check the Actions log and the branch of the `chore(i18n)` commit) |
