@@ -1,6 +1,6 @@
 # Globalization Skills
 
-Agent skills for localizing software projects. Currently targeting Claude Code, with plans to support other agents.
+Agent skills for localizing software projects. Currently targeting Claude Code and the Lovable agent, with plans to support more agents.
 
 ## Repository Structure
 
@@ -21,6 +21,7 @@ Skills currently in this repo:
 - `skills/globalize-now-cli-setup/` — install + authenticate the Globalize CLI, create a project, connect a repo
 - `skills/globalize-now-cli-use/` — manage existing Globalize translation resources
 - `skills/css-i18n/` — audit and convert CSS to logical properties for RTL support
+- `skills/lovable-i18n/` — single-file i18n skill for the Lovable.dev agent (Lingui + PO, both Lovable stacks, AGENTS.md coding rules, CI extraction, Globalize connect) — experimental
 
 ## Conventions
 
@@ -62,5 +63,7 @@ Not every skill should be delivered the same way. Claude Code's router only cons
   ```
 
   Imported files load into every session's context, so the rules are always in effect without depending on routing. Examples: the `*.code.md` references inside `i18n-guide`, `css-i18n` (when wired in).
+
+- **Platform-bundled single-file skills** — skills written for a non-Claude-Code agent platform (currently Lovable), where everything must live in one `SKILL.md`. Routed delivery is the platform's own skill matching, and passive rules are delivered by having the skill write them into the target project's repo-root `AGENTS.md` (which the platform always reads) instead of `@import`. Example: `lovable-i18n`.
 
 When creating a new skill, decide up front which track it belongs on — and if it's passive-rule, make sure an installer skill writes the `@import` line.
