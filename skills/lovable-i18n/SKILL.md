@@ -27,19 +27,21 @@ The library is **Lingui v6**, with one PO catalog per locale at `src/locales/{lo
 
 | Phase | What happens |
 |---|---|
-| Detect | Identify the project stack (Vite SPA or TanStack Start) and any existing i18n |
-| Ask | One chat message collecting source locale, target locales, URL routing, opt-ins |
-| Setup | Add dependencies, build config, `i18n.ts`, provider, catalogs, language switcher |
-| Rules | Add Lingui coding rules to `AGENTS.md` so every future edit stays localized |
-| Wrap | Wrap the app's existing hardcoded strings in Lingui macros |
-| CI | Add a GitHub Action that runs `lingui extract` and keeps catalogs in sync |
-| Connect | Hand off catalogs to the Globalize.now translation platform |
+| 1.1 Detect | Identify the project stack (Vite SPA or TanStack Start) and any existing i18n |
+| 1.2 Ask | One chat message collecting source locale, target locales, URL routing, opt-ins |
+| 2A / 2B Setup | Add dependencies, build config, `i18n.ts`, provider, catalogs, language switcher |
+| 3 Rules | Add Lingui coding rules to `AGENTS.md` so every future edit stays localized |
+| 4 Wrap | Wrap the app's existing hardcoded strings in Lingui macros |
+| 5 CI | Add a GitHub Action that runs `lingui extract` and keeps catalogs in sync |
+| 6 Connect | Hand off catalogs to the Globalize.now translation platform |
 
 Work the phases in order. Detect and Ask are quick; Setup is the bulk of the work.
 
 ---
 
-## Phase 1: Detect
+## Phase 1: Detect & Ask
+
+### 1.1 Detect
 
 Read `package.json` and decide which stack this project is. **First match wins.**
 
@@ -64,7 +66,7 @@ Read `package.json` and decide which stack this project is. **First match wins.*
 
 If neither matches, tell the user what you found and that this skill covers Lovable's two project stacks only — don't guess your way into a setup.
 
-### Escape hatches
+#### Escape hatches
 
 Check these before starting setup. They change or stop the plan.
 
@@ -86,13 +88,9 @@ Everything else in Phase 2A is identical.
 
 **Existing i18n library.** If `react-i18next`, `i18next`, `react-intl`, `next-translate`, or any other i18n library is already in `dependencies`: **STOP and ask the user.** Two options: keep the existing library (this skill doesn't apply — its setup, catalogs, and CI are Lingui-specific), or remove the existing library and its usages first, then re-run this skill. Never migrate or rip out an i18n library silently.
 
-**Existing Lingui config.** If a `lingui.config.ts` (or `.js`) already exists, run in **additive mode**: verify the config matches the shape in A3 (PO formatter, `src/locales/{locale}/messages` catalog path), add any locales the user requested that are missing (config + new `.po` files per A7), confirm the provider is wired (A5) and the vite plugins are present (A2) — fix only what's missing — then skip ahead to Phase 4 (Wrap).
+**Existing Lingui config.** If a `lingui.config.ts` (or `.js`) already exists, run in **additive mode**: verify the config matches the shape in A3 (PO formatter, `src/locales/{locale}/messages` catalog path), add any locales the user requested that are missing (config + new `.po` files per A7), confirm the provider is wired (A5) and the vite plugins are present (A2) — fix only what's missing — then continue from Phase 3 (make sure the AGENTS.md coding rules are in place) before wrapping strings in Phase 4.
 
-**Before each structural edit.** Before modifying `vite.config.ts`, `src/main.tsx`, `src/App.tsx`, or `index.html`, state in one chat sentence what will change and why (e.g. "I'm adding the Lingui plugins to vite.config.ts so translations compile at build time"), then make the edit. Don't wait for permission — just narrate.
-
----
-
-## Phase 1: Ask
+### 1.2 Ask
 
 Auto-detect before asking — pull defaults from the project so the user mostly confirms:
 
@@ -111,9 +109,11 @@ Then send **one chat message** with every question and a sensible default pre-se
 > 4. **Catalog sync via GitHub Actions** — a workflow that extracts new texts into the catalogs whenever code changes. **Default: yes.** Requires GitHub to be connected in Lovable (Settings → GitHub).
 > 5. **Connect Globalize.now** — a translation platform that fills in the actual translations via PRs. Optional, can be added later.
 
-After the user answers, execute the whole plan without further pauses. Only stop again for blockers: a build error you cannot resolve, an escape hatch from Phase 1, or a missing GitHub connection when the user asked for CI.
+After the user answers, execute the whole plan without further pauses. Only stop again for blockers: a build error you cannot resolve, an escape hatch from 1.1, or a missing GitHub connection when the user asked for CI.
 
 Record the answers — `SOURCE_LOCALE`, the locale list, routing choice, opt-ins — you will substitute them into every snippet below. The snippets use `en` as source and `['en', 'es', 'fr']` as the locale list; replace with the real choices everywhere.
+
+**Narrate structural edits.** Before modifying `vite.config.ts`, `src/main.tsx`, `src/App.tsx`, or `index.html`, state in one chat sentence what will change and why (e.g. "I'm adding the Lingui plugins to vite.config.ts so translations compile at build time"), then make the edit. Don't wait for permission — just narrate.
 
 ---
 
@@ -225,7 +225,13 @@ function getDirection(locale: string): 'ltr' | 'rtl' {
 }
 
 export function detectLocale(): string {
-  const detected = detect(fromUrl('lang'), fromStorage('lang'), fromNavigator())
+  let detected: string | null
+  try {
+    detected = detect(fromUrl('lang'), fromStorage('lang'), fromNavigator())
+  } catch {
+    // localStorage threw (sandboxed iframe / blocked storage) — retry without it
+    detected = detect(fromUrl('lang'), fromNavigator())
+  }
   if (detected) {
     if (LOCALES.includes(detected)) return detected
     // Regional fallback: es-MX → es
@@ -249,7 +255,11 @@ export async function activateLocale(locale: string) {
 }
 
 export function saveLocale(locale: string) {
-  localStorage.setItem('lang', locale)
+  try {
+    localStorage.setItem('lang', locale)
+  } catch {
+    // Storage unavailable — the choice just won't persist
+  }
 }
 
 export { i18n }
@@ -261,6 +271,7 @@ Notes:
 - `detectLocale()` tries sources in order: `?lang=` URL parameter → `lang` key in localStorage → browser language (with regional fallback, `es-MX` → `es`) → source locale.
 - `activateLocale()` also keeps `<html lang>` and `<html dir>` in sync, so RTL locales (Arabic, Hebrew, Farsi, Urdu…) flip the document direction automatically.
 - Call `saveLocale()` only on an explicit user choice (the language switcher), so the choice persists across visits.
+- Why the try/catch around storage: in sandboxed preview iframes and cookie-blocking browsers, touching `localStorage` throws a `SecurityError` — unguarded, that happens inside `detectLocale()` before first render and leaves the app blank.
 
 TypeScript doesn't know what a `.po` import is, so add a module declaration. Append to `src/vite-env.d.ts` (it exists in every Lovable Vite project), or create `src/po-modules.d.ts` if you prefer not to touch it:
 
@@ -297,6 +308,8 @@ void bootstrap()
 
 If `main.tsx` already wraps `<App />` in other providers, keep them and put `I18nProvider` outermost (everything that renders text needs it above them in the tree).
 
+The preview will show a dynamic-import error from this point until step A7 creates the `.po` catalogs — complete A7 before reading anything into the build output.
+
 ### A6. `index.html`
 
 Check the `<html lang="...">` value at the project root:
@@ -318,16 +331,16 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 ```
 
-Set `Language:` to the file's locale. Set `Plural-Forms` from this table where the locale appears; omit the line otherwise (Lingui stores plurals as ICU expressions inside messages, so the header is informational):
+Set `Language:` to the file's locale. Set `Plural-Forms` from this list where the locale appears (one line per locale group, expression after the `→`); omit the line otherwise (Lingui stores plurals as ICU expressions inside messages, so the header is informational):
 
-| Locales | Plural-Forms |
-|---|---|
-| en, es, de, it, nl, pt | `nplurals=2; plural=(n != 1);` |
-| fr, pt-BR, tr | `nplurals=2; plural=(n > 1);` |
-| ja, zh, ko, th, vi, id | `nplurals=1; plural=0;` |
-| ru, uk | `nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 \|\| n%100>=20) ? 1 : 2);` |
-| pl | `nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 \|\| n%100>=20) ? 1 : 2);` |
-| ar | `nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);` |
+```text
+en, es, de, it, nl, pt → nplurals=2; plural=(n != 1);
+fr, pt-BR, tr          → nplurals=2; plural=(n > 1);
+ja, zh, ko, th, vi, id → nplurals=1; plural=0;
+ru, uk                 → nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);
+pl                     → nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);
+ar                     → nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);
+```
 
 A header-only catalog is valid: it compiles to an empty message set, and Lingui falls back to the source text for any missing message. Entries get added by the Wrap phase and by CI extraction later.
 
@@ -518,28 +531,28 @@ Verify in the preview: `/` redirects to `/<locale>`, deep links re-prefix, switc
 
 ## Phase 2B: Setup — TanStack Start (SSR)
 
-<!-- Filled in Task 2 -->
+<!-- TODO: content added in part 2 -->
 
 ## Phase 3: Add the coding rules to AGENTS.md
 
-<!-- Filled in Task 2 -->
+<!-- TODO: content added in part 2 -->
 
 ## Phase 4: Wrap existing strings
 
-<!-- Filled in Task 2 -->
+<!-- TODO: content added in part 2 -->
 
 ## PO catalog maintenance protocol
 
-<!-- Filled in Task 2 -->
+<!-- TODO: content added in part 2 -->
 
 ## Phase 5: CI — catalog extraction workflow
 
-<!-- Filled in Task 2 -->
+<!-- TODO: content added in part 2 -->
 
 ## Phase 6: Connect Globalize.now
 
-<!-- Filled in Task 2 -->
+<!-- TODO: content added in part 2 -->
 
 ## Troubleshooting
 
-<!-- Filled in Task 2 -->
+<!-- TODO: content added in part 2 -->
