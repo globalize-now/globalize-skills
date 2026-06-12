@@ -1,0 +1,7 @@
+{
+  "name": "lovable-i18n",
+  "version": "1.0.0",
+  "description": "Add multi-language support to a Lovable app with Lingui: detect the stack, set up PO catalogs, wrap hardcoded strings, keep catalogs in sync via GitHub Actions, and connect Globalize.now.",
+  "tags": ["i18n", "lingui", "lovable", "translations", "globalize"],
+  "supportedAgents": ["lovable"]
+}
