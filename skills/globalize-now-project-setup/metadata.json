@@ -1,0 +1,7 @@
+{
+  "name": "globalize-now-project-setup",
+  "version": "1.0.0",
+  "description": "Create a Globalize translation project, connect a GitHub or GitLab repository, and set catalog file patterns. Assumes the CLI is installed and authenticated (run globalize-now-account-setup first).",
+  "tags": ["globalize", "translations", "cli", "setup", "project", "repository"],
+  "supportedAgents": ["claude-code"]
+}

@@ -6,7 +6,7 @@ description: >-
   manage glossaries or style guides, invite team members, manage API keys, or perform any
   Globalize platform operation. Also use when the user mentions managing translations,
   translation workflow, or wants to "set up translations for this repo." This skill assumes
-  the CLI is already installed and authenticated — run globalize-now-cli-setup first if not.
+  the CLI is already installed and authenticated — run globalize-now-account-setup first if not.
 ---
 
 # Globalize CLI Usage
@@ -27,7 +27,7 @@ Verify authentication is configured:
 npx @globalize-now/cli-client auth status --json
 ```
 
-If this fails or reports no credentials, run the `globalize-now-cli-setup` skill first.
+If this fails or reports no credentials, run the `globalize-now-account-setup` skill first.
 
 ---
 

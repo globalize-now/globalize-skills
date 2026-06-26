@@ -358,7 +358,7 @@ This setup phase scaffolded the catalog and enabled extraction but did **not** m
 
 ### Connect a translation service
 
-With `Localizable.xcstrings` populated, connect to Globalize using the `globalize-now-cli-setup` skill. The Phase-4 mapping is `fileFormat: xcstrings` with a **single-file pattern** — the catalog is one multi-locale file, so the pattern points at the file itself (`Localizable.xcstrings`, or `**/*.xcstrings` for multiple tables) with **no `{locale}` segment**. The source language is the catalog's `sourceLanguage`.
+With `Localizable.xcstrings` populated, connect to Globalize using the `globalize-now-project-setup` skill (it points you at `globalize-now-account-setup` first if you're not signed in). The Phase-4 mapping is `fileFormat: xcstrings` with a **single-file pattern** — the catalog is one multi-locale file, so the pattern points at the file itself (`Localizable.xcstrings`, or `**/*.xcstrings` for multiple tables) with **no `{locale}` segment**. The source language is the catalog's `sourceLanguage`.
 
 ### Add a non-English locale
 

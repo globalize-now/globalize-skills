@@ -1263,7 +1263,7 @@ npx @globalize-now/cli-client repositories create \
   --json
 ```
 
-`@globalize-now/cli-client` is deliberately unpinned — the platform manages its release cadence. If the user works with a local coding agent (Claude Code etc.), point them at the `globalize-now-cli-setup` skill instead — it walks the same flow with full auto-detection.
+`@globalize-now/cli-client` is deliberately unpinned — the platform manages its release cadence. If the user works with a local coding agent (Claude Code etc.), point them at the `globalize-now-account-setup` skill (sign in) followed by `globalize-now-project-setup` (create the project + connect the repo) instead — together they walk the same flow with full auto-detection.
 
 **Close the loop.** Once connected, Globalize picks up the catalogs from the repo, translates new entries, and delivers translated `.po` files back via PRs or pushes to the default branch. Lovable's GitHub sync pulls them in, and the language switcher starts showing real translations — no action needed in this chat. The CI workflow ignores locale-only pushes (the `!src/locales/**` path filter), so translation deliveries never trigger extraction loops.
 

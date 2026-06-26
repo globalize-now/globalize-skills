@@ -1,0 +1,7 @@
+{
+  "name": "globalize-now-account-setup",
+  "version": "1.0.0",
+  "description": "Set up the Globalize CLI: install, authenticate, and verify your organization. Account setup only — use globalize-now-project-setup to create a project and connect a repo.",
+  "tags": ["globalize", "translations", "cli", "setup", "auth"],
+  "supportedAgents": ["claude-code"]
+}

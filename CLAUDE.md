@@ -17,8 +17,9 @@ skills/
 
 Skills currently in this repo:
 
-- `skills/i18n-guide/` — orchestrator for the full i18n journey (detect → setup → convert → connect translation platform)
-- `skills/globalize-now-cli-setup/` — install + authenticate the Globalize CLI, create a project, connect a repo
+- `skills/i18n-guide/` — orchestrator for the full i18n journey (detect → setup → convert → connect Globalize: account sign-in upfront, project + repo at the end)
+- `skills/globalize-now-account-setup/` — install + authenticate the Globalize CLI (account sign-in)
+- `skills/globalize-now-project-setup/` — create a Globalize project, connect a GitHub/GitLab repo, set catalog patterns (assumes account-setup is done)
 - `skills/globalize-now-cli-use/` — manage existing Globalize translation resources
 - `skills/css-i18n/` — audit and convert CSS to logical properties for RTL support
 - `skills/lovable-i18n/` — single-file i18n skill for the Lovable.dev agent (Lingui + PO, both Lovable stacks, AGENTS.md coding rules, CI extraction, Globalize connect) — experimental
@@ -54,7 +55,7 @@ cp -r skills/i18n-guide /path/to/project/.claude/skills/i18n-guide
 
 Not every skill should be delivered the same way. Claude Code's router only consults skills for specialized, multi-step tasks — it doesn't pull in a skill mid-edit for routine code changes. This means skills split into two delivery tracks:
 
-- **Routed skills** — invoked on demand (setup, convert, orchestration). Live in `.claude/skills/<name>/` and rely on a discriminating `description` to trigger. Examples: `i18n-guide`, `globalize-now-cli-setup`.
+- **Routed skills** — invoked on demand (setup, convert, orchestration). Live in `.claude/skills/<name>/` and rely on a discriminating `description` to trigger. Examples: `i18n-guide`, `globalize-now-account-setup`, `globalize-now-project-setup`.
 
 - **Passive-rule skills** — continuous coding guidelines that should apply to every edit in a project (macro wrapping, plural handling, CSS logical properties). These don't trigger reliably via the router. Instead, an installer skill wires them into the target project's `CLAUDE.md` via Claude Code's `@import` syntax. For example, the `i18n-guide` orchestrator appends:
 

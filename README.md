@@ -36,8 +36,9 @@ The skill will be available next time you start a Claude Code conversation.
 
 | Skill | Description |
 |---|---|
-| `i18n-guide` | Orchestrates the full i18n journey for a project: detect stack, recommend a library (Lingui or next-intl), install + configure, wrap existing strings, optionally connect Globalize.now for translation. Drives the work through subagents with shared progress tracking. |
-| `globalize-now-cli-setup` | Install the Globalize CLI, authenticate, create a translation project, connect a GitHub or GitLab repository. |
+| `i18n-guide` | Orchestrates the full i18n journey for a project: detect stack, recommend a library, install + configure, wrap existing strings, and connect Globalize.now for translation (on by default — account sign-in runs upfront, project + repo connection at the end). Drives the work through subagents with shared progress tracking. |
+| `globalize-now-account-setup` | Install the Globalize CLI and authenticate (account sign-in). |
+| `globalize-now-project-setup` | Create a translation project, connect a GitHub or GitLab repository, and set catalog file patterns. Assumes the CLI is installed and authenticated. |
 | `globalize-now-cli-use` | Manage existing Globalize translation resources (languages, glossaries, style guides, repositories, team members, API keys). |
 | `css-i18n` | Audit and convert CSS to logical properties for RTL/bidirectional layout support. Library-agnostic — works with Tailwind, CSS Modules, vanilla CSS, CSS-in-JS. |
 | `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental — see the Lovable install note in the Installation section above. |

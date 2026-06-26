@@ -3,7 +3,7 @@ name: i18n-guide
 description: >-
   Drive the full internationalization journey for a project — detect the stack,
   recommend a library, set up the chosen library, wrap existing strings, and
-  optionally connect a translation platform. Use when the user asks to add or
+  connect a translation platform (Globalize.now, default-on). Use when the user asks to add or
   configure i18n, internationalization, localization, multi-language support,
   or translations — including when they explicitly mention LinguiJS, Lingui,
   next-intl, "wrap strings", "find hardcoded text", "make my app translatable",
@@ -17,18 +17,21 @@ description: >-
 
 # i18n Orchestrator
 
-This skill drives the full i18n journey through four phases:
+This skill drives the full i18n journey through five stages:
 
-| Phase | Goal |
+| Stage | Goal |
 |---|---|
 | 1 — Inspect and decide | Detect stack, ask all user questions, generate an executable plan |
+| 1.5 — Globalize account (upfront) | Install CLI + sign in + verify org via `globalize-now-account-setup` |
 | 2 — Setup | Install + configure the chosen library |
 | 3 — Convert | Wrap hardcoded strings, extract + compile catalogs |
-| 4 — Globalize-now (optional) | Connect a translation platform |
+| 4 — Globalize project (end) | Create project + connect repo + set patterns via `globalize-now-project-setup` |
+
+Stages 1.5 and 4 only run when the user keeps Globalize connection in scope (default-on; see 1.6). The Globalize work is split deliberately: account creation is interactive and project-independent, so it runs **upfront** while the user is engaged; project + repo setup needs the converted catalog paths, so it runs at the **end**.
 
 The orchestrator (this SKILL.md) is library-agnostic. Library- and stack-specific guidance lives in `references/` and is loaded by subagents at dispatch time, driven by `manifest.json`.
 
-**Architectural rule:** the orchestrator never executes work directly. It asks Phase 1 questions, generates the plan, dispatches subagents in the background, polls a shared progress workspace at `.globalize/`, and surfaces results. All file modifications, all bash commands, and all reference reading happen inside subagents.
+**Architectural rule:** the orchestrator never executes work directly. It asks Phase 1 questions, generates the plan, dispatches subagents in the background, polls a shared progress workspace at `.globalize/`, and surfaces results. All file modifications, all bash commands, and all reference reading happen inside subagents. **One carve-out:** the interactive Globalize steps (account sign-in in 1.5, project + repo connection in Phase 4) run on the main thread by **delegating to the `globalize-now-account-setup` / `globalize-now-project-setup` skills via the Skill tool** — the orchestrator never inlines Globalize CLI commands itself (those skills own the authoritative command surface).
 
 ---
 
@@ -40,13 +43,13 @@ Created in the **target project root** (the project being internationalized). Ev
 .globalize/
   detection.json              # output of inspect subagent (Phase 1.1)
   decisions.md                # frozen user choices from Phase 1
-  plan.md                     # executable plan for phases 2/3/4
+  plan.md                     # executable plan for phases 1.5/2/3/4
   manifest-snapshot.json      # frozen copy of the chosen manifest entry
+  globalize-inputs.json       # resolved Globalize project inputs (written in Phase 4, read by globalize-now-project-setup)
   progress/
     setup.json                # Phase 2 setup subagent
     wrap-1.json…wrap-N.json   # Phase 3 wrap subagents (one per partition)
     verify.json               # Phase 3 verify subagent
-    globalize.json            # Phase 4 project subagent
     archive/<ISO-timestamp>/  # archived after each phase completes
 ```
 
@@ -65,14 +68,16 @@ If `.globalize/` exists when the orchestrator starts, read `plan.md` and `progre
 
 Proceed accordingly.
 
+**Globalize auth is global, not local.** Sign-in state lives in `~/.globalize/config.json` (or the `GLOBALIZE_API_KEY` env var), **not** in `.globalize/`, so never infer the account step's done-ness from a local marker — it may have been configured outside this run. On resume, just re-delegate: both Globalize skills are idempotent. The account skill self-skips when `auth status` already returns valid credentials; the project skill lists-before-creates (`projects list`, `github installations`, existing repo connections), so re-invoking it fast-paths whatever is already done. That idempotency is why Phase 4 needs no `progress/globalize.json`.
+
 ---
 
 ## Phase 1 — Inspect and Decide
 
-Phase 1 ends with a fully populated `.globalize/` (detection, decisions, plan, manifest snapshot) and the user's "go" before any work happens. Every user prompt this skill ever asks lives in Phase 1 — Phases 2/3/4 are pure execution.
+Phase 1 ends with a fully populated `.globalize/` (detection, decisions, plan, manifest snapshot) and the user's "go" before any work happens. Every decision this skill collects lives in Phase 1 — Phases 1.5/2/3/4 are execution (the two Globalize stages delegate their own sign-in / browser interaction to the `globalize-now-account-setup` / `globalize-now-project-setup` skills).
 
 > **User-facing message** (orchestrator kickoff, before 1.1):
-> "Hey — I'll walk you through internationalizing this project in four phases: inspect, set up the library, wrap your hardcoded strings, and (optionally) connect a translation platform. First I'll do a read-only scan of your project — framework, router, existing i18n setup, files with translatable text. No changes yet. After that I'll ask a small set of questions to shape the plan."
+> "Hey — I'll walk you through internationalizing this project: inspect the stack, sign in to Globalize, set up the library, wrap your hardcoded strings, and finally create your Globalize project + connect the repo. First I'll do a read-only scan of your project — framework, router, existing i18n setup, files with translatable text. No changes yet. After that I'll ask a small set of questions to shape the plan (including whether to connect Globalize — it's on by default, and you can opt out)."
 
 ### 1.1 Inspect subagent
 
@@ -323,15 +328,15 @@ Use AskUserQuestion if multiple variants apply. If only one variant matches, sur
 ### 1.6 Journey scope
 
 > **User-facing message** (before asking):
-> "Which phases do you want to run? I've pre-checked the ones that make sense given what's already in the project."
+> "Which parts do you want to run? I've pre-checked the ones that make sense given what's already in the project. Connecting **Globalize.now** to translate your catalogs is included by default — you can uncheck it to skip the platform."
 
-Ask which phases to run. Defaults derived from `existing`:
+Ask which parts to run. Defaults derived from `existing`:
 
 - If `existing.configured === false` → setup is suggested
 - If `existing.stringsWrapped !== "yes"` AND `candidateFiles.length > 0` → convert is suggested
-- Globalize-now is opt-in only; default unchecked
+- **Connecting Globalize is default-on — pre-check it.** The user can uncheck to decline the platform; only then do stages 1.5 and 4 get skipped.
 
-Use AskUserQuestion with three multi-select options (setup / convert / connect translation platform) and the inferred defaults pre-checked.
+Use AskUserQuestion with three multi-select options (setup / convert / connect translation platform) and the inferred defaults pre-checked — including `connect translation platform`. Record the result under `decisions.scope` (`decisions.scope.globalize` is `true` unless the user unchecked it).
 
 ### 1.7 Setup choices
 
@@ -390,7 +395,28 @@ Show `plan.md` to the user as a checklist. Ask:
 > "Here's the plan. Ready to execute? (**yes** / **cancel** / **edit**)
 > Once you say yes, I won't pause for more questions unless a subagent gets stuck or finishes a phase."
 
-Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceeds to Phase 2.
+Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceeds to Phase 1.5 (when Globalize is in scope) or otherwise straight to Phase 2.
+
+---
+
+## Phase 1.5 — Globalize account (upfront, interactive)
+
+**Gate:** run this stage only if `decisions.scope.globalize === true`. If the user unchecked Globalize at 1.6, skip 1.5 **and** Phase 4 entirely and go to Phase 2.
+
+This stage gets the user signed in to Globalize **before** any code changes, so the platform is ready the moment the catalogs are done. It is the one interactive Globalize step that has nothing to wait for — account creation needs no project data — so doing it now keeps the long Phase 2/3 work hands-off.
+
+> **User-facing message** (at stage start):
+> "Before we touch your code, let's get you signed in to Globalize so it's ready when your catalogs are done. A browser window may open for device-flow sign-in. (Heads up: near the very end, when we connect your repo, you'll do one quick browser approval to authorize Globalize's GitHub/GitLab app — I'll remind you then.)"
+
+**Delegate to the account skill (main thread).** Invoke the **`globalize-now-account-setup`** skill via the Skill tool. It runs install → sign-in → verify on the main thread (interactive device flow), and **self-skips the login** if `auth status` already reports valid credentials. Do **not** inline any CLI commands here — the skill owns them.
+
+When it completes, record the authenticated org under `decisions.md` → `## Globalize-now` → `Authenticated org` (a soft audit marker), and mark `delegate_account_setup` done in `plan.md`.
+
+**If `globalize-now-account-setup` is not installed** (i18n-guide installed on its own), the Skill invocation fails. Tell the user:
+
+> "I couldn't load the `globalize-now-account-setup` skill — install the Globalize skills with `npx skills add globalize-now/globalize-skills`, then I'll continue." (The standard install co-installs all of them, so this is rare.)
+
+**If the user cancels sign-in** (declines the browser step even though Globalize is in scope): don't block the run. Continue to Phase 2, and set a soft flag so Phase 4's `auth status` re-check re-offers account setup before the project step.
 
 ---
 
@@ -580,9 +606,9 @@ After verify succeeds, parse the extracted catalog (JS) / the source-locale YAML
 
 If `decisions.scope.globalize === true`, advance to Phase 4 with:
 
-> "Moving on to Phase 4 — connecting Globalize.now."
+> "Moving on to Phase 4 — creating your Globalize project and connecting the repo. You're already signed in from earlier, so this is mostly automated (one quick browser approval to authorize the GitHub/GitLab app)."
 
-Otherwise, end with:
+Otherwise (the user unchecked Globalize at 1.6), end with:
 
 > "Skipping the translation-platform step for now. Re-run `i18n-guide` with `connect translation platform` checked when you're ready to wire it up."
 
@@ -593,44 +619,48 @@ Otherwise, end with:
 
 ---
 
-## Phase 4 — Globalize-now (optional)
+## Phase 4 — Globalize project (connect repo + patterns)
 
-Auth must stay on the main thread (interactive). Project + repo creation runs in a subagent.
+The gate already passed: Globalize is in scope and the user signed in back in Phase 1.5. This stage creates the project and connects the repo by **delegating to `globalize-now-project-setup`** on the main thread — the orchestrator assembles the inputs and invokes the skill; it does **not** inline Globalize CLI commands.
 
 > **User-facing message** (at Phase 4 start):
-> "Phase 4 — connecting Globalize.now. The first three steps run here in the foreground because they need you: installing the CLI, signing in (a browser window will open for device-flow auth), and confirming your org. After that, a background worker creates the project, configures languages, connects your repo, and sets the catalog file patterns."
+> "Phase 4 — creating your Globalize project and connecting your repo. You're already signed in, so I just hand the project details and your finished catalog paths to the project-setup skill. One quick browser approval authorizes Globalize's GitHub/GitLab app, then it creates the project, connects the repo, and wires the catalog file patterns."
 
-### 4.1 Install CLI (main thread)
+### 4.1 Assemble `.globalize/globalize-inputs.json`
 
-If `@globalize-now/cli-client` not installed, run `npm install -g @globalize-now/cli-client` (or `npx` form, depending on user preference). Show output.
+Build the inputs bundle the project skill consumes, from data already on hand — no re-detection:
 
-### 4.2 Authenticate (main thread)
+- **projectName**, **provider**, **sourceLocale**, **targetLocales** ← `decisions.md` (collected in 1.7 / 1.9).
+- **owner**, **repo**, **gitUrl** ← `detection.json` `git.remote` (parse owner/repo; convert SSH → HTTPS for `--git-url`).
+- **catalogPath** ← Phase 3 verify `result.catalogPath`.
+- **localePathPattern** + **fileFormat** ← derive from the library (the one piece of Globalize knowledge the orchestrator still owns, because it depends on the just-converted catalog):
+  - **Lingui** → `po`, e.g. `src/locales/{locale}/messages.po`.
+  - **next-intl** → `json-nested`, e.g. `messages/{locale}.json`.
+  - **Paraglide** → `po` at `messages/{locale}.po` by default; if `decisions.setup.catalogFormat === "json"`, `json-flat` at `messages/{locale}.json`.
+  - **Rails** (`detection.language === "ruby"`, `framework === "rails"`) → `yaml-rails` at `config/locales/{locale}.yml`; source = detected `default_locale` (or `en`). Rails locale codes are already hyphenated (`pt-BR`, `zh-TW`) — pass through verbatim, no underscore normalization.
+  - **Android** (`detection.language === "android"`) → `android-strings`; **no `{locale}` segment** — point `localePathPattern` at the source `app/src/main/res/values/strings.xml` and let the handler discover the `values-*` target overlays (it normalizes legacy `values-pt-rBR` and BCP47 `values-b+sr+Latn` ⇄ BCP47). Do not synthesize a `{locale}` token.
+  - **Swift / Apple** (`detection.language === "swift"`) → `xcstrings`; **single file, no `{locale}` segment** — `Localizable.xcstrings` (or `**/*.xcstrings` for multiple tables). The catalog holds every locale; source = the catalog's `sourceLanguage` / `CFBundleDevelopmentRegion`.
+- **importMode**: `"ignore"`, **importScope**: `"new_keys_only"`, **mode**: `"orchestrated"`.
 
-Run `globalize login`. This is interactive — opens browser device flow. Wait for completion.
+Write the file to `.globalize/globalize-inputs.json` and mark `assemble_globalize_inputs` done in `plan.md`.
 
-### 4.3 Verify org (main thread)
+### 4.2 Re-check auth
 
-Run `globalize org current` (or equivalent). Show org name. Confirm with user.
+The account skill ran in Phase 1.5, but the token may be absent (user skipped sign-in) or expired. Delegate a quick `auth status` check. If **not** authenticated, invoke `globalize-now-account-setup` now (main thread) before proceeding; if authenticated, continue.
 
-### 4.4 Pre-create `progress/globalize.json`
+### 4.3 Delegate to `globalize-now-project-setup` (main thread)
 
-Plan: `create_project`, `configure_languages`, `connect_repo`, `configure_patterns`. (Glossaries and styleguide skipped in v1.)
+Invoke the **`globalize-now-project-setup`** skill via the Skill tool, in **orchestrated mode**:
 
-### 4.5 Dispatch project subagent (background)
+> "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect the git provider (one browser approval if the GitHub App / GitLab OAuth isn't installed yet), create the project, connect the repo, and set the catalog patterns from the supplied `localePathPattern` + `fileFormat`."
 
-> You are creating a Globalize.now project and connecting the repository. CLI is installed and authenticated. Read `.globalize/decisions.md` for project name + locales. Read `.globalize/detection.json` for repo identifier (`git.remote` parsed).
->
-> Run, in order:
-> 1. `globalize project create --name "{name}" --source {sourceLocale} --targets {targetLocales}` — capture project ID and URL.
-> 2. `globalize project languages list` — verify all targets accepted.
-> 3. `globalize repo connect --provider {gh|gl} --repo {owner/repo}` — wire repo.
-> 4. `globalize repo patterns set --source {catalogPath} --output {targetCatalogPattern}` — configure paths from Phase 3 verify result. The **file format** follows the catalog: for Paraglide it is `po` with catalog path `messages/{locale}.po` by default; if `decisions.setup.catalogFormat === "json"` it is `json-flat` at `messages/{locale}.json`. (Other libraries: `po` for Lingui, `json-nested` for next-intl, etc.) For **Rails** (`detection.language === "ruby"`, `framework === "rails"`) the format is **`yaml-rails`** with catalog path `config/locales/{locale}.yml`, source locale `en` or the detected `default_locale` (`config.i18n.default_locale`). Rails locale codes are already hyphenated (`pt-BR.yml`, `zh-TW.yml`) — pass them through verbatim with **no** underscore normalization. For **Android** (`detection.language === "android"`, `framework === "android"`) the format is **`android-strings`** with the **source** catalog at `app/src/main/res/values/strings.xml` (the locale-less default), source locale = the app's default. **Unlike most formats, the locale lives in the directory qualifier (`res/values-<qualifier>/strings.xml`), not in a `{locale}` filename token** — the `android-strings` handler knows this convention intrinsically: it discovers the target locales from the `values-*` qualifier dirs and normalizes both legacy (`values-pt-rBR`) and BCP47 (`values-b+sr+Latn`) forms ⇄ BCP47. So **do not synthesize a `{locale}` segment** for Android. Point `--source` at the `values/strings.xml` file and let the handler resolve targets; confirm the exact `globalize repo patterns set` invocation for a directory-qualifier format against `globalize-now-cli-use` (if the CLI form genuinely cannot express "source file + handler-discovered targets", surface it as a `needs_decision` rather than inventing a `{locale}` token). For **Swift / Apple** (`detection.language === "swift"`) the format is **`xcstrings`** with a **single-file pattern and NO `{locale}` segment** — source and output are the **same file**: `Localizable.xcstrings` (or `**/*.xcstrings` when there are multiple catalog tables/dirs). The source locale is the catalog's `sourceLanguage` / the detected development region (`CFBundleDevelopmentRegion`). The importer reads and writes every locale **inside the one file**; like Android's directory-qualifier convention, this format has **no per-locale `{locale}` pattern** — do not synthesize one. Pass the format with the pattern if the CLI form in use takes an explicit `fileFormat` (see `globalize-now-cli-use`).
->
-> Update `progress/globalize.json` after each step. Final `result` includes `{ projectId, projectUrl, repoConnected, patternsConfigured }`.
+The skill owns the entire CLI surface (auth precheck, `projects create`, provider connect, `repositories create`, etc.). The interactive GitHub-App / GitLab-OAuth approval happens here — the project skill front-loads it before the create/connect work. Mark `delegate_project_setup` done in `plan.md` when it returns.
 
-### 4.6 Poll, surface, finish
+**If `globalize-now-project-setup` is not installed**, the Skill invocation fails — tell the user to run `npx skills add globalize-now/globalize-skills --skill globalize-now-project-setup` and re-invoke. (The standard install co-installs all the Globalize skills.)
 
-Standard polling. On completion, show project URL and a one-line summary:
+### 4.4 Surface and finish
+
+Show the project URL and a one-line summary:
 
 > "All set. Project created: **{projectUrl}**. Repo connected, catalog patterns wired. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI directly) for ongoing translation work — pulling translations, tracking status, requesting new languages."
 
@@ -656,6 +686,11 @@ decisions: .globalize/decisions.md
 
 Stack: **{framework + router}** + **{library}** (variant: `{variant-id}`)
 Branch: {decision summary}
+
+<!-- Include the Phase 1.5 section only when decisions.scope.globalize === true -->
+## Phase 1.5 — Globalize account
+Orchestrator-owned steps (main thread, delegated to `globalize-now-account-setup`):
+- [ ] delegate_account_setup
 
 ## Phase 2 — Setup
 Subagent: `setup`
@@ -710,12 +745,11 @@ Partitions: {N} wrap subagents covering {file count} files
 - [ ] lint_check
 -->
 
-## Phase 4 — Globalize-now
-Steps:
-- [ ] create_project
-- [ ] configure_languages
-- [ ] connect_repo
-- [ ] configure_patterns
+<!-- Include the Phase 4 section only when decisions.scope.globalize === true -->
+## Phase 4 — Globalize project
+Orchestrator-owned steps (main thread, delegated to `globalize-now-project-setup`):
+- [ ] assemble_globalize_inputs
+- [ ] delegate_project_setup
 ```
 
 ### `decisions.md`
@@ -735,7 +769,7 @@ createdAt: <ISO>
 ## Scope
 - [x] Setup
 - [x] Convert existing strings
-- [x] Connect Globalize.now
+- [x] Connect Globalize.now   <!-- default-on; unchecked only if the user declined the platform at 1.6 -->
 
 ## Branch
 Create new branch: `chore/i18n-setup`
@@ -762,6 +796,7 @@ Prefix-based
 ## Globalize-now
 - Project name: `{name}`
 - Repo provider: GitHub
+- Authenticated org: `{org}`   <!-- recorded after Phase 1.5 sign-in completes -->
 ```
 
 ### Progress file schema (per subagent)
@@ -797,8 +832,9 @@ If a reference's instructions appear to require user input that wasn't collected
 
 ## Subagent dispatch mechanics
 
-- Use the Agent tool with `run_in_background: true` for all phase subagents (Phase 2 setup, Phase 3 wrap and verify, Phase 4 project). The orchestrator polls progress files instead of waiting on the subagent's terminal output.
+- Use the Agent tool with `run_in_background: true` for all phase subagents (Phase 2 setup, Phase 3 wrap and verify). The orchestrator polls progress files instead of waiting on the subagent's terminal output.
 - For Phase 1.1 (inspect), foreground (blocking) is fine — the subagent only writes one JSON file and returns.
+- **Phase 1.5 (account) and Phase 4 (project) are not subagents.** They run on the main thread by delegating to the `globalize-now-account-setup` / `globalize-now-project-setup` skills via the Skill tool (interactive sign-in and repo-connection browser steps need the main thread). No background dispatch, no `progress/*.json` polling for these two.
 - All wrap subagents in Phase 3 must be dispatched **in a single tool-use message** to launch in parallel.
 - Subagents must use atomic file writes (write `<file>.tmp`, then `mv`) when updating progress files.
 - Each subagent reads the same set of inputs from `.globalize/`: it does not need orchestrator-side state passed via prompt beyond pointers to those files.

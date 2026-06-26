@@ -323,6 +323,6 @@ qualifier dir form (API 24+) and per-app language (API 33+ / AppCompat 1.6).
   layouts (via Lint `HardcodedText`) and in Kotlin/Java/Compose (grep-and-wrap), externalizes it to
   `strings.xml`, and replaces it with `getString`/`stringResource`.
 - **Connect a translation service** — with `res/values/strings.xml` populated, connect via the
-  `globalize-now-cli-setup` skill. The format is **`android-strings`**; the source is
+  `globalize-now-project-setup` skill (sign in first via `globalize-now-account-setup`). The format is **`android-strings`**; the source is
   `app/src/main/res/values/strings.xml`, and the handler discovers target locales from the `values-<qualifier>`
   dirs (no `{locale}` filename token).

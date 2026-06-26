@@ -824,6 +824,6 @@ Then add:
 
 > Rough local heuristic — globalize.now will return a precise quote once the project is set up.
 >
-> **Next step:** set up a Globalize project to run the translations. Run the `globalize-now-cli-setup` skill to install the CLI, authenticate, create a project, and connect this repo. Want me to start it now?
+> **Next step:** set up a Globalize project to run the translations. If you're not signed in yet, run `globalize-now-account-setup` (install the CLI + authenticate), then `globalize-now-project-setup` to create the project and connect this repo. Want me to start it now?
 
-Wait for the user's answer. If yes, invoke `globalize-now-cli-setup` via the Skill tool. If no or defer, end the conversion here.
+Wait for the user's answer. If yes, invoke `globalize-now-account-setup` first (skip if already signed in), then `globalize-now-project-setup` via the Skill tool. If no or defer, end the conversion here.
