@@ -1,7 +1,0 @@
-{
-  "name": "globalize-now-cli-setup",
-  "version": "1.0.0",
-  "description": "Set up the Globalize CLI: install, authenticate, create a translation project, connect a GitHub or GitLab repository.",
-  "tags": ["globalize", "translations", "cli", "setup"],
-  "supportedAgents": ["claude-code"]
-}

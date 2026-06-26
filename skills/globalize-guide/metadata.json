@@ -1,0 +1,7 @@
+{
+  "name": "globalize-guide",
+  "version": "1.0.0",
+  "description": "Detect, set up, convert, and connect Globalize.now for any supported i18n stack. Drives the full localization journey — inspect, Globalize account sign-in (upfront), library setup, string conversion, and project + repo connection (at the end) — with subagent execution and shared progress tracking.",
+  "tags": ["i18n", "internationalization", "localization", "lingui", "next-intl", "translations"],
+  "supportedAgents": ["claude-code"]
+}
