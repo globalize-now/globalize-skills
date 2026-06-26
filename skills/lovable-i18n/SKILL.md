@@ -23,6 +23,8 @@ Three consequences of that design, worth internalizing before you start:
 
 The library is **Lingui v6**, with one PO catalog per locale at `src/locales/{locale}/messages.po`.
 
+Because the whole pipeline — the catalog-sync workflow (Phase 5) and the Globalize.now hand-off (Phase 6) — runs through GitHub, this skill confirms GitHub is connected before doing anything, and stops until it is. See **Prerequisite: GitHub connection** below.
+
 ## Phases
 
 | Phase | What happens |
@@ -35,7 +37,24 @@ The library is **Lingui v6**, with one PO catalog per locale at `src/locales/{lo
 | 5 CI | Add a GitHub Action that runs `lingui extract` and keeps catalogs in sync |
 | 6 Connect | Hand off catalogs to the Globalize.now translation platform |
 
-Work the phases in order. Detect and Ask are quick; Setup is the bulk of the work.
+Work the phases in order. Detect and Ask are quick; Setup is the bulk of the work. Before Phase 1, confirm GitHub is connected (**Prerequisite** below) — the skill stops until it is.
+
+---
+
+## Prerequisite: GitHub connection
+
+**Before any i18n work — before even detecting the stack — confirm this Lovable project is connected to GitHub.** This is a hard gate. Everything this skill ultimately delivers runs through GitHub: the catalog-sync workflow (Phase 5) and the Globalize.now translation hand-off (Phase 6) both operate on the GitHub repository, which lives outside Lovable's sandbox. Globalize reads your message catalogs **from** GitHub and delivers translations **back through** it — there is no supported way to send your text out for translation or get it back without a connected repo.
+
+You know whether GitHub is connected from your Lovable project context — you don't need to read a file or run any command to tell. *(If you genuinely can't determine it from your context, ask the user to confirm before continuing.)* Do **not** infer connection from files in the tree: `.gitignore`, `package.json`, and a `.git` folder ship in every Lovable scaffold whether or not GitHub is connected, so they're false positives.
+
+- **If GitHub is connected** → say so in one line and continue to Phase 1.
+- **If GitHub is not connected** → **stop here.** Don't detect the stack, don't install anything, don't edit files. Tell the user:
+
+  > To translate this app I need it connected to GitHub first. The translation platform (Globalize.now) and the catalog-sync workflow both read and write your message catalogs through your GitHub repo — without it, there's no way to send your text out for translation or get it back.
+  >
+  > Connect it with the **GitHub button at the top-right of the editor** (or **Settings → GitHub**): authorize the Lovable GitHub App and create or link a repository. Once it's connected, tell me to continue and I'll set up translations.
+
+  Then wait. Resume at Phase 1 once the user confirms GitHub is connected.
 
 ---
 
@@ -106,10 +125,10 @@ Then send **one chat message** with every question and a sensible default pre-se
 > 3. **Locale in the URL?**
 >    - **No URL locale (default)** — language is remembered per visitor (saved choice → browser language). URLs stay exactly as they are. Simplest, no link changes.
 >    - URL prefix (`/es/dashboard`) — every page exists per language; shareable, SEO-friendly language URLs, but all internal links need a locale prefix.
-> 4. **Catalog sync via GitHub Actions** — a workflow that extracts new texts into the catalogs whenever code changes. **Default: yes.** Requires GitHub to be connected in Lovable (Settings → GitHub).
+> 4. **Catalog sync via GitHub Actions** — a workflow that extracts new texts into the catalogs whenever code changes. **Default: yes.** GitHub is already connected (the prerequisite), so this just adds the workflow.
 > 5. **Connect Globalize.now** — a translation platform that fills in the actual translations via PRs. Optional, can be added later.
 
-After the user answers, execute the whole plan without further pauses. Only stop again for blockers: a build error you cannot resolve, an escape hatch from 1.1, or a missing GitHub connection when the user asked for CI.
+After the user answers, execute the whole plan without further pauses. Only stop again for blockers: a build error you cannot resolve, or an escape hatch from 1.1. GitHub connection is already settled by the prerequisite, so it's not a mid-flow stop.
 
 Record the answers — `SOURCE_LOCALE`, the locale list, routing choice, opt-ins — you will substitute them into every snippet below. The snippets use `en` as source and `['en', 'es', 'fr']` as the locale list; replace with the real choices everywhere.
 
@@ -1161,7 +1180,7 @@ If Lovable reports a GitHub sync conflict on a `.po` file (you and CI/Globalize 
 
 ## Phase 5: CI — catalog extraction workflow
 
-Only if the user opted in during Ask. **Precondition:** GitHub is connected in Lovable (Settings → GitHub). If it isn't, tell the user to connect it first — without the sync, the workflow file never reaches GitHub and CI never runs.
+Only if the user opted in during Ask. GitHub is already connected — the prerequisite gate guaranteed it before any setup ran — so the workflow file syncs to the repo and CI can run.
 
 This workflow is what retires the hand-maintenance protocol: after every code push, it runs `lingui extract` and commits the normalized catalogs back. You keep adding entries by hand only as a same-edit courtesy (so strings are immediately visible to translators); CI is the authority that fixes anything you got slightly wrong.
 
@@ -1221,6 +1240,8 @@ Verify with the user after the next code push: the `i18n-extract` run shows up i
 
 Only if the user opted in. The Globalize CLI can't run inside Lovable — these steps happen **outside this chat**, on the Globalize dashboard or the user's machine. Your job is to print everything the user needs, ready to paste.
 
+GitHub is already connected (the prerequisite), so your catalogs already live in a repo Globalize can reach — connecting Globalize just points it at that same repo.
+
 Print this connection summary (with the project's real values):
 
 > **Globalize.now connection details**
@@ -1230,7 +1251,7 @@ Print this connection summary (with the project's real values):
 > - Catalog pattern: `src/locales/{locale}/messages.po`
 > - File format: `po`
 
-**Option 1 — Globalize.now dashboard (no tooling needed).** On [globalize.now](https://globalize.now): create a project with those source/target languages, connect the GitHub repository (this installs the Globalize GitHub App — approve it in the browser), and set the catalog pattern and file format above.
+**Option 1 — Globalize.now dashboard (no tooling needed).** On [globalize.now](https://globalize.now): create a project with those source/target languages, connect the **same GitHub repository Lovable syncs to** (this installs the Globalize GitHub App — approve it in the browser; translation deliveries then flow back into Lovable through that repo), and set the catalog pattern and file format above.
 
 **Option 2 — Globalize CLI on the user's machine (requires Node.js).** Give the user this sequence to run locally:
 
