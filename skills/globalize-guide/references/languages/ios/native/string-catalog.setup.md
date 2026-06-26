@@ -118,8 +118,8 @@ Before proceeding, check for blockers. **If any check below says STOP, you MUST 
 
 | Check | How to detect | Action |
 |-------|--------------|--------|
-| **Not a native Apple project** | No `*.xcodeproj`/`*.xcworkspace` and no `Package.swift`; no `*.swift`/`*.m`/`*.h` | **STOP.** Tell the user: "No native Apple (Swift) project detected. This setup phase requires an Xcode project or a Swift package. For a cross-platform mobile project (React Native, Flutter, Capacitor), a different i18n-guide variant applies." |
-| **Cross-platform wrapper detected** | `package.json` with React Native / Expo / Capacitor, or `pubspec.yaml` (Flutter) at root alongside the iOS dir | **STOP.** Tell the user: "This looks like a {framework} project that embeds an iOS target. Localize at the {framework} layer, not via the native String Catalog — a different i18n-guide variant applies." |
+| **Not a native Apple project** | No `*.xcodeproj`/`*.xcworkspace` and no `Package.swift`; no `*.swift`/`*.m`/`*.h` | **STOP.** Tell the user: "No native Apple (Swift) project detected. This setup phase requires an Xcode project or a Swift package. For a cross-platform mobile project (React Native, Flutter, Capacitor), a different globalize-guide variant applies." |
+| **Cross-platform wrapper detected** | `package.json` with React Native / Expo / Capacitor, or `pubspec.yaml` (Flutter) at root alongside the iOS dir | **STOP.** Tell the user: "This looks like a {framework} project that embeds an iOS target. Localize at the {framework} layer, not via the native String Catalog — a different globalize-guide variant applies." |
 | **Objective-C-first stack** | Only `*.m`/`*.h` sources; no Swift | **Warn (non-blocking).** Tell the user: "This is an Objective-C project. String Catalogs work, but this skill authors Swift. I can still create the catalog and convert existing `.strings`/`.stringsdict` as input; new authoring guidance assumes Swift. Proceeding for catalog + migration only." |
 | **Existing catalog already configured** | A populated `Localizable.xcstrings` already present | **Warn (non-blocking).** Tell the user: "A String Catalog already exists at `{path}`. I'll inspect it and skip catalog creation (Step 3), continuing with locale registration and the coding rules." Skip Step 3 but continue. |
 
@@ -149,7 +149,7 @@ If no blockers were found, proceed to the **Setup Mode** prompt before continuin
 
 ## Step 2: No Install — Localization Ships with the SDK
 
-**There is nothing to install.** This is the key departure from every other i18n-guide variant, which installs an npm/SPM package and wires a compiler plugin. Apple localization is **built into Foundation and SwiftUI**:
+**There is nothing to install.** This is the key departure from every other globalize-guide variant, which installs an npm/SPM package and wires a compiler plugin. Apple localization is **built into Foundation and SwiftUI**:
 
 - The localization APIs (`Text(...)`, `String(localized:)`, `LocalizedStringKey`, `NSLocalizedString`) are part of the SDK.
 - **CLDR plural rules ship with the SDK** — there is no `rails-i18n`/plural-data package to add. The system selects the correct plural category per locale at runtime.
@@ -266,27 +266,27 @@ For Objective-C `NSLocalizedString` call sites, the conversion can ingest them a
 
 ## Step 8: Enable Coding Rules
 
-The Apple String Catalog coding rules at `references/languages/ios/native/string-catalog.code.md` contain the rules for auto-localizing `Text` literals, `String(localized:)`, `comment:` translator context, C-style format specifiers, catalog plural authoring (no ICU), and what not to wrap. They ship as part of the `i18n-guide` skill and already live at `.claude/skills/i18n-guide/references/languages/ios/native/string-catalog.code.md` in the target project.
+The Apple String Catalog coding rules at `references/languages/ios/native/string-catalog.code.md` contain the rules for auto-localizing `Text` literals, `String(localized:)`, `comment:` translator context, C-style format specifiers, catalog plural authoring (no ICU), and what not to wrap. They ship as part of the `globalize-guide` skill and already live at `.claude/skills/globalize-guide/references/languages/ios/native/string-catalog.code.md` in the target project.
 
 Wire the rules in via a single `@import` line. Idempotently append the exact line
 
 ```
-@.claude/skills/i18n-guide/references/languages/ios/native/string-catalog.code.md
+@.claude/skills/globalize-guide/references/languages/ios/native/string-catalog.code.md
 ```
 
 to the target project's root `CLAUDE.md` (create the file with just that line if it doesn't exist; if the exact line is already present, skip silently — do not duplicate it). Imported files load into every session's context, so the rules apply on every edit without relying on skill routing. **Tell the user to approve the `@` import once when Claude Code prompts** — until approved, the rules won't load.
 
-Verify `.claude/skills/i18n-guide/references/languages/ios/native/string-catalog.code.md` exists in the target project.
+Verify `.claude/skills/globalize-guide/references/languages/ios/native/string-catalog.code.md` exists in the target project.
 
 - **If it exists**: proceed with the wiring.
-- **If it is missing — guided mode**: tell the user the `i18n-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
 - **If it is missing — unguided mode**: skip the CLAUDE.md append and record `⚠ iOS coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
 
 ---
 
 ## Tooling Floor — No Pins, No Install
 
-This variant has **no package pins** and **no install** of any kind — the architectural departure from every other i18n-guide variant.
+This variant has **no package pins** and **no install** of any kind — the architectural departure from every other globalize-guide variant.
 
 - **Build-time floor:** String Catalogs require **Xcode 15** or newer to build (the catalog `version` is `"1.0"` for Xcode 15+). This is a *tooling* floor, not a runtime one.
 - **No runtime floor / no minimum deployment target:** adopting a catalog adds **no minimum deployment target** and imposes **no deployment-target floor**. At build time the catalog compiles down to legacy `.strings` + `.stringsdict`, which the OS has supported for years, so apps targeting old iOS versions are unaffected.

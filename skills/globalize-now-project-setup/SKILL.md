@@ -35,7 +35,7 @@ If this returns a valid `source` and `key`, continue. If it fails or reports no 
 
 ## Supplied inputs (orchestrated mode)
 
-This skill can be driven by another skill (e.g. the `i18n-guide` orchestrator) that has already collected the project details and just-converted catalog paths.
+This skill can be driven by another skill (e.g. the `globalize-guide` orchestrator) that has already collected the project details and just-converted catalog paths.
 
 **If `.globalize/globalize-inputs.json` exists in the project root** (or the invoking prompt supplies these values directly), read it and treat its fields as authoritative: skip the **detection** in Step 1 and the **Setup Mode** prompt below, run **unguided**, and proceed straight to Step 2 (provider connection) → Step 3 (create project) → Step 4 (connect repo). Do **not** re-detect or re-prompt for anything the file provides.
 
@@ -166,7 +166,7 @@ During detection, also determine the **locale file path pattern** — a path tem
 | **LinguiJS** (single catalog) | Read `catalogs[0].path` from config. Strip `<rootDir>/` prefix. Append `.po`. Example: `src/locales/{locale}/messages.po` |
 | **LinguiJS** (per-page catalogs) | Read `catalogs[0].path`. Replace `{entryDir}`/`{entryName}` with `**/*` wildcards, keep `{locale}`. Example: `src/app/{locale}/**/*.po` |
 | **next-intl** | Check `messages/` directory. Flat JSON files per locale → `messages/{locale}.json`. Subdirectories with multiple namespace files → `messages/{locale}/{namespace}.json` |
-| **Paraglide** | Flat message catalog per locale. `messages/{locale}.po` for the PO format (the i18n-guide default — a `plugin.globalizeNow.po` key in `project.inlang/settings.json`, or `messages/*.po` files present); `messages/{locale}.json` for the ICU-JSON format (`plugin.inlang.icu-messageformat-1`, or `messages/*.json`) |
+| **Paraglide** | Flat message catalog per locale. `messages/{locale}.po` for the PO format (the globalize-guide default — a `plugin.globalizeNow.po` key in `project.inlang/settings.json`, or `messages/*.po` files present); `messages/{locale}.json` for the ICU-JSON format (`plugin.inlang.icu-messageformat-1`, or `messages/*.json`) |
 | **i18next** | Read `backend.loadPath` from config. Replace `{{lng}}` → `{locale}`, `{{ns}}` → `{namespace}`. Example: `locales/{locale}/{namespace}.json` |
 | **react-intl** | No standard config key. Derive from directory scanning below. |
 | **Rails** | Pattern is always `config/locales/{locale}.yml`. Note in detection output that Rails projects may also have split files (e.g. `config/locales/devise.en.yml`) or subdirectories — the pattern targets the primary per-locale files. |
@@ -184,7 +184,7 @@ When a locale path pattern is determined, also determine the **file format**. Th
 |--------|----------------|
 | **LinguiJS** | `po` |
 | **next-intl** | `json-nested` (next-intl uses nested key structure) |
-| **Paraglide** | `po` if `messages/*.po` are present (the i18n-guide default — PO format via `@globalize-now/paraglidejs-po-format`, carries `#.` translator comments). `json-flat` for `messages/*.json` (ICU-JSON; flat key → ICU string, no translator comments) |
+| **Paraglide** | `po` if `messages/*.po` are present (the globalize-guide default — PO format via `@globalize-now/paraglidejs-po-format`, carries `#.` translator comments). `json-flat` for `messages/*.json` (ICU-JSON; flat key → ICU string, no translator comments) |
 | **i18next** | `json-nested` by default. If `keySeparator: false` in config, use `json-flat`. |
 | **react-intl** | Inspect file content (see JSON detection below) |
 | **`.po` / `.pot` files** | `po` |

@@ -12,7 +12,7 @@ Install via the standard [`npx skills`](https://github.com/vercel-labs/skills) C
 
 ```bash
 # Install a single skill into the current project
-npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code
+npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code
 
 # Install all skills
 npx skills add globalize-now/globalize-skills -a claude-code
@@ -23,7 +23,7 @@ npx skills add globalize-now/globalize-skills -a claude-code
 Copy a skill directly into your project:
 
 ```bash
-cp -r skills/i18n-guide /path/to/your/project/.claude/skills/i18n-guide
+cp -r skills/globalize-guide /path/to/your/project/.claude/skills/globalize-guide
 ```
 
 The skill will be available next time you start a Claude Code conversation.
@@ -36,7 +36,7 @@ The skill will be available next time you start a Claude Code conversation.
 
 | Skill | Description |
 |---|---|
-| `i18n-guide` | Orchestrates the full i18n journey for a project: detect stack, recommend a library, install + configure, wrap existing strings, and connect Globalize.now for translation (on by default — account sign-in runs upfront, project + repo connection at the end). Drives the work through subagents with shared progress tracking. |
+| `globalize-guide` | Orchestrates the full i18n journey for a project: detect stack, recommend a library, install + configure, wrap existing strings, and connect Globalize.now for translation (on by default — account sign-in runs upfront, project + repo connection at the end). Drives the work through subagents with shared progress tracking. |
 | `globalize-now-account-setup` | Install the Globalize CLI and authenticate (account sign-in). |
 | `globalize-now-project-setup` | Create a translation project, connect a GitHub or GitLab repository, and set catalog file patterns. Assumes the CLI is installed and authenticated. |
 | `globalize-now-cli-use` | Manage existing Globalize translation resources (languages, glossaries, style guides, repositories, team members, API keys). |

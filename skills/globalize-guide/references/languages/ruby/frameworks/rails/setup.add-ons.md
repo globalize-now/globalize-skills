@@ -12,14 +12,14 @@ Rails paths are fixed by the core setup: catalogs live in `config/locales/{local
 
 ## Add-on 1: Coding rules (`@import`)
 
-The Rails i18n coding rules at `references/languages/ruby/frameworks/rails/rails.code.md` contain the rules for `I18n.with_locale`, lazy dot-lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap. They ship as part of the `i18n-guide` skill and already live at `.claude/skills/i18n-guide/references/languages/ruby/frameworks/rails/rails.code.md` in the target project.
+The Rails i18n coding rules at `references/languages/ruby/frameworks/rails/rails.code.md` contain the rules for `I18n.with_locale`, lazy dot-lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap. They ship as part of the `globalize-guide` skill and already live at `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` in the target project.
 
 Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits — they aren't consulted unless explicitly invoked. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
 
-Verify `.claude/skills/i18n-guide/references/languages/ruby/frameworks/rails/rails.code.md` exists in the target project.
+Verify `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` exists in the target project.
 
 - **If it exists**: proceed.
-- **If it is missing — guided mode**: tell the user the `i18n-guide` skill is not installed in their project and stop this add-on. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this add-on. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
 - **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ Rails coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
 
 Check whether `CLAUDE.md` exists at the project root.
@@ -28,10 +28,10 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/i18n-guide/references/languages/ruby/frameworks/rails/rails.code.md
+  @.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/i18n-guide/references/languages/ruby/frameworks/rails/rails.code.md` to your CLAUDE.md so the Rails i18n coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` to your CLAUDE.md so the Rails i18n coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
 If the exact `@` line is already present, skip silently — this add-on is idempotent.
 

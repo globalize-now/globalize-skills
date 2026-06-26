@@ -285,7 +285,7 @@ before_action { I18n.locale = params[:locale] || I18n.default_locale }
 
 The locale switcher above reads `params[:locale]`, which requires the locale to appear in the request parameters. The idiomatic Rails approach is to embed the locale in the URL path (e.g. `/en/books`, `/es/books`).
 
-**When run via the `i18n-guide` orchestrator, this choice is already collected in Phase 1** (`SKILL.md` §1.7 asks it explicitly for Rails and records it under `decisions.setup`) — read the decision and apply it; do **not** re-ask. When this reference is used standalone — **ask the user (guided mode) / apply by default (unguided mode):**
+**When run via the `globalize-guide` orchestrator, this choice is already collected in Phase 1** (`SKILL.md` §1.7 asks it explicitly for Rails and records it under `decisions.setup`) — read the decision and apply it; do **not** re-ask. When this reference is used standalone — **ask the user (guided mode) / apply by default (unguided mode):**
 
 > **Would you like to add URL-based locale routing?** This embeds the locale code in the URL path — e.g. `/en/books`, `/es/books`. It requires wrapping your routes in a scope and overriding `default_url_options`.
 
@@ -359,14 +359,14 @@ This setting is safe to emit unconditionally (no version-gated branches); on Rai
 
 ## Step 7: Enable Coding Rules
 
-The Rails i18n coding rules at `references/languages/ruby/frameworks/rails/rails.code.md` contain the rules for `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap. They ship as part of the `i18n-guide` skill and already live at `.claude/skills/i18n-guide/references/languages/ruby/frameworks/rails/rails.code.md` in the target project.
+The Rails i18n coding rules at `references/languages/ruby/frameworks/rails/rails.code.md` contain the rules for `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap. They ship as part of the `globalize-guide` skill and already live at `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` in the target project.
 
 Follow the procedure in `references/languages/ruby/frameworks/rails/setup.add-ons.md` to wire the `@import` line into the target project's `CLAUDE.md`.
 
-Verify `.claude/skills/i18n-guide/references/languages/ruby/frameworks/rails/rails.code.md` exists in the target project.
+Verify `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` exists in the target project.
 
 - **If it exists**: proceed with the wiring.
-- **If it is missing — guided mode**: tell the user the `i18n-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
 - **If it is missing — unguided mode**: skip the CLAUDE.md append and record `⚠ Rails coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
 
 ---

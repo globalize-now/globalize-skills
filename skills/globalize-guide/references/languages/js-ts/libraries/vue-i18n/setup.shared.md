@@ -17,7 +17,7 @@ This setup phase covers **Vue 3** projects using the **Composition API** on **Vi
 - **Quasar** — partially covered (experimental reference file). Warn the user v1 treats this as experimental; proceed only on explicit confirmation.
 - **Non-ICU message format** — this setup phase configures ICU MessageFormat via a custom `messageCompiler`. Projects that need vue-i18n's native pipe-plural / custom-format syntax for existing content should not run this setup.
 - **Converting existing hardcoded strings** to `t('...')` across the codebase — handled by the convert phase. This setup phase only scaffolds; it does not rewrite your views. Run the convert phase after setup is complete.
-- **Other Vue i18n libraries** (`i18next-vue`, `@tolgee/vue`, `fluent-vue`, Lingui-for-Vue, Paraglide) — this setup phase installs `vue-i18n` exclusively. If one of these is already installed, **hard stop** (same pattern as Lingui's "existing i18n library" check). Paraglide (`@inlang/paraglide-js`) is a supported library for **SvelteKit** projects via the i18n-guide skill, but inside a **Vue** project it is a competing library — the hard stop still applies here.
+- **Other Vue i18n libraries** (`i18next-vue`, `@tolgee/vue`, `fluent-vue`, Lingui-for-Vue, Paraglide) — this setup phase installs `vue-i18n` exclusively. If one of these is already installed, **hard stop** (same pattern as Lingui's "existing i18n library" check). Paraglide (`@inlang/paraglide-js`) is a supported library for **SvelteKit** projects via the globalize-guide skill, but inside a **Vue** project it is a competing library — the hard stop still applies here.
 
 ---
 
@@ -532,14 +532,14 @@ If any step fails, check the build tool integration (Step 4) first — most setu
 
 ## Step 8: Enable Coding Rules
 
-The vue-i18n coding rules at `references/languages/js-ts/libraries/vue-i18n/code.md` contain the rules for wrapping strings, attributes, plurals, and numbers correctly as new Vue code is written. They ship as part of the `i18n-guide` skill, so the file already lives at `.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md` in the target project.
+The vue-i18n coding rules at `references/languages/js-ts/libraries/vue-i18n/code.md` contain the rules for wrapping strings, attributes, plurals, and numbers correctly as new Vue code is written. They ship as part of the `globalize-guide` skill, so the file already lives at `.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md` in the target project.
 
 Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits — they aren't consulted unless the user explicitly invokes them. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
 
-Verify `.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md` exists.
+Verify `.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md` exists.
 
 - **If it exists**: proceed.
-- **If it is missing — guided mode**: tell the user the `i18n-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill i18n-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
 - **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ vue-i18n coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
 
 Check whether `CLAUDE.md` exists at the project root.
@@ -548,10 +548,10 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md
+  @.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/i18n-guide/references/languages/js-ts/libraries/vue-i18n/code.md` to your CLAUDE.md so the vue-i18n coding rules auto-load every session") and wait for confirmation before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md` to your CLAUDE.md so the vue-i18n coding rules auto-load every session") and wait for confirmation before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
 

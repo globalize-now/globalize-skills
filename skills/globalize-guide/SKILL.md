@@ -1,5 +1,5 @@
 ---
-name: i18n-guide
+name: globalize-guide
 description: >-
   Drive the full internationalization journey for a project — detect the stack,
   recommend a library, set up the chosen library, wrap existing strings, and
@@ -225,7 +225,7 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 
 | Condition | Stop message |
 |---|---|
-| `language === "js-ts"` AND `react === false` AND `vue === false` AND `svelte === false` | "i18n-guide currently supports React-based, Vue-based, and Svelte-based projects only. This project uses {framework}. No supported library available." |
+| `language === "js-ts"` AND `react === false` AND `vue === false` AND `svelte === false` | "globalize-guide currently supports React-based, Vue-based, and Svelte-based projects only. This project uses {framework}. No supported library available." |
 | `framework === "cra"` | "Create React App is no longer supported by this skill. Migrate to Vite or Next.js, then re-run." |
 | `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
 | `framework === "next"` AND `router === "pages"` AND user wants Lingui | (Surface only after library choice in 1.5) "Lingui setup does not currently cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router." |
@@ -239,7 +239,7 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 
 | Condition | Action |
 |---|---|
-| `language === "ruby"` AND `framework !== "rails"` | **STOP.** "i18n-guide currently supports Ruby only through Rails (built-in `I18n` API + locale-rooted YAML). Non-Rails Ruby (Sinatra, Hanami, plain `i18n` gem) is not supported. Point me at a Rails app, or use the `i18n` gem docs directly." |
+| `language === "ruby"` AND `framework !== "rails"` | **STOP.** "globalize-guide currently supports Ruby only through Rails (built-in `I18n` API + locale-rooted YAML). Non-Rails Ruby (Sinatra, Hanami, plain `i18n` gem) is not supported. Point me at a Rails app, or use the `i18n` gem docs directly." |
 | `gettext_i18n_rails` OR `fast_gettext` in `Gemfile`/`Gemfile.lock` | **STOP.** "This project uses `gettext_i18n_rails` — the catalog format is PO, not YAML. The v1 Rails path supports locale-rooted YAML only; the PO/gettext overlay for Rails is not yet supported. Proceed manually, or wait for the PO overlay." |
 
 **Name-collision warning (Ruby, non-blocking):** if `globalize`, `mobility`, or `traco` was detected (the model/DB-content translation gems — unrelated to Globalize.now), surface but do **not** stop: "I found `{gem}` in your Gemfile. It translates DB/model content (per-row data), not UI strings, and is unrelated to Globalize.now. The i18n setup won't touch it, and its content won't be in the connected catalog. Proceeding with UI-string i18n." Never conflate the `globalize` gem with the Globalize.now platform.
@@ -251,7 +251,7 @@ When stopping, prefix the message with `Compatibility check — found a blocker:
 | Condition | Action |
 |---|---|
 | `react-native` in `package.json` AND an `android/` folder present | **STOP.** "This is a React Native app. React Native localizes through JS i18n libraries (i18next, react-intl, Lingui), not native Android string resources. Native `android-strings` support targets native Kotlin/Java apps. Use the JS path, or wait for RN support." |
-| `@capacitor/core`, `cordova`, or any `@ionic/*` in `package.json` AND an `android/` folder present | **STOP.** "This looks like a Capacitor/Cordova/Ionic hybrid app — its UI is localized in the web layer, not in native `strings.xml`. Run i18n-guide against the web UI (the JS path)." |
+| `@capacitor/core`, `cordova`, or any `@ionic/*` in `package.json` AND an `android/` folder present | **STOP.** "This looks like a Capacitor/Cordova/Ionic hybrid app — its UI is localized in the web layer, not in native `strings.xml`. Run globalize-guide against the web UI (the JS path)." |
 | `pubspec.yaml` present (Flutter) | **STOP.** "This is a Flutter app. Flutter localizes via `.arb` files and `gen_l10n`, not native Android `strings.xml`. Flutter support isn't available yet." |
 | `language === "android"` AND a Kotlin/Compose **Multiplatform** layout (resources under `commonMain` / a `compose.resources` setup, no `app/src/main/res`) | **Warn (non-blocking).** "This looks like a Kotlin/Compose Multiplatform project, which uses a different resource mechanism (`compose.resources`) than standard Android `res/values/strings.xml`. v1 covers standard Android only — I'll proceed against the Android resource dirs I can find, but multiplatform resources won't be handled." |
 
@@ -412,7 +412,7 @@ This stage gets the user signed in to Globalize **before** any code changes, so 
 
 When it completes, record the authenticated org under `decisions.md` → `## Globalize-now` → `Authenticated org` (a soft audit marker), and mark `delegate_account_setup` done in `plan.md`.
 
-**If `globalize-now-account-setup` is not installed** (i18n-guide installed on its own), the Skill invocation fails. Tell the user:
+**If `globalize-now-account-setup` is not installed** (globalize-guide installed on its own), the Skill invocation fails. Tell the user:
 
 > "I couldn't load the `globalize-now-account-setup` skill — install the Globalize skills with `npx skills add globalize-now/globalize-skills`, then I'll continue." (The standard install co-installs all of them, so this is rare.)
 
@@ -610,7 +610,7 @@ If `decisions.scope.globalize === true`, advance to Phase 4 with:
 
 Otherwise (the user unchecked Globalize at 1.6), end with:
 
-> "Skipping the translation-platform step for now. Re-run `i18n-guide` with `connect translation platform` checked when you're ready to wire it up."
+> "Skipping the translation-platform step for now. Re-run `globalize-guide` with `connect translation platform` checked when you're ready to wire it up."
 
 ### Phase 3 collapse-cases
 

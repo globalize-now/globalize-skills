@@ -23,7 +23,7 @@ This setup phase covers **native Android** apps (Kotlin and/or Java, Views and/o
 
 - **React Native, Capacitor, Cordova, Ionic** (and other JS/web wrappers) — these ship a native `android/`
   folder but localize their UI in the JavaScript layer; their `strings.xml` holds only `app_name`. **Routed to
-  the JS path / hard-stopped in the orchestrator** (`SKILL.md §1.2`). Run i18n-guide against the web UI.
+  the JS path / hard-stopped in the orchestrator** (`SKILL.md §1.2`). Run globalize-guide against the web UI.
 - **Flutter** — localizes via `.arb` files and `gen_l10n`, not native `strings.xml`. **Hard stop.**
 - **Kotlin / Compose Multiplatform** — uses a different resource mechanism (`compose.resources`,
   `commonMain/composeResources/`), not `res/values/strings.xml`. **Not covered in v1** (warned, non-blocking).
@@ -112,8 +112,8 @@ and the resource tree to determine the project shape.
 
 | Check | How to detect | Action |
 |-------|--------------|--------|
-| **React Native** | `react-native` in a root `package.json` (with an `android/` folder) | **STOP.** "This is a React Native app. It localizes through JS i18n libraries (i18next/react-intl/Lingui), not native `strings.xml`. Run i18n-guide against the JS code." |
-| **Capacitor/Cordova/Ionic** | `@capacitor/core` / `cordova` / `@ionic/*` in a root `package.json` (with an `android/` folder) | **STOP.** "This is a hybrid web app — its UI is localized in the web layer, not native `strings.xml`. Run i18n-guide against the web UI." |
+| **React Native** | `react-native` in a root `package.json` (with an `android/` folder) | **STOP.** "This is a React Native app. It localizes through JS i18n libraries (i18next/react-intl/Lingui), not native `strings.xml`. Run globalize-guide against the JS code." |
+| **Capacitor/Cordova/Ionic** | `@capacitor/core` / `cordova` / `@ionic/*` in a root `package.json` (with an `android/` folder) | **STOP.** "This is a hybrid web app — its UI is localized in the web layer, not native `strings.xml`. Run globalize-guide against the web UI." |
 | **Flutter** | `pubspec.yaml` at root | **STOP.** "This is a Flutter app. Flutter localizes via `.arb`/`gen_l10n`, not native Android `strings.xml`. Flutter support isn't available yet." |
 | **Not an Android project** | No `AndroidManifest.xml` and no Android Gradle plugin | **STOP.** "No native Android project detected. This setup phase requires an Android app (Gradle + `AndroidManifest.xml`)." |
 | **Compose/Kotlin Multiplatform** | Resources under `commonMain/composeResources/`, a `compose.resources` setup, and no `app/src/main/res` | **Warn (non-blocking).** "This looks like a Multiplatform project, which uses `compose.resources` rather than `res/values/strings.xml`. v1 covers standard Android only — I'll target the Android resource dirs I can find; multiplatform resources won't be handled." |
