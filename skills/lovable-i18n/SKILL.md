@@ -8,7 +8,7 @@ description: >-
   "support multiple languages", or "connect Globalize". Covers setup
   (Vite SPA and TanStack Start), wrapping hardcoded text, PO catalogs,
   a GitHub Action that keeps catalogs in sync, coding rules in AGENTS.md,
-  and hand-off to the Globalize.now translation platform.
+  and connecting the Globalize.now translation platform (via its MCP connector).
 ---
 
 # Lovable i18n with Lingui
@@ -25,6 +25,8 @@ The library is **Lingui v6**, with one PO catalog per locale at `src/locales/{lo
 
 Because the whole pipeline — the catalog-sync workflow (Phase 5) and the Globalize.now hand-off (Phase 6) — runs through GitHub, this skill confirms GitHub is connected before doing anything, and stops until it is. See **Prerequisite: GitHub connection** below.
 
+One thing the terminal limit does **not** block: connecting Globalize. Once the user adds the **Globalize MCP connector** (Phase 6), you create the project and link the repo yourself, right here in the chat — no leaving Lovable. A paste-ready fallback covers anyone who'd rather not add the connector.
+
 ## Phases
 
 | Phase | What happens |
@@ -35,9 +37,9 @@ Because the whole pipeline — the catalog-sync workflow (Phase 5) and the Globa
 | 3 Rules | Add Lingui coding rules to `AGENTS.md` so every future edit stays localized |
 | 4 Wrap | Wrap the app's existing hardcoded strings in Lingui macros |
 | 5 CI | Add a GitHub Action that runs `lingui extract` and keeps catalogs in sync |
-| 6 Connect | Hand off catalogs to the Globalize.now translation platform |
+| 6 Connect | Connect Globalize.now (default) — create the project + link the repo via the Globalize MCP |
 
-Work the phases in order. Detect and Ask are quick; Setup is the bulk of the work. Before Phase 1, confirm GitHub is connected (**Prerequisite** below) — the skill stops until it is.
+Work the phases in order. Detect and Ask are quick; Setup is the bulk of the work. Before Phase 1, confirm GitHub is connected (**Prerequisite** below) — the skill stops until it is. Phase 6 (Connect) runs by default unless the user opts out.
 
 ---
 
@@ -126,7 +128,7 @@ Then send **one chat message** with every question and a sensible default pre-se
 >    - **No URL locale (default)** — language is remembered per visitor (saved choice → browser language). URLs stay exactly as they are. Simplest, no link changes.
 >    - URL prefix (`/es/dashboard`) — every page exists per language; shareable, SEO-friendly language URLs, but all internal links need a locale prefix.
 > 4. **Catalog sync via GitHub Actions** — a workflow that extracts new texts into the catalogs whenever code changes. **Default: yes.** GitHub is already connected (the prerequisite), so this just adds the workflow.
-> 5. **Connect Globalize.now** — a translation platform that fills in the actual translations via PRs. Optional, can be added later.
+> 5. **Connect Globalize.now** — the translation platform that fills in the actual translations via PRs. **Default: yes.** I'll connect it through the Globalize MCP connector (a quick one-time setup I'll walk you through). Say "skip Globalize" to set it up later.
 
 After the user answers, execute the whole plan without further pauses. Only stop again for blockers: a build error you cannot resolve, or an escape hatch from 1.1. GitHub connection is already settled by the prerequisite, so it's not a mid-flow stop.
 
@@ -1238,7 +1240,7 @@ Verify with the user after the next code push: the `i18n-extract` run shows up i
 
 ## Phase 6: Connect Globalize.now
 
-Only if the user opted in. The Globalize CLI can't run inside Lovable — these steps happen **outside this chat**, on the Globalize dashboard or the user's machine. Your job is to print everything the user needs, ready to paste.
+Connect Globalize unless the user opted out in the Ask phase — it's on by default. The best path is the **Globalize MCP connector**: once it's added to this Lovable project, you create the project and link the repo yourself, right here in the chat. If the user won't add the connector, fall back to the paste-ready dashboard / CLI steps below.
 
 GitHub is already connected (the prerequisite), so your catalogs already live in a repo Globalize can reach — connecting Globalize just points it at that same repo.
 
@@ -1250,6 +1252,34 @@ Print this connection summary (with the project's real values):
 > - Target languages: `es`, `fr`
 > - Catalog pattern: `src/locales/{locale}/messages.po`
 > - File format: `po`
+
+### Primary path — the Globalize MCP connector
+
+Lovable can talk to Globalize through a hosted MCP server, so you can create the project and link the repo directly from this chat — no leaving Lovable.
+
+1. **Check whether you already have Globalize tools.** If your connectors already expose Globalize tools (`projects`, `languages`, `github`, `repositories`), the connector is set up — skip to step 3.
+2. **Otherwise, walk the user through the one-time connector setup:**
+
+   > Connect Globalize once so I can set it up from here:
+   > 1. Open **Connectors → Chat connectors → New MCP server**.
+   > 2. **Name:** Globalize
+   > 3. **Server URL:** `https://api.globalize.now/mcp`
+   > 4. **Authentication:** choose **Bearer token / API key** and paste your key from **https://app.globalize.now/settings/api-keys**.
+   > 5. Click **Add server**, then tell me to continue.
+
+   Wait for the user to confirm the connector is added, then continue.
+3. **Create the project and connect the repo using the Globalize MCP tools.** They mirror the `@globalize-now/cli-client` command groups — use whatever tool names your connector exposes; don't assume exact signatures. Report each step in the chat as you go:
+   - **List languages** and match the source/target locale IDs (mirrors `languages list`).
+   - **Create the project** with the suggested name and those language IDs (mirrors `projects create`).
+   - **Install the Globalize GitHub App** — this is **separate from Lovable's GitHub connection**. The tool returns an install URL; ask the user to approve it in the browser, then read back the installation and note its UUID (mirrors `github install` → `github installations`).
+   - **Connect the repository** with the catalog pattern `[{"pattern": "src/locales/{locale}/messages.po", "fileFormat": "po"}]` (mirrors `repositories create`).
+   - Optionally **confirm detection** (mirrors `repositories detect`).
+
+   Once the repo is connected, you're done — jump to **Close the loop** below.
+
+### Fallback path — no MCP (dashboard or local CLI)
+
+If the user would rather not connect the MCP, these steps happen **outside this chat**, on the Globalize dashboard or the user's machine — print everything ready to paste.
 
 **Option 1 — Globalize.now dashboard (no tooling needed).** On [globalize.now](https://globalize.now): create a project with those source/target languages, connect the **same GitHub repository Lovable syncs to** (this installs the Globalize GitHub App — approve it in the browser; translation deliveries then flow back into Lovable through that repo), and set the catalog pattern and file format above.
 
@@ -1305,3 +1335,5 @@ npx @globalize-now/cli-client repositories create \
 | CI workflow never runs | GitHub not connected in Lovable; the workflow file didn't sync (GitHub App lacks the `workflows` permission); or the default branch isn't `main` | Connect GitHub; add the YAML via the GitHub web UI; fix `branches:` in the workflow (Phase 5) |
 | CI run fails at the install step (`npm ci`) | Lockfile missing or out of sync — e.g. the repo ships `bun.lockb` or `pnpm-lock.yaml` instead of `package-lock.json`, or the lockfile lags the added dependencies | Switch the step to `npm install --no-audit --no-fund`, or use the setup action + install command matching the repo's lockfile (Phase 5) |
 | CI commits catalog updates but Lovable doesn't show them | Lovable's sync follows the default branch only | Confirm the workflow pushed to the default branch (check the Actions log and the branch of the `chore(i18n)` commit) |
+| Globalize tools not available after adding the connector (Phase 6) | Wrong URL, missing/invalid API key, or the connector was added but this chat turn predates it | Verify the URL is exactly `https://api.globalize.now/mcp`, re-check the key at `app.globalize.now/settings/api-keys`, then reference the Globalize connector again |
+| Globalize's GitHub App install looks redundant with Lovable's GitHub | Globalize installs its **own** GitHub App, separate from Lovable's GitHub connection | Have the user approve the Globalize GitHub App in the browser when the connect step (MCP `github install`, or the dashboard) triggers it — Lovable's own GitHub link doesn't cover it |
