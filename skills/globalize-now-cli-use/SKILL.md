@@ -506,6 +506,92 @@ npx @globalize-now/cli-client style-guides delete \
 
 ---
 
+## Step 5.5: Making corrections stick — glossary, style guides & translation memory
+
+**Read this before you try to "fix a wrong translation."** This is the single
+biggest source of wasted time when correcting Globalize output.
+
+### Translation memory overrides the glossary
+
+Translation memory (TM) is a cache of prior translations that the pipeline
+**reuses**, and a TM hit takes **precedence over a glossary term or style-guide
+rule you add later**. So adding a glossary entry does **not** retroactively fix a
+key that was already translated — the next job serves the cached TM value and
+your glossary is silently bypassed. Symptom: you add the glossary term, re-run
+translation, and the output is unchanged.
+
+### Corrections are durable ONLY through the pipeline — never by hand-editing files
+
+Globalize **owns and regenerates** the committed locale files. A translation job
+(triggered by a push to a connected branch, or `repositories translate`)
+re-translates keys and commits the result, **overwriting any manual edits** to
+those files. Hand-fixing `de.json` in the repo is not durable — the next sync
+reverts it (often on the very PR you push, as an extra "chore: update
+translations" commit). Durable corrections go through Globalize's inputs, in this
+exact order:
+
+1. **Encode the desired output** as a glossary entry (below) or a style-guide rule.
+2. **Invalidate the stale TM** so the pipeline re-translates instead of reusing
+   the cached value. *This is the step everyone misses.*
+3. **Re-translate** (`repositories translate --delivery-mode pr`) and merge the
+   resulting PR.
+
+### Glossary: force a term, or keep it verbatim
+
+- **Forced translation** — `--source-term "Born in Italy" --target-term "Né en Italie"`
+  makes the term translate that exact way for that target language.
+- **Do-not-translate** — set `--target-term` equal to `--source-term`
+  (`--source-term "DMLTN" --target-term "DMLTN"`) to keep brand names, product
+  names, SKUs, and idioms verbatim.
+- Glossary entries are **per target language** — create one per language you want
+  to control (a glossary for `de` does nothing for `fr`).
+- `--source-language-id` / `--target-language-id` are **project-language UUIDs**
+  from `project-languages list` — NOT catalog IDs from `languages list`. Catalog
+  IDs return `INVALID_LANGUAGE_REFERENCE`.
+
+### Invalidate the translation memory so the change takes effect
+
+A glossary or style-guide change only affects keys the pipeline actually
+re-translates. For a key already in the TM, clear the stale entry first:
+
+```bash
+# Find it (match on the exact source text):
+npx @globalize-now/cli-client translation-memory list \
+  --project-id <PROJECT_ID> --source-language-id <SRC_PROJ_LANG_ID> \
+  --target-language-id <TGT_PROJ_LANG_ID> --query "Born in Italy" --json
+# Delete it by entry id:
+npx @globalize-now/cli-client translation-memory delete \
+  --project-id <PROJECT_ID> --entry-id <ENTRY_ID> --json
+```
+
+The query matches source text broadly — an exact key like `Born in Italy` may
+return the standalone key **plus** longer entries that contain it (a full
+sentence, an uppercase variant). Delete only the entry whose `sourceText` matches
+exactly the one you're correcting; leave the others. Alternatively,
+`style-guides apply … --invalidate-tm` invalidates TM for a language as part of
+applying a style guide.
+
+Then re-run translation and verify the resulting PR before merging:
+
+```bash
+npx @globalize-now/cli-client repositories translate --id <REPO_ID> --branch main --delivery-mode pr --json
+```
+
+Because the corrected values now come from the pipeline (glossary + clean TM),
+they are **durable** — a later sync reproduces them instead of reverting.
+
+### Symptom → cause → fix
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Added a glossary term but the translation didn't change | TM hit bypassed the glossary | Delete the stale TM entry (or `--invalidate-tm`), then re-translate |
+| A manual edit to a locale file reverted after a push | Globalize re-translated and overwrote it | Encode the fix as glossary/style-guide + invalidate TM; never hand-edit the files |
+| `INVALID_LANGUAGE_REFERENCE` on `glossary create` | Passed catalog language IDs | Use project-language UUIDs from `project-languages list` |
+| Only some languages picked up the corrected term | Glossary is per-language and TM is still stale on the others | Add a glossary entry AND invalidate TM for **each** affected language |
+| An unexpected "chore: update translations" commit appeared on my PR branch | A push to a connected branch triggers a translation job that commits to that branch | Expected — let it land; don't fight it with hand-edits. After the PR merges the branch is deleted (don't push a stale local copy of it) |
+
+---
+
 ## Step 6: Organisation and Team Management
 
 These commands are less commonly needed from an agent but are available when requested.
@@ -704,6 +790,9 @@ npx @globalize-now/cli-client billing ledger --json
 
 ## Common Gotchas
 
+- **Translation memory overrides a newly-added glossary/style-guide rule.** A TM hit reuses the cached translation and bypasses the glossary, so adding a glossary term does NOT fix an already-translated key on its own. You must invalidate the stale TM (`translation-memory delete`, or `style-guides apply --invalidate-tm`) and re-translate. See **Step 5.5** — this is the most common correction pitfall.
+- **Never hand-edit the committed locale files to "fix" a translation.** Globalize regenerates them on the next sync and overwrites your edit (often on the same PR you push). Encode corrections as glossary/style-guide entries + TM invalidation, then re-translate. See **Step 5.5**.
+- **A push to a connected branch triggers a translation job that commits to that branch.** Expect an extra "chore: update translations" commit on feature branches; after a PR merges its branch is deleted (don't resurrect it by pushing a stale local copy).
 - **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability.
 - **IDs are UUIDs (except `--installation-id`)**: All `--id`, `--project-id`, `--org-id`, etc. expect UUID values returned from prior create/list commands. **Two different installation ID flags exist — they take different value types.** `--installation-id` (used by `github repos`, `github branches`, `github detect`) expects the **numeric** GitHub installation ID (the `installationId` field from `github installations --json`, e.g. `122432012`). `--github-installation-id` (used by `repositories create/update`) expects the **UUID** (the `id` field from `github installations --json`). Always capture both IDs from the JSON response.
 - **Project language IDs vs global language IDs**: Glossary (`--source-language-id`, `--target-language-id`) and style guide (`--language-id`) commands use _project language_ UUIDs — the ID of a language within a specific project. Get these from `project-languages list`, not `languages list`.
