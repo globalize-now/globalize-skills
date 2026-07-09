@@ -1,7 +1,17 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ApiClient } from "@globalize-now/cli-client";
-import { listProjects, createProject, updateProject, getProject, deleteProject } from "@globalize-now/cli-client";
+import {
+  listProjects,
+  createProject,
+  updateProject,
+  getProject,
+  deleteProject,
+  getProjectRefs,
+  listProjectScorecards,
+  getProjectBudget,
+  rotateWebhookSecret,
+} from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
 
 export function registerProjectTools(server: McpServer, client: ApiClient) {
@@ -53,9 +63,8 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
             qa: z
               .object({
                 enabledChecks: z.array(z.enum(["placeholder", "length", "terminology", "formatting"])).optional(),
-                qualityThreshold: z.number().optional(),
                 lengthRatioBounds: z.record(z.object({ min: z.number(), max: z.number() })).optional(),
-                aiReviewScope: z.enum(["passes-only", "all", "none"]).optional(),
+                aiReviewScope: z.enum(["enabled", "disabled"]).optional(),
               })
               .optional(),
             defaultProvider: z.string().optional(),
@@ -123,6 +132,74 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
     async ({ id }) => {
       try {
         return formatSuccess(await deleteProject(client, id));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_project_refs",
+    {
+      description: "List refs (branches) tracked by a project",
+      inputSchema: {
+        id: z.string().uuid().describe("Project UUID"),
+      },
+    },
+    async ({ id }) => {
+      try {
+        return formatSuccess(await getProjectRefs(client, id));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_project_scorecards",
+    {
+      description: "Get project scorecards for the dashboard",
+      inputSchema: {
+        limit: z.number().int().optional().describe("Maximum number of scorecards"),
+      },
+    },
+    async ({ limit }) => {
+      try {
+        return formatSuccess(await listProjectScorecards(client, limit));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_project_budget",
+    {
+      description: "Get a project's budget",
+      inputSchema: {
+        id: z.string().uuid().describe("Project UUID"),
+      },
+    },
+    async ({ id }) => {
+      try {
+        return formatSuccess(await getProjectBudget(client, id));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "rotate_webhook_secret",
+    {
+      description: "Rotate a project's webhook signing secret",
+      inputSchema: {
+        id: z.string().uuid().describe("Project UUID"),
+      },
+    },
+    async ({ id }) => {
+      try {
+        return formatSuccess(await rotateWebhookSecret(client, id));
       } catch (e) {
         return formatError(e);
       }

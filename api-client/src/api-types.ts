@@ -3511,6 +3511,7 @@ export interface paths {
                             id: string;
                             name: string;
                             keyPrefix: string;
+                            createdById: string;
                             /** Format: date-time */
                             createdAt: string;
                             revokedAt: string | null;
@@ -7674,7 +7675,7 @@ export interface paths {
                                 completedAt: string | null;
                                 supersededBy: string | null;
                                 error: string | null;
-                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed") | null;
+                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed" | "pipeline_terminal_failure" | "stalled") | null;
                                 checkRunId: number | null;
                                 headSha: string | null;
                                 hasPriorSibling: boolean;
@@ -7837,7 +7838,7 @@ export interface paths {
                                 completedAt: string | null;
                                 supersededBy: string | null;
                                 error: string | null;
-                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed") | null;
+                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed" | "pipeline_terminal_failure" | "stalled") | null;
                                 checkRunId: number | null;
                                 headSha: string | null;
                                 hasPriorSibling: boolean;
@@ -8008,7 +8009,7 @@ export interface paths {
                                 completedAt: string | null;
                                 supersededBy: string | null;
                                 error: string | null;
-                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed") | null;
+                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed" | "pipeline_terminal_failure" | "stalled") | null;
                                 checkRunId: number | null;
                                 headSha: string | null;
                                 hasPriorSibling: boolean;
@@ -8220,7 +8221,7 @@ export interface paths {
                                 completedAt: string | null;
                                 supersededBy: string | null;
                                 error: string | null;
-                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed") | null;
+                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed" | "pipeline_terminal_failure" | "stalled") | null;
                                 checkRunId: number | null;
                                 headSha: string | null;
                                 hasPriorSibling: boolean;
@@ -8389,6 +8390,7 @@ export interface paths {
                                 targetProjectLanguageId: string;
                                 status: string;
                                 metadata: unknown;
+                                segmentCount?: number;
                             }[];
                             pagination: {
                                 total: number;
@@ -8560,6 +8562,16 @@ export interface paths {
                                 targetProjectLanguageId: string;
                                 status: string;
                                 metadata: unknown;
+                                segmentCount?: number;
+                                segments: {
+                                    id: string;
+                                    index: number;
+                                    ignorable: boolean;
+                                    sourceText: string;
+                                    translatedText: string | null;
+                                    status: string;
+                                    metadata: unknown;
+                                }[];
                             };
                         };
                     };
@@ -8731,6 +8743,7 @@ export interface paths {
                                 targetProjectLanguageId: string;
                                 status: string;
                                 metadata: unknown;
+                                segmentCount?: number;
                             } | null;
                         };
                     };
@@ -9199,13 +9212,340 @@ export interface paths {
                                 completedAt: string | null;
                                 supersededBy: string | null;
                                 error: string | null;
-                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed") | null;
+                                failureReason?: ("insufficient_credits" | "project_budget_exceeded" | "translation_retry_ceiling_exceeded" | "translation_unrecoverable_failure" | "translation_store_write_failed" | "pipeline_terminal_failure" | "stalled") | null;
                                 checkRunId: number | null;
                                 headSha: string | null;
                                 hasPriorSibling: boolean;
                                 discoveryReport?: unknown | null;
                             } | null;
                             unitCount: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List job files */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                id: string;
+                                jobId: string;
+                                filename: string;
+                                s3Key: string;
+                                format: string;
+                                sizeBytes: number;
+                                keyCount: number | null;
+                                tokenEstimate: number | null;
+                                status: string;
+                                error: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            }[];
+                            pagination: {
+                                total: number;
+                                limit: number;
+                                hasMore: boolean;
+                                cursor?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Upload a file (multipart, single request) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            file: {
+                                id: string;
+                                jobId: string;
+                                filename: string;
+                                s3Key: string;
+                                format: string;
+                                sizeBytes: number;
+                                keyCount: number | null;
+                                tokenEstimate: number | null;
+                                status: string;
+                                error: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            } | null;
                         };
                     };
                 };
@@ -9682,182 +10022,6 @@ export interface paths {
                 };
             };
         };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/jobs/{id}/files": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List job files */
-        get: {
-            parameters: {
-                query?: {
-                    limit?: number;
-                    cursor?: string;
-                };
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Default Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            data: {
-                                id: string;
-                                jobId: string;
-                                filename: string;
-                                s3Key: string;
-                                format: string;
-                                sizeBytes: number;
-                                keyCount: number | null;
-                                tokenEstimate: number | null;
-                                status: string;
-                                error: string | null;
-                                /** Format: date-time */
-                                createdAt: string;
-                                /** Format: date-time */
-                                updatedAt: string;
-                            }[];
-                            pagination: {
-                                total: number;
-                                limit: number;
-                                hasMore: boolean;
-                                cursor?: string;
-                            };
-                        };
-                    };
-                };
-                /** @description Default Response */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-                /** @description Default Response */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-                /** @description Default Response */
-                402: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-                /** @description Default Response */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-                /** @description Default Response */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-                /** @description Default Response */
-                429: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-                /** @description Default Response */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-                /** @description Default Response */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            code: string;
-                            message: string;
-                            statusCode: number;
-                            details?: unknown;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -10534,6 +10698,8 @@ export interface paths {
             parameters: {
                 query?: {
                     targetLang?: string;
+                    namespace?: string;
+                    fileId?: string;
                 };
                 header?: never;
                 path: {
@@ -10549,6 +10715,165 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{id}/export/manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List downloadable export files */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            files: {
+                                namespaceId: string | null;
+                                namespaceIdentity: string | null;
+                                fileId: string;
+                                targetLanguage: string | null;
+                                filename: string;
+                                format: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
                 };
             };
         };

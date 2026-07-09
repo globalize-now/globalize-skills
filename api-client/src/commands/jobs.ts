@@ -93,6 +93,14 @@ export async function exportJob(client: ApiClient, id: string, query: ExportQuer
   return data ?? { exported: true };
 }
 
+export async function exportJobManifest(client: ApiClient, id: string) {
+  const { data, error, response } = await client.GET("/api/jobs/{id}/export/manifest", {
+    params: { path: { id } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
 export async function listJobUnits(client: ApiClient, jobId: string, query: ListUnitsQuery) {
   const { data, error, response } = await client.GET("/api/jobs/{jobId}/units", {
     params: { path: { jobId }, query },
@@ -274,6 +282,20 @@ export function register(group: Command, getClient: ClientFactory): void {
         const query: ExportQuery = {};
         if (cmdOpts.targetLang !== undefined) query.targetLang = cmdOpts.targetLang;
         output(await exportJob(client, cmdOpts.id, query), opts);
+      } catch (e) {
+        outputError((e as Error).message, opts);
+      }
+    });
+
+  group
+    .command("export-manifest")
+    .description("List downloadable export files for a job")
+    .requiredOption("--id <id>", "Job UUID")
+    .action(async (cmdOpts, cmd) => {
+      const opts: OutputOptions = cmd.optsWithGlobals();
+      try {
+        const client = await getClient();
+        output(await exportJobManifest(client, cmdOpts.id), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }

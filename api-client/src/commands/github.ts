@@ -21,6 +21,42 @@ export async function pollGithubInstallStatus(client: ApiClient, nonce: string) 
   return data!;
 }
 
+export async function listGithubInstallations(client: ApiClient) {
+  const { data, error, response } = await client.GET("/api/github/installations");
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function listGithubRepos(client: ApiClient, installationId: string) {
+  const { data, error, response } = await client.GET("/api/github/installations/{installationId}/repos", {
+    params: { path: { installationId } },
+  });
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function listGithubBranches(client: ApiClient, installationId: string, owner: string, repo: string) {
+  const { data, error, response } = await client.GET(
+    "/api/github/installations/{installationId}/branches/{owner}/{repo}",
+    {
+      params: { path: { installationId, owner, repo } },
+    },
+  );
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
+export async function detectGithubRepo(client: ApiClient, installationId: string, owner: string, repo: string) {
+  const { data, error, response } = await client.POST(
+    "/api/github/installations/{installationId}/repos/{owner}/{repo}/detect",
+    {
+      params: { path: { installationId, owner, repo } },
+    },
+  );
+  if (error) throw new Error(extractError(response, error));
+  return data!;
+}
+
 export function register(group: Command, getClient: ClientFactory): void {
   group
     .command("install")
@@ -91,9 +127,7 @@ export function register(group: Command, getClient: ClientFactory): void {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
-        const { data, error, response } = await client.GET("/api/github/installations");
-        if (error) throw new Error(extractError(response, error));
-        output(data, opts);
+        output(await listGithubInstallations(client), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }
@@ -107,11 +141,7 @@ export function register(group: Command, getClient: ClientFactory): void {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
-        const { data, error, response } = await client.GET("/api/github/installations/{installationId}/repos", {
-          params: { path: { installationId: cmdOpts.installationId } },
-        });
-        if (error) throw new Error(extractError(response, error));
-        output(data, opts);
+        output(await listGithubRepos(client, cmdOpts.installationId), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }
@@ -127,20 +157,7 @@ export function register(group: Command, getClient: ClientFactory): void {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
-        const { data, error, response } = await client.GET(
-          "/api/github/installations/{installationId}/branches/{owner}/{repo}",
-          {
-            params: {
-              path: {
-                installationId: cmdOpts.installationId,
-                owner: cmdOpts.owner,
-                repo: cmdOpts.repo,
-              },
-            },
-          },
-        );
-        if (error) throw new Error(extractError(response, error));
-        output(data, opts);
+        output(await listGithubBranches(client, cmdOpts.installationId, cmdOpts.owner, cmdOpts.repo), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }
@@ -156,20 +173,7 @@ export function register(group: Command, getClient: ClientFactory): void {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
-        const { data, error, response } = await client.POST(
-          "/api/github/installations/{installationId}/repos/{owner}/{repo}/detect",
-          {
-            params: {
-              path: {
-                installationId: cmdOpts.installationId,
-                owner: cmdOpts.owner,
-                repo: cmdOpts.repo,
-              },
-            },
-          },
-        );
-        if (error) throw new Error(extractError(response, error));
-        output(data, opts);
+        output(await detectGithubRepo(client, cmdOpts.installationId, cmdOpts.owner, cmdOpts.repo), opts);
       } catch (e) {
         outputError((e as Error).message, opts);
       }
