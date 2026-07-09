@@ -77,6 +77,7 @@ export {
   dismissQa,
   undismissQa,
   exportJob,
+  exportJobManifest,
   listJobUnits,
   getJobUnit,
   listJobFiles,
@@ -98,7 +99,14 @@ export {
 export { getBalance, getLedger } from "./commands/billing.js";
 
 // GitHub
-export { startGithubInstall, pollGithubInstallStatus } from "./commands/github.js";
+export {
+  startGithubInstall,
+  pollGithubInstallStatus,
+  listGithubInstallations,
+  listGithubRepos,
+  listGithubBranches,
+  detectGithubRepo,
+} from "./commands/github.js";
 
 // GitLab
 export {

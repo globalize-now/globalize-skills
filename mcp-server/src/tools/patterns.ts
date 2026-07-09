@@ -7,6 +7,7 @@ import {
   updatePattern,
   deletePattern,
   reorderPattern,
+  bulkCreatePatterns,
   FILE_FORMATS,
 } from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
@@ -105,6 +106,31 @@ export function registerPatternTools(server: McpServer, client: ApiClient) {
     async ({ repositoryId, patternId, position }) => {
       try {
         return formatSuccess(await reorderPattern(client, repositoryId, patternId, position));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "bulk_create_patterns",
+    {
+      description: "Bulk-create locale path patterns for a repository (skips existing)",
+      inputSchema: {
+        repositoryId: z.string().uuid().describe("Repository UUID"),
+        patterns: z
+          .array(
+            z.object({
+              pattern: z.string().describe("Locale path pattern (e.g. locales/{locale}/*.json)"),
+              fileFormat: z.enum(FILE_FORMATS).describe("File format"),
+            }),
+          )
+          .describe("Patterns to create"),
+      },
+    },
+    async ({ repositoryId, patterns }) => {
+      try {
+        return formatSuccess(await bulkCreatePatterns(client, repositoryId, patterns));
       } catch (e) {
         return formatError(e);
       }

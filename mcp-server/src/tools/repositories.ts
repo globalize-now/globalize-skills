@@ -8,6 +8,8 @@ import {
   deleteRepository,
   detectRepository,
   listRepositoryBranches,
+  discoverRepository,
+  translateRepository,
   FILE_FORMATS,
 } from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
@@ -147,6 +149,42 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
     async ({ id }) => {
       try {
         return formatSuccess(await listRepositoryBranches(client, id));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "discover_repository",
+    {
+      description: "Discover translation files in a repository",
+      inputSchema: {
+        id: z.string().uuid().describe("Repository UUID"),
+      },
+    },
+    async ({ id }) => {
+      try {
+        return formatSuccess(await discoverRepository(client, id));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "translate_repository",
+    {
+      description: "Trigger on-demand translation for a repository",
+      inputSchema: {
+        id: z.string().uuid().describe("Repository UUID"),
+        branch: z.string().optional().describe("Branch to translate"),
+        deliveryMode: z.enum(["push", "pr"]).optional().describe("Delivery mode"),
+      },
+    },
+    async ({ id, branch, deliveryMode }) => {
+      try {
+        return formatSuccess(await translateRepository(client, id, { branch, deliveryMode }));
       } catch (e) {
         return formatError(e);
       }

@@ -77,19 +77,26 @@ To pass the key via environment variable in your MCP config:
 
 ## Tools
 
-The server exposes 28 tools across 9 groups:
+The server exposes 81 tools across 16 groups:
 
 | Group | Tools | Description |
 |-------|-------|-------------|
-| **Organisations** | `list_orgs`, `create_org`, `delete_org` | Manage organisations |
-| **Projects** | `list_projects`, `create_project`, `get_project`, `delete_project` | Manage translation projects |
+| **Organisations** | `list_orgs`, `delete_org` | Manage organisations |
+| **Projects** | `list_projects`, `create_project`, `update_project`, `get_project`, `delete_project`, `get_project_refs`, `list_project_scorecards`, `get_project_budget`, `rotate_webhook_secret` | Manage translation projects |
 | **Languages** | `list_languages`, `get_language` | Browse the language catalog |
 | **Project Languages** | `list_project_languages`, `add_project_language`, `remove_project_language` | Configure languages on a project |
-| **Repositories** | `list_repositories`, `create_repository`, `delete_repository`, `detect_repository` | Connect and scan git repositories |
+| **Repositories** | `list_repositories`, `create_repository`, `update_repository`, `delete_repository`, `detect_repository`, `list_repository_branches`, `discover_repository`, `translate_repository` | Connect and scan git repositories |
+| **Patterns** | `list_patterns`, `create_pattern`, `update_pattern`, `delete_pattern`, `reorder_pattern`, `bulk_create_patterns` | Manage repository locale path patterns |
 | **Glossary** | `list_glossary`, `create_glossary_entry`, `delete_glossary_entry` | Manage translation glossaries |
-| **Style Guides** | `list_style_guides`, `upsert_style_guide`, `delete_style_guide` | Set translation style instructions |
+| **Style Guides** | `list_style_guides`, `upsert_style_guide`, `delete_style_guide`, `generate_style_guide`, `apply_style_guide`, `get_style_guide_quota` | Set translation style instructions |
 | **API Keys** | `list_api_keys`, `create_api_key`, `revoke_api_key` | Manage API keys |
 | **Members** | `list_members`, `invite_member`, `remove_member` | Manage organisation members |
+| **GitHub** | `github_install`, `github_install_status`, `list_github_installations`, `list_github_repos`, `list_github_branches`, `detect_github_repo` | GitHub App installation and repositories |
+| **GitLab** | `gitlab_install`, `gitlab_install_status`, `list_gitlab_connections`, `delete_gitlab_connection`, `list_gitlab_projects`, `list_gitlab_project_branches`, `detect_gitlab_project` | GitLab connection and repositories |
+| **Jobs** | `list_jobs`, `get_job`, `start_job`, `retry_job`, `get_job_stats`, `get_qa_report`, `dismiss_qa`, `undismiss_qa`, `export_job`, `export_job_manifest`, `list_job_units`, `get_job_unit`, `list_job_files`, `redeliver_job` | Manage translation jobs |
+| **Namespaces** | `list_namespaces`, `update_namespace`, `delete_namespace` | Manage project namespaces |
+| **Translation Memory** | `list_translation_memory`, `delete_translation_memory_entry`, `count_translation_memory`, `fresh_count_translation_memory` | Browse and manage translation memory |
+| **Billing** | `get_balance`, `get_ledger` | View billing balance and ledger |
 
 ## Development
 
@@ -98,11 +105,11 @@ Requires Node.js >= 18.
 ```bash
 cd mcp-server
 npm install
-npm run build    # Generate API types + compile TypeScript
-npm run dev      # Generate from staging API + watch mode
+npm run build    # Compile TypeScript to dist/
+npm run dev      # Watch mode (tsc --watch)
 ```
 
-The build generates TypeScript types from the Globalize OpenAPI spec, then compiles to JavaScript in `dist/`.
+The MCP server consumes the typed API client from `@globalize-now/cli-client`; `npm run build` compiles the server's TypeScript to `dist/`. To refresh the underlying API types, regenerate the client in `../api-client` (`npm run generate`).
 
 ### Environment variables
 

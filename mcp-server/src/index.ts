@@ -12,10 +12,15 @@ import { registerApiKeyTools } from "./tools/api-keys.js";
 import { registerMemberTools } from "./tools/members.js";
 import { registerPatternTools } from "./tools/patterns.js";
 import { registerGitlabTools } from "./tools/gitlab.js";
+import { registerGithubTools } from "./tools/github.js";
+import { registerJobTools } from "./tools/jobs.js";
+import { registerNamespaceTools } from "./tools/namespaces.js";
+import { registerTranslationMemoryTools } from "./tools/translation-memory.js";
+import { registerBillingTools } from "./tools/billing.js";
 
 const server = new McpServer({
   name: "globalize",
-  version: "0.1.0",
+  version: "0.1.1",
 });
 
 const { apiKey, apiUrl } = await resolveAuth();
@@ -32,6 +37,11 @@ registerApiKeyTools(server, client);
 registerMemberTools(server, client);
 registerPatternTools(server, client);
 registerGitlabTools(server, client);
+registerGithubTools(server, client);
+registerJobTools(server, client);
+registerNamespaceTools(server, client);
+registerTranslationMemoryTools(server, client);
+registerBillingTools(server, client);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

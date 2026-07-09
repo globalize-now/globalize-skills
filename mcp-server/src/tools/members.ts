@@ -25,16 +25,16 @@ export function registerMemberTools(server: McpServer, client: ApiClient) {
   server.registerTool(
     "invite_member",
     {
-      description: "Invite a user to an organisation by their user ID",
+      description: "Invite a user to an organisation by email",
       inputSchema: {
         orgId: z.string().uuid().describe("Organisation UUID"),
-        clerkUserId: z.string().describe("Clerk user ID of the person to invite"),
+        email: z.string().email().describe("Email address of the person to invite"),
         role: z.enum(["admin", "member"]).optional().describe("Role (defaults to member)"),
       },
     },
-    async ({ orgId, clerkUserId, role }) => {
+    async ({ orgId, email, role }) => {
       try {
-        return formatSuccess(await inviteMember(client, orgId, clerkUserId, role));
+        return formatSuccess(await inviteMember(client, orgId, email, role));
       } catch (e) {
         return formatError(e);
       }

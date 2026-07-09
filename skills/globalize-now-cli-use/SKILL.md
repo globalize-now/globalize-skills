@@ -286,7 +286,7 @@ Pass a JSON object via `--config`. The object is **merged** — only include the
 ```bash
 npx @globalize-now/cli-client projects update \
   --id <PROJECT_ID> \
-  --config '{"qa": {"enabledChecks": ["placeholder", "terminology"], "qualityThreshold": 80}}' \
+  --config '{"qa": {"enabledChecks": ["placeholder", "terminology"]}}' \
   --json
 ```
 
@@ -296,7 +296,7 @@ You can also update `--name`, `--source-language`, and `--target-languages` in t
 
 | Section | Fields | Description |
 |---------|--------|-------------|
-| `qa` | `enabledChecks` (`"placeholder"`, `"length"`, `"terminology"`, `"formatting"`), `qualityThreshold` (number), `lengthRatioBounds` (object keyed by locale, each `{min, max}`), `aiReviewScope` (`"passes-only"`, `"all"`, `"none"`) | Quality assurance checks and thresholds |
+| `qa` | `enabledChecks` (`"placeholder"`, `"length"`, `"terminology"`, `"formatting"`), `lengthRatioBounds` (object keyed by locale, each `{min, max}`), `aiReviewScope` (`"enabled"`, `"disabled"`) | Quality assurance checks and thresholds |
 | `defaultProvider` | string | Default translation provider |
 | `providerOverrides` | object keyed by locale → provider string | Per-language provider overrides |
 | `deeplFormality` | object keyed by locale → formality string | DeepL formality settings per language |
@@ -310,7 +310,7 @@ You can also update `--name`, `--source-language`, and `--target-languages` in t
 ```bash
 npx @globalize-now/cli-client projects update \
   --id <PROJECT_ID> \
-  --config '{"qa": {"enabledChecks": ["placeholder", "length", "terminology", "formatting"], "qualityThreshold": 90, "aiReviewScope": "all"}}' \
+  --config '{"qa": {"enabledChecks": ["placeholder", "length", "terminology", "formatting"], "aiReviewScope": "enabled"}}' \
   --json
 ```
 
@@ -634,6 +634,7 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `jobs qa-dismiss` | `--id`, `--unit-id`, `--check-type` | `--reason`, `--note` |
 | `jobs qa-undismiss` | `--id`, `--unit-id`, `--check-type` | |
 | `jobs export` | `--id` | `--target-lang` |
+| `jobs export-manifest` | `--id` | |
 | `jobs units` | `--job-id`, `--target-project-language-id` | `--filter`, `--search`, `--limit`, `--cursor` |
 | `jobs unit-get` | `--job-id`, `--unit-id` | |
 | `jobs files` | `--id` | `--limit`, `--cursor` |

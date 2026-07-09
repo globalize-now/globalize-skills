@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ApiClient } from "@globalize-now/cli-client";
-import { listOrgs, createOrg, deleteOrg } from "@globalize-now/cli-client";
+import { listOrgs, deleteOrg } from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
 
 export function registerOrgTools(server: McpServer, client: ApiClient) {
@@ -14,23 +14,6 @@ export function registerOrgTools(server: McpServer, client: ApiClient) {
     async () => {
       try {
         return formatSuccess(await listOrgs(client));
-      } catch (e) {
-        return formatError(e);
-      }
-    },
-  );
-
-  server.registerTool(
-    "create_org",
-    {
-      description: "Create a new organisation",
-      inputSchema: {
-        name: z.string().describe("Organisation name"),
-      },
-    },
-    async ({ name }) => {
-      try {
-        return formatSuccess(await createOrg(client, name));
       } catch (e) {
         return formatError(e);
       }
