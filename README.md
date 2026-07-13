@@ -30,7 +30,7 @@ The skill will be available next time you start a Claude Code conversation.
 
 ### Lovable
 
-`lovable-i18n` targets the [Lovable](https://lovable.dev) platform agent rather than Claude Code. Import it into your Lovable workspace via Settings → Skills → import from GitHub, pointing at this repo's `skills/lovable-i18n` subdirectory (or upload it as a zip).
+`lovable-i18n` targets the [Lovable](https://lovable.dev) platform agent rather than Claude Code. It now lives in its own repo — [globalize-now/lovable-i18n](https://github.com/globalize-now/lovable-i18n) — which is the maintained source; import from there. The copy under this repo's `skills/lovable-i18n` is kept for backwards compatibility and is no longer updated.
 
 ## Available skills
 
@@ -41,7 +41,7 @@ The skill will be available next time you start a Claude Code conversation.
 | `globalize-now-project-setup` | Create a translation project, connect a GitHub or GitLab repository, and set catalog file patterns. Assumes the CLI is installed and authenticated. |
 | `globalize-now-cli-use` | Manage existing Globalize translation resources (languages, glossaries, style guides, repositories, team members, API keys). |
 | `css-i18n` | Audit and convert CSS to logical properties for RTL/bidirectional layout support. Library-agnostic — works with Tailwind, CSS Modules, vanilla CSS, CSS-in-JS. |
-| `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental — see the Lovable install note in the Installation section above. |
+| `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental — now maintained at [globalize-now/lovable-i18n](https://github.com/globalize-now/lovable-i18n); this copy is kept for backwards compatibility (see the Lovable install note in the Installation section above). |
 
 ## Repository conventions
 
