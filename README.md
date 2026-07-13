@@ -43,6 +43,24 @@ The skill will be available next time you start a Claude Code conversation.
 | `css-i18n` | Audit and convert CSS to logical properties for RTL/bidirectional layout support. Library-agnostic — works with Tailwind, CSS Modules, vanilla CSS, CSS-in-JS. |
 | `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental — now maintained at [globalize-now/lovable-i18n](https://github.com/globalize-now/lovable-i18n); this copy is kept for backwards compatibility (see the Lovable install note in the Installation section above). |
 
+## MCP server
+
+The skills handle the i18n work inside your codebase. The **Globalize MCP server** is the other half: it connects your agent to the Globalize platform API to create translation projects, add languages, manage glossaries and style guides, connect repositories, and track translation jobs.
+
+### Hosted (recommended)
+
+The production MCP server is built into the Globalize app as a remote Streamable HTTP endpoint — nothing to install:
+
+```
+https://api.globalize.now/mcp
+```
+
+Authenticate with OAuth (your MCP client will prompt) or an API key from the [dashboard](https://app.globalize.now). Published on the official MCP registry as `io.github.globalize-now/globalize`. Works with Claude Code (`claude mcp add --transport http globalize https://api.globalize.now/mcp`), Claude custom connectors, Cursor, and any other MCP client.
+
+### Local package (this repo)
+
+[`mcp-server/`](./mcp-server) contains the open-source TypeScript implementation, `@globalize-now/mcp-server`, which talks to the same Globalize API over stdio. See its [README](./mcp-server/README.md) for installation and configuration. The hosted endpoint is the maintained production path.
+
 ## Repository conventions
 
 Each skill lives at `skills/<skill-name>/` and contains:
