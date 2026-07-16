@@ -137,7 +137,7 @@ All generated files in this setup phase use `.ts` extensions and TypeScript synt
 If `typescript` is **not** in devDeps and no `tsconfig.json` exists at project root, tell the user:
 
 > This project looks like plain JavaScript (no `typescript` in devDeps, no `tsconfig.json`). This setup creates `.ts` files with type annotations — Vite will still compile them, but they'll be stylistically out of place. Options:
-> 1. Add TypeScript to the project first (`npm install -D 'typescript@^5'` plus a minimal `tsconfig.json`), then re-run.
+> 1. Add TypeScript to the project first (`npm install -D 'typescript@^6'` plus a minimal `tsconfig.json`), then re-run.
 > 2. Continue — I'll generate `.ts` files; you can convert them to `.js` (or `.js` + JSDoc) after.
 > 3. Stop.
 

@@ -51,16 +51,16 @@ Detect the package manager from the lockfile (`package-lock.json` → npm, `pnpm
 
 ```bash
 # npm
-npm install --save-dev 'eslint-plugin-lingui@^0.13'
+npm install --save-dev 'eslint-plugin-lingui@^0.14'
 # pnpm
-pnpm add -D 'eslint-plugin-lingui@^0.13'
+pnpm add -D 'eslint-plugin-lingui@^0.14'
 # yarn
-yarn add -D 'eslint-plugin-lingui@^0.13'
+yarn add -D 'eslint-plugin-lingui@^0.14'
 # bun
-bun add -D 'eslint-plugin-lingui@^0.13'
+bun add -D 'eslint-plugin-lingui@^0.14'
 ```
 
-(If the published current major has advanced past `0.13`, bump the pin accordingly — confirm via `npm view eslint-plugin-lingui version` if uncertain.)
+(If the published current major has advanced past `0.14`, bump the pin accordingly — confirm via `npm view eslint-plugin-lingui version` if uncertain.)
 
 ### Configure
 
