@@ -224,7 +224,7 @@ Because Paraglide messages are hand-authored per locale, a contributor can add `
 
 This add-on is **not required** for the initial setup to work. Tests that don't assert on locale-specific output are unaffected. But a test that needs to render a component under a specific locale must set the active locale first — otherwise the `m` functions resolve under whatever locale the test environment defaults to.
 
-Detect the test runner from `package.json`. Vitest is the standard for Vite/SvelteKit projects; this helper targets Vitest with `@testing-library/svelte` and jsdom. If neither is present, install them pinned (`'vitest@^4'`, `'@testing-library/svelte@^5'`, `'jsdom@^29'`) — confirm current majors with `npm view <pkg> version` and adjust. jsdom 27+ requires Node `^20.19.0 || ^22.13.0 || >=24.0.0` (surfaces as `ERR_REQUIRE_ESM` on older Node, see vitest-dev/vitest#9281) — already satisfied by Vite's own Node floor, so this is a non-issue for Vite/SvelteKit projects.
+Detect the test runner from `package.json`. Vitest is the standard for Vite/SvelteKit projects; this helper targets Vitest with `@testing-library/svelte` and jsdom. If neither is present, install them pinned (`'vitest@^4'`, `'@testing-library/svelte@^5'`, `'jsdom@^29'`) — confirm current majors with `npm view <pkg> version` and adjust.
 
 ### Test helper
 
