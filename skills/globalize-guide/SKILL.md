@@ -607,7 +607,7 @@ If the verify subagent returns `status: "needs_cleanup"` with `result.recallViol
 For up to `maxCleanupRounds` (default **2**) rounds:
 1. Collect the distinct files in `recallViolations`. If more than **40**, cap to the 40 highest-violation files and surface how many were dropped (no silent truncation).
 2. Dispatch a **`wrap-cleanup` subagent** (background, same dispatch pattern as Phase 3.2) whose prompt mirrors the Phase 3.2 wrap prompt — same `manifest-snapshot.references.convert` + `references.code` — with the file list = the violating files and the "these files were MISSED by detection; wrap per `code.md`, apply the skip-list, leave genuine non-translatables" note from the recall reference. Pre-create `progress/wrap-cleanup-{round}.json`.
-3. When it terminates, re-dispatch the verify subagent from its recall step (re-extract/compile, re-scan). Read the new `recallViolations`.
+3. Before returning, the `wrap-cleanup` subagent itself re-runs the library's catalog step (Lingui: `lingui extract --clean` + `compile`; Paraglide: `paraglide compile`; next-intl/vue-i18n: none — runtime catalogs) and the recall scan, writing its round's residual `recallViolations` and the count it wrapped to `progress/wrap-cleanup-{round}.json` (per the reference — there is no separate verify re-dispatch). The orchestrator reads that residual and aggregates the per-round counts into the verify `result`.
 4. Stop when: the scan is clean; **or** a round wrapped zero new strings (`stringsWrappedInCleanup === 0`); **or** the round budget is reached. Report any `residualViolations` to the user with file+line (never drop silently).
 
 Record `result.cleanupRounds` and surface a one-line summary: "Self-heal wrapped **{stringsWrappedInCleanup}** strings that detection missed{, N left for manual review if residual}." Then proceed to `comment_review_pass` and 3.6.
@@ -620,7 +620,7 @@ After verify succeeds, parse the extracted catalog (JS) / the source-locale YAML
 
 > "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now."
 
-When `result.stringsWrappedInCleanup > 0` (the 3.5.1 recall cleanup loop ran), prepend that round's self-heal summary to this message: "Self-heal wrapped **{stringsWrappedInCleanup}** strings that detection missed{, N left for manual review if residual}."
+When `result.stringsWrappedInCleanup > 0` (the 3.5.1 recall cleanup loop ran), prepend the recall self-heal summary to this message: "Self-heal wrapped **{stringsWrappedInCleanup}** strings that detection missed{, N left for manual review if residual}."
 
 If `decisions.scope.globalize === true`, advance to Phase 4 with:
 
