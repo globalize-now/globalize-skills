@@ -210,3 +210,57 @@ carry coverage checks and the failure is JS-specific.
 - Making the permanent lint guardrail default-on for non-Lingui libraries (no
   reliable rule exists; grep self-check is the backstop there).
 - A verify step that wraps strings itself (wrapping stays in subagents).
+
+## Post-implementation status
+
+### (a) $0 gate result (Task 6)
+
+Hand-applied the `msg\`\`` fix to a copy of the regression fixture and ran all
+four gates end-to-end in a scratch Vite+React+Lingui install (`mktemp -d`; the
+repo working tree was never touched). **All four gates passed:**
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` | PASS |
+| `npm run build` | PASS (macro transform verified in the production bundle — `msg` calls compiled to hashed `{id:"…"}` descriptors, zero remaining `@lingui/core/macro` / `@lingui/react/macro` references) |
+| `lingui extract --clean` | PASS — 15 messages extracted (13 target `products.ts` strings + 2 pre-existing), all 13 target strings present in the catalog |
+| `eslint` w/ `lingui/no-unlocalized-strings` (tuned) | PASS — 0 errors on the wrapped module (`src/data/products.ts`, `src/components/ProductList.tsx`) |
+
+This proves the eval lint gate goes **13 → 0** for the fix's target shape.
+
+The scratch install used **current pins**, not the brief's original ones:
+`@lingui/cli` / `@lingui/core` / `@lingui/react` / `@lingui/vite-plugin` at
+`^6` (not `^5`); `@lingui/swc-plugin` added (required for macro transforms
+under `@vitejs/plugin-react-swc` — `babel-plugin-macros` alone is a no-op on
+the SWC pipeline); `eslint` at `^10` (not `^9`, compatible per
+`eslint-plugin-lingui@0.14`'s peer range `^8.37.0 || ^9 || ^10`).
+
+Separately, the `no-unlocalized-strings` option names documented in this
+skill's `setup.add-ons.md` were **stale for `eslint-plugin-lingui@^0.14`**
+(`ignoreAttribute`/`ignoreFunction` don't exist on the installed rule's
+schema) and have been corrected to `ignoreNames` / `ignoreFunctions` /
+`ignore` (fixed separately, commit `f684996`).
+
+### (b) Gated model runs (not run this pass — real tokens, explicit go required)
+
+Gated Layer A (detection nudge, ~3 min, model tokens):
+```bash
+./evals/run-eval-layer-a.sh vite-swc-data-module   # asserts candidateFilesMustContain src/data/products.ts
+```
+
+Gated Layer B (self-heal end-to-end, ~5 min, model tokens) — requires a prefill
+whose `plan.md` OMITS `products.ts` from wrap partitions (simulating the
+detection miss the fix guards against), generated per `evals/README.md`:
+```bash
+./evals/run-eval-layer-b.sh vite-swc-data-module   # verify-string-wrapping must show the 13 strings wrapped (13→0)
+```
+
+### (c) Downstream globalize.now follow-ups (not this repo)
+
+- Re-bake the conversion-plane image (`image/stage.sh`) so the plane's baked
+  copy of `globalize-guide` picks up this fix.
+- Promote `fixtures/vite-swc-data-module` (or an equivalent data-module app)
+  into the `conversion-matrix` corpus / `example-websites/typescript/` as a
+  permanent guard there too.
+- Run the deepseek-v4-flash eval cell on the fixture before/after — the
+  `no-unlocalized-strings` gate must go 13→0.
