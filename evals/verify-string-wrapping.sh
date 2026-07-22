@@ -44,7 +44,7 @@ for i in $(seq 0 $((WRAPPED_COUNT - 1))); do
     # String is present — check if it's inside a Lingui wrapper
     # Look for Trans, t(, msg(, defineMessage on the same line or surrounding context
     CONTEXT=$(grep -nF "$ORIGINAL" "$FILE" | head -5)
-    if echo "$CONTEXT" | grep -qE '(Trans|t\(|msg\(|defineMessage)'; then
+    if echo "$CONTEXT" | grep -qE '(<Trans|<Plural|<Select|useLingui|t\(|t`|msg\(|msg`|defineMessage)'; then
       pass "\"$ORIGINAL\" in $FILE is wrapped"
     else
       fail "\"$ORIGINAL\" in $FILE appears bare (no Lingui wrapper)"
