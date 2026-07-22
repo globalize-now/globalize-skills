@@ -519,7 +519,7 @@ If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-com
 Multiple wrap subagents in parallel, then one verify subagent.
 
 > **User-facing message** (at Phase 3 start):
-> "Starting Phase 3 — converting hardcoded strings. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, and adds short translator comments where context isn't obvious. After they all finish, a final verify worker {for JS/TS: `runs extract + compile + build to make sure everything still type-checks and the catalog is clean`; for Rails: `checks that every wrapped key has a matching source-locale entry, tidies any leftover scaffold keys, and runs your test suite if you have one`; for Android: `checks every `strings.xml` is well-formed and that target locales cover the source keys (running Lint for `MissingTranslation` if the Android SDK is available)`; for Swift: `runs a catalog-integrity check — confirming the String Catalog is valid JSON and covers the keys your code uses (no extract/compile step; the build populates the catalog)`}."
+> "Starting Phase 3 — converting hardcoded strings. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, and adds short translator comments where context isn't obvious. After they all finish, a final verify worker {for JS/TS: `runs extract + compile + build, then a recall self-check that catches any user-facing string the first pass missed (data modules, helpers) and self-heals it, so nothing ships unwrapped`; for Rails: `checks that every wrapped key has a matching source-locale entry, tidies any leftover scaffold keys, and runs your test suite if you have one`; for Android: `checks every `strings.xml` is well-formed and that target locales cover the source keys (running Lint for `MissingTranslation` if the Android SDK is available)`; for Swift: `runs a catalog-integrity check — confirming the String Catalog is valid JSON and covers the keys your code uses (no extract/compile step; the build populates the catalog)`}."
 
 ### 3.1 Pre-create progress files
 
@@ -565,11 +565,13 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 > 1. Run `npx lingui extract --clean` (Lingui) or `npx next-intl extract` if applicable. Capture errors. Atomically update `progress/verify.json` after this step.
 > 2. Run `npx lingui compile` (with `--typescript` if TS). Capture errors.
 > 3. Run the project's typecheck and build command. Capture pass/fail.
-> 4. Read the extracted catalog. For entries lacking translator comments where the heuristic in the reference says one should exist (single-/two-word phrases, action labels without object, domain-sensitive terms), edit the source file to add the missing comment.
+> 4. **Recall self-check (backstop for detection misses).** Following `references/languages/js-ts/convert.recall-self-check.md`, scan the full source root for user-facing strings that were never wrapped — Lingui: install + run `lingui/no-unlocalized-strings` (per Add-on 2; guided-mode consent before installing, unguided installs directly; declined → grep scan); next-intl: tuned grep scan; vue-i18n: `@intlify/eslint-plugin-vue-i18n` `no-raw-text` or grep. Write findings to `result.recallViolations`. If **empty**, continue to step 5. If **non-empty**, write `status: "needs_cleanup"` and stop — the orchestrator runs the cleanup loop (below) and re-dispatches verify from step 4 until the recall scan is clean or the budget is hit.
+> 5. Read the extracted catalog. For entries lacking translator comments where the heuristic in the reference says one should exist (single-/two-word phrases, action labels without object, domain-sensitive terms), edit the source file to add the missing comment.
 >
 > For Paraglide:
 > 1. Run `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide` (both flags; single-quoted pin so zsh's `EXTENDED_GLOB` does not eat the caret). Capture errors. Atomically update `progress/verify.json` after this step.
 > 2. Run the project's typecheck and build command. Capture pass/fail. (No extract step.) **Default PO format:** (a) inspect a compiled plural message (`src/lib/paraglide/messages/<key>.js`) to confirm it emits CLDR `registry.plural(...)` branches and **not** the raw `{count, plural, …}` source as a literal — raw source means `"messageFormat": "icu"` is missing or an `msgstr` is malformed (both fail silently); (b) run a comment-review pass over the base `messages/{baseLocale}.po`, adding `#.` comments where the reference's heuristic says one should exist. **ICU-JSON format (`catalogFormat === "json"`):** skip both — there is no comment field, and the ICU1 plugin already fails the build on malformed ICU.
+> 3. **Recall self-check.** Paraglide has no official `no-unlocalized-strings` rule (see `paraglide/setup.add-ons.md`), so run the tuned grep scan from `references/languages/js-ts/convert.recall-self-check.md` over `src/` (adapted to `.svelte` templates). Write `result.recallViolations`; on non-empty, `status: "needs_cleanup"` and let the orchestrator run the cleanup loop (the cleanup subagent authors the missing `m.key()` entries per the Paraglide convert reference).
 >
 > For Rails:
 > 0. **Ensure `i18n-tasks` is installed (this phase owns the install).** If `i18n-tasks` is not in `Gemfile.lock`, add `gem "i18n-tasks", "~> 1.0"` to the `:development, :test` group, run `bundle install`, and scaffold `config/i18n-tasks.yml` if absent (per `rails.convert.md` Step 4). If `bundle install` fails, record the error, mark the gate **skipped** (not failed), and continue — do not block the run on missing audit tooling. (Rails installs gems inside subagents; Phase 2.0 is a no-op for bundler.)
@@ -598,11 +600,27 @@ If any returns `failed`, surface error. The verify subagent should still run on 
 >
 > Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded, recallViolations, cleanupRounds, stringsWrappedInCleanup, residualViolations }` — the last four are the recall self-check fields (`recallViolations`: `[{file,line,text}]` from the scan; `cleanupRounds`: how many cleanup rounds ran; `stringsWrappedInCleanup`: total strings the cleanup subagents wrapped; `residualViolations`: any left when the loop stopped, reported to the user). For libraries with no recall scan run (Rails/Android/Swift this pass), set all four to `null`. For Paraglide, set `extractOk` to `null`; set `commentsAdded` to the count added on the default PO format and to `null` on ICU-JSON; report compile success under `compileOk`. For Rails, set `extractOk` to `null` (no extraction — keys are hand-authored in YAML); report the base-locale completeness result (`i18n-tasks missing -t used` empty) under `compileOk` (Rails' catalog-integrity gate stands in for compile; a gate skipped because `bundle install` failed reports as `null` with the error noted in `errors`); set `buildOk` to the test-suite result when a suite ran, else `null` (Rails has no build step); set `commentsAdded` to `null`. For Rails, `catalogPath` is `config/locales/{default_locale}.yml` and `totalMessages` is the key count in that file (Rails has no extraction step to count from). For Android, set `extractOk` to `null` (no extraction — keys are hand-authored in XML); report the combined XML-validity + locale-coverage result under `compileOk` (Android's catalog-integrity gate stands in for compile); set `buildOk` to the `./gradlew lint` result when it ran, else `null` (lint skipped / no SDK); set `commentsAdded` to the count of `<!-- -->` comments added (Android XML carries comments). For Android, `catalogPath` is `app/src/main/res/values/strings.xml` and `totalMessages` is the `<string>` + `<plurals>` count in that file. For Swift, set `extractOk` to `null` (no extraction codemod — keys land via build-time `SWIFT_EMIT_LOC_STRINGS`/`xcstringstool`); report the catalog-integrity result under `compileOk` (and `null` with build-verify-deferred noted in `errors` when `xcstringstool` is absent and only static-JSON-validate ran); set `buildOk` to `null` (no JS build step); set `commentsAdded` to `null`. For Swift, `catalogPath` is the `.xcstrings` (e.g. `Localizable.xcstrings`) and `totalMessages` is the key count in `strings`.
 
+#### 3.5.1 Cleanup loop (JS/TS recall backstop)
+
+If the verify subagent returns `status: "needs_cleanup"` with `result.recallViolations`, the orchestrator self-heals the missed strings — this is the backstop for any `candidateFiles` detection miss (data modules, toast/error helpers, config copy). Drive it per `references/languages/js-ts/convert.recall-self-check.md`:
+
+For up to `maxCleanupRounds` (default **2**) rounds:
+1. Collect the distinct files in `recallViolations`. If more than **40**, cap to the 40 highest-violation files and surface how many were dropped (no silent truncation).
+2. Dispatch a **`wrap-cleanup` subagent** (background, same dispatch pattern as Phase 3.2) whose prompt mirrors the Phase 3.2 wrap prompt — same `manifest-snapshot.references.convert` + `references.code` — with the file list = the violating files and the "these files were MISSED by detection; wrap per `code.md`, apply the skip-list, leave genuine non-translatables" note from the recall reference. Pre-create `progress/wrap-cleanup-{round}.json`.
+3. When it terminates, re-dispatch the verify subagent from its recall step (re-extract/compile, re-scan). Read the new `recallViolations`.
+4. Stop when: the scan is clean; **or** a round wrapped zero new strings (`stringsWrappedInCleanup === 0`); **or** the round budget is reached. Report any `residualViolations` to the user with file+line (never drop silently).
+
+Record `result.cleanupRounds` and surface a one-line summary: "Self-heal wrapped **{stringsWrappedInCleanup}** strings that detection missed{, N left for manual review if residual}." Then proceed to `comment_review_pass` and 3.6.
+
+Rails/Android/Swift do not run this loop this pass — their verify gates (`i18n-tasks missing -t used`, `./gradlew lint`, catalog integrity) already report coverage; extending the loop to them (`erb_lint`, `gradlew` `HardcodedText`, grep) is a follow-up.
+
 ### 3.6 Cost estimate (Phase 3 → 4 bridge)
 
 After verify succeeds, parse the extracted catalog (JS) / the source-locale YAML (Rails) / the source `res/values/strings.xml` (Android) to compute word count. Show the user:
 
 > "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now."
+
+When `result.stringsWrappedInCleanup > 0` (the 3.5.1 recall cleanup loop ran), prepend that round's self-heal summary to this message: "Self-heal wrapped **{stringsWrappedInCleanup}** strings that detection missed{, N left for manual review if residual}."
 
 If `decisions.scope.globalize === true`, advance to Phase 4 with:
 
@@ -728,10 +746,12 @@ Partitions: {N} wrap subagents covering {file count} files
 - [ ] extract_clean
 - [ ] compile
 - [ ] build_check
+- [ ] recall_self_check   <!-- JS/TS backstop: scan for unwrapped strings, self-heal via wrap-cleanup subagents (see convert.recall-self-check.md); ≤2 rounds -->
 - [ ] comment_review_pass
 <!-- compile-from-catalog (Paraglide) instead: no extract step, no comment_review_pass (inlang/ICU has no comment field):
 - [ ] paraglide_compile
 - [ ] build_check
+- [ ] recall_self_check
 -->
 <!-- runtime-catalog, no compile (Rails) instead: no extract step, no compile step, no build step (Rails loads config/locales/*.yml directly at runtime). The gate is base-locale completeness (i18n-tasks missing -t used); there is no normalize-drift gate. test_suite is optional — include only if a spec/ or test/ dir exists (run with raise_on_missing_translations):
 - [ ] ensure_i18n_tasks
