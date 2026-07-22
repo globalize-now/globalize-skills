@@ -21,11 +21,15 @@ excluding tests, stories, configs, and `.d.ts`.
   `ignoreFunctions`, `ignore`). Consent rule: **guided** mode → describe and confirm before
   installing; **unguided** mode → install directly. If the user declines in
   guided mode, use the grep scan below for this run. Then run the project's ESLint
-  over the source root reporting only `lingui/no-unlocalized-strings`, e.g.:
+  over the source root with the **Add-on 2 config in effect** (so the tuned
+  `ignoreNames`/`ignoreFunctions`/`ignore` apply — do **not** pass `--rule`, which
+  overrides the rule and drops its options, which would surface the identifier/config
+  decoys as noise):
   ```bash
-  npx eslint 'src/**/*.{ts,tsx,js,jsx}' --rule '{"lingui/no-unlocalized-strings":"error"}' --format json
+  npx eslint 'src/**/*.{ts,tsx,js,jsx}' --format json
   ```
-  Parse the JSON into `{ file, line, text }` violations. Because verify installs
+  Parse the JSON, keep only messages whose `ruleId === "lingui/no-unlocalized-strings"`
+  (ignore other rules' messages), into `{ file, line, text }` violations. Because verify installs
   the plugin, the project keeps it as a **permanent guardrail** — the intended
   bonus.
 - **next-intl / Paraglide — no reliable rule → tuned grep scan.** There is no
