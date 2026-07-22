@@ -1,0 +1,14 @@
+{
+  "match": {
+    "framework": "vite", "compiler": "swc",
+    "react": true, "vue": false, "typescript": true,
+    "packageManager": "npm", "sourceDir": "src",
+    "existing": { "library": "none", "configured": false, "providerWired": false,
+                  "catalogsScaffolded": false, "stringsWrapped": "no" }
+  },
+  "ignore": ["candidateFiles", "routeEntries", "git", "localeSignals", "router", "version", "platform", "buildSystem", "uiFramework", "svelte"],
+  "softAssert": {
+    "candidateFilesMinCount": 2,
+    "candidateFilesMustContain": ["src/data/products.ts"]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "wrapped_strings": [
+    { "file": "src/data/products.ts", "original": "Wireless Headphones" },
+    { "file": "src/data/products.ts", "original": "Premium noise-cancelling over-ear headphones with 30-hour battery life." },
+    { "file": "src/data/products.ts", "original": "Smart Watch" },
+    { "file": "src/data/products.ts", "original": "Track your fitness, sleep, and notifications on the go." },
+    { "file": "src/data/products.ts", "original": "Mechanical Keyboard" },
+    { "file": "src/data/products.ts", "original": "Tactile hot-swappable switches for a satisfying typing experience." },
+    { "file": "src/data/products.ts", "original": "USB-C Hub" },
+    { "file": "src/data/products.ts", "original": "Seven ports in a compact aluminium body." },
+    { "file": "src/data/products.ts", "original": "Desk Lamp" },
+    { "file": "src/data/products.ts", "original": "Adjustable warmth and brightness for late-night work." },
+    { "file": "src/data/products.ts", "original": "Audio" },
+    { "file": "src/data/products.ts", "original": "Wearables" },
+    { "file": "src/data/products.ts", "original": "Accessories" }
+  ],
+  "min_files_with_trans": 2,
+  "min_extracted_messages": 13
+}
