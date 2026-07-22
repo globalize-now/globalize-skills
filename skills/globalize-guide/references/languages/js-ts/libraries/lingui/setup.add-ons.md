@@ -100,14 +100,17 @@ Read the plugin README for the exact rule list at the installed version — rule
 
 ### `no-unlocalized-strings` configuration
 
-This rule is the noisiest by default because it flags every string literal in JSX. Tune the project's `ignoredAttributes`, `ignoredProperties`, and `ignoreFunction` to match the codebase before running across the full repo, otherwise the first lint pass produces hundreds of false positives in tests, fixtures, and `data-testid` attributes. A reasonable starting point:
+This rule is the noisiest by default because it flags every string literal in JSX. Tune the rule's `ignoreNames` (attribute, property, and variable names — e.g. `data-testid`, `id`, `slug`), `ignoreFunctions` (functions whose string arguments to skip), and `ignore` (regex patterns for literal values to skip) to match the codebase before running across the full repo, otherwise the first lint pass produces hundreds of false positives in tests, fixtures, and `data-testid` attributes. A reasonable starting point:
 
 ```js
 {
   rules: {
     'lingui/no-unlocalized-strings': ['error', {
-      ignoreAttribute: ['data-testid', 'href', 'src', 'id', 'className', 'class'],
-      ignoreFunction: ['Symbol', 'cva'],
+      // ignoreNames covers JSX attribute names, object property names, and variable names.
+      ignoreNames: ['data-testid', 'href', 'src', 'srcSet', 'id', 'slug', 'sku', 'key', 'type', 'variant', 'role', 'className', 'class', 'style', 'styleName', 'width', 'height', 'displayName'],
+      ignoreFunctions: ['Symbol', 'cva', 'cn', 'console.*'],
+      // Skip ALL_CAPS enum values / internal codes (see code.md 'What not to wrap').
+      ignore: ['^[A-Z0-9_-]+$'],
     }],
   },
 }
