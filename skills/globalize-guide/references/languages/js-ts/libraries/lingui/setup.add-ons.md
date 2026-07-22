@@ -100,14 +100,17 @@ Read the plugin README for the exact rule list at the installed version — rule
 
 ### `no-unlocalized-strings` configuration
 
-This rule is the noisiest by default because it flags every string literal in JSX. Tune the project's `ignoredAttributes`, `ignoredProperties`, and `ignoreFunction` to match the codebase before running across the full repo, otherwise the first lint pass produces hundreds of false positives in tests, fixtures, and `data-testid` attributes. A reasonable starting point:
+This rule is the noisiest by default because it flags every string literal in JSX. Tune the rule's `ignoreNames` (attribute, property, and variable names — e.g. `data-testid`, `id`, `slug`), `ignoreFunctions` (functions whose string arguments to skip), and `ignore` (regex patterns for literal values to skip) to match the codebase before running across the full repo, otherwise the first lint pass produces hundreds of false positives in tests, fixtures, and `data-testid` attributes. A reasonable starting point:
 
 ```js
 {
   rules: {
     'lingui/no-unlocalized-strings': ['error', {
-      ignoreAttribute: ['data-testid', 'href', 'src', 'id', 'className', 'class'],
-      ignoreFunction: ['Symbol', 'cva'],
+      // ignoreNames covers JSX attribute names, object property names, and variable names.
+      ignoreNames: ['data-testid', 'href', 'src', 'srcSet', 'id', 'slug', 'sku', 'key', 'type', 'variant', 'role', 'className', 'class', 'style', 'styleName', 'width', 'height', 'displayName'],
+      ignoreFunctions: ['Symbol', 'cva', 'cn', 'console.*'],
+      // Skip ALL_CAPS enum values / internal codes (see code.md 'What not to wrap').
+      ignore: ['^[A-Z0-9_-]+$'],
     }],
   },
 }
@@ -118,6 +121,8 @@ Apply this only inside `src/` (or the project's source root), not test files or 
 ### After install
 
 Run the project's lint command once and report the count of new errors to the user. If the count is large (>50), suggest running `lingui extract` first so any missed wraps surface as proper catalog entries before the lint-driven cleanup pass.
+
+> **Note:** the convert **verify** phase now installs and runs `lingui/no-unlocalized-strings` as a recall self-check regardless of this add-on (see `references/languages/js-ts/convert.recall-self-check.md`), so a converted project keeps this guardrail even if the add-on wasn't selected. Selecting this add-on additionally wires the full recommended preset and (with Add-on 3) the CI drift check.
 
 ---
 

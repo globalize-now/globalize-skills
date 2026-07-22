@@ -43,6 +43,14 @@
     "library": "lingui",
     "variant": "vite-swc-lingui"
   },
+  "vite-swc-data-module": {
+    "category": "positive",
+    "type": "local",
+    "path": "fixtures/vite-swc-data-module",
+    "library": "lingui",
+    "variant": "vite-swc-lingui",
+    "expectedDetection": "evals/expectations/detection/vite-swc-data-module.json"
+  },
   "vite-babel": {
     "category": "positive",
     "type": "local",

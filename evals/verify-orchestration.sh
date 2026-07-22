@@ -86,6 +86,20 @@ else
         warn "candidateFiles count ($ACTUAL_COUNT) below threshold $CANDIDATE_MIN — content-sensitive detection may need tuning"
       fi
     fi
+
+    # softAssert: candidateFilesMustContain (warn, not fail) — each substring must
+    # appear in at least one candidateFiles[].path. Guards detection-recall for
+    # specific file shapes (e.g. data/content modules) without over-constraining
+    # the content-sensitive candidate ranking.
+    MUST_CONTAIN=$(jq -r '.softAssert.candidateFilesMustContain // [] | .[]' "$EXPECTED_DETECTION_FILE")
+    while IFS= read -r NEEDLE; do
+      [ -z "$NEEDLE" ] && continue
+      if jq -e --arg n "$NEEDLE" '.candidateFiles // [] | any(.path | contains($n))' "$DETECTION_JSON" >/dev/null 2>&1; then
+        pass "candidateFiles contains a path matching '$NEEDLE'"
+      else
+        warn "candidateFiles has no path matching '$NEEDLE' — detection may miss this file shape"
+      fi
+    done <<< "$MUST_CONTAIN"
   fi
 fi
 
