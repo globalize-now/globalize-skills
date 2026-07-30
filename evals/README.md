@@ -1,6 +1,6 @@
 # Skill Evals
 
-Evaluates whether the `i18n-guide` skill makes the right decisions and produces working setups when followed by Claude Code.
+Evaluates whether the `globalize-guide` skill makes the right decisions and produces working setups when followed by Claude Code.
 
 Testing runs in two layers:
 
@@ -37,7 +37,7 @@ With `KEEP_WORKDIR=1` the temp dir survives, so you can re-run a verifier agains
 
 **Layer A** (`run-eval-layer-a.sh`):
 1. Prepare a fixture project in a temp dir (`helpers/prepare-workdir.sh`).
-2. Install the skill into `.claude/skills/i18n-guide/`.
+2. Install the skill into `.claude/skills/globalize-guide/`.
 3. Run `claude -p` with a prompt that pre-answers every Phase 1 question (positive/collapse) or simply asks the skill to inspect (hard-stop), and stops before Phase 2.
 4. Verify the `.globalize/` artifacts: `verify-orchestration.sh` (positive/collapse) or `verify-hard-stop.sh` (hard-stop).
 

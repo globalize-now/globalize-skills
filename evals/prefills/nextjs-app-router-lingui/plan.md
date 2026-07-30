@@ -36,6 +36,7 @@ Subagent steps:
 - [ ] provider_wiring
 - [ ] language_switcher
 - [ ] scaffold_catalogs
+- [ ] gitignore_artifacts
 - [ ] extract_compile
 - [ ] install_coding_rules
 - [ ] build_verification
