@@ -1,0 +1,47 @@
+# The conversion plane bakes this repo's playbook into its container image at
+# build time — nothing fetches skills at runtime. A change here therefore has no
+# effect on conversions until the plane image is rebuilt, so push the rebuild
+# from here rather than relying on someone remembering.
+#
+# Deploys to the STAGE plane only. Production is a manual run of the same
+# workflow in globalize.now, after a validation conversion.
+name: Deploy conversion plane
+
+on:
+  push:
+    branches: [main]
+    # Only the skills the image actually installs. Keep in sync with the
+    # `skills add -s …` list in globalize.now →
+    # packages/conversion-plane/image/Dockerfile (and skillsToStage in
+    # evals/conversion-matrix/matrix.config.ts, which src/image.spec.ts pins to it).
+    paths:
+      - skills/globalize-guide/**
+      - skills/css-i18n/**
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-conversion-plane
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      # PLANE_DEPLOY_TOKEN: a PAT that can dispatch workflows in
+      # globalize-now/globalize.now. The default GITHUB_TOKEN cannot — it is
+      # scoped to this repository.
+      - name: Trigger the plane rebuild
+        env:
+          GH_TOKEN: ${{ secrets.PLANE_DEPLOY_TOKEN }}
+          # Via env, never inline `${{ }}` — a commit message is attacker-shaped input.
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          subject="${COMMIT_SUBJECT%%$'\n'*}"   # first line only
+          gh workflow run deploy-conversion-plane.yml \
+            --repo globalize-now/globalize.now \
+            --ref main \
+            -f environment=stage \
+            -f reason="skills@${GITHUB_SHA:0:7} ${subject:-manual dispatch}"
+          echo "Dispatched. Watch: https://github.com/globalize-now/globalize.now/actions/workflows/deploy-conversion-plane.yml"
