@@ -80,7 +80,7 @@ export default defineConfig({
 })
 ```
 
-**First-run ordering.** On a clean clone, run `vite build` (or start `vite dev` once) before `tsc -b` / `tsc --noEmit`. The TanStack Router plugin generates `src/routeTree.gen.ts` on first Vite run; `tsc` fails if the generated file does not yet exist. If the project's `npm run build` currently runs `tsc -b && vite build`, reorder to `vite build && tsc --noEmit` (or add a pre-build `vite build --mode dev` step) so the route tree is present before type-checking.
+**First-run ordering.** On a clean clone, run `vite build` (or start `vite dev` once) before `tsc -b` / `tsc --noEmit`. The TanStack Router plugin generates `src/routeTree.gen.ts` on first Vite run; `tsc` fails if the generated file does not yet exist. If the project's `npm run build` currently runs `tsc -b && vite build`, reorder to `vite build && tsc --noEmit` (or add a pre-build `vite build --mode dev` step) so the route tree is present before type-checking. `lingui compile` goes first in that chain — the compiled catalogs are gitignored as well, so on a clean clone they do not exist until the compiler has run; the full order is `lingui compile` → `vite build` → `tsc --noEmit`, which is exactly what the prefixed `build` script in "Catalog artifacts" (end of this file) sets up.
 
 ## Provider Setup
 
@@ -109,7 +109,7 @@ For plain SPAs without file-based routing, skip the routing choice — use optio
 
 **This pattern modifies the root route file** (`__root.tsx` for TanStack Router, root layout for React Router) by wrapping it with `I18nProvider`. Show the user what changes before making them.
 
-> **Heads-up for Step 8 (first extract):** the per-route dynamic imports shown below (`import(\`./locales/{route}/${locale}.ts\`)`) must resolve at extract time, so every target path needs an `export const messages = {}` stub on first run. See the main `SKILL.md` Step 3 subsection *"Before first extract: seed route-scoped catalog stubs"* — follow it before running `lingui extract-experimental` the first time.
+> **Heads-up for Step 8 (first extract):** the per-route dynamic imports shown below (`import(\`./locales/{route}/${locale}.ts\`)`) must resolve at extract time, so every target path needs an `export const messages = {}` stub on first run. See *"Catalog artifacts: bootstrapping, scripts, `.gitignore`"* at the end of this file — follow its stub-bootstrapping step before running `lingui extract-experimental` the first time.
 
 #### Strategy 1: Unprefixed source locale (per-page catalogs)
 
@@ -1021,6 +1021,135 @@ import { LanguageSwitcher } from './components/LanguageSwitcher'
 If the project has a shared header/navigation component, place the switcher there instead of directly in the provider wrapper.
 
 **Styling**: The examples use inline styles as a baseline. Adapt the styling to match the project's CSS approach (Tailwind, CSS Modules, etc.) and the visual style of the surrounding navigation.
+
+---
+
+## Catalog artifacts: bootstrapping, scripts, `.gitignore`
+
+Work through this section after the provider setup above and before the first `lingui extract` run.
+
+### Catalog stub bootstrapping (per-page catalogs only)
+
+Skip this if the project uses the single-catalog layout — it applies only to the per-page layout above.
+
+Every per-page route shown above loads its catalog via a dynamic `import()` of `./locales/{route}/{locale}.ts`. Lingui's per-page extractor resolves those dynamic imports with esbuild at extract time — *before* it writes any `.po` or compiled catalog files. On a fresh project the `locales/` directories don't exist yet, so the very first run of `lingui extract-experimental` fails with either `Could not resolve import(...)` or `No matches for the glob in ./locales/${locale}.ts`, and exits before generating anything.
+
+**Bootstrap before the first `lingui extract-experimental` run (the `scaffold_catalogs` step of Phase 2):** for every route that declares `import('./locales/{route}/' + locale + '.ts')`, create a compiled-catalog stub at each `locales/{route}/{locale}.ts` target containing a single line:
+
+```ts
+export const messages = {}
+```
+
+For the Strategy 1 layout with `LOCALES = ['en', 'fr']` and routes `about.tsx` + `dashboard.tsx`, that's:
+
+```
+src/routes/locales/about/en.ts
+src/routes/locales/about/fr.ts
+src/routes/locales/dashboard/en.ts
+src/routes/locales/dashboard/fr.ts
+```
+
+React Router projects use `app/routes/` in place of `src/routes/`. Prefixed routes resolve their specifier relative to their own directory, so `src/routes/$locale/about.tsx` needs its stubs at `src/routes/$locale/locales/about/{locale}.ts`.
+
+One `export const messages = {}` line per file — the extractor will overwrite these with real compiled catalogs after the first `lingui:extract` + `lingui:compile` cycle.
+
+If the route list is long, enumerate it with grep (adapt the locales to the project's `LOCALES` array, and the directory to `app/routes/` for React Router):
+
+```sh
+grep -rlE "import\\([^)]*\\./locales/" src/routes/ | while read f; do
+  name="$(basename "$f" .tsx)"
+  dir="$(dirname "$f")/locales/$name"
+  mkdir -p "$dir"
+  for loc in en fr; do echo "export const messages = {}" > "$dir/$loc.ts"; done
+done
+```
+
+The script is a convenience — the load-bearing step is verifying that every `import()` target path listed in the route files has a matching stub. Routes using non-default paths (e.g. `'./locales/profile/' + locale + '.ts'` inside `src/routes/user/settings.tsx`) must have stubs at the exact specifier the code uses.
+
+> **These stubs are local-only scaffolding.** They are written to the paths you just gitignored, so they are never committed — and they do not need to be. They exist for exactly one situation: the **very first** `lingui extract` on a project that has no `.po` files yet, where the extractor must resolve the route files' dynamic catalog imports before any catalog exists.
+>
+> **On a fresh clone, do not re-seed stubs — run `lingui compile`.** The `.po` sources are committed, so `lingui compile` regenerates the real compiled catalogs. Seeding is only correct when there is no `.po` file at all.
+>
+> Order inside setup: append the `.gitignore` rule → seed stubs → `lingui extract` → `lingui compile`. After the first compile the stubs are overwritten by real catalogs, which stay untracked.
+>
+> Do not run `git add -A` between seeding and the ignore rule landing.
+
+### Catalog scripts
+
+Add the extract and compile scripts to `package.json`, and **prepend** `lingui compile && ` to `dev`, `build`, and `typecheck` (if present) — prefix the existing value, never replace it:
+
+```json
+{
+  "scripts": {
+    "lingui:extract": "lingui extract --clean",
+    "lingui:compile": "lingui compile",
+    "dev": "lingui compile && vite",
+    "build": "lingui compile && vite build"
+  }
+}
+```
+
+**`lingui compile` must run before the app is built, type-checked, or served.** The compiled catalogs are not in git, so every fresh clone and every CI run starts without them. Call the binary directly (`lingui compile && …`), not through `npm run`, so the scripts work under npm, pnpm, yarn, and bun alike. Do **not** use a `prebuild` hook — pnpm ≥7 disables pre/post scripts by default and Yarn Berry dropped them entirely, so it would silently no-op for two of the four package managers this skill supports.
+
+Known limitation: in dev, a `.po` edited after startup (e.g. a Globalize delivery pulled mid-session) needs a dev-server restart, because the compile ran at startup.
+
+**Which extractor:** `lingui extract --clean` above is the single-catalog form. For the per-page layout the extract script is `lingui extract-experimental` instead — the per-page extractor is what resolves the route files' dynamic `import()` specifiers. Use the one matching the layout you set up.
+
+**TypeScript projects:** this reference ships no `lingui.config.ts` block, so there is no `compileNamespace: 'ts'` to rely on. If the project has a `tsconfig.json`, use `lingui compile --typescript` everywhere `lingui compile` appears above (the `lingui:compile` script and the `dev` / `build` prefixes) so the compiler emits `.ts` catalogs the route `import()`s can resolve and type-check. Omit the flag for plain-JS projects.
+
+### `.gitignore`
+
+Compiled catalogs are build output, not source. Lingui's own CLI docs are explicit: *"Compiled files should be ignored by version control as they are generated during deployment."* Unlike Paraglide, the Lingui compiler does **not** emit a `.gitignore` of its own, so add the rule yourself.
+
+Append to the project's root `.gitignore` (create it if missing). In guided mode, show the diff first if the file already has rules. If an equivalent rule is already present, skip — this step is idempotent.
+
+Emit **only** the block matching the catalog layout the project actually uses — never both.
+
+Per-page catalogs (`src/routes/**/locales/{route}/{locale}.ts`):
+
+```gitignore
+# Lingui compiled catalogs — regenerated by `lingui compile`
+src/routes/**/locales/**/*.ts
+src/routes/**/locales/**/*.js
+```
+
+Single catalog (`src/locales/{locale}/messages.ts`):
+
+```gitignore
+# Lingui compiled catalogs — regenerated by `lingui compile`
+src/locales/*/messages.ts
+src/locales/*/messages.js
+src/locales/*/messages.d.ts
+```
+
+**Extension caveat.** This reference does not ship a `lingui.config.ts` block, so the compiled extension depends on the config you created in `create_config`: with `compileNamespace: 'ts'` (or `lingui compile --typescript`) the output is `.ts`; with the default (`cjs`) it is `.js`. The block above ignores both, so the rule is correct either way — but derive the real *directory* from the config you wrote (`catalogs[].path`, or `experimental.extractor.output` for the per-page extractor) and from the actual `import()` / `require()` specifiers in the route files, and adjust the paths above if they differ. Confirm with the `git check-ignore` self-check below.
+
+**Do not ignore the `.po` files, and do not ignore the directory.** The compiled catalog sits in the *same directory* as its `.po` source, and the `.po` is the translation source of truth — it is what Globalize imports from the repo in Phase 4. So:
+
+- never `<dir>/` (directory rule — swallows the `.po`),
+- never `<dir>/*/messages.*` (extension wildcard — swallows the `.po`),
+- always the explicit compiled extensions shown above.
+
+A pattern containing a `/` is anchored to the `.gitignore`'s directory, so no leading slash is needed. `**/` matches zero or more directories. `*.ts` already covers `*.d.ts`; the anchored `messages.ts` form does not, hence the explicit line.
+
+Self-check before moving on (both must hold):
+
+```bash
+git check-ignore -v <one real compiled path>   # prints the matching rule → ignored
+git check-ignore    <its .po sibling>          # exits 1, prints nothing → still tracked
+```
+
+**Sweep for strays before you finish.** Bootstrap stubs seeded at a path the final config does not emit to — e.g. a single-catalog `locale/{locale}/messages.ts` left behind after the config settled on per-page catalogs — are compiled artifacts too, and the pattern above will not match them. After the first successful `lingui compile`, list every compiled catalog on disk and delete any that the resolved `lingui.config.*` no longer produces. Do **not** widen the ignore rule to cover a path nothing imports.
+
+**Already-tracked artifacts.** `.gitignore` does not untrack files. If `git ls-files` shows compiled catalogs already committed (an existing project, or a re-run), tell the user and, with their consent, run:
+
+```bash
+git rm --cached --quiet <compiled paths>
+```
+
+The files stay on disk; git stops tracking them. Without this, the ignore rule has no effect on those paths.
+
+Ignoring the compiled catalogs is only safe because `lingui compile` runs before every build — see the catalog scripts above. Do not do one without the other.
 
 ---
 

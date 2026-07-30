@@ -3,7 +3,7 @@ set -uo pipefail
 
 # Usage: next-intl.sh <project-dir> <fixture-name> [variant]
 # Per-library verifier (dispatched by verify-setup.sh) for next-intl setups.
-# Runs 3 layers of verification against a project where the i18n-guide skill
+# Runs 3 layers of verification against a project where the globalize-guide skill
 # set up next-intl.
 #
 # next-intl is a RUNTIME-catalog library: messages are JSON files consumed

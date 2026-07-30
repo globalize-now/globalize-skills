@@ -4,5 +4,5 @@
   "phasesIncluded": ["setup"],
   "phase2StepsContain": ["build_verification"],
   "phase2StepsContainPattern": ["verify_"],
-  "phase2StepsAbsent": ["create_config"]
+  "phase2StepsAbsent": ["create_config", "gitignore_artifacts"]
 }

@@ -3,7 +3,7 @@ set -uo pipefail
 
 # Usage: vue-i18n.sh <project-dir> <fixture-name> [variant]
 # Per-library verifier (dispatched by verify-setup.sh) for vue-i18n setups.
-# Runs 3 layers of verification against a project where the i18n-guide skill
+# Runs 3 layers of verification against a project where the globalize-guide skill
 # set up vue-i18n.
 #
 # vue-i18n is a RUNTIME library: catalogs are plain JSON loaded at runtime and

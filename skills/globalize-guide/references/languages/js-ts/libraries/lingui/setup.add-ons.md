@@ -141,6 +141,8 @@ Detect from `package.json` and `lingui.config.{ts,js}`:
 
 ### `package.json` scripts
 
+**Script-name reconciliation — read `package.json` before adding anything.** The framework setup references (`nextjs/app-router/lingui.setup.md`, the Vite files, the TanStack Start files) create a `lingui:extract` / `lingui:compile` pair as part of core setup. This add-on was written around an `i18n:extract` / `i18n:compile` pair. They run the same commands. If the `lingui:*` pair already exists, **reuse it** and add only what is missing — in practice just the drift check, `i18n:check` — rather than creating a second, near-duplicate pair. Point the GitHub Actions workflow below at whichever names the project actually has.
+
 Add (or merge with existing):
 
 ```json
@@ -148,14 +150,18 @@ Add (or merge with existing):
   "scripts": {
     "i18n:extract": "lingui extract --clean",
     "i18n:compile": "lingui compile --typescript",
-    "i18n:check": "lingui extract --clean && git diff --exit-code -- src/locales"
+    "i18n:check": "lingui compile && lingui extract --clean && git diff --exit-code -- src/locales"
   }
 }
 ```
 
 Replace `src/locales` in `i18n:check` with the project's actual catalog path. Drop `--typescript` if the project is plain JavaScript.
 
-Wire `i18n:compile` into the build script so production bundles include compiled catalogs. Look at the existing `build` script:
+**Why `i18n:check` compiles first.** Compiled catalogs are gitignored (see the `` `.gitignore` `` section of the stack's setup reference), so a clean CI checkout has the `.po` sources but none of the compiled output. That breaks extraction on the per-route stacks: the per-page extractor resolves each route file's dynamic-import target with esbuild **before writing anything**, and fails with `Could not resolve import(...)` when those targets are absent — see `frameworks/tanstack-start/lingui.setup.md:423`. Running `lingui compile` first materialises them so the extract can proceed. Without the leading compile, the old form of this script fails on every clean CI checkout for those stacks.
+
+A side effect: `git diff --exit-code` can now only ever report `.po` changes, because the compiled catalogs it would otherwise have flagged are untracked. That is the intended contract — the drift check is about catalog *sources*, not build artifacts.
+
+**Build wiring — check before you write.** Core setup now prepends `lingui compile` to the `build` and `dev` scripts itself (see the "Catalog scripts" section of the stack's setup reference). Read `package.json`: if the `build` script already starts with `lingui compile`, leave it alone — do **not** add a second compile invocation. Only wire it in here when it is absent, which means an older setup that predates that change, or a hand-built project that never went through the setup reference:
 
 ```json
 {
@@ -191,11 +197,13 @@ jobs:
         with:
           node-version: lts/*
       - run: npm ci
-      - name: Verify catalogs are in sync
-        run: npm run i18n:check
       - name: Compile catalogs
         run: npm run i18n:compile
+      - name: Verify catalogs are in sync
+        run: npm run i18n:check
 ```
+
+**Compile before anything that type-checks or builds.** The compile step comes first on purpose. Compiled catalogs are gitignored, so a CI checkout starts without them and the route files' catalog imports cannot resolve until something generates them. Any job that runs `tsc --noEmit`, `next build`, `vite build`, or the project's `build` script on a clean checkout must run `i18n:compile` first (or invoke a `build` script that already prepends `lingui compile`). Keep this ordering if you add typecheck or build steps to this workflow, and apply it to any other workflow that touches the app.
 
 Adjust `paths`, source directory, and the install command to match the project. If the project does not have `.github/workflows/`, skip the workflow scaffold and just install the npm scripts. Tell the user how to wire `i18n:check` into their CI of choice.
 

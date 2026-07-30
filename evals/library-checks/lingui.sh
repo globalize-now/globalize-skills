@@ -3,7 +3,7 @@ set -uo pipefail
 
 # Usage: lingui.sh <project-dir> <fixture-name> [variant]
 # Per-library verifier (dispatched by verify-setup.sh) for Lingui setups.
-# Runs 3 layers of verification against a project where the i18n-guide skill
+# Runs 3 layers of verification against a project where the globalize-guide skill
 # set up Lingui.
 
 WORKDIR="${1:?Usage: lingui.sh <project-dir> <fixture-name> [variant]}"
@@ -107,6 +107,92 @@ if npx lingui compile 2>&1 | grep -q -i "error"; then
   fail "lingui compile produced errors"
 else
   pass "lingui compile succeeded"
+fi
+
+# 1.6b Compiled catalogs are gitignored; .po sources are not.
+#
+# Layer B workdirs are plain `cp -R` copies with no git repo, so drive git through
+# a throwaway GIT_DIR that never lands inside the project tree.
+if ! command -v git > /dev/null 2>&1; then
+  warn "git unavailable — compiled-catalog ignore checks skipped"
+elif [ "$PO_COUNT" -eq 0 ]; then
+  warn "No .po files — compiled-catalog ignore checks skipped (setup-only scope)"
+else
+  SCRATCH_GIT="$(mktemp -d)/g"
+  GIT_DIR="$SCRATCH_GIT" GIT_WORK_TREE="$PWD" git init -q > /dev/null 2>&1
+  # Every call must carry both paths explicitly — exporting GIT_DIR would leak
+  # into `npm run build` below.
+  gci() { git --git-dir="$SCRATCH_GIT" --work-tree="$PWD" check-ignore -q "$1" > /dev/null 2>&1; }
+
+  # Collect the compiled siblings of every .po catalog (same basename, .ts/.js).
+  # This shape covers both layouts: single-catalog `locales/<locale>/messages.po`
+  # and per-route `locales/<route>/<locale>.po`.
+  COMPILED=()
+  while IFS= read -r po; do
+    for ext in ts js; do
+      cand="${po%.po}.$ext"
+      [ -f "$cand" ] && COMPILED+=("$cand")
+    done
+  done < <(find . -name "*.po" -not -path './node_modules/*')
+
+  # (1) A rule exists at all — the direct regression test for the reported gap.
+  if [ -f .gitignore ] && grep -Eq '(locales|paraglide).*\.(ts|js)$' .gitignore; then
+    pass "Compiled-catalog rule present in .gitignore"
+  else
+    fail "No compiled-catalog rule in .gitignore (compiled catalogs would be committed)"
+  fi
+
+  if [ ${#COMPILED[@]} -eq 0 ]; then
+    warn "No compiled catalogs on disk next to the .po files — ignore/untrack checks skipped"
+  else
+    # (2) A real compiled artifact is ignored.
+    if gci "${COMPILED[0]}"; then
+      pass "Compiled catalog is gitignored (${COMPILED[0]})"
+    else
+      fail "Compiled catalog is NOT gitignored: ${COMPILED[0]}"
+    fi
+
+    # (3) Its .po sibling is NOT ignored. This is the critical guard: the compiled
+    # file is a sibling of the committed source, so a directory-scoped rule would
+    # silently untrack the translation source of truth.
+    PO_SIBLING="${COMPILED[0]%.*}.po"
+    if gci "$PO_SIBLING"; then
+      fail "Over-broad ignore rule — the .po SOURCE is ignored too: $PO_SIBLING"
+    else
+      pass "PO source is still tracked (not ignored): $PO_SIBLING"
+    fi
+  fi
+
+  # (4) Build wiring — the ignore is only safe if the build regenerates the catalogs.
+  BUILD_SCRIPT=$(jq -r '.scripts.build // empty' package.json 2>/dev/null)
+  DEV_SCRIPT=$(jq -r '.scripts.dev // empty' package.json 2>/dev/null)
+  case "$BUILD_SCRIPT" in
+    *"lingui compile"*) pass "build script runs 'lingui compile'" ;;
+    *) fail "build script does not run 'lingui compile' — fresh clones will have no catalogs (build: '$BUILD_SCRIPT')" ;;
+  esac
+  case "$DEV_SCRIPT" in
+    *"lingui compile"*) pass "dev script runs 'lingui compile'" ;;
+    *) warn "dev script does not run 'lingui compile' (dev: '$DEV_SCRIPT')" ;;
+  esac
+
+  # (5) Fresh-clone simulation — the coupling regression test. Delete only the
+  # compiled catalogs (never `git clean -Xdf`, which would take node_modules) and
+  # confirm the build regenerates them.
+  if [ ${#COMPILED[@]} -gt 0 ]; then
+    rm -f "${COMPILED[@]}"
+    echo "  Simulating fresh clone (compiled catalogs removed), running npm run build..."
+    if npm run build > "$(mktemp)" 2>&1; then
+      REGENERATED=0
+      for f in "${COMPILED[@]}"; do [ -f "$f" ] && REGENERATED=$((REGENERATED + 1)); done
+      if [ "$REGENERATED" -gt 0 ]; then
+        pass "Build regenerates compiled catalogs from .po ($REGENERATED/${#COMPILED[@]} restored)"
+      else
+        fail "Build succeeded but regenerated no compiled catalogs — .po sources are not reaching the app"
+      fi
+    else
+      fail "npm run build failed without pre-existing compiled catalogs (fresh clone would break)"
+    fi
+  fi
 fi
 
 # 1.7 Project builds (branch on exit status — parsing output for "error" both

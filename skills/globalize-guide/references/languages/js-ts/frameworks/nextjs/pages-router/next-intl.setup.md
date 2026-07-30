@@ -577,6 +577,14 @@ All imports come from `next-intl` (not `next-intl/server` — that is App Router
 
 ---
 
+## Commit and ignore rules
+
+**What to commit:** the message files — `messages/{locale}.json`, or `messages/{locale}.po` on the PO variant. They are the translation source of truth, and they are what Globalize imports from the repo. Commit them.
+
+**What to gitignore:** nothing. next-intl reads the message files at request or build time and writes nothing back to disk, so there is no generated artifact to exclude. On the PO variant the Turbopack/Webpack loader installed by `createNextIntlPlugin`'s `experimental.messages` option compiles `.po` in memory — on Pages Router that happens at render time, since `precompile: false` is required here — and still emits no on-disk output. Contrast with Lingui, which writes compiled catalogs next to its `.po` sources and therefore does need an ignore rule. Do not carry that rule over into a next-intl project.
+
+---
+
 ## Optional add-ons
 
 If the user selected any optional add-ons in `SKILL.md §1.10` (coding rules `@import`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from `references/languages/js-ts/libraries/next-intl/setup.add-ons.md`. Skip add-ons the user did not select. Skip this section entirely if no add-ons were selected.

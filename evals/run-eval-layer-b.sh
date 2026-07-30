@@ -4,7 +4,7 @@ set -euo pipefail
 # Usage: ./evals/run-eval-layer-b.sh <fixture-name>
 # Example: ./evals/run-eval-layer-b.sh nextjs-app-router-lingui
 #
-# Layer B: end-to-end test of the i18n-guide skill.
+# Layer B: end-to-end test of the globalize-guide skill.
 # Populates a fixture workdir, injects a prefill into .globalize/, and invokes
 # the skill with a "resume" prompt so it skips Phase 1 and runs Phase 2 to
 # completion. Then verifies the result with three checks: library setup,
@@ -53,10 +53,10 @@ trap cleanup EXIT
 echo "==> Preparing fixture: $FIXTURE (library: $LIBRARY, variant: $VARIANT)"
 "$SCRIPT_DIR/helpers/prepare-workdir.sh" "$FIXTURE" "$WORKDIR"
 
-# 2. Install i18n-guide skill
-echo "==> Installing skill: i18n-guide"
-mkdir -p "$WORKDIR/.claude/skills/i18n-guide"
-cp -R "$REPO_ROOT/skills/i18n-guide/." "$WORKDIR/.claude/skills/i18n-guide/"
+# 2. Install globalize-guide skill
+echo "==> Installing skill: globalize-guide"
+mkdir -p "$WORKDIR/.claude/skills/globalize-guide"
+cp -R "$REPO_ROOT/skills/globalize-guide/." "$WORKDIR/.claude/skills/globalize-guide/"
 
 # 3. Copy prefill into .globalize/ (so skill resumes at Phase 2)
 echo "==> Injecting prefill: $PREFILL"
@@ -108,7 +108,7 @@ find . -type f \
 # 9. Run verification
 echo ""
 echo "============================================"
-echo "  VERIFICATION: i18n-guide / $FIXTURE"
+echo "  VERIFICATION: globalize-guide / $FIXTURE"
 echo "============================================"
 echo ""
 
@@ -118,7 +118,7 @@ VERIFY_EXIT=0
 # 10. Run behavior checks
 echo ""
 echo "============================================"
-echo "  BEHAVIOR: i18n-guide / $FIXTURE"
+echo "  BEHAVIOR: globalize-guide / $FIXTURE"
 echo "============================================"
 echo ""
 
@@ -131,7 +131,7 @@ EXPECTATIONS="$SCRIPT_DIR/expectations/$FIXTURE.json"
 if [ -f "$EXPECTATIONS" ]; then
   echo ""
   echo "============================================"
-  echo "  STRING WRAPPING: i18n-guide / $FIXTURE"
+  echo "  STRING WRAPPING: globalize-guide / $FIXTURE"
   echo "============================================"
   echo ""
 
@@ -141,7 +141,7 @@ fi
 # Summary
 echo ""
 echo "============================================"
-echo "  SUMMARY: i18n-guide / $FIXTURE"
+echo "  SUMMARY: globalize-guide / $FIXTURE"
 echo "============================================"
 if [ $VERIFY_EXIT -eq 0 ] && [ $BEHAVIOR_EXIT -eq 0 ] && [ $STRING_EXIT -eq 0 ]; then
   echo "  RESULT: PASS"

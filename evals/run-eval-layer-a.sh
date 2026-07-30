@@ -4,7 +4,7 @@ set -euo pipefail
 # Usage: ./evals/run-eval-layer-a.sh <fixture-name>
 # Example: ./evals/run-eval-layer-a.sh nextjs-app-router-lingui
 #
-# Layer A harness: runs the i18n-guide skill through Phase 1 only.
+# Layer A harness: runs the globalize-guide skill through Phase 1 only.
 # No package installs, no setup execution. Tests:
 #   - positive/collapse fixtures: framework detection + plan generation
 #   - hard-stop fixtures: compatibility check refusal (no plan written)
@@ -54,12 +54,12 @@ echo ""
 echo "--- Preparing Fixture ---"
 "$SCRIPT_DIR/helpers/prepare-workdir.sh" "$FIXTURE" "$WORKDIR"
 
-# 2. Install i18n-guide skill
+# 2. Install globalize-guide skill
 echo ""
 echo "--- Installing Skill ---"
-mkdir -p "$WORKDIR/.claude/skills/i18n-guide"
-cp -R "$REPO_ROOT/skills/i18n-guide/." "$WORKDIR/.claude/skills/i18n-guide/"
-echo "==> Skill installed: i18n-guide"
+mkdir -p "$WORKDIR/.claude/skills/globalize-guide"
+cp -R "$REPO_ROOT/skills/globalize-guide/." "$WORKDIR/.claude/skills/globalize-guide/"
+echo "==> Skill installed: globalize-guide"
 
 # 3. Back up package.json (for hard-stop deps-unchanged check)
 mkdir -p "$WORKDIR/.eval-backup"
@@ -75,9 +75,9 @@ echo ""
 echo "--- Building Prompt ---"
 
 if [ "$CATEGORY" = "positive" ] || [ "$CATEGORY" = "collapse" ]; then
-  PROMPT="Use the i18n-guide skill on this project. Library: ${LIBRARY}. Source locale: en. Target locales: es, fr. Stay on the current branch. Scope: setup only (not convert or globalize-now). Mode: guided. Routing strategy: prefix-based. Optional add-ons: none. Run through Phase 1 fully and stop once .globalize/plan.md is generated. Do not advance to Phase 2 — do not install any packages."
+  PROMPT="Use the globalize-guide skill on this project. Library: ${LIBRARY}. Source locale: en. Target locales: es, fr. Stay on the current branch. Scope: setup only (not convert or globalize-now). Mode: guided. Routing strategy: prefix-based. Optional add-ons: none. Run through Phase 1 fully and stop once .globalize/plan.md is generated. Do not advance to Phase 2 — do not install any packages."
 elif [ "$CATEGORY" = "hard-stop" ]; then
-  PROMPT="Use the i18n-guide skill to set up internationalization in this project. Run the initial inspection and tell me what you find."
+  PROMPT="Use the globalize-guide skill to set up internationalization in this project. Run the initial inspection and tell me what you find."
 else
   echo "ERROR: Unknown fixture category: $CATEGORY"
   exit 1
