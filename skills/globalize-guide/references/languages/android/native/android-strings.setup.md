@@ -43,7 +43,7 @@ This setup phase covers **native Android** apps (Kotlin and/or Java, Views and/o
 | 3. Source catalog `res/values/strings.xml` | Additive | New/edited source file; if one exists, augment, don't clobber |
 | 4. Scaffold `res/values-<qualifier>/` | Additive | New per-locale `strings.xml`; does not touch existing locale dirs |
 | 5. Locale-selection wiring (optional) | **Modifies existing files** | Per-app language: manifest + `build.gradle` + an Activity/Application call — describe and confirm |
-| 6. Enable coding rules | **Modifies existing file** | Appends one `@import` line to project `CLAUDE.md` via `setup.add-ons.md` |
+| 6. Generate coding rules | Additive (+ optional file edit) | Writes `.claude/globalize-rules.md` via `setup.add-ons.md` — **always runs**, Phase 3 wraps against it; the `@import` line into project `CLAUDE.md` is the opt-in add-on |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get
 confirmation before proceeding. Do NOT silently modify existing project files.** _(Modified by the setup mode
@@ -169,7 +169,7 @@ entries. Globalize keys off a populated source file, so ensure it has real entri
 </resources>
 ```
 
-Notes (full rules in `android-strings.code.md`):
+Notes (full rules land in the project's generated `.claude/globalize-rules.md` — see Step 6):
 - **Interpolation is positional** — `%1$s` (string), `%1$d` (int). Always positional so translators can
   reorder. Wrap a do-not-translate run in `<xliff:g>` (requires the `xmlns:xliff` declaration on `<resources>`).
 - **Plurals** use native `<plurals>` with CLDR `quantity` categories (`zero/one/two/few/many/other`) — **not
@@ -281,14 +281,21 @@ change and get confirmation. Off by default in unguided mode.
 
 ---
 
-## Step 6: Enable Coding Rules
+## Step 6: Generate Coding Rules (`generate_coding_rules` — always runs)
 
-The Android i18n coding rules at `references/languages/android/native/android-strings.code.md` cover string
-externalization, positional args, native plurals, escaping, `<xliff:g>`, and what not to wrap. Follow the
-procedure in `references/languages/android/native/setup.add-ons.md` (Add-on 1) to wire the `@import` line into
-the target project's `CLAUDE.md`. Apply the same missing-file handling the Rails add-ons reference uses (if the
-`code.md` is absent because the skill isn't installed, stop in guided mode / record a skipped-warning in
-unguided mode; never recreate the file).
+The Android i18n coding rules are a **generated file**, not a shipped one:
+`references/languages/android/native/android-strings.rules.template.md` covers string externalization,
+positional args, native plurals, escaping, `<xliff:g>`, translator comments, in-app language switching, and
+what not to wrap — across both Compose and Views/XML. Follow the **core coding-rules section** in
+`references/languages/android/native/setup.add-ons.md`: it renders the template down to this project's one
+configuration (real resource dir and locales substituted in) and writes `.claude/globalize-rules.md`. That
+section carries the missing-template handling (stop in guided mode / record a skipped-warning in unguided
+mode; never recreate the file) and the fail-closed rule — there is no generic `code.md` to fall back to.
+
+**Never skip this step**: it is not gated on a `SKILL.md §1.10` selection, because Phase 3's wrap subagents
+read the generated file as their authoring contract. Only appending the `@import` line to the target project's
+`CLAUDE.md` is opt-in — that is **Add-on 1** in the same file, applied only if the user selected the
+coding-rules import in `SKILL.md §1.10`.
 
 ---
 

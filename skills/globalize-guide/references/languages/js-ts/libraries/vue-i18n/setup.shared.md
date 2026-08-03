@@ -32,7 +32,7 @@ This setup phase covers **Vue 3** projects using the **Composition API** on **Vi
 | 5. Provider | **Modifies existing file** | `main.ts` (Vite), boot file (Quasar); Nuxt module handles it |
 | 6. Language Switcher | **Modifies existing file** | New component file + wired into layout / header |
 | 7. Scaffold | Additive | New `locales/{locale}.json` files |
-| 8. Coding rules | **Modifies existing file** | Creates or appends one `@import` line to project `CLAUDE.md` |
+| 8. Generate coding rules | Additive (+ optional file edit) | Writes `.claude/globalize-rules.md` — **always runs**, Phase 3 wraps against it; the `@import` line into project `CLAUDE.md` is the opt-in tail |
 | 9. CI/CD | **Modifies existing file** | Adds catalog-freshness check — **optional, ask first** |
 | 10. Tests | Additive | New test wrapper file — **optional, ask first** |
 
@@ -530,17 +530,96 @@ If any step fails, check the build tool integration (Step 4) first — most setu
 
 ---
 
-## Step 8: Enable Coding Rules
+## Step 8: Generate Coding Rules (`generate_coding_rules` — always runs)
 
-The vue-i18n coding rules at `references/languages/js-ts/libraries/vue-i18n/code.md` contain the rules for wrapping strings, attributes, plurals, and numbers correctly as new Vue code is written. They ship as part of the `globalize-guide` skill, so the file already lives at `.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md` in the target project.
+**This step is not optional and is not gated on a `SKILL.md §1.10` selection.** Phase 3's wrap subagents read `.claude/globalize-rules.md` as their authoring contract — composable decision tree, plural rules, skip-list, real catalog paths — so conversion cannot start until this step has produced it. Only the `CLAUDE.md` import in sub-step 7 is opt-in, because it edits a file the user owns.
 
-Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits — they aren't consulted unless the user explicitly invokes them. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
+The vue-i18n coding rules are a **generated file**, not a shipped one. `references/languages/js-ts/libraries/vue-i18n/rules.template.md` covers every configuration vue-i18n supports — the composable decision tree, attribute binding, plurals and ICU, numbers/dates/currencies, reactivity pitfalls, the Nuxt routing and head APIs. This step renders it down to the one configuration this project actually has (only the branches that apply, with the project's real catalog path, instance import, format names, and locales substituted in) and writes the result to `.claude/globalize-rules.md`.
 
-Verify `.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md` exists.
+**Read `references/rules-template-format.md` before rendering.** It is the whole rendering contract — template anatomy, the conditional grammar, the `<<placeholder>>` form, the step order, the header, the fail-closed rule. The steps below only add where *this library's* values come from.
+
+Apply the same guided / unguided rules used elsewhere in this setup phase: in guided mode describe each change before making it and wait for confirmation; in unguided mode apply directly and stop only on hard errors.
+
+### 1. Locate the template
+
+Read `.globalize/manifest-snapshot.json` → `references.rulesTemplate`.
+
+**If the entry has no `rulesTemplate`**, the installed skill is out of date — all three vue-i18n variants carry one. Do not look for a generic `code.md`; it no longer exists for this library. Treat this exactly like the missing-file case below.
+
+Verify the template exists in the target project.
 
 - **If it exists**: proceed.
 - **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
-- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ vue-i18n coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
+- **If it is missing — unguided mode**: do not block. Skip this step and record `⚠ vue-i18n coding rules not generated — template missing` in the end-of-run summary, with the reinstall command shown above. Treat it as the fail-closed case in sub-step 6: a core step did not complete, so Phase 3 has no rules file.
+
+### 2. Resolve the template's `conditions`
+
+Resolve every key listed in the template frontmatter's `conditions` and write them to `.globalize/rules-values.json`. Comparison values are string literals.
+
+| Condition | Where to read it |
+|---|---|
+| `framework` | `.globalize/manifest-snapshot.json` → `match.framework`: `"nuxt"`, `"vite"`, or `"quasar"`. This is the variant dispatch from Step 1, so it is already decided — do not re-detect. |
+| `catalogFormat` | The `catalogFormat` choice recorded in `.globalize/decisions.md` (Step 1), confirmed on disk: `"po"` when the catalog directory holds `.po` files **and** `poLoader` is wired into the build config (`vite.config.*`, `vite: { plugins }` in `nuxt.config.*`, or `build.vitePlugins` in `quasar.config.*`); `"json"` otherwise. The disk wins if the two disagree. |
+| `icuCatalogSupport` | Composite of `framework` and `catalogFormat`, because the limitation needs both. `"limited"` — Nuxt with JSON catalogs loaded through `@nuxtjs/i18n`'s `langDir`: `unplugin-vue-i18n` pre-compiles those files with a non-ICU compiler, so `plural` / `select` / `selectordinal` fail the build (see Step 7's Nuxt seed exception). `"full"` — everything else, including a Nuxt project whose locale JSON is imported statically rather than via `langDir`. Check `nuxt.config.*` for `langDir` before deciding. |
+| `namedFormats` | `"registered"` when the `createI18n(...)` call (Vite / Quasar: the i18n instance module; Nuxt: `i18n.config.ts`) declares `numberFormats` **and** `datetimeFormats` for the source locale — the block Step 3 seeds. `"none"` when that block was skipped or only one of the two exists. Read the file on disk; the block is optional, so absence is a healthy project, not an error. |
+
+### 3. Eliminate branches, then resolve the surviving `values`
+
+Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`, `<!-- /if -->` all disappear, kept branch or not). Only then resolve the `values` still referenced in what survived — from the files **on disk**, what Steps 3–7 actually wrote, not from `decisions.md`, which records what was asked for rather than what landed — appending them to the same `.globalize/rules-values.json`.
+
+**The order is load-bearing.** A value that lives inside a false branch has no value to resolve: a Vite SPA has no `strategy`, and a project that skipped the optional number/date-format block has no format names. Those placeholders sit inside branches that are already gone. Resolving up front would demand values that don't exist and trip sub-step 6 on a perfectly healthy project.
+
+| Value | Where to read it |
+|---|---|
+| `catalogPath` | The catalog directory Step 7 actually created, written with the `{locale}` token and the real extension — `src/i18n/locales/{locale}.json` (Vite / Quasar), `locales/{locale}.json` (Nuxt 3), `i18n/locales/{locale}.json` (Nuxt 4), `.po` in place of `.json` when `catalogFormat` is `"po"`. Glob for it; do not assume the layout. On Nuxt, `langDir` in `nuxt.config.*` confirms it. |
+| `sourceLocale` | `sourceLocale` in the locales module Step 3 created (`src/i18n/locales.ts`, or `i18n/locales.ts` on Nuxt 4). On Nuxt, cross-check `defaultLocale` in the `i18n:` block of `nuxt.config.*`; the config wins. |
+| `targetLocales` | `locales` in the same module minus `sourceLocale`, comma-separated: `de, fr, ja`. |
+| `globalImport` | The statement that yields the global i18n instance. **Vite / Quasar**: the import of the instance module Step 3 wrote — `import { i18n } from '@/i18n'` only when `tsconfig.json`'s `compilerOptions.paths` declares the `@/*` alias; otherwise the path the project actually resolves (e.g. `import { i18n } from '../i18n'` or `'./src/i18n'`). Confirm the module really exports a binding named `i18n`; if setup wrote a different name or location, use that. **Nuxt**: `const { $i18n } = useNuxtApp()` — there is no instance module on Nuxt (`i18n.config.ts` default-exports a config factory, not an instance). |
+| `globalI18n` | The accessor paired with `globalImport`: `i18n.global` on Vite / Quasar (or `<exportedName>.global` if the export was renamed), `$i18n` on Nuxt. Rendered as `<globalI18n>.t(...)` / `.n(...)` / `.d(...)`, so give the object, never a method. |
+| `currencyFormat` | The currency-style key under `numberFormats.<sourceLocale>` in the `createI18n(...)` call — Step 3 seeds `currency`. If several exist, use the one with `style: 'currency'`. |
+| `dateFormat` | A date-style key under `datetimeFormats.<sourceLocale>` — Step 3 seeds `short`. |
+| `numberFormats` | Every key under `numberFormats.<sourceLocale>`, comma-separated — Step 3 seeds `currency, percent`. |
+| `dateFormats` | Every key under `datetimeFormats.<sourceLocale>`, comma-separated — Step 3 seeds `short, long, time`. |
+| `nuxtStrategy` | `strategy` in the `i18n:` block of `nuxt.config.*` — e.g. `prefix_except_default`. Read the literal value; do not assume the recommended default. |
+
+### 4. Render
+
+Substitute every surviving `<<name>>` with its resolved value, strip the frontmatter, and **copy everything retained verbatim** — do not rewrite, summarize, reflow, re-order, or improve the prose. Prepend the two-line generated header:
+
+```
+<!-- globalize-rules v<templateVersion> | template=vue-i18n | variant=<manifest-snapshot variant> | generated by globalize-guide -->
+<!-- Generated file. Re-running globalize-guide overwrites it. Put your own project rules in CLAUDE.md. -->
+```
+
+Write the result to `.claude/globalize-rules.md`, overwriting any file left by an earlier run.
+
+**`.claude/globalize-rules.md` should be committed.** It is team-shared coding guidance, exactly like `CLAUDE.md` — every contributor's agent needs it. Do **not** add it to `.gitignore`; it is not a `.globalize/` progress artifact.
+
+### 5. Self-check the generated file
+
+All four must hold:
+
+- zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
+- zero occurrences of `<<`
+- the header is on line 1
+- the line count is within the template's `budget` for the resolved conditions
+
+### 6. Fail closed
+
+If **any** surviving condition or value can't be resolved, or the self-check fails: **never write a partial file.** Delete anything already written to `.claude/globalize-rules.md`, then:
+
+- **Guided mode** — ask the user for the specific value. Every one of these is a one-line answer ("Where do your locale catalogs live?", "Which module exports the i18n instance?", "Which routing strategy is `@nuxtjs/i18n` configured with?"), and getting one beats shipping either wrong rules or none. Resolve, re-render, re-check. Only if the user can't answer, or the self-check still fails, stop this step and say which key or check failed.
+- **Unguided mode** — don't block the run. Skip this step and record `⚠ vue-i18n coding rules not generated (catalogPath unresolved) — no rules file installed` in the end-of-run summary.
+
+Either way a **core step did not complete**, so surface it instead of letting the run drift into conversion: report `generate_coding_rules` as failed, leave it unchecked in `plan.md`, and tell the orchestrator that Phase 3 has no `.claude/globalize-rules.md` to wrap against. The user then either supplies the missing value and re-runs this step, or converts knowing the wrap subagents are working without this project's rules.
+
+There is no generic-rules fallback: `vue-i18n/code.md` was deleted when this library moved to a template, so the template is the only source of truth for vue-i18n rules. Installing nothing is recoverable — re-run this step. Installing rules that name the wrong catalog path or a non-existent `@/i18n` import is not; the agent follows them into a bug on every future edit and nothing signals it.
+
+### 7. Optional — import it from `CLAUDE.md` (`install_coding_rules`)
+
+**Only if the user selected the coding-rules import in `SKILL.md §1.10`** — this edits a file the user owns. Skip in silence otherwise; `.claude/globalize-rules.md` is on disk either way, and the user can add the import later. Skip it too if sub-step 6 fired and no rules file was written: an `@` line pointing at a missing file opens every future session with a dangling import.
+
+The import is what carries the rules past setup: Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits, but an `@`-imported file loads into every session's context.
 
 Check whether `CLAUDE.md` exists at the project root.
 
@@ -548,14 +627,16 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md
+  @.claude/globalize-rules.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/code.md` to your CLAUDE.md so the vue-i18n coding rules auto-load every session") and wait for confirmation before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**, describe the change to the user ("I'll append `@.claude/globalize-rules.md` to your CLAUDE.md so the vue-i18n coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+
+If the exact `@` line is already present, skip silently — this sub-step is idempotent.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
 
-Verify: in a fresh session, ask Claude "how should I wrap a plural string in this project?" — the answer should reference ICU syntax and `t(key, { count })` patterns from the imported file.
+Verify: in a fresh session, ask Claude "how should I wrap a plural string in this project?" — the answer should reference ICU `{count, plural, …}` syntax and `t(key, { count })` patterns from the generated file.
 
 ---
 

@@ -1,6 +1,8 @@
-# Rails i18n: Optional Add-Ons
+# Rails i18n: Coding Rules + Optional Add-Ons
 
-This file is invoked from the Rails setup file (`references/languages/ruby/frameworks/rails/rails.setup.md`) after the core setup has been applied. The orchestrator's `SKILL.md §1.10` lets the user multi-select the add-ons below. Run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Each sub-step is independently re-runnable: if it has already been applied, detect that and skip without prompting.
+This file is invoked from the Rails setup file (`references/languages/ruby/frameworks/rails/rails.setup.md`) after the core setup has been applied.
+
+It has two parts. **The core step below always runs** — it is not an add-on and is not gated on any selection. The add-ons after it are the ones `SKILL.md §1.10` lets the user multi-select: run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Every section here is independently re-runnable: if it has already been applied, detect that and skip without prompting.
 
 Apply the same guided / unguided rules used elsewhere in setup:
 - **Guided mode**: describe the change before making it and wait for confirmation.
@@ -10,17 +12,90 @@ Rails paths are fixed by the core setup: catalogs live in `config/locales/{local
 
 ---
 
-## Add-on 1: Coding rules (`@import`)
+## Core step: generate the coding rules (`generate_coding_rules` — always runs)
 
-The Rails i18n coding rules at `references/languages/ruby/frameworks/rails/rails.code.md` contain the rules for `I18n.with_locale`, lazy dot-lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap. They ship as part of the `globalize-guide` skill and already live at `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` in the target project.
+**This is a core Phase 2 step, not an add-on**, and it is **not** gated on a `SKILL.md §1.10` selection. Phase 3's wrap subagents read `.claude/globalize-rules.md` as their authoring contract — key conventions, plural rules, skip-list, real catalog paths — so conversion cannot start until this step has produced it. The only opt-in part is importing the file from the project's `CLAUDE.md`, which is **Add-on 1** below.
 
-Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits — they aren't consulted unless explicitly invoked. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
+The Rails i18n coding rules are a **generated file**, not a shipped one. `references/languages/ruby/frameworks/rails/rails.rules.template.md` covers every configuration the Rails I18n path supports — `I18n.with_locale` and per-request locale scope, lazy dot-lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, gender via sibling sub-keys, `l()` and the number helpers, and what not to wrap. This step renders it down to the one configuration this project actually has (only the branches that apply, with the project's real locale-file path and locales substituted in) and writes the result to `.claude/globalize-rules.md`.
 
-Verify `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` exists in the target project.
+**Read `references/rules-template-format.md` before rendering.** It is the whole rendering contract — template anatomy, the conditional grammar, the `<<placeholder>>` form, the step order, the header, the fail-closed rule. The steps below only add where *this library's* values come from.
+
+### 1. Locate the template
+
+Read `.globalize/manifest-snapshot.json` → `references.rulesTemplate`.
+
+**If the entry has no `rulesTemplate`**, the installed skill is out of date — the `rails-yaml` variant carries one. Do not look for a generic `code.md`; it no longer exists for this library. Treat this exactly like the missing-file case below.
+
+Verify the template exists in the target project.
 
 - **If it exists**: proceed.
-- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this add-on. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
-- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ Rails coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
+- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — unguided mode**: do not block. Skip this step and record `⚠ Rails coding rules not generated — template missing` in the end-of-run summary, with the reinstall command shown above. Treat it as the fail-closed case in step 6: a core step did not complete, so Phase 3 has no rules file.
+
+### 2. Resolve the template's `conditions`
+
+Resolve every key listed in the template frontmatter's `conditions` and write them to `.globalize/rules-values.json`. Comparison values are string literals, so booleans resolve to `"true"` / `"false"`.
+
+| Condition | Where to read it |
+|---|---|
+| `urlLocaleRouting` | `.globalize/decisions.md` → the routing-strategy answer the orchestrator collects for Rails in `SKILL.md §1.7` ("URL-locale routing (prefix `/:locale`) or none"): `"prefix"` or `"none"`. Confirm on disk — `"prefix"` requires a `scope "/:locale"` (or `scope "(:locale)"`) block in `config/routes.rb`. The file on disk wins if the two disagree: without that scope `params[:locale]` is always `nil`, and rules that tell the agent to read it are rules it will follow into a bug. |
+| `railsI18nGem` | `"true"` when `rails-i18n` is in `Gemfile` or `Gemfile.lock` (Step 2 of the setup phase installs it), `"false"` otherwise. Prefer `Gemfile.lock` — it records what is actually resolved. |
+| `modelContentGems` | `"true"` when `Gemfile` or `Gemfile.lock` lists `globalize`, `mobility`, or `traco` — the DB/model-content translation gems Step 1 detects and warns about. The `globalize` **gem** is unrelated to the Globalize.now platform; that is precisely why the branch exists. `"false"` when none of the three is present. |
+
+### 3. Eliminate branches, then resolve the surviving `values`
+
+Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`, `<!-- /if -->` all disappear, kept branch or not). Only then resolve the `values` still referenced in what survived — from the files **on disk**, the ones core setup actually wrote, not from `decisions.md`, which records what was asked for rather than what landed — appending them to the same `.globalize/rules-values.json`.
+
+**The order is load-bearing.** Resolving up front would demand values that don't exist and trip step 6 on a perfectly healthy project.
+
+| Value | Where to read it |
+|---|---|
+| `catalogPath` | The layout actually present under `config/locales/`. `config/locales/{locale}.yml` for the standard one-file-per-locale layout. If the app uses a split layout (`devise.en.yml`, `models.en.yml`, nested directories — all auto-loaded by Rails), write the glob that covers it instead, e.g. `config/locales/**/*.{locale}.yml`. Keep the `{locale}` token exactly as written. |
+| `sourceLocale` | `config.i18n.default_locale` in `config/application.rb`, or in `config/initializers/locale.rb` if the app configures i18n there. Drop the leading colon (`:pt-BR` → `pt-BR`). Cross-check that `config/locales/<sourceLocale>.yml` exists in `config/locales/` — **this value becomes the YAML root key and the leading segment of every key path in the generated rules file**, so a wrong answer makes every example in it wrong. |
+| `targetLocales` | `config.i18n.available_locales` (same two files) minus `sourceLocale`, comma-separated: `de, fr, ja`. If `available_locales` is unset, use the locale basenames actually present in `config/locales/`, minus `sourceLocale`. |
+
+### 4. Render
+
+Substitute every surviving `<<name>>` with its resolved value, strip the frontmatter, and **copy everything retained verbatim** — do not rewrite, summarize, reflow, re-order, or improve the prose. Prepend the two-line generated header:
+
+```
+<!-- globalize-rules v<templateVersion> | template=rails | variant=<manifest-snapshot variant> | generated by globalize-guide -->
+<!-- Generated file. Re-running globalize-guide overwrites it. Put your own project rules in CLAUDE.md. -->
+```
+
+Write the result to `.claude/globalize-rules.md`, overwriting any file left by an earlier run.
+
+**`.claude/globalize-rules.md` should be committed.** It is team-shared coding guidance, exactly like `CLAUDE.md` — every contributor's agent needs it. Do **not** add it to `.gitignore`; it is not a `.globalize/` progress artifact.
+
+### 5. Self-check the generated file
+
+All four must hold:
+
+- zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
+- zero occurrences of `<<`
+- the header is on line 1
+- the line count is within the template's `budget` for the resolved conditions
+
+### 6. Fail closed
+
+If **any** surviving condition or value can't be resolved, or the self-check fails: **never write a partial file.** Delete anything already written to `.claude/globalize-rules.md`, then:
+
+- **Guided mode** — ask the user for the specific value. `catalogPath`, `sourceLocale`, and `targetLocales` are all one-line answers ("Which locale is your source?", "Do your translations live in one file per locale under `config/locales/`?"), and getting one beats shipping either wrong rules or none. Resolve, re-render, re-check. Only if the user can't answer, or the self-check still fails, stop this step and say which key or check failed.
+- **Unguided mode** — don't block the run. Skip this step and record `⚠ Rails coding rules not generated (sourceLocale unresolved) — no rules file installed` in the end-of-run summary.
+
+Either way a **core step did not complete**, so surface it instead of letting the run drift into conversion: report `generate_coding_rules` as failed, leave it unchecked in `plan.md`, and tell the orchestrator that Phase 3 has no `.claude/globalize-rules.md` to wrap against. The user then either supplies the missing value and re-runs this step, or converts knowing the wrap subagents are working without this project's rules.
+
+There is no generic-rules fallback: `rails.code.md` was deleted when this library moved to a template, so the template is the only source of truth for Rails i18n rules. Installing nothing is recoverable — re-run this step. Installing rules whose YAML examples are rooted under the wrong locale, or that read `params[:locale]` on an app with no locale segment in its URLs, is not; the agent follows them into a bug on every future edit and nothing signals it.
+
+---
+
+## Add-on 1: Import the coding rules from `CLAUDE.md` (`install_coding_rules`)
+
+**Only if the user selected it in `SKILL.md §1.10`** — this edits a file the user owns. Skip in silence otherwise; `.claude/globalize-rules.md` is on disk either way, and the user can add the import later.
+
+The import is what carries the rules past setup: Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits, but an `@`-imported file loads into every session's context.
+
+If the core step failed and there is no `.claude/globalize-rules.md` on disk, skip this add-on — an `@` line pointing at a missing file opens every future session with a dangling import.
 
 Check whether `CLAUDE.md` exists at the project root.
 
@@ -28,14 +103,16 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md
+  @.claude/globalize-rules.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` to your CLAUDE.md so the Rails i18n coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**, describe the change to the user ("I'll append `@.claude/globalize-rules.md` to your CLAUDE.md so the Rails i18n coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
 If the exact `@` line is already present, skip silently — this add-on is idempotent.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
+
+Verify: in a fresh session, ask Claude "how should I switch locale per request in this project?" — the answer should reference `around_action` with `I18n.with_locale`, and warn against bare `I18n.locale =` assignment.
 
 ---
 

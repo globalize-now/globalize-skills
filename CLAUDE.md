@@ -57,14 +57,18 @@ Not every skill should be delivered the same way. Claude Code's router only cons
 
 - **Routed skills** — invoked on demand (setup, convert, orchestration). Live in `.claude/skills/<name>/` and rely on a discriminating `description` to trigger. Examples: `globalize-guide`, `globalize-now-account-setup`, `globalize-now-project-setup`.
 
-- **Passive-rule skills** — continuous coding guidelines that should apply to every edit in a project (macro wrapping, plural handling, CSS logical properties). These don't trigger reliably via the router. Instead, an installer skill wires them into the target project's `CLAUDE.md` via Claude Code's `@import` syntax. For example, the `globalize-guide` orchestrator appends:
+- **Passive-rule skills** — continuous coding guidelines that should apply to every edit in a project (macro wrapping, plural handling, CSS logical properties). These don't trigger reliably via the router, so an installer skill wires them into the target project's `CLAUDE.md` via Claude Code's `@import` syntax. The current approach is a **generated artifact**, not an import of a shipped generic file: a library ships one `rules.template.md` covering every configuration it supports, using `<!-- if: key == "value" -->` conditional blocks and `<<placeholder>>` substitution (format spec: `skills/globalize-guide/references/rules-template-format.md`). Setup renders it against the project's real values, writes `.claude/globalize-rules.md` into the target repo (committed), and appends a single import line:
 
   ```
-  @.claude/skills/globalize-guide/references/languages/js-ts/libraries/<library>/code.md
+  @.claude/globalize-rules.md
   ```
 
-  Imported files load into every session's context, so the rules are always in effect without depending on routing. Examples: the `*.code.md` references inside `globalize-guide`, `css-i18n` (when wired in).
+  Rendering rather than importing a generic file matters because the imported file sits in every session's context forever: branches that don't apply are pure cost, and a path or locale asserted as fact but resolved differently by setup is worse than cost.
+
+  **The generated file must stay self-contained** — it never references `.claude/skills/…`, so **the user can delete the `globalize-guide` skill once setup is done and the rules keep working.** Setup is a one-time twenty-stack orchestrator; there's no reason for it to live in the repo forever. The old track could not offer this: its import pointed *into* the skill directory, so removing the skill left a dangling `@` reference in every future session. `evals/verify-rules-template.sh` enforces the invariant — a template body may not contain `.claude/skills/`, a `references/` path, or the literal `globalize-guide`.
+
+  **All 20 stack variants are on this track.** Every manifest entry carries `references.rulesTemplate`; `references.code` and the per-library generic `code.md` files no longer exist. There is no fallback — if rendering can't resolve a value, guided mode asks the user and unguided installs nothing, because wrong rules are worse than no rules. Seven templates cover the twenty variants: `lingui`, `next-intl`, `vue-i18n`, `paraglide` (PO and ICU-JSON in one template), `rails`, `string-catalog` (iOS), `android-strings`. `css-i18n` is still a separate skill and is not on this track.
 
 - **Platform-bundled single-file skills** — skills written for a non-Claude-Code agent platform (currently Lovable), where everything must live in one `SKILL.md`. Routed delivery is the platform's own skill matching, and passive rules are delivered by having the skill write them into the target project's repo-root `AGENTS.md` (which the platform always reads) instead of `@import`. Example: `lovable-i18n`.
 
-When creating a new skill, decide up front which track it belongs on — and if it's passive-rule, make sure an installer skill writes the `@import` line.
+When creating a new skill, decide up front which track it belongs on — and if it's passive-rule, author a `rules.template.md` and have an installer skill render it into `.claude/globalize-rules.md` plus the `@import` line. Do not ship a generic always-on rules file; that track is gone.

@@ -1,6 +1,6 @@
 # SvelteKit + Paraglide Setup
 
-This covers wiring **Paraglide JS 2.x** into a **SvelteKit 2.x** project running **Svelte 5** (runes era). Paraglide is compiler-based and key-authored: there is no extraction step — you author messages directly into `messages/{locale}.po` and call the generated `m` functions. This file sets up the build plugin, server middleware, routing, and a language switcher; the per-edit authoring rules live in `references/languages/js-ts/libraries/paraglide/code.md`.
+This covers wiring **Paraglide JS 2.x** into a **SvelteKit 2.x** project running **Svelte 5** (runes era). Paraglide is compiler-based and key-authored: there is no extraction step — you author messages directly into `messages/{locale}.po` and call the generated `m` functions. This file sets up the build plugin, server middleware, routing, and a language switcher; the per-edit authoring rules live in `references/languages/js-ts/libraries/paraglide/rules.template.md`.
 
 ## Scope
 
@@ -91,7 +91,7 @@ msgstr "{count, plural, one {# like} other {# likes}}"
 - The empty `msgid ""` header block is required by the PO spec; keep `Content-Type` and `Language`.
 - `msgid` is the **Paraglide message key** — `hello_world` compiles to `m.hello_world()`. `msgstr` is the **ICU message body**.
 - `#.` lines are translator comments — the reason to use PO. Write a one-line intent note per message.
-- Only the base-locale file needs entries to make code compile; the other locale files are populated by the translation platform. (Authoring conventions — plurals, select, descriptive keys, comments — are in `paraglide/code.md`.)
+- Only the base-locale file needs entries to make code compile; the other locale files are populated by the translation platform. (Authoring conventions — plurals, select, descriptive keys, comments — are in `paraglide/rules.template.md`.)
 
 ## Vite plugin
 
@@ -229,7 +229,7 @@ Wire it into the root layout so it appears on every page:
 {@render children()}
 ```
 
-By default `setLocale()` reloads so the server re-renders under the new locale (correct under SSR). Use `localizeHref('/path')` for in-app links that should carry the active locale's prefix; see `paraglide/code.md` for the markup conventions. Style the switcher to match the project (the inline markup above is a baseline).
+By default `setLocale()` reloads so the server re-renders under the new locale (correct under SSR). Use `localizeHref('/path')` for in-app links that should carry the active locale's prefix; see `paraglide/rules.template.md` for the markup conventions. Style the switcher to match the project (the inline markup above is a baseline).
 
 ## `.gitignore`
 
@@ -249,9 +249,9 @@ The Paraglide compiler also emits a `.gitignore` of its own inside `outdir` by d
 3. **Render a plural and confirm it selects the correct form.** Call `m.likes({ count: 1 })` and `m.likes({ count: 5 })` somewhere on a page and confirm the output is `1 like` and `5 likes` — **not** the raw `{count, plural, …}` source and not an empty string. Raw-source output means `messageFormat: "icu"` is missing (or the plugin URL is below `0.1.2`); fix that before continuing. This check is non-negotiable — it is the only signal that ICU is actually being evaluated (a malformed or unparsed ICU body is imported as literal text with no build error).
 4. Run the production build (`npm run build`) and confirm it completes — a missing or misconfigured `project.inlang/settings.json` surfaces here.
 
-## Optional add-ons
+## Coding rules + optional add-ons
 
-If the user selected optional add-ons (coding-rules `@import`, CI/CD, test setup), apply the matching sub-steps from `references/languages/js-ts/libraries/paraglide/setup.add-ons.md`. Skip add-ons the user did not select; skip this section entirely if none were selected.
+First apply the **core coding-rules section** of `references/languages/js-ts/libraries/paraglide/setup.add-ons.md` (step `generate_coding_rules`) — it always runs, whatever the user selected, because Phase 3 wraps against the file it generates. Then, if the user selected optional add-ons (import the coding rules from `CLAUDE.md`, CI/CD, test setup), apply the matching sub-steps from the same file; skip add-ons the user did not select.
 
 ## Translator comments
 
@@ -263,7 +263,7 @@ msgid "cart_remove_button"
 msgstr "Remove"
 ```
 
-A `#.` comment is the single biggest quality lever for AI-assisted and human translation, and Globalize reads it straight from the `.po`. Write one per message — see the authoring guidance in `paraglide/code.md` and `paraglide.convert.md`.
+A `#.` comment is the single biggest quality lever for AI-assisted and human translation, and Globalize reads it straight from the `.po`. Write one per message — see the authoring guidance in `paraglide/rules.template.md` and `paraglide.convert.md`.
 
 > The plugin drops `#.` comments when it hydrates the inlang model at compile time (they do not reach `m.key()`), but they **live in the `.po` that Globalize imports**, so they reach translators. That round-trip is what makes them worth writing. (The ICU-JSON alternative has no comment field at all — another reason PO is the default.)
 

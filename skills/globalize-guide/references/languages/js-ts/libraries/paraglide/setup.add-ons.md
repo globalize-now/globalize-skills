@@ -1,28 +1,109 @@
-# Paraglide JS: Optional Add-Ons
+# Paraglide JS: Coding Rules + Optional Add-Ons
 
-This file is invoked from the SvelteKit Paraglide setup file (`frameworks/sveltekit/paraglide.setup.md`) after the core setup has been applied. The orchestrator's `SKILL.md §1.10` lets the user multi-select the add-ons below. Run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Each sub-step is independently re-runnable: if it has already been applied, detect that and skip without prompting.
+This file is invoked from the SvelteKit Paraglide setup file (`frameworks/sveltekit/paraglide.setup.md`) after the core setup has been applied.
+
+It has two parts. **The core step below always runs** — it is not an add-on and is not gated on any selection. The add-ons after it are the ones `SKILL.md §1.10` lets the user multi-select: run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Every section here is independently re-runnable: if it has already been applied, detect that and skip without prompting.
 
 Apply the same guided / unguided rules used elsewhere in setup:
 - **Guided mode**: describe the change before making it and wait for confirmation.
 - **Unguided mode**: apply directly; only stop on hard errors.
 
-Paraglide paths are fixed by the core setup: catalogs live in `messages/{locale}.json`, the inlang project is at `project.inlang/`, and compiled output goes to `src/lib/paraglide/`. Detect the package manager from the lockfile (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lockb` / `bun.lock` → bun, `package-lock.json` → npm) before emitting any snippet below.
+Core setup's defaults are `messages/{locale}.po` for the catalogs (`.json` on the ICU-JSON format), `project.inlang/` for the inlang project, and `src/lib/paraglide/` for the compiled output — but read the real values from `project.inlang/settings.json` (`pathPattern`, `baseLocale`, `locales`) and the `paraglideVitePlugin({ outdir })` call in `vite.config.{ts,js}` rather than assuming them. Detect the package manager from the lockfile (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lockb` / `bun.lock` → bun, `package-lock.json` → npm) before emitting any snippet below.
 
 ---
 
-## Add-on 1: Coding rules (`@import`)
+## Core step: generate the coding rules (`generate_coding_rules` — always runs)
 
-> **Pick the file that matches the catalog format.** This add-on wires in `code.md` (the **default PO** coding rules — `#.` comments, `msgid`/`msgstr`). If `decisions.setup.catalogFormat === "json"`, substitute **`json-format.code.md`** for `code.md` in **every** path below — same directory, same `@import` mechanics; it carries the ICU-JSON authoring rules (key→ICU JSON, no comments). Wire in exactly one of the two, never both (they would conflict).
+**This is a core Phase 2 step, not an add-on**, and it is **not** gated on a `SKILL.md §1.10` selection. Phase 3's wrap subagents read `.claude/globalize-rules.md` as their authoring contract — message decision tree, plural rules, skip-list, real catalog paths — so conversion cannot start until this step has produced it. The only opt-in part is importing the file from the project's `CLAUDE.md`, which is **Add-on 1** below.
 
-The Paraglide coding rules at `references/languages/js-ts/libraries/paraglide/code.md` contain the rules for authoring strings, numbers, currencies, dates, and plurals correctly as new code is written, plus the descriptive-key guidance and the SSR request-scoped-locale rules. They ship as part of the `globalize-guide` skill, so the file already lives at `.claude/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/code.md` in the target project.
+The Paraglide coding rules are a **generated file**, not a shipped one. `references/languages/js-ts/libraries/paraglide/rules.template.md` covers every configuration Paraglide supports on SvelteKit — both catalog formats (PO and ICU-JSON), the message decision tree, the authoring workflow, plurals/select/ordinal, numbers, currencies, dates, the SSR request-scoped-locale rules, and translator comments. This step renders it down to the one configuration this project actually has (only the branches that apply, with the project's real catalog path, generated-module import base, and locales substituted in) and writes the result to `.claude/globalize-rules.md`.
 
-Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits — they aren't consulted unless explicitly invoked. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
+One template, one output file. There is no longer a PO file and a JSON file to choose between — the catalog format is a **condition** resolved in step 2 below, and the branch that doesn't apply is deleted before anything is written.
 
-Verify `.claude/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/code.md` exists.
+**Read `references/rules-template-format.md` before rendering.** It is the whole rendering contract — template anatomy, the conditional grammar, the `<<placeholder>>` form, the step order, the header, the fail-closed rule. The steps below only add where *this library's* values come from.
+
+### 1. Locate the template
+
+Read `.globalize/manifest-snapshot.json` → `references.rulesTemplate`.
+
+**If the entry has no `rulesTemplate`**, the installed skill is out of date — the Paraglide variant carries one. Do not look for a generic `code.md` or a `json-format.code.md`; neither exists for this library any more. Treat this exactly like the missing-file case below.
+
+Verify the template exists in the target project.
 
 - **If it exists**: proceed.
-- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this add-on. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
-- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ paraglide coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
+- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — unguided mode**: do not block. Skip this step and record `⚠ paraglide coding rules not generated — template missing` in the end-of-run summary, with the reinstall command shown above. Treat it as the fail-closed case in step 6: a core step did not complete, so Phase 3 has no rules file.
+
+### 2. Resolve the template's `conditions`
+
+Resolve every key listed in the template frontmatter's `conditions` and write them to `.globalize/rules-values.json`. Comparison values are string literals, so booleans resolve to `"true"` / `"false"`.
+
+| Condition | Where to read it |
+|---|---|
+| `catalogFormat` | `project.inlang/settings.json`, confirmed against the catalogs on disk: `"po"` when `modules` lists the `@globalize-now/paraglidejs-po-format` URL and the `plugin.globalizeNow.po` key is present; `"json"` when it lists `@inlang/plugin-icu1` with a `plugin.inlang.icu-messageformat-1` key. Cross-check `.globalize/decisions.md`; **the settings file on disk wins** if they disagree. Exactly one catalog-owning plugin may be listed — if both are, stop and fail closed (step 6), because the project is misconfigured and neither branch is correct. |
+| `ssr` | `"true"` unless the project is globally SPA-only. Read the **root** layout — `src/routes/+layout.js` / `+layout.ts` — and resolve `"false"` only when it exports `ssr = false` (optionally corroborated by `@sveltejs/adapter-static` with a `fallback` in `svelte.config.js`). Anything else — no root layout, no `ssr` export, `ssr = true`, per-route `ssr = false` on some routes but not the root — resolves `"true"`. The asymmetry is deliberate: the SSR branch is the correct default for every project this setup targets, and the `"false"` branch is a strict subset of it, so an over-broad `"true"` costs a few lines while an over-broad `"false"` would drop a rule that applies. |
+
+### 3. Eliminate branches, then resolve the surviving `values`
+
+Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`, `<!-- /if -->` all disappear, kept branch or not). Only then resolve the `values` still referenced in what survived — from the config **on disk**, the files core setup actually wrote, not from `decisions.md`, which records what was asked for rather than what landed — appending them to the same `.globalize/rules-values.json`.
+
+**The order is load-bearing.** `hooksServerPath` lives inside the `ssr == "true"` branch: a project rendered as an SPA has no request-scoped middleware and no path to name. Resolving up front would demand a value that doesn't exist and trip step 6 on a perfectly healthy project.
+
+Paraglide is **hand-authored** — there is no extraction step, so the agent writes catalog entries directly at the path these rules name. A wrong `catalogPath` or `sourceCatalog` here is not a cosmetic error: every future message lands in a file the compiler never reads. Resolve both from `project.inlang/settings.json`, and confirm the file exists on disk before rendering.
+
+| Value | Where to read it |
+|---|---|
+| `catalogPath` | The catalog plugin's `pathPattern` in `project.inlang/settings.json` — `plugin.globalizeNow.po.pathPattern` on PO, `plugin.inlang.icu-messageformat-1.pathPattern` on ICU-JSON. Strip a leading `./` and keep the `{locale}` token exactly as the settings file writes it — it is part of the **path format**, not a template placeholder, and must survive into the rendered file (e.g. `messages/{locale}.po`). |
+| `sourceCatalog` | `catalogPath` with `{locale}` replaced by `baseLocale` from `project.inlang/settings.json` — e.g. `messages/en.po`. Verify that exact file exists; if it does not, the base catalog was never seeded and this add-on has nothing correct to say. |
+| `sourceLocale` | `baseLocale` in `project.inlang/settings.json`. |
+| `targetLocales` | `locales` in `project.inlang/settings.json` minus `baseLocale`, comma-separated: `de, fr, ja`. |
+| `paraglideImportBase` | The **import specifier** for the compiler's `outdir`, not the filesystem path. Read `outdir` from `paraglideVitePlugin({ ... })` in `vite.config.{ts,js}` (setup writes `./src/lib/paraglide`). Anything under `src/lib` maps to the SvelteKit `$lib` alias — `./src/lib/paraglide` → `$lib/paraglide`. A custom `outdir` outside `src/lib` has no `$lib` form; use the specifier the project's own imports use (an alias from `svelte.config.js` `kit.alias`, or a project-relative path). Do **not** assume `$lib/paraglide`. |
+| `hooksServerPath` | The **actual on-disk** server hook that calls `paraglideMiddleware` — `src/hooks.server.ts` on a TypeScript project, `src/hooks.server.js` on a JavaScript one. Glob for it; do not assume the extension. (Only needed when `ssr == "true"`.) |
+
+### 4. Render
+
+Substitute every surviving `<<name>>` with its resolved value, strip the frontmatter, and **copy everything retained verbatim** — do not rewrite, summarize, reflow, re-order, or improve the prose. Prepend the two-line generated header:
+
+```
+<!-- globalize-rules v<templateVersion> | template=paraglide | variant=<manifest-snapshot variant> | generated by globalize-guide -->
+<!-- Generated file. Re-running globalize-guide overwrites it. Put your own project rules in CLAUDE.md. -->
+```
+
+Write the result to `.claude/globalize-rules.md`, overwriting any file left by an earlier run.
+
+**`.claude/globalize-rules.md` should be committed.** It is team-shared coding guidance, exactly like `CLAUDE.md` — every contributor's agent needs it. Do **not** add it to `.gitignore`; it is not a `.globalize/` progress artifact.
+
+### 5. Self-check the generated file
+
+All four must hold:
+
+- zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
+- zero occurrences of `<<`
+- the header is on line 1
+- the line count is within the template's `budget` for the resolved conditions
+
+One extra check for this library, because both formats render from the same template: the generated file must describe **exactly one** catalog format. If it mentions both `msgid`/`msgstr` and ICU-JSON message values, a branch survived that should have been deleted — fail closed and re-render.
+
+### 6. Fail closed
+
+If **any** surviving condition or value can't be resolved, or the self-check fails: **never write a partial file.** Delete anything already written to `.claude/globalize-rules.md`, then:
+
+- **Guided mode** — ask the user for the specific value. Every one of these is a one-line answer ("Where do your message catalogs live?", "Which locale is the source?", "What does the Paraglide compiler's `outdir` import as?"), and getting one beats shipping either wrong rules or none. Resolve, re-render, re-check. Only if the user can't answer, or the self-check still fails, stop this step and say which key or check failed.
+- **Unguided mode** — don't block the run. Skip this step and record `⚠ paraglide coding rules not generated (catalogPath unresolved) — no rules file installed` in the end-of-run summary.
+
+Either way a **core step did not complete**, so surface it instead of letting the run drift into conversion: report `generate_coding_rules` as failed, leave it unchecked in `plan.md`, and tell the orchestrator that Phase 3 has no `.claude/globalize-rules.md` to wrap against. The user then either supplies the missing value and re-runs this step, or converts knowing the wrap subagents are working without this project's rules.
+
+There is no generic-rules fallback: `paraglide/rules.template.md` **and** `paraglide/rules.template.md` were both deleted when this library moved to a single template, so the template is the only source of truth for Paraglide rules. Installing nothing is recoverable — re-run this step. Installing rules that name the wrong catalog path is not: Paraglide is hand-authored, so the agent writes every future message straight into a file the compiler never reads, and nothing signals it.
+
+---
+
+## Add-on 1: Import the coding rules from `CLAUDE.md` (`install_coding_rules`)
+
+**Only if the user selected it in `SKILL.md §1.10`** — this edits a file the user owns. Skip in silence otherwise; `.claude/globalize-rules.md` is on disk either way, and the user can add the import later.
+
+The import is what carries the rules past setup: Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits, but an `@`-imported file loads into every session's context.
+
+If the core step failed and there is no `.claude/globalize-rules.md` on disk, skip this add-on — an `@` line pointing at a missing file opens every future session with a dangling import.
 
 Check whether `CLAUDE.md` exists at the project root.
 
@@ -30,16 +111,16 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/code.md
+  @.claude/globalize-rules.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/code.md` to your CLAUDE.md so the paraglide coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**, describe the change to the user ("I'll append `@.claude/globalize-rules.md` to your CLAUDE.md so the paraglide coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
 If the exact `@` line is already present, skip silently — this add-on is idempotent.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
 
-Verify: in a fresh session, ask Claude "how should I author a plural string in this project?" — the answer should reference an ICU `plural` body in a `messages/{locale}.po` entry (or `messages/{locale}.json` on the ICU-JSON format) called through `m`, not a JS conditional.
+Verify: in a fresh session, ask Claude "how should I author a plural string in this project?" — the answer should reference an ICU `plural` body written into this project's own source catalog and called through `m`, not a JS conditional.
 
 ---
 
@@ -66,7 +147,7 @@ What is available, and what it does **not** cover:
 
   (Confirm the current major with `npm view eslint-plugin-svelte version` and adjust the pin if it has advanced past `3`. Most SvelteKit scaffolds already include this — check `package.json` before installing.)
 
-There is no generic "no hardcoded JSX/markup strings" ESLint rule that works reliably for Svelte templates the way `lingui/no-unlocalized-strings` does for JSX. The practical substitute is the **coding rules** in Add-on 1 plus the CI drift check in Add-on 3, which together keep the catalog authoritative.
+There is no generic "no hardcoded JSX/markup strings" ESLint rule that works reliably for Svelte templates the way `lingui/no-unlocalized-strings` does for JSX. The practical substitute is the generated **coding rules** from the core step above plus the CI drift check in Add-on 3, which together keep the catalog authoritative.
 
 **Recommendation:** unless the project already lints Svelte, skip this add-on and rely on Add-ons 1 and 3. If you skip, say so plainly — do not leave the user thinking a translation linter was wired up.
 
@@ -228,7 +309,7 @@ Detect the test runner from `package.json`. Vitest is the standard for Vite/Svel
 
 ### Test helper
 
-`setLocale()` from the runtime sets the active locale via the configured strategies. **By default it reloads the page** (see `paraglide.setup.md` and `paraglide/code.md`), which throws "navigation not implemented" under jsdom. Pass `{ reload: false }` so the helper works in tests:
+`setLocale()` from the runtime sets the active locale via the configured strategies. **By default it reloads the page** (see `paraglide.setup.md` and `paraglide/rules.template.md`), which throws "navigation not implemented" under jsdom. Pass `{ reload: false }` so the helper works in tests:
 
 ```ts
 // src/test/renderWithLocale.ts

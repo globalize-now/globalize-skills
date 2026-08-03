@@ -43,7 +43,7 @@ Use this in place of the PO base's `messages/en.po`. Create the base-locale cata
 }
 ```
 
-Only the base-locale file needs entries to make code compile; the other locale files are populated by the translation platform. (Authoring conventions — plurals, select, descriptive keys — are in `paraglide/json-format.code.md`.)
+Only the base-locale file needs entries to make code compile; the other locale files are populated by the translation platform. (Authoring conventions — plurals, select, descriptive keys — are in `paraglide/rules.template.md`.)
 
 ## What stays the same
 
@@ -68,4 +68,4 @@ The compile command is also unchanged: `npx '@inlang/paraglide-js@^2' compile --
 
 ## Translator comments
 
-**Not supported on ICU-JSON.** The inlang/ICU JSON message model has no comment, context, or description field, so there is nowhere to attach translator notes — see the "Translator comments" section in `paraglide/json-format.code.md`. The only disambiguation lever is a descriptive key name (`cart_remove_button`, not `remove`). Do not attempt to wire comment metadata into JSON messages. To get translator comments, use the default PO format (`paraglide.setup.md`) — its migration section converts an existing ICU-JSON project losslessly.
+**Not supported on ICU-JSON.** The inlang/ICU JSON message model has no comment, context, or description field, so there is nowhere to attach translator notes — see the "Translator comments" section in `paraglide/rules.template.md`. The only disambiguation lever is a descriptive key name (`cart_remove_button`, not `remove`). Do not attempt to wire comment metadata into JSON messages. To get translator comments, use the default PO format (`paraglide.setup.md`) — its migration section converts an existing ICU-JSON project losslessly.

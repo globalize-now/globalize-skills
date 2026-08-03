@@ -1,8 +1,18 @@
 {
   "variant": "nextjs-app-router-next-intl",
   "library": "next-intl",
-  "phasesIncluded": ["setup"],
-  "phase2StepsContain": ["build_verification"],
-  "phase2StepsContainPattern": ["verify_"],
-  "phase2StepsAbsent": ["create_config", "gitignore_artifacts"]
+  "phasesIncluded": [
+    "setup"
+  ],
+  "phase2StepsContain": [
+    "build_verification",
+    "generate_coding_rules"
+  ],
+  "phase2StepsContainPattern": [
+    "verify_"
+  ],
+  "phase2StepsAbsent": [
+    "create_config",
+    "gitignore_artifacts"
+  ]
 }

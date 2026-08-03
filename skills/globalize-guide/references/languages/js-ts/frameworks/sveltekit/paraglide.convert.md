@@ -1,6 +1,6 @@
 # SvelteKit + Paraglide: String Wrapping Patterns
 
-This covers converting hardcoded UI strings in an existing **SvelteKit 2.x + Svelte 5 + Paraglide 2.x** codebase into Paraglide messages, using the **default PO (gettext) catalog format** (`@globalize-now/paraglidejs-po-format`, `messageFormat: "icu"`). The build plugin, middleware, and routing are assumed already wired (see `paraglide.setup.md`). The per-edit authoring rules — plurals, numbers/dates, what-not-to-wrap — live in `references/languages/js-ts/libraries/paraglide/code.md`; this file is the **mechanics of finding and converting existing literals**.
+This covers converting hardcoded UI strings in an existing **SvelteKit 2.x + Svelte 5 + Paraglide 2.x** codebase into Paraglide messages, using the **default PO (gettext) catalog format** (`@globalize-now/paraglidejs-po-format`, `messageFormat: "icu"`). The build plugin, middleware, and routing are assumed already wired (see `paraglide.setup.md`). The per-edit authoring rules — plurals, numbers/dates, what-not-to-wrap — live in `references/languages/js-ts/libraries/paraglide/rules.template.md`; this file is the **mechanics of finding and converting existing literals**.
 
 > **ICU-JSON catalog format?** If `decisions.setup.catalogFormat === "json"`, the catalog entries are JSON key-values and translator comments are not available — apply `references/languages/js-ts/libraries/paraglide/json-format.convert.md`, which overrides the entry shape and the comment rule below. The call sites (`m.key(...)`) are identical across both formats.
 
@@ -56,7 +56,7 @@ msgstr "Nothing here yet."
 <img src={logo} alt={m.company_logo_alt()} />
 ```
 
-Leave non-UI attributes alone — `class`, `data-testid`, `href` route paths, `name`. See the skip-list in `paraglide/code.md`.
+Leave non-UI attributes alone — `class`, `data-testid`, `href` route paths, `name`. See the skip-list in `paraglide/rules.template.md`.
 
 ---
 
@@ -96,7 +96,7 @@ msgstr "{count, plural, one {# item} other {# items}}"
 <span>{m.cart_item_count({ count })}</span>
 ```
 
-The full ICU rules (CLDR categories, `#`, `other` required, selectordinal) are in `paraglide/code.md` — follow them there; do not re-derive them per string.
+The full ICU rules (CLDR categories, `#`, `other` required, selectordinal) are in `paraglide/rules.template.md` — follow them there; do not re-derive them per string.
 
 ---
 
@@ -136,7 +136,7 @@ Note the map stores the **function reference** (`m.order_status_pending`), and t
 
 ## Module-scope strings and reused constants
 
-Constant arrays of labels (nav items, menu entries, column headers) are usually defined once outside the render. Paraglide has **no `msg`-style descriptor**, and you must **not** call `m.key()` at module scope: the call would resolve at import time, under whichever locale was active then, and would not update per request. This contradicts the SSR rule in `paraglide/code.md` ("do not cache `getLocale()` in module scope; call where you need it").
+Constant arrays of labels (nav items, menu entries, column headers) are usually defined once outside the render. Paraglide has **no `msg`-style descriptor**, and you must **not** call `m.key()` at module scope: the call would resolve at import time, under whichever locale was active then, and would not update per request. This contradicts the SSR rule in `paraglide/rules.template.md` ("do not cache `getLocale()` in module scope; call where you need it").
 
 The correct shape is to store the **message function** and invoke it during render:
 
@@ -200,7 +200,7 @@ export const actions: Actions = {
 }
 ```
 
-Because this is server code, **never read the locale from a browser API** (`navigator.language`, `document`, `window`) — those are undefined on the server and leak one request's locale across others. `getLocale()` is the only correct source. (See the SSR section in `paraglide/code.md`.)
+Because this is server code, **never read the locale from a browser API** (`navigator.language`, `document`, `window`) — those are undefined on the server and leak one request's locale across others. `getLocale()` is the only correct source. (See the SSR section in `paraglide/rules.template.md`.)
 
 Only wrap fields that are rendered as **copy**. IDs, slugs, and raw API payloads returned from `load` are not UI text — leave them.
 
@@ -217,7 +217,7 @@ new Intl.NumberFormat(getLocale(), { style: 'currency', currency: 'USD' }).forma
 new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium' }).format(new Date(timestamp))
 ```
 
-When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), and hardcoded date formats (`'MM/DD/YYYY'`). Details in `paraglide/code.md`. (ICU `number` skeletons inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup — prefer `Intl` for dates/times.)
+When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), and hardcoded date formats (`'MM/DD/YYYY'`). Details in `paraglide/rules.template.md`. (ICU `number` skeletons inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup — prefer `Intl` for dates/times.)
 
 ---
 
@@ -272,7 +272,7 @@ Use `cart_remove_button`, not `remove`; two different "Remove" buttons need dist
 
 ## What not to wrap
 
-Do not give catalog keys to non-UI text — CSS class names, `console`/debug strings, import paths, object keys and internal codes, `ALL_CAPS` enums, `data-testid`, URL/API paths, SvelteKit route IDs (`/blog/[slug]`), and `load` return values that are IDs/slugs/raw payloads rather than copy. The full skip-list is in `paraglide/code.md` — apply it there rather than re-deciding per string.
+Do not give catalog keys to non-UI text — CSS class names, `console`/debug strings, import paths, object keys and internal codes, `ALL_CAPS` enums, `data-testid`, URL/API paths, SvelteKit route IDs (`/blog/[slug]`), and `load` return values that are IDs/slugs/raw payloads rather than copy. The full skip-list is in `paraglide/rules.template.md` — apply it there rather than re-deciding per string.
 
 ---
 

@@ -905,6 +905,6 @@ If `npm run build` fails with `Trans is not defined` or `<Trans>` renders as raw
 - `@lingui/swc-plugin`'s `swc_core` version matches the one shipped by `@vitejs/plugin-react-swc` — see the version-pinning note in Section 1.
 - The macro import is `import { Trans } from '@lingui/react/macro'` (not the deprecated `@lingui/macro`; non-React macros like `t` come from `@lingui/core/macro`).
 
-## 13. Optional add-ons
+## 13. Coding rules + optional add-ons
 
-If the user selected any optional add-ons in `SKILL.md §1.10` (coding rules `@import`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from `references/languages/js-ts/libraries/lingui/setup.add-ons.md`. Skip add-ons the user did not select. Skip this section entirely if no add-ons were selected.
+First apply the **core coding-rules section** of `references/languages/js-ts/libraries/lingui/setup.add-ons.md` (step `generate_coding_rules`) — it always runs, whatever the user selected, because Phase 3 wraps against the file it generates. Then, if the user selected any optional add-ons in `SKILL.md §1.10` (import the coding rules from `CLAUDE.md`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from the same file. Skip add-ons the user did not select.

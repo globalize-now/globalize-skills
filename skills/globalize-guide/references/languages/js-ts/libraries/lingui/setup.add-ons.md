@@ -1,6 +1,8 @@
-# LinguiJS: Optional Add-Ons
+# LinguiJS: Coding Rules + Optional Add-Ons
 
-This file is invoked from the framework-specific lingui setup files (`nextjs/app-router/lingui.setup.md`, `vite/react-swc/lingui.setup.md`, `vite/react-babel/lingui.setup.md`, `tanstack-start/lingui.setup.md`, `tanstack-start/swc/lingui.setup.md`) after the core setup has been applied. The orchestrator's `SKILL.md §1.10` lets the user multi-select up to four add-ons. Run only the sub-steps below that match the user's selections in `decisions.md` — skip the rest in silence. Each sub-step is independently re-runnable: if it has already been applied, detect that and skip without prompting.
+This file is invoked from the framework-specific lingui setup files (`nextjs/app-router/lingui.setup.md`, `vite/react-swc/lingui.setup.md`, `vite/react-babel/lingui.setup.md`, `tanstack-start/lingui.setup.md`, `tanstack-start/swc/lingui.setup.md`) after the core setup has been applied.
+
+It has two parts. **The core step below always runs** — it is not an add-on and is not gated on any selection. The add-ons after it are the ones `SKILL.md §1.10` lets the user multi-select: run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Every section here is independently re-runnable: if it has already been applied, detect that and skip without prompting.
 
 Apply the same guided / unguided rules used elsewhere in setup:
 - **Guided mode**: describe the change before making it and wait for confirmation.
@@ -10,17 +12,89 @@ The catalog path and build command vary by framework — read `decisions.md` and
 
 ---
 
-## Add-on 1: Coding rules (`@import`)
+## Core step: generate the coding rules (`generate_coding_rules` — always runs)
 
-The lingui coding rules at `references/languages/js-ts/libraries/lingui/code.md` contain the rules for wrapping strings, props, plurals, ordinals, numbers, currencies, and dates correctly as new code is written, plus translator-comment guidance and the App-Router server-vs-client split. They ship as part of the `globalize-guide` skill, so the file already lives at `.claude/skills/globalize-guide/references/languages/js-ts/libraries/lingui/code.md` in the target project.
+**This is a core Phase 2 step, not an add-on**, and it is **not** gated on a `SKILL.md §1.10` selection. Phase 3's wrap subagents read `.claude/globalize-rules.md` as their authoring contract — macro decision tree, plural rules, skip-list, real catalog paths — so conversion cannot start until this step has produced it. The only opt-in part is importing the file from the project's `CLAUDE.md`, which is **Add-on 1** below.
 
-Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits — they aren't consulted unless explicitly invoked. To make the rules always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
+The lingui coding rules are a **generated file**, not a shipped one. `references/languages/js-ts/libraries/lingui/rules.template.md` covers every configuration lingui supports — wrapping strings, props, plurals, ordinals, numbers, currencies, dates, translator comments, the App-Router server-vs-client split. This step renders it down to the one configuration this project actually has (only the branches that apply, with the project's real catalog path and locales substituted in) and writes the result to `.claude/globalize-rules.md`.
 
-Verify `.claude/skills/globalize-guide/references/languages/js-ts/libraries/lingui/code.md` exists.
+**Read `references/rules-template-format.md` before rendering.** It is the whole rendering contract — template anatomy, the conditional grammar, the `<<placeholder>>` form, the step order, the header, the fail-closed rule. The steps below only add where *this library's* values come from.
+
+### 1. Locate the template
+
+Read `.globalize/manifest-snapshot.json` → `references.rulesTemplate`.
+
+**If the entry has no `rulesTemplate`**, the installed skill is out of date — every lingui variant carries one. Do not look for a generic `code.md`; it no longer exists for this library. Treat this exactly like the missing-file case below.
+
+Verify the template exists in the target project.
 
 - **If it exists**: proceed.
-- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this add-on. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
-- **If it is missing — unguided mode**: do not block. Skip the CLAUDE.md append and record `⚠ lingui coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
+- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
+- **If it is missing — unguided mode**: do not block. Skip this step and record `⚠ lingui coding rules not generated — template missing` in the end-of-run summary, with the reinstall command shown above. Treat it as the fail-closed case in step 6: a core step did not complete, so Phase 3 has no rules file.
+
+### 2. Resolve the template's `conditions`
+
+Resolve every key listed in the template frontmatter's `conditions` and write them to `.globalize/rules-values.json`. Comparison values are string literals, so booleans resolve to `"true"` / `"false"`.
+
+| Condition | Where to read it |
+|---|---|
+| `router` | `.globalize/manifest-snapshot.json` → `match.router`. `"app"` on the Next.js App Router variant; the key is **absent** on the Vite and TanStack Start variants — treat absent as not-`"app"`. |
+| `perPageCatalogs` | `lingui.config.{ts,js}`: `"true"` when it sets `experimental.extractor`, `"false"` otherwise. That block is what switches the project to `lingui extract-experimental` and co-located per-route catalogs. |
+
+### 3. Eliminate branches, then resolve the surviving `values`
+
+Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`, `<!-- /if -->` all disappear, kept branch or not). Only then resolve the `values` still referenced in what survived — from the config **on disk**, the file core setup actually wrote, not from `decisions.md`, which records what was asked for rather than what landed — appending them to the same `.globalize/rules-values.json`.
+
+**The order is load-bearing.** A value that lives inside a false branch has no value to resolve — there is no navigation path on a project without prefix routing, and no per-page catalog output on a project without the experimental extractor. Resolving up front would demand values that don't exist and trip step 6 on a perfectly healthy project.
+
+| Value | Where to read it |
+|---|---|
+| `catalogPath` | `catalogs[].path` in `lingui.config.{ts,js}` — e.g. `src/locales/{locale}/messages`. Keep the `{locale}` token exactly as the config writes it. If the config declares several catalog entries, use the one covering the project's source root. |
+| `sourceLocale` | `sourceLocale` in `lingui.config.{ts,js}`. |
+| `targetLocales` | `locales` in `lingui.config.{ts,js}` minus `sourceLocale`, comma-separated: `de, fr, ja`. |
+
+### 4. Render
+
+Substitute every surviving `<<name>>` with its resolved value, strip the frontmatter, and **copy everything retained verbatim** — do not rewrite, summarize, reflow, re-order, or improve the prose. Prepend the two-line generated header:
+
+```
+<!-- globalize-rules v<templateVersion> | template=lingui | variant=<manifest-snapshot variant> | generated by globalize-guide -->
+<!-- Generated file. Re-running globalize-guide overwrites it. Put your own project rules in CLAUDE.md. -->
+```
+
+Write the result to `.claude/globalize-rules.md`, overwriting any file left by an earlier run.
+
+**`.claude/globalize-rules.md` should be committed.** It is team-shared coding guidance, exactly like `CLAUDE.md` — every contributor's agent needs it. Do **not** add it to `.gitignore`; it is not a `.globalize/` progress artifact.
+
+### 5. Self-check the generated file
+
+All four must hold:
+
+- zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
+- zero occurrences of `<<`
+- the header is on line 1
+- the line count is within the template's `budget` for the resolved conditions
+
+### 6. Fail closed
+
+If **any** surviving condition or value can't be resolved, or the self-check fails: **never write a partial file.** Delete anything already written to `.claude/globalize-rules.md`, then:
+
+- **Guided mode** — ask the user for the specific value. `catalogPath`, `sourceLocale`, and `targetLocales` are all one-line answers ("Where do your catalogs live?"), and getting one beats shipping either wrong rules or none. Resolve, re-render, re-check. Only if the user can't answer, or the self-check still fails, stop this step and say which key or check failed.
+- **Unguided mode** — don't block the run. Skip this step and record `⚠ lingui coding rules not generated (catalogPath unresolved) — no rules file installed` in the end-of-run summary.
+
+Either way a **core step did not complete**, so surface it instead of letting the run drift into conversion: report `generate_coding_rules` as failed, leave it unchecked in `plan.md`, and tell the orchestrator that Phase 3 has no `.claude/globalize-rules.md` to wrap against. The user then either supplies the missing value and re-runs this step, or converts knowing the wrap subagents are working without this project's rules.
+
+There is no generic-rules fallback: `lingui/code.md` was deleted when this library moved to a template, so the template is the only source of truth for lingui rules. Installing nothing is recoverable — re-run this step. Installing rules that name the wrong catalog path is not; the agent follows them into a bug on every future edit and nothing signals it.
+
+---
+
+## Add-on 1: Import the coding rules from `CLAUDE.md` (`install_coding_rules`)
+
+**Only if the user selected it in `SKILL.md §1.10`** — this edits a file the user owns. Skip in silence otherwise; `.claude/globalize-rules.md` is on disk either way, and the user can add the import later.
+
+The import is what carries the rules past setup: Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits, but an `@`-imported file loads into every session's context.
+
+If the core step failed and there is no `.claude/globalize-rules.md` on disk, skip this add-on — an `@` line pointing at a missing file opens every future session with a dangling import.
 
 Check whether `CLAUDE.md` exists at the project root.
 
@@ -28,16 +102,16 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/globalize-guide/references/languages/js-ts/libraries/lingui/code.md
+  @.claude/globalize-rules.md
   ```
 
-- **If it exists**, describe the change to the user ("I'll append `@.claude/skills/globalize-guide/references/languages/js-ts/libraries/lingui/code.md` to your CLAUDE.md so the lingui coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+- **If it exists**, describe the change to the user ("I'll append `@.claude/globalize-rules.md` to your CLAUDE.md so the lingui coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
 If the exact `@` line is already present, skip silently — this add-on is idempotent.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
 
-Verify: in a fresh session, ask Claude "how should I wrap a plural string in this project?" — the answer should reference the `<Plural>` macro and ICU plural patterns from the imported file.
+Verify: in a fresh session, ask Claude "how should I wrap a plural string in this project?" — the answer should reference the `<Plural>` macro and ICU plural patterns from the generated file.
 
 ---
 

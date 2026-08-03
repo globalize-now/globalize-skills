@@ -13,7 +13,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md"],
         "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.convert.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -27,7 +27,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md"],
         "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.convert.md"],
-        "code": ["references/languages/js-ts/libraries/next-intl/code.md"],
+        "rulesTemplate": ["references/languages/js-ts/libraries/next-intl/rules.template.md"],
         "optional": {
           "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
           "po-format-convert": ["references/languages/js-ts/libraries/next-intl/po-format.convert.md"]
@@ -45,7 +45,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md"],
         "convert": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.convert.md"],
-        "code": ["references/languages/js-ts/libraries/next-intl/code.md"],
+        "rulesTemplate": ["references/languages/js-ts/libraries/next-intl/rules.template.md"],
         "optional": {
           "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
           "po-format-convert": ["references/languages/js-ts/libraries/next-intl/po-format.convert.md"]
@@ -68,7 +68,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/vite/react-swc/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -82,7 +82,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -96,7 +96,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/tanstack-start/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -113,7 +113,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/tanstack-start/swc/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -127,7 +127,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/remix/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -141,7 +141,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/remix/swc/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -158,7 +158,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/react-router-framework/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -172,7 +172,7 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/react-router-framework/swc/lingui.setup.md"],
         "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
-        "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
     {
@@ -192,7 +192,7 @@
           "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
           "references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md"
         ],
-        "code": ["references/languages/js-ts/libraries/vue-i18n/code.md"],
+        "rulesTemplate": ["references/languages/js-ts/libraries/vue-i18n/rules.template.md"],
         "optional": {
           "po-format-convert": ["references/languages/js-ts/libraries/vue-i18n/po-format.convert.md"]
         }
@@ -215,7 +215,7 @@
           "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
           "references/languages/js-ts/frameworks/nuxt/vue-i18n.convert.md"
         ],
-        "code": ["references/languages/js-ts/libraries/vue-i18n/code.md"],
+        "rulesTemplate": ["references/languages/js-ts/libraries/vue-i18n/rules.template.md"],
         "optional": {
           "po-format-convert": ["references/languages/js-ts/libraries/vue-i18n/po-format.convert.md"]
         }
@@ -238,7 +238,7 @@
           "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
           "references/languages/js-ts/frameworks/quasar/vue-i18n.convert.md"
         ],
-        "code": ["references/languages/js-ts/libraries/vue-i18n/code.md"],
+        "rulesTemplate": ["references/languages/js-ts/libraries/vue-i18n/rules.template.md"],
         "optional": {
           "po-format-convert": ["references/languages/js-ts/libraries/vue-i18n/po-format.convert.md"]
         }
@@ -255,12 +255,11 @@
       "references": {
         "setup": ["references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md"],
         "convert": ["references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md"],
-        "code": ["references/languages/js-ts/libraries/paraglide/code.md"],
+        "rulesTemplate": ["references/languages/js-ts/libraries/paraglide/rules.template.md"],
         "optional": {
           "setup-add-ons": ["references/languages/js-ts/libraries/paraglide/setup.add-ons.md"],
           "json-format-setup": ["references/languages/js-ts/libraries/paraglide/json-format.setup.md"],
-          "json-format-convert": ["references/languages/js-ts/libraries/paraglide/json-format.convert.md"],
-          "json-format-code": ["references/languages/js-ts/libraries/paraglide/json-format.code.md"]
+          "json-format-convert": ["references/languages/js-ts/libraries/paraglide/json-format.convert.md"]
         }
       }
     },
@@ -280,7 +279,7 @@
       "references": {
         "setup": ["references/languages/ruby/frameworks/rails/rails.setup.md"],
         "convert": ["references/languages/ruby/frameworks/rails/rails.convert.md"],
-        "code": ["references/languages/ruby/frameworks/rails/rails.code.md"],
+        "rulesTemplate": ["references/languages/ruby/frameworks/rails/rails.rules.template.md"],
         "optional": {
           "setup-add-ons": ["references/languages/ruby/frameworks/rails/setup.add-ons.md"]
         }
@@ -297,7 +296,7 @@
       "references": {
         "setup": ["references/languages/android/native/android-strings.setup.md"],
         "convert": ["references/languages/android/native/android-strings.convert.md"],
-        "code": ["references/languages/android/native/android-strings.code.md"],
+        "rulesTemplate": ["references/languages/android/native/android-strings.rules.template.md"],
         "optional": {
           "setup-add-ons": ["references/languages/android/native/setup.add-ons.md"]
         }
@@ -314,7 +313,7 @@
       "references": {
         "setup": ["references/languages/ios/native/string-catalog.setup.md"],
         "convert": ["references/languages/ios/native/string-catalog.convert.md"],
-        "code": ["references/languages/ios/native/string-catalog.code.md"]
+        "rulesTemplate": ["references/languages/ios/native/string-catalog.rules.template.md"]
       }
     },
     {
@@ -328,7 +327,7 @@
       "references": {
         "setup": ["references/languages/ios/native/string-catalog.setup.md"],
         "convert": ["references/languages/ios/native/string-catalog.convert.md"],
-        "code": ["references/languages/ios/native/string-catalog.code.md"]
+        "rulesTemplate": ["references/languages/ios/native/string-catalog.rules.template.md"]
       }
     },
     {
@@ -342,7 +341,7 @@
       "references": {
         "setup": ["references/languages/ios/native/string-catalog.setup.md"],
         "convert": ["references/languages/ios/native/string-catalog.convert.md"],
-        "code": ["references/languages/ios/native/string-catalog.code.md"]
+        "rulesTemplate": ["references/languages/ios/native/string-catalog.rules.template.md"]
       }
     }
   ],

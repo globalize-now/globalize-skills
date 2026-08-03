@@ -1,6 +1,6 @@
 # Rails i18n Conversion
 
-Rails-specific guidance for the convert phase. Covers Rails 6.1 → 8.1 projects using the built-in `I18n` API with locale-rooted YAML catalogs. The per-edit authoring rules — `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, `with_locale`, what-not-to-wrap — live in `rails.code.md` (wired automatically via `@import`). This file is the **mechanics of finding and converting existing hardcoded strings**.
+Rails-specific guidance for the convert phase. Covers Rails 6.1 → 8.1 projects using the built-in `I18n` API with locale-rooted YAML catalogs. The per-edit authoring rules — `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, `with_locale`, what-not-to-wrap — live in the project's generated coding rules (`.claude/globalize-rules.md`, wired via `@import`). This file is the **mechanics of finding and converting existing hardcoded strings**.
 
 ---
 
@@ -96,7 +96,7 @@ Review flagged literals. For autocorrect, add `--autocorrect` — but review all
 
 ### Views — lazy `t('.key')` with mirrored YAML path
 
-For lazy lookup rules, the key-path → YAML-path mirror, and the `t` helper vs `I18n.t` distinction, see `rails.code.md` → "Lazy lookup". One convert-phase note: **partials strip the leading underscore from the YAML key path**:
+For lazy lookup rules, the key-path → YAML-path mirror, and the `t` helper vs `I18n.t` distinction, see the coding rules → "Lazy lookup". One convert-phase note: **partials strip the leading underscore from the YAML key path**:
 
 | Template | Lazy call | YAML key path |
 |----------|-----------|---------------|
@@ -251,10 +251,10 @@ en:
 
 ## Step 3: Interpolation, HTML-safe keys, dates, numbers
 
-All rules for `%{name}` interpolation, `_html` key naming, and localized formatting are in `rails.code.md`. Apply them during wrapping — do not re-derive them per string. Quick reference:
+All rules for `%{name}` interpolation, `_html` key naming, and localized formatting are in the project's coding rules. Apply them during wrapping — do not re-derive them per string. Quick reference:
 
 - **Interpolation:** `t('key', name: user.name)` against `"Hello, %{name}!"` — never build sentences by Ruby string concatenation or `#{}` interpolation of a raw string.
-- **HTML markup:** key ending in `_html` (e.g. `terms_html`) — Rails marks the result `html_safe`; interpolated variables are still HTML-escaped by Rails, so you do not escape them manually. When the value contains **double-quoted** HTML attributes (`href="/privacy"`), author it as a **single-quoted** YAML scalar so the inner `"` need no escaping (see `rails.code.md` → "HTML-safe keys").
+- **HTML markup:** key ending in `_html` (e.g. `terms_html`) — Rails marks the result `html_safe`; interpolated variables are still HTML-escaped by Rails, so you do not escape them manually. When the value contains **double-quoted** HTML attributes (`href="/privacy"`), author it as a **single-quoted** YAML scalar so the inner `"` need no escaping (see the coding rules → "HTML-safe keys").
 - **Dates and times:** `l(article.published_at, format: :short)` — `l()` localizes `Date`, `DateTime`, and `Time` objects only. Passing a number to `l()` raises `I18n::ArgumentError`.
 - **Numbers and currency:** use Action View helpers — `number_to_currency(price)`, `number_with_delimiter(count)`, `number_with_precision(rate)`. These are backed by `rails-i18n`'s `number.*` YAML keys. Do **not** pass numeric values to `l()`.
 
@@ -348,10 +348,10 @@ Do **not** run `i18n-tasks normalize` as part of convert (it destroys authored r
 
 ## Do-not-touch
 
-- **`globalize` gem, `mobility` gem, `traco` gem** — these translate per-row database content (`*_translations` tables, suffixed columns). They are DB-content translation gems, unrelated to Globalize.now and to UI-string translation. Do **not** wrap model content managed by these gems with `t()`, and do not include their keys in the connected catalog. See `rails.code.md` for the full skip-list.
+- **`globalize` gem, `mobility` gem, `traco` gem** — these translate per-row database content (`*_translations` tables, suffixed columns). They are DB-content translation gems, unrelated to Globalize.now and to UI-string translation. Do **not** wrap model content managed by these gems with `t()`, and do not include their keys in the connected catalog. See the coding rules for the full skip-list.
 - **`db/` directory** — migrations, schema, and seeds are not user-facing UI text.
 - **`rails-i18n`-provided default keys** — `activerecord.errors.messages.*`, `date.formats.*`, `number.*`, and similar defaults are already translated by `rails-i18n` for each locale. Only app-authored overrides of these belong in your connected catalog. Extracting built-in defaults would duplicate keys that `rails-i18n` already manages.
-- **Non-user-facing strings** — log messages, `Rails.logger` calls, exception messages, internal codes, `data-testid` values, URL paths, config file values. See the full skip-list in `rails.code.md`.
+- **Non-user-facing strings** — log messages, `Rails.logger` calls, exception messages, internal codes, `data-testid` values, URL paths, config file values. See the full skip-list in the project's coding rules.
 
 ---
 
