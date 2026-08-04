@@ -30,7 +30,7 @@ This setup phase covers **native Apple (Swift) projects** localizing with an **A
 | 5. Register target locales | **Modifies project config** | Adds localizations / known regions to the Xcode project — describe the change and get confirmation |
 | 6. SPM: edit `Package.swift` | **Modifies existing file** | Adds `defaultLocalization` + processed-resource declaration — describe the change and get confirmation |
 | 7. Optional legacy migration | Additive (per table) | Converts existing `.strings`/`.stringsdict` to a catalog; non-blocking |
-| 8. Enable coding rules | **Modifies existing file** | Appends one `@import` line to project `CLAUDE.md` |
+| 8. Generate coding rules | Additive (+ optional file edit) | Writes `.claude/globalize-rules.md` — **always runs**, Phase 3 wraps against it; the `@import` line into project `CLAUDE.md` is the opt-in tail |
 
 **RULE: Steps that modify the Xcode project config or existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify project configuration or existing files.** _(This rule is modified by the setup mode chosen below.)_
 
@@ -264,23 +264,102 @@ For Objective-C `NSLocalizedString` call sites, the conversion can ingest them a
 
 ---
 
-## Step 8: Enable Coding Rules
+## Step 8: Generate Coding Rules (`generate_coding_rules` — always runs)
 
-The Apple String Catalog coding rules at `references/languages/ios/native/string-catalog.code.md` contain the rules for auto-localizing `Text` literals, `String(localized:)`, `comment:` translator context, C-style format specifiers, catalog plural authoring (no ICU), and what not to wrap. They ship as part of the `globalize-guide` skill and already live at `.claude/skills/globalize-guide/references/languages/ios/native/string-catalog.code.md` in the target project.
+**This step is not optional and is not gated on a `SKILL.md §1.10` selection.** Phase 3's wrap subagents read `.claude/globalize-rules.md` as their authoring contract — which API localizes, plural authoring, skip-list, the real catalog path — so conversion cannot start until this step has produced it. Only the `CLAUDE.md` import in sub-step 7 is opt-in, because it edits a file the user owns.
 
-Wire the rules in via a single `@import` line. Idempotently append the exact line
+The Apple String Catalog coding rules are a **generated file**, not a shipped one. `references/languages/ios/native/string-catalog.rules.template.md` covers every configuration this variant supports — auto-localizing `Text` literals, `String(localized:)`, bundle-scoped lookups in Swift packages, `comment:` translator context, key conventions, C-style format specifiers, catalog plural authoring (no ICU), and what not to wrap. This step renders it down to the one configuration this project actually has (only the branches that apply, with the project's real catalog path and locales substituted in) and writes the result to `.claude/globalize-rules.md`.
 
-```
-@.claude/skills/globalize-guide/references/languages/ios/native/string-catalog.code.md
-```
+**Read `references/rules-template-format.md` before rendering.** It is the whole rendering contract — template anatomy, the conditional grammar, the `<<placeholder>>` form, the step order, the header, the fail-closed rule. The steps below only add where *this variant's* values come from.
 
-to the target project's root `CLAUDE.md` (create the file with just that line if it doesn't exist; if the exact line is already present, skip silently — do not duplicate it). Imported files load into every session's context, so the rules apply on every edit without relying on skill routing. **Tell the user to approve the `@` import once when Claude Code prompts** — until approved, the rules won't load.
+### 1. Locate the template
 
-Verify `.claude/skills/globalize-guide/references/languages/ios/native/string-catalog.code.md` exists in the target project.
+Read `.globalize/manifest-snapshot.json` → `references.rulesTemplate`.
 
-- **If it exists**: proceed with the wiring.
+**If the entry has no `rulesTemplate`**, the installed skill is out of date — all three iOS variants carry one. Do not look for a generic `code.md`; it no longer exists for this variant. Treat this exactly like the missing-file case below.
+
+Verify the template exists in the target project.
+
+- **If it exists**: proceed.
 - **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
-- **If it is missing — unguided mode**: skip the CLAUDE.md append and record `⚠ iOS coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
+- **If it is missing — unguided mode**: do not block. Skip this step and record `⚠ iOS coding rules not generated — template missing` in the end-of-run summary, with the reinstall command shown above. Treat it as the fail-closed case in sub-step 6: a core step did not complete, so Phase 3 has no rules file.
+
+### 2. Resolve the template's `conditions`
+
+Resolve every key listed in the template frontmatter's `conditions` and write them to `.globalize/rules-values.json`. Comparison values are string literals.
+
+| Condition | Where to read it |
+|---|---|
+| `uiFramework` | `.globalize/manifest-snapshot.json` → `match.uiFramework` **when present**: `"swiftui"` on `ios-swiftui-string-catalog`, `"uikit"` on `ios-uikit-string-catalog`. The key is **absent** on `ios-spm-string-catalog` — a Swift package may ship either — so for that variant detect it from the target's own Swift sources: `"swiftui"` if any source under `Sources/<Target>/` imports `SwiftUI` or declares a `View`; `"uikit"` if they import `UIKit` and no `SwiftUI`. Genuine ambiguity defaults to `"swiftui"`, the same tie-break Step 1 uses. |
+| `bundleScope` | Composite of **packaging × UI framework**, resolved here because the grammar has no `&&` (the `paramsShape` worked example in `references/rules-template-format.md` is the same shape). Read packaging from `.globalize/manifest-snapshot.json` → `match.buildSystem`. `"xcode"` → `bundleScope` = `"none"`: an app target resolves against the main bundle and takes no `bundle:` argument. `"spm"` → `"spm-swiftui"` or `"spm-uikit"`, matching the `uiFramework` resolved above. The two SPM values exist only so the rendered `bundle: .module` examples use the API the project actually writes. |
+
+`bundle: .module` is not cosmetic: a Swift-package lookup without it resolves against the main app bundle, the string renders as its raw key, and nothing signals the failure (Step 6). Getting `bundleScope` wrong on an SPM target ships coding rules that produce silently non-localizing code.
+
+### 3. Eliminate branches, then resolve the surviving `values`
+
+Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`, `<!-- /if -->` all disappear, kept branch or not). Only then resolve the `values` still referenced in what survived — from the files **on disk**, what this setup actually wrote, not from `decisions.md`, which records what was asked for rather than what landed — appending them to the same `.globalize/rules-values.json`.
+
+| Value | Where to read it |
+|---|---|
+| `catalogPath` | Locate the `.xcstrings` file — glob `**/*.xcstrings` and take the default table (`Localizable.xcstrings`), the one created or confirmed in Step 3. On an SPM target that is `Sources/<Target>/Resources/Localizable.xcstrings` (Step 6). Record it **project-root-relative**. A String Catalog is a **single multi-locale file**, so this is the path of the file itself and must contain **no `{locale}` segment**. If several tables exist, name the default one. |
+| `sourceLocale` | The `sourceLanguage` field **inside the catalog file** — that is what the build honours. Info.plist `CFBundleDevelopmentRegion` and the project development region are the inputs Step 3 used; the catalog on disk wins if they disagree. |
+| `targetLocales` | The project localizations registered in Step 5 minus the catalog's `sourceLanguage`, comma-separated: `de, fr, ja`. Cross-check against the locale keys present in the catalog's `localizations` blocks. |
+
+### 4. Render
+
+Substitute every surviving `<<name>>` with its resolved value, strip the frontmatter, and **copy everything retained verbatim** — do not rewrite, summarize, reflow, re-order, or improve the prose. Prepend the two-line generated header:
+
+```
+<!-- globalize-rules v<templateVersion> | template=string-catalog | variant=<manifest-snapshot variant> | generated by globalize-guide -->
+<!-- Generated file. Re-running globalize-guide overwrites it. Put your own project rules in CLAUDE.md. -->
+```
+
+Write the result to `.claude/globalize-rules.md`, overwriting any file left by an earlier run.
+
+**`.claude/globalize-rules.md` should be committed.** It is team-shared coding guidance, exactly like `CLAUDE.md` — every contributor's agent needs it. Do **not** add it to `.gitignore`; it is not a `.globalize/` progress artifact.
+
+### 5. Self-check the generated file
+
+All four must hold:
+
+- zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
+- zero occurrences of `<<`
+- the header is on line 1
+- the line count is within the template's `budget` for the resolved conditions
+
+### 6. Fail closed
+
+If **any** surviving condition or value can't be resolved, or the self-check fails: **never write a partial file.** Delete anything already written to `.claude/globalize-rules.md`, then:
+
+- **Guided mode** — ask the user for the specific value. `catalogPath`, `sourceLocale`, and `targetLocales` are all one-line answers ("Which `.xcstrings` file is the app's default table?", "Which locale is the source?"), and getting one beats shipping either wrong rules or none. Resolve, re-render, re-check. Only if the user can't answer, or the self-check still fails, stop this step and say which key or check failed.
+- **Unguided mode** — don't block the run. Skip the step and record `⚠ iOS coding rules not generated (catalogPath unresolved) — no rules file installed` in the end-of-run summary.
+
+Either way a **core step did not complete**, so surface it instead of letting the run drift into conversion: report `generate_coding_rules` as failed, leave it unchecked in `plan.md`, and tell the orchestrator that Phase 3 has no `.claude/globalize-rules.md` to wrap against. The user then either supplies the missing value and re-runs this step, or converts knowing the wrap subagents are working without this project's rules.
+
+There is no generic-rules fallback: `string-catalog.code.md` was deleted when this variant moved to a template, so the template is the only source of truth for these rules. Installing nothing is recoverable — re-run this step. Installing rules that name the wrong catalog path, or that omit `bundle: .module` on a Swift package, is not; the agent follows them into a bug on every future edit and nothing signals it.
+
+### 7. Optional — import it from `CLAUDE.md` (`install_coding_rules`)
+
+**Only if the user selected the coding-rules import in `SKILL.md §1.10`** — this edits a file the user owns. Skip in silence otherwise; `.claude/globalize-rules.md` is on disk either way, and the user can add the import later. Skip it too if sub-step 6 fired and no rules file was written: an `@` line pointing at a missing file opens every future session with a dangling import.
+
+The import is what carries the rules past setup: Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits, but an `@`-imported file loads into every session's context.
+
+Check whether `CLAUDE.md` exists at the project root.
+
+- **If it doesn't exist**, create it:
+  ```
+  # Project Instructions
+
+  @.claude/globalize-rules.md
+  ```
+
+- **If it exists**, describe the change to the user ("I'll append `@.claude/globalize-rules.md` to your CLAUDE.md so the String Catalog coding rules auto-load every session") and wait for confirmation in guided mode before appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
+
+If the exact `@` line is already present, skip silently — this sub-step is idempotent.
+
+Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt asking to approve the `@` import. Approve it — otherwise the rules won't load."
+
+Verify: in a fresh session, ask Claude "how should I author a plural string in this project?" — the answer should reference catalog `variations.plural` with CLDR categories (not ICU) from the generated file.
 
 ---
 
@@ -298,10 +377,10 @@ This variant has **no package pins** and **no install** of any kind — the arch
 ## Common Gotchas
 
 - **Catalog stays empty after a build** — `SWIFT_EMIT_LOC_STRINGS` is not `YES` (Step 4), or the localizable strings are not literals. The compiler can only extract a *literal* key; `Text(variable)` / `String(localized: variable)` are skipped silently.
-- **A `String` variable in `Text` renders untranslated** — `Text(title)` where `title` is a `String` does not localize. Wrap with `Text(LocalizedStringKey(title))` or resolve via `String(localized:)`. See `string-catalog.code.md`.
+- **A `String` variable in `Text` renders untranslated** — `Text(title)` where `title` is a `String` does not localize. Wrap with `Text(LocalizedStringKey(title))` or resolve via `String(localized:)`. See the generated coding rules (Step 8).
 - **SPM strings render as raw keys at runtime** — the lookup is hitting the main app bundle, not the package. Pass `bundle: .module` (Step 6); confirm the target declares `resources:` so `Bundle.module` is generated.
-- **Plural shows the wrong form** — plurals are not authored in source as ICU. There is **no ICU MessageFormat** here; author plurals as catalog `variations.plural.<category>` (CLDR `zero`/`one`/`two`/`few`/`many`/`other`). See `string-catalog.code.md`.
-- **Editing English text orphans a translation** — when the literal is the key, changing the English source changes the key; the old entry goes stale and the new key starts untranslated. For churny copy, opt in to a symbolic key with a `defaultValue` (see `string-catalog.code.md`).
+- **Plural shows the wrong form** — plurals are not authored in source as ICU. There is **no ICU MessageFormat** here; author plurals as catalog `variations.plural.<category>` (CLDR `zero`/`one`/`two`/`few`/`many`/`other`). See the generated coding rules (Step 8).
+- **Editing English text orphans a translation** — when the literal is the key, changing the English source changes the key; the old entry goes stale and the new key starts untranslated. For churny copy, opt in to a symbolic key with a `defaultValue` (see the generated coding rules, Step 8).
 - **Stale entries piling up** — removed source strings are marked stale, not deleted. Clean them in the catalog editor periodically; the compiler will not remove them for you.
 - **Multiple tables** — additional tables (`InfoPlist.xcstrings`, custom) are separate catalogs. Connect them in Phase 4 with a `**/*.xcstrings` pattern; do not merge them into `Localizable.xcstrings`.
 - **No Xcode on the machine** — catalogs can be authored by hand, but extraction and the `xcrun xcstringstool` round-trip need Xcode 15+. Build-verify on a Mac.
@@ -344,7 +423,7 @@ Text("Hi \(name)")   // extracted as "Hi %@"
 Text("\(count) rooms")
 ```
 
-For comprehensive wrapping patterns, comments, positional specifiers, plural authoring, and what not to wrap, see the convert phase (`string-catalog.convert.md`). For ongoing coding rules (loaded automatically via `@import`), see `string-catalog.code.md`.
+For comprehensive wrapping patterns, comments, positional specifiers, plural authoring, and what not to wrap, see the convert phase (`string-catalog.convert.md`). Ongoing coding rules are generated into `.claude/globalize-rules.md` in Step 8 and loaded automatically via `@import`.
 
 ---
 

@@ -45,6 +45,7 @@ Created in the **target project root** (the project being internationalized). Ev
   decisions.md                # frozen user choices from Phase 1
   plan.md                     # executable plan for phases 1.5/2/3/4
   manifest-snapshot.json      # frozen copy of the chosen manifest entry
+  rules-values.json           # resolved template conditions and values; written by the core `generate_coding_rules` step in Phase 2, consumed when rendering `.claude/globalize-rules.md`
   globalize-inputs.json       # resolved Globalize project inputs (written in Phase 4, read by globalize-now-project-setup)
   progress/
     setup.json                # Phase 2 setup subagent
@@ -150,7 +151,7 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 > | `existing.providerWired` | Layout/main file imports and renders `I18nProvider` (Lingui) or `NextIntlClientProvider` (next-intl); OR (Vue) `app.use(i18n)` in `main.*` (Vite) / boot file registered (Quasar) / `@nuxtjs/i18n` listed in `modules` (Nuxt); OR (Paraglide) `paraglideMiddleware` in `src/hooks.server.ts`. |
 > | `existing.catalogsScaffolded` | Locale directories with at least one message file exist. |
 > | `existing.stringsWrapped` | Glob source tree (`.{tsx,jsx,js,svelte}`), sample up to 50 files, count files with bare markup text vs. files importing macros/message functions (for Paraglide, `import { m } from '$lib/paraglide/messages.js'`): > 80% imported → "yes", > 20% → "partial", else → "no". |
-> | `candidateFiles` | Glob `src/**/*.{tsx,ts,jsx,js,svelte}`, exclude tests/configs/`.d.ts`, grep each for: bare markup text (`>Word<`, including Svelte template text), user-visible attrs (`placeholder=`, `aria-label=`, `title=`, `alt=`), exported user-facing string literals, **and display-copy string literals inside exported data/content modules** — string *values* under object/array keys whose name matches `name`, `title`, `label`, `heading`, `subheading`, `description`, `summary`, `body`, `text`, `message`, `caption`, `placeholder`, `tooltip`, `alt`, `cta`, or `content` (e.g. `export const products = [{ name: '…', description: '…' }]`). Deliberately narrow — do **not** treat identifier/config keys as display copy (`id`, `slug`, `sku`, `key`, `href`, `src`, `type`, `variant`, `icon`, `role`, `className`, `testid`); those are covered by the `code.md` skip-list and must not inflate the candidate set. This is a recall signal: a data module matching it becomes a wrap candidate so a Phase 3 subagent opens it; the subagent still applies the skip-list, so occasional over-match is harmless. Return files with ≥1 match, sorted by match count desc. |
+> | `candidateFiles` | Glob `src/**/*.{tsx,ts,jsx,js,svelte}`, exclude tests/configs/`.d.ts`, grep each for: bare markup text (`>Word<`, including Svelte template text), user-visible attrs (`placeholder=`, `aria-label=`, `title=`, `alt=`), exported user-facing string literals, **and display-copy string literals inside exported data/content modules** — string *values* under object/array keys whose name matches `name`, `title`, `label`, `heading`, `subheading`, `description`, `summary`, `body`, `text`, `message`, `caption`, `placeholder`, `tooltip`, `alt`, `cta`, or `content` (e.g. `export const products = [{ name: '…', description: '…' }]`). Deliberately narrow — do **not** treat identifier/config keys as display copy (`id`, `slug`, `sku`, `key`, `href`, `src`, `type`, `variant`, `icon`, `role`, `className`, `testid`); those are covered by the coding rules' skip-list and must not inflate the candidate set. This is a recall signal: a data module matching it becomes a wrap candidate so a Phase 3 subagent opens it; the subagent still applies the skip-list, so occasional over-match is harmless. Return files with ≥1 match, sorted by match count desc. |
 > | `localeSignals` | List existing locale dirs (e.g., `src/locales/`), env vars matching `*LOCALE*`, README mentions of language names. |
 >
 > **Ruby / Rails detection rules** (apply only when `language === "ruby"`; the JS rules above do not apply):
@@ -377,9 +378,11 @@ If `connect translation platform` is in scope, collect:
 ### 1.10 Optional steps
 
 > **User-facing message** (before asking):
-> "Optional add-ons. None of these are required, but the passive coding rules (an `@import` line in your `CLAUDE.md`) are recommended — they keep me from re-introducing hardcoded strings on future edits."
+> "Optional add-ons — none of these are required. Note that I always generate a coding-rules file tailored to this setup (`.claude/globalize-rules.md`), because the conversion phase wraps strings against it. The optional part is whether I also import it from your `CLAUDE.md`, which is what keeps me from re-introducing hardcoded strings on future edits — recommended."
 
-Multi-select for setup-time optionals: ESLint plugin, CI/CD integration (extract+compile in build), test setup wrapper, install passive coding rules (`@import` line in target `CLAUDE.md`).
+Multi-select for setup-time optionals: ESLint plugin, CI/CD integration (extract+compile in build), test setup wrapper, import the coding rules from the target `CLAUDE.md` (`@.claude/globalize-rules.md`).
+
+**Generating the rules file is not optional and is not in this list.** It is a core Phase 2 step (`generate_coding_rules`) that runs as soon as the stack's config is on disk, because Phase 3 wrap subagents read it — the tailored rules ARE the conversion contract (macro decision tree, plural rules, skip-list, real catalog paths). Only the `CLAUDE.md` import is opt-in, because it edits a file the user owns.
 
 ### 1.11 Generate `plan.md` + `manifest-snapshot.json` + `decisions.md`
 
@@ -472,7 +475,7 @@ Subagent prompt skeleton:
 >
 > Read these reference files for variant-specific instructions:
 > - {paths from manifest-snapshot.references.setup, joined}
-> - Coding rules to install (if applicable): {manifest-snapshot.references.code joined}
+> - Coding rules template — render this into `.claude/globalize-rules.md` (step `generate_coding_rules`, always runs): {manifest-snapshot.references.rulesTemplate joined}
 >
 > **Packages already installed.** The orchestrator ran the package install on the main thread (Phase 2.0) for the manifest's `packages.runtime` and `packages.dev` before dispatching you. Do **not** run `npm install` / `yarn add` / `pnpm add` / `bun add` for those packages. If a reference's setup instructions list an install command for them, treat it as already done and move on. Only flag an extra install if the reference explicitly calls for a package that is **not** in the manifest's `packages` (e.g., a pinned remediation version after a build failure or an opt-in extra) — in that case, write `status: "needs_decision"` with a `needsDecision: { step: "extra_install", question: "An extra package install is needed: <command>. Run it on the main thread?", options: ["yes", "skip"] }` and exit so the orchestrator runs it on the main thread.
 >
@@ -512,7 +515,7 @@ While `progress/setup.json` is in `running` state, wake every 30–60 seconds, r
 
 ### Phase 2 collapse-case
 
-If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, `gitignore_artifacts`, and `build_verification`. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n; **Rails** — loads `config/locales/*.yml` directly at runtime; and **Android** — the platform loads `res/values*/strings.xml` at runtime) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale (for Rails, also run `bundle exec i18n-tasks missing -t used` to confirm every used key has a source-locale entry — not `health`, which false-fails on incomplete target stubs; for Android, confirm every `res/values-*/strings.xml` is well-formed XML and covers the source keys, running `./gradlew lint` for `MissingTranslation` when the SDK is available); a **compile-from-catalog** library (Paraglide) re-runs `paraglide_compile` (`npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`) to regenerate `src/lib/paraglide/` from the hand-authored `messages/{locale}.{json,po}` catalogs. Same dispatch pattern.
+If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, `gitignore_artifacts`, `generate_coding_rules`, and `build_verification`. **`generate_coding_rules` is not dropped by the collapse** — an already-configured project still needs the tailored rules file for Phase 3, and its values come from the config that already exists, which makes it cheaper here than in a from-scratch run, not more expensive. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n; **Rails** — loads `config/locales/*.yml` directly at runtime; and **Android** — the platform loads `res/values*/strings.xml` at runtime) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale (for Rails, also run `bundle exec i18n-tasks missing -t used` to confirm every used key has a source-locale entry — not `health`, which false-fails on incomplete target stubs; for Android, confirm every `res/values-*/strings.xml` is well-formed XML and covers the source keys, running `./gradlew lint` for `MissingTranslation` when the SDK is available); a **compile-from-catalog** library (Paraglide) re-runs `paraglide_compile` (`npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`) to regenerate `src/lib/paraglide/` from the hand-authored `messages/{locale}.{json,po}` catalogs. Same dispatch pattern.
 
 `gitignore_artifacts` runs in the collapse case too, and it is the **only** place the step can find pre-existing *tracked* generated catalogs: an already-configured Lingui or Paraglide project almost always has them committed. There the step does two things — append the ignore rule, and (with the user's consent) `git rm --cached` the tracked generated files so the working tree keeps them while git stops seeing them. Omit the step for runtime-catalog libraries, which generate nothing.
 
@@ -540,7 +543,7 @@ Send all wrap subagents in **a single Agent tool message** so they launch in par
 > Your assigned files (process in order; layout/shell first, then shared, then pages, then utilities):
 > {numbered list from plan.md for this partition}
 >
-> Read these reference files for macro guidance: {paths from manifest-snapshot.references.convert}.
+> Read `.claude/globalize-rules.md` **first** — Phase 2 generated it for exactly this project, and it is the authority on which macro to use, how to handle plurals, what to skip, and where catalogs live. Then read these reference files for the mechanics of finding and converting existing strings: {paths from manifest-snapshot.references.convert}. If the two ever disagree on an authoring rule, `.claude/globalize-rules.md` wins — it carries this project's real paths and locales.
 >
 > For each file: identify translatable strings, wrap with the correct macro, add translator comments inline per the rules in the reference. (Paraglide is key-authored with no macro — instead of wrapping, author a descriptive, context-encoding key plus its catalog entry and replace the string with the `m.key()` call. **On the default PO catalog format**, author the entry into `messages/{baseLocale}.po` as `#.` comment + `msgid "key"` + `msgstr "ICU body"` — `.po` carries `#.` comments, so DO add them, following `references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md`. **On the ICU-JSON catalog format** (`decisions.setup.catalogFormat === "json"`), the inlang/ICU JSON model has no translator-comment field, so do NOT add comments — descriptive key naming is the only disambiguation lever; follow `references/languages/js-ts/libraries/paraglide/json-format.convert.md` instead. **Android is also key-authored, with no macro and no automated extractor** — author a `<string name="key">value</string>` (or `<plurals>`) entry into `res/values/strings.xml`, then replace the literal with `getString(R.string.key)` / `resources.getQuantityString(R.plurals.key, count, count)` in Kotlin/Java, `stringResource(R.string.key)` / `pluralStringResource(...)` in Compose, or `@string/key` in XML layouts. Android XML **supports `<!-- -->` comments**, so DO add a short translator comment above non-obvious keys, plus `<xliff:g>` for do-not-translate runs; follow `references/languages/android/native/android-strings.convert.md`.) Update `.globalize/progress/wrap-N.json` after each file (atomic write). Do NOT run `extract` or `compile` — that runs once after all wrap subagents complete (Android has no extract/compile — the verify worker only validates).
 >
@@ -612,7 +615,7 @@ If the verify subagent returns `status: "needs_cleanup"` with `result.recallViol
 
 For up to `maxCleanupRounds` (default **2**) rounds:
 1. Collect the distinct files in `recallViolations`. If more than **40**, cap to the 40 highest-violation files and surface how many were dropped (no silent truncation).
-2. Dispatch a **`wrap-cleanup` subagent** (background, same dispatch pattern as Phase 3.2) whose prompt mirrors the Phase 3.2 wrap prompt — same `manifest-snapshot.references.convert` + `references.code` — with the file list = the violating files and the "these files were MISSED by detection; wrap per `code.md`, apply the skip-list, leave genuine non-translatables" note from the recall reference. Pre-create `progress/wrap-cleanup-{round}.json`.
+2. Dispatch a **`wrap-cleanup` subagent** (background, same dispatch pattern as Phase 3.2) whose prompt mirrors the Phase 3.2 wrap prompt — `.claude/globalize-rules.md` plus `manifest-snapshot.references.convert` — with the file list = the violating files and the "these files were MISSED by detection; wrap per the coding rules, apply the skip-list, leave genuine non-translatables" note from the recall reference. Pre-create `progress/wrap-cleanup-{round}.json`.
 3. Before returning, the `wrap-cleanup` subagent itself re-runs the library's catalog step (Lingui: `lingui extract --clean` + `compile`; Paraglide: `paraglide compile`; next-intl/vue-i18n: none — runtime catalogs) and the recall scan, writing its round's residual `recallViolations` and the count it wrapped to `progress/wrap-cleanup-{round}.json` (per the reference — there is no separate verify re-dispatch). The orchestrator reads that residual and aggregates the per-round counts into the verify `result`.
 4. Stop when: the scan is clean; **or** a round wrapped zero new strings (`stringsWrappedInCleanup === 0`); **or** the round budget is reached. Report any `residualViolations` to the user with file+line (never drop silently).
 
@@ -721,7 +724,7 @@ Subagent: `setup`
 Progress: `.globalize/progress/setup.json`
 References:
 - {paths joined from manifest.references.setup}
-- {paths joined from manifest.references.code}
+- {paths joined from manifest.references.rulesTemplate}
 
 Orchestrator-owned steps (main thread, before subagent dispatch):
 - [ ] install_packages_main_thread
@@ -736,8 +739,8 @@ Subagent steps:
 - [ ] gitignore_artifacts   <!-- libraries that emit on-disk generated catalogs only. Lingui: the compiled `.ts`/`.js` siblings of the committed `.po` sources. Paraglide: the compiler `outdir` (`src/lib/paraglide/`). Runs BEFORE the first seed/extract/compile so generated files are never staged. Omit for runtime-catalog libraries (next-intl, vue-i18n, Rails, Android, iOS) — nothing lands on disk to ignore. -->
 - [ ] extract_compile   <!-- compile-time libraries only (Lingui); runtime-catalog libraries (next-intl, vue-i18n) consume the scaffolded catalogs directly — omit this step. Compile-from-catalog libraries (Paraglide) use `paraglide_compile` instead — see below. -->
 - [ ] paraglide_compile   <!-- compile-from-catalog libraries only (Paraglide): `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`; replaces extract_compile, omit for all other libraries -->
-- [ ] install_coding_rules
-- [ ] {optional steps if opted in}
+- [ ] generate_coding_rules   <!-- ALWAYS present, every library, every variant, including the collapse case. Renders manifest.references.rulesTemplate against this project's resolved values into `.claude/globalize-rules.md`. Phase 3 wrap subagents read that file, so Phase 2 cannot be considered done without it. Never gate this on a §1.10 selection. -->
+- [ ] {optional steps if opted in — including `install_coding_rules`, the `@import` into CLAUDE.md}
 - [ ] build_verification
 
 ## Phase 3 — Convert
@@ -818,7 +821,7 @@ Prefix-based
 - [x] ESLint plugin
 - [ ] CI/CD integration
 - [ ] Test setup wrapper
-- [x] Install passive coding rules (@import)
+- [x] Import the coding rules from `CLAUDE.md` (`@.claude/globalize-rules.md`)   <!-- opt-in. Generating the file itself is a core step, not a decision — do not record it here. -->
 
 ## Globalize-now
 - Project name: `{name}`
@@ -853,7 +856,7 @@ Prefix-based
 
 Reference files under `references/languages/.../*.md` walk through their variant's setup or convert work linearly via section headings (e.g., "Packages", "Build Tool Integration", "Provider Setup", "Language Switcher"). Follow them in document order — section headings are the authoritative ordering, not the orchestrator's plan step IDs (those are higher-level phase markers used by the polling loop).
 
-Some references include catalog-format sub-references for an **alternate** format (e.g., `references/languages/js-ts/libraries/next-intl/po-format.setup.md`, and for Paraglide `references/languages/js-ts/libraries/paraglide/json-format.{setup,convert,code}.md`). When the user is on the alternate format, substitute that reference's snippets in place of the default examples — the variant reference itself flags the substitution points. For Paraglide specifically: the **default is PO**, so the base files (`frameworks/sveltekit/paraglide.{setup,convert}.md` and `libraries/paraglide/code.md`) are the PO path and apply as-is. Only when `decisions.setup.catalogFormat === "json"` does the setup subagent apply `json-format.setup.md` over `paraglide.setup.md`, the wrap subagents apply `json-format.convert.md` over `paraglide.convert.md`, and the coding-rules add-on install `json-format.code.md` instead of `code.md` (see the add-ons reference).
+Some references include catalog-format sub-references for an **alternate** format (e.g., `references/languages/js-ts/libraries/next-intl/po-format.setup.md`, and for Paraglide `references/languages/js-ts/libraries/paraglide/json-format.{setup,convert}.md`). When the user is on the alternate format, substitute that reference's snippets in place of the default examples — the variant reference itself flags the substitution points. For Paraglide specifically: the **default is PO**, so the base files (`frameworks/sveltekit/paraglide.{setup,convert}.md`) are the PO path and apply as-is. Only when `decisions.setup.catalogFormat === "json"` does the setup subagent apply `json-format.setup.md` over `paraglide.setup.md` and the wrap subagents apply `json-format.convert.md` over `paraglide.convert.md`. The coding rules are **not** format-split any more: one `libraries/paraglide/rules.template.md` covers both, and the add-on renders the matching branch from the `catalogFormat` condition (see the add-ons reference).
 
 If a reference's instructions appear to require user input that wasn't collected in Phase 1, do not improvise: write `status: "needs_decision"` to your progress file and exit so the orchestrator can ask.
 

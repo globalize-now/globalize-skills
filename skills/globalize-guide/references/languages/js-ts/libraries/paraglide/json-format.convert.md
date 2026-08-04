@@ -40,4 +40,4 @@ Use `cart_remove_button`, not `remove`; two different "Remove" buttons need dist
 
 ## Everything else
 
-Follow `paraglide.convert.md` and `paraglide/json-format.code.md` unchanged for: the conversion loop mechanics, markup/attributes/interpolation, `{#each}`/conditionals/dynamic labels, module-scope constants, `load`/server strings, numbers/currencies/dates, and what-not-to-wrap. Only swap the catalog entry shape (JSON key-value) and drop the comments.
+Follow `paraglide.convert.md` and `paraglide/rules.template.md` unchanged for: the conversion loop mechanics, markup/attributes/interpolation, `{#each}`/conditionals/dynamic labels, module-scope constants, `load`/server strings, numbers/currencies/dates, and what-not-to-wrap. Only swap the catalog entry shape (JSON key-value) and drop the comments.

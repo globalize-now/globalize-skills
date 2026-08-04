@@ -183,6 +183,23 @@ Each library checker runs three layers:
 
 `check-behavior.sh` analyzes the agent's output (detection happened, correct variant) and the file changes (no originals deleted, only i18n-related files created). `verify-string-wrapping.sh` runs only when `expectations/<fixture>.json` exists (a convert-phase check).
 
+## Coding-Rules Templates
+
+`verify-rules-template.sh` guards the coding-rules template mechanism described in `skills/globalize-guide/references/rules-template-format.md`. It has two modes and needs no fixture.
+
+```bash
+./evals/verify-rules-template.sh                  # static: lint every skills/**/rules.template.md
+./evals/verify-rules-template.sh --project DIR    # post-render: lint a rendered project
+```
+
+**Static mode** runs standalone (no agent, no workdir) and is cheap enough to run on every change to a template. It checks the frontmatter contract (`template`, `templateVersion`, `conditions`, `values`, `budget`), balanced and non-nested `<!-- if: -->` / `<!-- else -->` / `<!-- /if -->` markers, the strict marker grammar, conditions and values declared-vs-used in **both** directions (an undeclared key and an unused declared key are both errors), and that placeholders use `<< >>` rather than `{{ }}`. Fenced code blocks are tracked so HTML comments in XML samples and Vue interpolation in `.vue` samples don't false-positive. Finding zero templates is a failure, not a pass.
+
+It also enforces **self-containment**: a template body may not contain `.claude/skills`, a `references/` path, or the literal `globalize-guide`. The generated `.claude/globalize-rules.md` is imported as `@.claude/globalize-rules.md`, so the user can delete the `globalize-guide` skill once setup is done and the rules keep working — any path back into the skill would dangle. Naming a *separate* skill (`css-i18n`) and referencing the target project's own files (`src/i18n/request.ts`, `messages/{locale}.po`) are both fine. Code fences are scanned for this one, since a sample renders into the generated file verbatim; frontmatter is exempt because it is stripped at render time. See "Self-containment is a hard requirement" in `skills/globalize-guide/references/rules-template-format.md`.
+
+**Post-render mode** runs after a Layer B setup that included the coding-rules add-on: `.claude/globalize-rules.md` exists with the generated header on line 1, no markers or `<<` survived, and `CLAUDE.md` imports it exactly once. It reports the rendered line count and the resolved keys from `.globalize/rules-values.json` so substitution can be eyeballed.
+
+Exit codes are 0 (clean), 1 (failures), 2 (usage or environment error).
+
 ## Adding a New Fixture
 
 1. **Author the project** under `fixtures/<category>/<name>/` (or reuse a base via a `derived` overlay for collapse cases). Keep it minimal — a handful of files with a few translatable strings.

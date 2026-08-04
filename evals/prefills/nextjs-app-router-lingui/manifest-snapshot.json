@@ -9,6 +9,6 @@
   "references": {
     "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md"],
     "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.convert.md"],
-    "code": ["references/languages/js-ts/libraries/lingui/code.md"]
+    "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
   }
 }

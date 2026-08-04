@@ -18,7 +18,7 @@ Subagent: `setup`
 Progress: `.globalize/progress/setup.json`
 References:
 - references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md
-- references/languages/js-ts/libraries/lingui/code.md
+- references/languages/js-ts/libraries/lingui/rules.template.md
 
 Packages to install (orchestrator main thread, before subagent dispatch):
 - Runtime: `@lingui/core@^6`, `@lingui/react@^6`, `@lingui/macro@^5`
@@ -38,6 +38,7 @@ Subagent steps:
 - [ ] scaffold_catalogs
 - [ ] gitignore_artifacts
 - [ ] extract_compile
+- [ ] generate_coding_rules
 - [ ] install_coding_rules
 - [ ] build_verification
 

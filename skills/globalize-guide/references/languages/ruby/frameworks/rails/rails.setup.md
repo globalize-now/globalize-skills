@@ -30,7 +30,7 @@ This setup phase covers **Ruby on Rails** projects using the **built-in `I18n` A
 | 4. Scaffold `config/locales/` | Additive | New `{locale}.yml` files; does not touch existing locale files |
 | 5. `ApplicationController` switcher | **Modifies existing file** | Adds `around_action` + `switch_locale` method; optional URL-locale routing edits `config/routes.rb` |
 | 6. Test-env `raise_on_missing_translations` | **Modifies existing file** | Adds one line to `config/environments/test.rb` |
-| 7. Enable coding rules | **Modifies existing file** | Appends one `@import` line to project `CLAUDE.md` via `setup.add-ons.md` |
+| 7. Generate coding rules | Additive (+ optional file edit) | Writes `.claude/globalize-rules.md` via `setup.add-ons.md` — **always runs**, Phase 3 wraps against it; the `@import` line into project `CLAUDE.md` is the opt-in add-on |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.** _(This rule is modified by the setup mode chosen below.)_
 
@@ -357,17 +357,13 @@ This setting is safe to emit unconditionally (no version-gated branches); on Rai
 
 ---
 
-## Step 7: Enable Coding Rules
+## Step 7: Generate Coding Rules (`generate_coding_rules` — always runs)
 
-The Rails i18n coding rules at `references/languages/ruby/frameworks/rails/rails.code.md` contain the rules for `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap. They ship as part of the `globalize-guide` skill and already live at `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` in the target project.
+The Rails i18n coding rules — `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap — are a **generated file**, not a shipped one. They are rendered from `references/languages/ruby/frameworks/rails/rails.rules.template.md` down to this project's actual configuration (routing decision, `rails-i18n` presence, real source and target locales) and written to `.claude/globalize-rules.md`.
 
-Follow the procedure in `references/languages/ruby/frameworks/rails/setup.add-ons.md` to wire the `@import` line into the target project's `CLAUDE.md`.
+Follow the **core coding-rules section** in `references/languages/ruby/frameworks/rails/setup.add-ons.md` — it carries the full procedure, including where each condition and value is read from and the fail-closed rule. **Never skip it**: it is not gated on a `SKILL.md §1.10` selection, because Phase 3's wrap subagents read the generated file as their authoring contract.
 
-Verify `.claude/skills/globalize-guide/references/languages/ruby/frameworks/rails/rails.code.md` exists in the target project.
-
-- **If it exists**: proceed with the wiring.
-- **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and stop this step. The fix is to reinstall it (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't attempt to recreate the file.
-- **If it is missing — unguided mode**: skip the CLAUDE.md append and record `⚠ Rails coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command shown above.
+Only the `CLAUDE.md` `@import` is opt-in — that is **Add-on 1** in the same file, applied only if the user selected the coding-rules import in `SKILL.md §1.10`.
 
 ---
 
@@ -455,7 +451,7 @@ en:
 redirect_to root_path, notice: t('users.sessions.created')
 ```
 
-For comprehensive wrapping patterns, HTML-safe keys, model validations, mailers, and auditing tools, see the Rails convert phase (`rails.convert.md`). For ongoing coding rules (loaded automatically via `@import`), see `rails.code.md`.
+For comprehensive wrapping patterns, HTML-safe keys, model validations, mailers, and auditing tools, see the Rails convert phase (`rails.convert.md`). For ongoing coding rules, see the generated `.claude/globalize-rules.md` (loaded automatically via `@import` — see Step 7).
 
 ---
 

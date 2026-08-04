@@ -38,7 +38,7 @@ excluding tests, stories, configs, and `.d.ts`.
   user-visible attrs (`placeholder=`/`aria-label=`/`title=`/`alt=`), and
   display-copy string literals under keys
   `name|title|label|heading|subheading|description|summary|body|text|message|caption|placeholder|tooltip|alt|cta|content`.
-  Exclude the `code.md` skip-list classes: CSS class names, `console`/debug,
+  Exclude the coding rules' skip-list classes: CSS class names, `console`/debug,
   import paths, object keys / internal codes, `ALL_CAPS` enums, `data-testid`,
   URLs/API paths, and identifier keys (`id`/`slug`/`sku`/`key`/`href`/`src`/`type`/`variant`/`icon`/`role`). Emit
   `{ file, line, text }` candidates. This scan needs **recall only** — the cleanup
@@ -60,13 +60,15 @@ The orchestrator, on `needs_cleanup`, loops up to **`maxCleanupRounds` (default
    highest-violation files, `log()` how many files were dropped, and continue —
    never silently truncate.
 2. **Dispatch a `wrap-cleanup` subagent** over the distinct violating files. Its
-   prompt mirrors the Phase 3.2 wrap subagent (same `references.convert` +
-   `references.code`), with the file list = the recall violations, and the note:
+   prompt mirrors the Phase 3.2 wrap subagent (same `references.convert` plus the
+   project's coding rules at `.claude/globalize-rules.md`, which Phase 2's core
+   `generate_coding_rules` step always produces), with the file list = the recall violations,
+   and the note:
    *"These files were MISSED by detection. Wrap genuine user-facing strings per the
-   convert reference and the `code.md` decision tree — for strings defined outside
+   convert reference and the coding rules' decision tree — for strings defined outside
    a component (data/content modules) use `msg\`text\`` at the definition site and
-   resolve with `t(descriptor)` at the call site (`code.md` → 'Constants imported
-   from another module'). Apply the `code.md` 'What not to wrap' skip-list: leave
+   resolve with `t(descriptor)` at the call site (the coding rules' constants /
+   copy-module pattern). Apply the coding rules' 'What not to wrap' skip-list: leave
    identifiers, slugs, SKUs, enum values, URLs, class names, and `data-testid`
    untouched. If a flagged string is genuinely non-translatable, leave it and note
    it — do not force a wrap."*
@@ -89,7 +91,7 @@ now-complete wrapped set (including the cleanup wraps).
 ## Why recall-then-judge is safe
 
 The recall scan is deliberately over-inclusive; precision comes from the
-`wrap-cleanup` subagent reading `code.md` and applying its skip-list. A raw grep
+`wrap-cleanup` subagent reading the coding rules and applying their skip-list. A raw grep
 hit on a SKU or class name is surfaced but *not* wrapped, because the subagent
 judges each candidate exactly as a normal Phase 3.2 wrap subagent would. This is
 the same recall/precision split the detection→wrap pipeline already uses.

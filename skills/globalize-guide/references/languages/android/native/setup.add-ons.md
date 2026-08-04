@@ -1,39 +1,157 @@
-# Android i18n: Optional Add-Ons
+# Android i18n: Coding Rules + Optional Add-Ons
 
 Invoked from the Android setup file (`references/languages/android/native/android-strings.setup.md`) after core
-setup. The orchestrator's `SKILL.md §1.10` lets the user multi-select the add-ons below. Run only the sub-steps
-that match the user's selections in `decisions.md` — skip the rest in silence. Each sub-step is independently
+setup.
+
+It has two parts. **The core step below always runs** — it is not an add-on and is not gated on any selection.
+The add-ons after it are the ones `SKILL.md §1.10` lets the user multi-select: run only the sub-steps that match
+the user's selections in `decisions.md` — skip the rest in silence. Every section here is independently
 re-runnable: if already applied, detect and skip without prompting.
 
 Apply the same guided / unguided rules used elsewhere in setup:
 - **Guided mode**: describe the change before making it and wait for confirmation.
 - **Unguided mode**: apply directly; only stop on hard errors.
 
-Android paths are fixed by core setup: the source catalog is `app/src/main/res/values/strings.xml`; per-locale
-overlays are `app/src/main/res/values-<qualifier>/strings.xml`; code reads via `getString`/`stringResource` and
-`getQuantityString`/`pluralStringResource`. Nothing is installed — string resources are platform-built-in.
+Android paths come from core setup: the source catalog is `<res root>/values/strings.xml` for the module that
+applies `com.android.application` (`app/src/main/res` in the standard single-module layout, but read it off
+disk — see the core step's step 3); per-locale overlays are `<res root>/values-<qualifier>/strings.xml`; code
+reads via `getString`/`stringResource` and `getQuantityString`/`pluralStringResource`. Nothing is installed —
+string resources are platform-built-in.
 
 ---
 
-## Add-on 1: Coding rules (`@import`)
+## Core step: generate the coding rules (`generate_coding_rules` — always runs)
 
-The Android i18n coding rules at `references/languages/android/native/android-strings.code.md` cover string
-externalization, positional args, native plurals, escaping, `<xliff:g>`, and what not to wrap. They ship as
-part of the `globalize-guide` skill and already live at
-`.claude/skills/globalize-guide/references/languages/android/native/android-strings.code.md` in the target project.
+**This is a core Phase 2 step, not an add-on**, and it is **not** gated on a `SKILL.md §1.10` selection.
+Phase 3's wrap subagents read `.claude/globalize-rules.md` as their authoring contract — externalization rules,
+native plural rules, skip-list, real resource directory — so conversion cannot start until this step has
+produced it. The only opt-in part is importing the file from the project's `CLAUDE.md`, which is **Add-on 1**
+below.
 
-Claude Code doesn't reliably auto-trigger passive "coding rules" references during routine edits. To make them
-always-available, reference the file from the project's root `CLAUDE.md` using Claude Code's `@` import syntax.
+The Android i18n coding rules are a **generated file**, not a shipped one.
+`references/languages/android/native/android-strings.rules.template.md` covers every configuration this variant
+supports — string externalization, positional args, `<xliff:g>` do-not-translate runs, native `<plurals>` with
+CLDR `quantity`, escaping, translator comments, in-app language switching, and what not to wrap, across Jetpack
+Compose and Views/XML. This step renders it down to the one configuration this project actually has (only the
+branches that apply, with the project's real resource directory and locales substituted in) and writes the
+result to `.claude/globalize-rules.md`.
 
-Verify `.claude/skills/globalize-guide/references/languages/android/native/android-strings.code.md` exists in the
-target project.
+**Read `references/rules-template-format.md` before rendering.** It is the whole rendering contract — template
+anatomy, the conditional grammar, the `<<placeholder>>` form, the step order, the header, the fail-closed rule.
+The steps below only add where *this variant's* values come from.
+
+### 1. Locate the template
+
+Read `.globalize/manifest-snapshot.json` → `references.rulesTemplate`.
+
+**If the entry has no `rulesTemplate`**, the installed skill is out of date — the `android-strings` variant
+carries one. Do not look for a generic `code.md`; it no longer exists for this variant. Treat this exactly like
+the missing-file case below.
+
+Verify the template exists in the target project.
 
 - **If it exists**: proceed.
 - **If it is missing — guided mode**: tell the user the `globalize-guide` skill is not installed in their project and
-  stop this add-on. The fix is to reinstall it
+  stop this step. The fix is to reinstall it
   (`npx skills add globalize-now/globalize-skills --skill globalize-guide -a claude-code`). Don't recreate the file.
-- **If it is missing — unguided mode**: do not block. Skip the append and record
-  `⚠ Android coding rules not installed — wiring skipped` in the end-of-run summary, with the reinstall command.
+- **If it is missing — unguided mode**: do not block. Skip this step and record
+  `⚠ Android coding rules not generated — template missing` in the end-of-run summary, with the reinstall
+  command. Treat it as the fail-closed case in step 6: a core step did not complete, so Phase 3 has no rules
+  file.
+
+### 2. Resolve the template's `conditions`
+
+Resolve every key listed in the template frontmatter's `conditions` and write them to
+`.globalize/rules-values.json`. Comparison values are string literals, so booleans resolve to `"true"` /
+`"false"`.
+
+| Condition | Where to read it |
+|---|---|
+| `uiToolkit` | `"compose"`, `"views"`, or `"both"`. **Nothing upstream records this** — not `.globalize/detection.json` (its schema has no such field) and not the manifest `match`. Detect it from the build files yourself, across every module that contributes UI, not just `app/`. **Compose signals:** a `androidx.compose.*` dependency in a `build.gradle{,.kts}` (`androidx.compose:compose-bom`, `androidx.compose.ui:ui`, `androidx.compose.material3:material3`), the Compose compiler plugin (`org.jetbrains.kotlin.plugin.compose` / `kotlin("plugin.compose")` on Kotlin 2.0+, or `buildFeatures { compose = true }` with a `composeOptions {}` block before it), a `compose`-named entry in `gradle/libs.versions.toml`; corroborate with `@Composable` in `src/main/`. **Views signals:** any `src/main/res/layout/*.xml`, plus `setContentView(R.layout.…)`, `findViewById`, or `buildFeatures { viewBinding = true }` / `dataBinding = true`. Both sets present (common mid-migration) → `"both"`. |
+| `localeSwitcher` | `"true"` when the app has, or is getting, an in-app language picker: `setApplicationLocales(` anywhere in Kotlin/Java source, **or** `android:localeConfig` on `<application>` in `AndroidManifest.xml`, **or** `generateLocaleConfig = true` in an `androidResources {}` block, **or** the user selected **Add-on 2** in `decisions.md` (add-ons can run in either order, so check the selection, not only the disk state). Otherwise `"false"` — the app follows the device language and none of that API is a rule the agent needs. |
+
+**If neither `uiToolkit` signal is present** (no layouts, no Compose dependency — a project that has not written
+its UI yet), resolve `"both"`. It is the superset, so nothing that applies is dropped; the only cost is a few
+extra lines. In guided mode confirm the choice with the user before rendering; in unguided mode take `"both"`
+and note it in the summary. Never guess one toolkit and silently delete the other's rules.
+
+### 3. Eliminate branches, then resolve the surviving `values`
+
+Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`, `<!-- /if -->` all disappear,
+kept branch or not). Only then resolve the `values` still referenced in what survived — from the project **on
+disk**, what core setup actually created, not from `decisions.md`, which records what was asked for rather than
+what landed — appending them to the same `.globalize/rules-values.json`.
+
+| Value | Where to read it |
+|---|---|
+| `resDir` | The **app module's main resource root**, project-root-relative, no trailing slash — the directory holding `values/strings.xml` for the module that applies `com.android.application`. `app/src/main/res` in the standard layout, but the module can be named anything (`:mobile`, `:androidApp`); read `settings.gradle{,.kts}` and glob `**/src/main/res/values/strings.xml` rather than assuming. Flavor source sets (`src/<flavor>/res`) are overlays on top of `src/main/res` — always use `src/main/res`. If library modules carry their own `res/`, still use the app module's here and surface the others to the user. |
+| `sourceLocale` | The BCP47 tag of the language the unqualified `values/strings.xml` is written in. `unqualifiedResLocale` in `res/values/resources.properties` when that file exists (AGP 8.1+ locale-config auto-gen); otherwise the source locale recorded in `.globalize/decisions.md`; otherwise `en`. |
+| `targetLocales` | The `values-<qualifier>` directories that exist beside the source catalog, each qualifier normalized to BCP47 and the source locale removed, comma-separated: `values-es`, `values-pt-rBR`, `values-b+zh+Hant` → `es, pt-BR, zh-Hant`. Cross-check against `res/xml/locale_config.xml` (or the generated locale config) and `decisions.md`; the directories on disk win. |
+
+**The order is load-bearing.** A value inside a false branch has no value to resolve, and resolving up front
+would demand values that don't exist and trip step 5 on a perfectly healthy project.
+
+### 4. Render
+
+Substitute every surviving `<<name>>` with its resolved value, strip the frontmatter, and **copy everything
+retained verbatim** — do not rewrite, summarize, reflow, re-order, or improve the prose. Prepend the two-line
+generated header:
+
+```
+<!-- globalize-rules v<templateVersion> | template=android-strings | variant=<manifest-snapshot variant> | generated by globalize-guide -->
+<!-- Generated file. Re-running globalize-guide overwrites it. Put your own project rules in CLAUDE.md. -->
+```
+
+Write the result to `.claude/globalize-rules.md`, overwriting any file left by an earlier run.
+
+**`.claude/globalize-rules.md` should be committed.** It is team-shared coding guidance, exactly like
+`CLAUDE.md` — every contributor's agent needs it. Do **not** add it to `.gitignore`; it is not a `.globalize/`
+progress artifact.
+
+### 5. Self-check the generated file
+
+All four must hold:
+
+- zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
+- zero occurrences of `<<`
+- the header is on line 1
+- the line count is within the template's `budget` for the resolved conditions
+
+### 6. Fail closed
+
+If **any** surviving condition or value can't be resolved, or the self-check fails: **never write a partial
+file.** Delete anything already written to `.claude/globalize-rules.md`, then:
+
+- **Guided mode** — ask the user for the specific value. Every one of these is a one-line answer ("Which module
+  holds your `res/` directory?", "Which language is `values/strings.xml` written in?", "Does the app have an
+  in-app language picker?"), and getting one beats shipping either wrong rules or none. Resolve, re-render,
+  re-check. Only if the user can't answer, or the self-check still fails, stop this step and say which key or
+  check failed.
+- **Unguided mode** — don't block the run. Skip this step and record
+  `⚠ Android coding rules not generated (resDir unresolved) — no rules file installed` in the end-of-run summary.
+
+Either way a **core step did not complete**, so surface it instead of letting the run drift into conversion:
+report `generate_coding_rules` as failed, leave it unchecked in `plan.md`, and tell the orchestrator that
+Phase 3 has no `.claude/globalize-rules.md` to wrap against. The user then either supplies the missing value
+and re-runs this step, or converts knowing the wrap subagents are working without this project's rules.
+
+There is no generic-rules fallback: `android-strings.code.md` was deleted when this variant moved to a
+template, so the template is the only source of truth for Android string-resource rules. Installing nothing is
+recoverable — re-run this step. Installing rules that name the wrong resource directory is not; the agent
+follows them into a bug on every future edit and nothing signals it.
+
+---
+
+## Add-on 1: Import the coding rules from `CLAUDE.md` (`install_coding_rules`)
+
+**Only if the user selected it in `SKILL.md §1.10`** — this edits a file the user owns. Skip in silence
+otherwise; `.claude/globalize-rules.md` is on disk either way, and the user can add the import later.
+
+The import is what carries the rules past setup: Claude Code doesn't reliably auto-trigger passive "coding
+rules" references during routine edits, but an `@`-imported file loads into every session's context.
+
+If the core step failed and there is no `.claude/globalize-rules.md` on disk, skip this add-on — an `@` line
+pointing at a missing file opens every future session with a dangling import.
 
 Check whether `CLAUDE.md` exists at the project root.
 
@@ -41,10 +159,9 @@ Check whether `CLAUDE.md` exists at the project root.
   ```
   # Project Instructions
 
-  @.claude/skills/globalize-guide/references/languages/android/native/android-strings.code.md
+  @.claude/globalize-rules.md
   ```
-- **If it exists**, describe the change ("I'll append
-  `@.claude/skills/globalize-guide/references/languages/android/native/android-strings.code.md` to your CLAUDE.md so
+- **If it exists**, describe the change ("I'll append `@.claude/globalize-rules.md` to your CLAUDE.md so
   the Android i18n coding rules auto-load every session") and wait for confirmation in guided mode before
   appending. Put the line at the end of the file on its own line. Do not remove or reorder existing content.
 
@@ -52,6 +169,9 @@ If the exact `@` line is already present, skip silently — idempotent.
 
 Tell the user: "The first time you start a Claude Code session in this project, you'll see a one-time prompt
 asking to approve the `@` import. Approve it — otherwise the rules won't load."
+
+Verify: in a fresh session, ask Claude "how should I add a plural string in this project?" — the answer should
+reference `<plurals>` with CLDR `quantity` items and `getQuantityString`/`pluralStringResource`, not ICU.
 
 ---
 

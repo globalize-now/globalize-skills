@@ -1,13 +1,16 @@
 {
   "variant": "nextjs-app-router-lingui",
   "library": "lingui",
-  "phasesIncluded": ["setup"],
+  "phasesIncluded": [
+    "setup"
+  ],
   "phase2StepsContain": [
     "create_config",
     "build_tool_integration",
     "provider_wiring",
     "scaffold_catalogs",
     "gitignore_artifacts",
-    "extract_compile"
+    "extract_compile",
+    "generate_coding_rules"
   ]
 }

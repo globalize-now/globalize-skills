@@ -727,6 +727,6 @@ The compile step comes **before** `tsc --noEmit` on purpose: the compiled catalo
 
 If any step fails, capture the error to `result.verificationResult` in your progress file and exit with `status: "failed"` per `SKILL.md §2.2`. Do not advance to Phase 3 with a broken build.
 
-## Optional add-ons
+## Coding rules + optional add-ons
 
-If the user selected any optional add-ons in `SKILL.md §1.10` (coding rules `@import`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from `references/languages/js-ts/libraries/lingui/setup.add-ons.md`. Skip add-ons the user did not select. Skip this section entirely if no add-ons were selected.
+First apply the **core coding-rules section** of `references/languages/js-ts/libraries/lingui/setup.add-ons.md` (step `generate_coding_rules`) — it always runs, whatever the user selected, because Phase 3 wraps against the file it generates. Then, if the user selected any optional add-ons in `SKILL.md §1.10` (import the coding rules from `CLAUDE.md`, ESLint plugin, CI/CD integration, test setup wrapper), apply the matching sub-steps from the same file. Skip add-ons the user did not select.
