@@ -2,8 +2,8 @@
 
 Android-specific guidance for the convert phase: **finding hardcoded user-visible text and externalizing it to
 `res/values/strings.xml`**. The per-edit authoring rules — positional args, native plurals, escaping,
-`<xliff:g>`, what-not-to-wrap — live in the project's generated `.claude/globalize-rules.md` (rendered from
-`android-strings.rules.template.md` in setup Step 6, wired automatically via `@import`). This file is the
+`<xliff:g>`, what-not-to-wrap — live in the project's generated `.agents/globalize-rules.md` (rendered from
+`android-strings.rules.template.md` in setup Step 6, and wired into `CLAUDE.md` and `AGENTS.md` there). This file is the
 **mechanics of discovery and wrapping**.
 
 Android is **key-authored, with no macro and no automated extractor**. Unlike Lingui/Paraglide (which extract
@@ -161,7 +161,7 @@ Text(pluralStringResource(R.plurals.inbox_count, n, n))
 
 ## Step 3: Interpolation, escaping, do-not-translate
 
-Full rules in the generated `.claude/globalize-rules.md` — apply them while wrapping, don't re-derive per
+Full rules in the generated `.agents/globalize-rules.md` — apply them while wrapping, don't re-derive per
 string. Quick reference:
 
 - **Interpolation:** positional `%1$s` (string), `%1$d` (int), `%1$f` (float). Multiple args **must** be

@@ -1,6 +1,6 @@
 # Apple String Catalog Conversion
 
-iOS-specific guidance for the convert phase. Covers native Apple (Swift / SwiftUI / UIKit / SPM) projects that localize with a single multi-locale **Apple String Catalog** (`.xcstrings`). The per-edit authoring rules — `Text` literal auto-localization, `String(localized:)`, `comment:` context, C-style format specifiers, catalog plural authoring, what-not-to-wrap — live in the project's generated `.claude/globalize-rules.md` (rendered from `string-catalog.rules.template.md` in setup Step 8, wired automatically via `@import`). Catalog creation and `SWIFT_EMIT_LOC_STRINGS` live in `string-catalog.setup.md`. This file is the **mechanics of finding and converting existing hardcoded strings**.
+iOS-specific guidance for the convert phase. Covers native Apple (Swift / SwiftUI / UIKit / SPM) projects that localize with a single multi-locale **Apple String Catalog** (`.xcstrings`). The per-edit authoring rules — `Text` literal auto-localization, `String(localized:)`, `comment:` context, C-style format specifiers, catalog plural authoring, what-not-to-wrap — live in the project's generated `.agents/globalize-rules.md` (rendered from `string-catalog.rules.template.md` in setup Step 8, and wired into `CLAUDE.md` and `AGENTS.md` there). Catalog creation and `SWIFT_EMIT_LOC_STRINGS` live in `string-catalog.setup.md`. This file is the **mechanics of finding and converting existing hardcoded strings**.
 
 ---
 
@@ -124,7 +124,7 @@ Default to literal-as-key (it matches Apple's editor flow); reach for symbolic k
 
 ## Step 3: Interpolation and plurals
 
-The full per-edit rules are in the generated `.claude/globalize-rules.md`. Apply them during wrapping — do not re-derive them per string. The convert-phase essentials:
+The full per-edit rules are in the generated `.agents/globalize-rules.md`. Apply them during wrapping — do not re-derive them per string. The convert-phase essentials:
 
 ### Interpolation — C-style format specifiers
 
@@ -221,7 +221,7 @@ Do not localize, give a catalog entry, or wrap:
 - **URLs, API paths, network strings** — endpoints, query keys, header names, scheme/host literals.
 - **`Package.swift` and `Info.plist` keys themselves** — bundle identifiers, feature-flag names, the plist *keys*. Note: `Info.plist` *values* (app display name, usage descriptions) localize via a separate **`InfoPlist.xcstrings`** table, which is **out of v1 default scope** — flag it, don't wrap it here.
 
-The full skip-list lives in the generated `.claude/globalize-rules.md` → "What NOT to wrap".
+The full skip-list lives in the generated `.agents/globalize-rules.md` → "What NOT to wrap".
 
 ---
 

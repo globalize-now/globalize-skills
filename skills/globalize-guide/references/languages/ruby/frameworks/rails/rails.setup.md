@@ -30,7 +30,7 @@ This setup phase covers **Ruby on Rails** projects using the **built-in `I18n` A
 | 4. Scaffold `config/locales/` | Additive | New `{locale}.yml` files; does not touch existing locale files |
 | 5. `ApplicationController` switcher | **Modifies existing file** | Adds `around_action` + `switch_locale` method; optional URL-locale routing edits `config/routes.rb` |
 | 6. Test-env `raise_on_missing_translations` | **Modifies existing file** | Adds one line to `config/environments/test.rb` |
-| 7. Generate coding rules | Additive (+ optional file edit) | Writes `.claude/globalize-rules.md` via `setup.add-ons.md` — **always runs**, Phase 3 wraps against it; the `@import` line into project `CLAUDE.md` is the opt-in add-on |
+| 7. Generate + wire coding rules | Additive (+ edits `CLAUDE.md` / `AGENTS.md`) | Writes `.agents/globalize-rules.md` via `setup.add-ons.md` and points `CLAUDE.md` and `AGENTS.md` at it — **always runs**, Phase 3 wraps against it |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.** _(This rule is modified by the setup mode chosen below.)_
 
@@ -359,11 +359,11 @@ This setting is safe to emit unconditionally (no version-gated branches); on Rai
 
 ## Step 7: Generate Coding Rules (`generate_coding_rules` — always runs)
 
-The Rails i18n coding rules — `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap — are a **generated file**, not a shipped one. They are rendered from `references/languages/ruby/frameworks/rails/rails.rules.template.md` down to this project's actual configuration (routing decision, `rails-i18n` presence, real source and target locales) and written to `.claude/globalize-rules.md`.
+The Rails i18n coding rules — `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap — are a **generated file**, not a shipped one. They are rendered from `references/languages/ruby/frameworks/rails/rails.rules.template.md` down to this project's actual configuration (routing decision, `rails-i18n` presence, real source and target locales) and written to `.agents/globalize-rules.md`.
 
 Follow the **core coding-rules section** in `references/languages/ruby/frameworks/rails/setup.add-ons.md` — it carries the full procedure, including where each condition and value is read from and the fail-closed rule. **Never skip it**: it is not gated on a `SKILL.md §1.10` selection, because Phase 3's wrap subagents read the generated file as their authoring contract.
 
-Only the `CLAUDE.md` `@import` is opt-in — that is **Add-on 1** in the same file, applied only if the user selected the coding-rules import in `SKILL.md §1.10`.
+Then follow the **second core step** in the same file, which points `CLAUDE.md` (`@.agents/globalize-rules.md`) and `AGENTS.md` (a pointer section) at the generated file. It always runs too, and is likewise not a §1.10 selection.
 
 ---
 
@@ -451,7 +451,7 @@ en:
 redirect_to root_path, notice: t('users.sessions.created')
 ```
 
-For comprehensive wrapping patterns, HTML-safe keys, model validations, mailers, and auditing tools, see the Rails convert phase (`rails.convert.md`). For ongoing coding rules, see the generated `.claude/globalize-rules.md` (loaded automatically via `@import` — see Step 7).
+For comprehensive wrapping patterns, HTML-safe keys, model validations, mailers, and auditing tools, see the Rails convert phase (`rails.convert.md`). For ongoing coding rules, see the generated `.agents/globalize-rules.md` (wired into `CLAUDE.md` and `AGENTS.md` — see Step 7).
 
 ---
 

@@ -251,7 +251,7 @@ The Paraglide compiler also emits a `.gitignore` of its own inside `outdir` by d
 
 ## Coding rules + optional add-ons
 
-First apply the **core coding-rules section** of `references/languages/js-ts/libraries/paraglide/setup.add-ons.md` (step `generate_coding_rules`) — it always runs, whatever the user selected, because Phase 3 wraps against the file it generates. Then, if the user selected optional add-ons (import the coding rules from `CLAUDE.md`, CI/CD, test setup), apply the matching sub-steps from the same file; skip add-ons the user did not select.
+First apply the **core coding-rules section** of `references/languages/js-ts/libraries/paraglide/setup.add-ons.md` (step `generate_coding_rules`) — it always runs, whatever the user selected, because Phase 3 wraps against the file it generates. Then apply the **second core section** (step `install_coding_rules`), which points `CLAUDE.md` and `AGENTS.md` at the generated file — it always runs too. Finally, if the user selected optional add-ons (CI/CD, test setup), apply the matching sub-steps from the same file; skip add-ons the user did not select.
 
 ## Translator comments
 

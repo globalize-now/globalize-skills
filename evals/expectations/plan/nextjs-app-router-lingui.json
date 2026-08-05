@@ -11,6 +11,7 @@
     "scaffold_catalogs",
     "gitignore_artifacts",
     "extract_compile",
-    "generate_coding_rules"
+    "generate_coding_rules",
+    "install_coding_rules"
   ]
 }

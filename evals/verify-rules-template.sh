@@ -10,10 +10,12 @@ set -uo pipefail
 # values declared-vs-used in both directions, and the << >> placeholder
 # delimiter. Zero templates found is a failure, not a pass.
 #
-# Post-render mode lints a target project after the coding-rules add-on ran:
-# .claude/globalize-rules.md exists, carries the generated header on line 1, has
-# no surviving markers or placeholders, and is imported from CLAUDE.md exactly
-# once. Reports the rendered line count and the resolved rules-values.json keys.
+# Post-render mode lints a target project after generate_coding_rules and
+# install_coding_rules ran: .agents/globalize-rules.md exists, carries the
+# generated header on line 1, has no surviving markers or placeholders, is not
+# gitignored, is imported from CLAUDE.md exactly once and pointed at from
+# AGENTS.md exactly once, and nothing is left over at the old .claude/ path.
+# Reports the rendered line count and the resolved rules-values.json keys.
 #
 # Exit codes: 0 = all checks passed, 1 = failures found, 2 = usage/environment error.
 
@@ -32,7 +34,7 @@ info() { echo "  INFO: $1"; }
 usage() {
   echo "Usage: verify-rules-template.sh [--project <path>]"
   echo "  (no args)          lint every skills/**/rules.template.md in this repo"
-  echo "  --project <path>   lint a rendered .claude/globalize-rules.md in <path>"
+  echo "  --project <path>   lint a rendered .agents/globalize-rules.md in <path>"
 }
 
 # ─── Argument handling ───
@@ -273,11 +275,15 @@ lint_template() {
     # delete globalize-guide once setup is done and the rules keep working — so
     # nothing in the body may point back into it. Scanned inside code fences
     # too: a sample containing such a path renders into the generated file just
-    # the same. Only paths into globalize-guide are banned; naming a separate
-    # skill (`css-i18n`) or a target-project path (`src/i18n/request.ts`) is
-    # fine. Frontmatter is exempt — it is stripped at render time.
+    # the same. `.claude/` is banned outright (not just `.claude/skills/`):
+    # it is where the skill installs AND where the generated file used to live
+    # before it moved to `.agents/`, so a body naming it is either reaching back
+    # into the skill or asserting a path that no longer exists. Naming a
+    # separate skill (`css-i18n`) or a target-project path
+    # (`src/i18n/request.ts`) is fine. Frontmatter is exempt — stripped at
+    # render time.
     hits=""
-    case "$line" in *'.claude/skills'*) hits="$hits .claude/skills" ;; esac
+    case "$line" in *'.claude/'*) hits="$hits .claude/" ;; esac
     case "$line" in *'references/'*) hits="$hits references/" ;; esac
     case "$line" in *'globalize-guide'*) hits="$hits globalize-guide" ;; esac
     if [ -n "$hits" ]; then
@@ -393,7 +399,7 @@ lint_template() {
   fi
 
   if [ $selfref -eq 0 ]; then
-    pass "$tag: self-contained — no '.claude/skills', 'references/' or 'globalize-guide' reference in the body"
+    pass "$tag: self-contained — no '.claude/', 'references/' or 'globalize-guide' reference in the body"
   fi
 
   if [ $if_count -eq $close_count ]; then
@@ -483,13 +489,13 @@ run_project_mode() {
     exit 2
   fi
 
-  local rules="$proj/.claude/globalize-rules.md"
+  local rules="$proj/.agents/globalize-rules.md"
 
   if [ ! -f "$rules" ]; then
-    fail ".claude/globalize-rules.md missing at $rules — the core generate_coding_rules step did not produce it (fail-closed, or it was skipped). Phase 3 wrap subagents read this file, so conversion has no authoring contract without it."
+    fail ".agents/globalize-rules.md missing at $rules — the core generate_coding_rules step did not produce it (fail-closed, or it was skipped). Phase 3 wrap subagents read this file, so conversion has no authoring contract without it."
     return
   fi
-  pass ".claude/globalize-rules.md exists"
+  pass ".agents/globalize-rules.md exists"
 
   local header=""
   IFS= read -r header < "$rules"
@@ -525,18 +531,64 @@ run_project_mode() {
     fi
   done
 
+  # Bridge 1: CLAUDE.md (Claude Code). An @-import, so it loads unconditionally.
   local claude="$proj/CLAUDE.md"
   if [ ! -f "$claude" ]; then
     fail "CLAUDE.md missing at $claude — nothing imports the generated rules file"
   else
-    c=$(grep -oF -- '@.claude/globalize-rules.md' "$claude" | wc -l | tr -d ' ')
+    c=$(grep -oF -- '@.agents/globalize-rules.md' "$claude" | wc -l | tr -d ' ')
     if [ "$c" -eq 1 ]; then
-      pass "CLAUDE.md imports @.claude/globalize-rules.md exactly once"
+      pass "CLAUDE.md imports @.agents/globalize-rules.md exactly once"
     elif [ "$c" -eq 0 ]; then
-      fail "CLAUDE.md has no '@.claude/globalize-rules.md' import"
+      fail "CLAUDE.md has no '@.agents/globalize-rules.md' import"
     else
-      fail "CLAUDE.md has $c '@.claude/globalize-rules.md' imports (expected exactly 1)"
+      fail "CLAUDE.md has $c '@.agents/globalize-rules.md' imports (expected exactly 1)"
     fi
+
+    # No dangling import left by the pre-.agents/ layout.
+    c=$(grep -oF -- '@.claude/globalize-rules.md' "$claude" | wc -l | tr -d ' ')
+    if [ "$c" -eq 0 ]; then
+      pass "CLAUDE.md has no stale '@.claude/globalize-rules.md' import"
+    else
+      fail "CLAUDE.md still has $c stale '@.claude/globalize-rules.md' import(s) — install_coding_rules did not strip the old line, so every future session opens with a dangling import"
+    fi
+  fi
+
+  # Bridge 2: AGENTS.md (Codex CLI, Cursor, Copilot, Gemini, Aider, Cline).
+  # A pointer, not an import — AGENTS.md has no import syntax — so all this can
+  # check is that the path is named once and resolves.
+  local agents="$proj/AGENTS.md"
+  if [ ! -f "$agents" ]; then
+    fail "AGENTS.md missing at $agents — install_coding_rules creates it when absent, so nothing points non-Claude agents at the rules"
+  else
+    c=$(grep -oF -- '.agents/globalize-rules.md' "$agents" | wc -l | tr -d ' ')
+    if [ "$c" -eq 1 ]; then
+      pass "AGENTS.md points at .agents/globalize-rules.md exactly once"
+    elif [ "$c" -eq 0 ]; then
+      fail "AGENTS.md does not mention '.agents/globalize-rules.md'"
+    else
+      fail "AGENTS.md mentions '.agents/globalize-rules.md' $c times (expected exactly 1) — the pointer section is not idempotent"
+    fi
+  fi
+
+  # Migration: the old rules file must be gone, not merely superseded. Leaving it
+  # means contributors' agents can still load stale rules from the old path.
+  local old_rules="$proj/.claude/globalize-rules.md"
+  if [ ! -f "$old_rules" ]; then
+    pass "no stale .claude/globalize-rules.md left on disk"
+  else
+    fail ".claude/globalize-rules.md still exists at $old_rules — generate_coding_rules did not migrate it off the pre-.agents/ path"
+  fi
+
+  # A rules file nobody receives is not doing its job.
+  if git -C "$proj" rev-parse --git-dir >/dev/null 2>&1; then
+    if git -C "$proj" check-ignore -q .agents/globalize-rules.md 2>/dev/null; then
+      fail ".agents/globalize-rules.md is gitignored — it is team-shared coding guidance and must be committed"
+    else
+      pass ".agents/globalize-rules.md is not gitignored"
+    fi
+  else
+    info "not a git repo — skipped the gitignore check"
   fi
 
   local lines

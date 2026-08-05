@@ -61,7 +61,7 @@ The orchestrator, on `needs_cleanup`, loops up to **`maxCleanupRounds` (default
    never silently truncate.
 2. **Dispatch a `wrap-cleanup` subagent** over the distinct violating files. Its
    prompt mirrors the Phase 3.2 wrap subagent (same `references.convert` plus the
-   project's coding rules at `.claude/globalize-rules.md`, which Phase 2's core
+   project's coding rules at `.agents/globalize-rules.md`, which Phase 2's core
    `generate_coding_rules` step always produces), with the file list = the recall violations,
    and the note:
    *"These files were MISSED by detection. Wrap genuine user-facing strings per the

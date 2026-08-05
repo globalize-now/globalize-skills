@@ -1,6 +1,6 @@
 # Rails i18n Conversion
 
-Rails-specific guidance for the convert phase. Covers Rails 6.1 → 8.1 projects using the built-in `I18n` API with locale-rooted YAML catalogs. The per-edit authoring rules — `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, `with_locale`, what-not-to-wrap — live in the project's generated coding rules (`.claude/globalize-rules.md`, wired via `@import`). This file is the **mechanics of finding and converting existing hardcoded strings**.
+Rails-specific guidance for the convert phase. Covers Rails 6.1 → 8.1 projects using the built-in `I18n` API with locale-rooted YAML catalogs. The per-edit authoring rules — `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, `with_locale`, what-not-to-wrap — live in the project's generated coding rules (`.agents/globalize-rules.md`, wired into `CLAUDE.md` and `AGENTS.md`). This file is the **mechanics of finding and converting existing hardcoded strings**.
 
 ---
 

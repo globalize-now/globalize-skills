@@ -28,7 +28,7 @@ Not a git repo — staying on current working directory (no branch action).
 **Prefix-based** (`/en/...`, `/es/...`, `/fr/...`) — *applied as default; not explicitly user-confirmed.* Will scaffold `app/[locale]/` layout in Phase 2.
 
 ## Optional setup steps
-- [x] Install passive coding rules (@import in CLAUDE.md) — *applied as default; not explicitly user-confirmed.*
+<!-- Generating the coding rules and wiring them into CLAUDE.md / AGENTS.md are core steps, not decisions — not recorded here. -->
 - [ ] ESLint plugin
 - [ ] CI/CD integration
 - [ ] Test setup wrapper
