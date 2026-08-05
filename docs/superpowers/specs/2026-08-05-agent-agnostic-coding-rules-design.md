@@ -38,12 +38,11 @@ Also out of scope:
 
 - `skills/lovable-i18n` — a backwards-compat copy, maintained in its own repo, and
   it already writes rules into `AGENTS.md` by a different mechanism.
-- The three `rules.template.md` files that `manifest.json` declares but that do not
-  exist on disk yet (`rails.rules.template.md`,
-  `string-catalog.rules.template.md`, `android-strings.rules.template.md`). They
-  are referenced by 5 manifest entries. When they land they inherit the new path
-  from `rules-template-format.md`; their surrounding setup prose *is* in scope,
-  because it already hardcodes `.claude/`.
+
+All seven declared templates exist on disk and match `manifest.json` exactly
+(`lingui`, `next-intl`, `paraglide`, `vue-i18n` as `rules.template.md`; `rails`,
+`string-catalog`, `android-strings` as `<prefix>.rules.template.md`). No template
+body contains `.claude/`, so the tightened self-containment check costs nothing.
 
 ## What lands in the target repo
 
@@ -223,6 +222,15 @@ The seven files carrying "§1.10 gating prose" each state that the `CLAUDE.md`
 import is the opt-in part and that the rules file lands on disk either way. That
 claim is false once `install_coding_rules` becomes core, so those passages are
 rewritten, not substituted.
+
+**Twelve further files carry the same false claim without naming the path**, so a
+`.claude/globalize-rules` grep does not surface them. They are the framework setup
+entry points that dispatch into `setup.add-ons.md`, each ending with "if the user
+selected any optional add-ons in `SKILL.md §1.10` (import the coding rules from
+`CLAUDE.md`, …)": the nine Lingui variants (Next.js App Router; Vite react-swc and
+react-babel; TanStack Start ×2; Remix ×2; React Router framework ×2), both next-intl
+variants (App and Pages Router), and SvelteKit Paraglide. Each gains a sentence
+dispatching to `install_coding_rules` and drops the import from its optional list.
 
 ## Verification
 

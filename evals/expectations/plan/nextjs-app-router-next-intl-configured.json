@@ -6,7 +6,8 @@
   ],
   "phase2StepsContain": [
     "build_verification",
-    "generate_coding_rules"
+    "generate_coding_rules",
+    "install_coding_rules"
   ],
   "phase2StepsContainPattern": [
     "verify_"
