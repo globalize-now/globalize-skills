@@ -340,6 +340,41 @@ case "$VARIANT" in
     else
       fail "Lingui client provider (I18nProvider/LinguiClientProvider) not found"
     fi
+
+    # RSC boundary. `useParams` from next/navigation is client-only via Next's
+    # `react-server` export condition, so a Server Component that imports any
+    # module transitively pulling it in fails the build — at import time, not
+    # invoke time, under both Turbopack and webpack. The App Router therefore
+    # needs the hooks in a separate 'use client' module. Verified against
+    # Next 16.2.1: combined module fails both bundlers, split passes.
+    NAV_PURE=""
+    for c in src/i18n/navigation.ts src/i18n/navigation.js i18n/navigation.ts i18n/navigation.js; do
+      [ -f "$c" ] && NAV_PURE="$c" && break
+    done
+    NAV_HOOKS=""
+    for c in src/i18n/navigation.hooks.ts src/i18n/navigation.hooks.js i18n/navigation.hooks.ts i18n/navigation.hooks.js; do
+      [ -f "$c" ] && NAV_HOOKS="$c" && break
+    done
+
+    if [ -z "$NAV_PURE" ]; then
+      # Cookie-only routing emits no navigation module at all — nothing to check.
+      :
+    elif grep -qE "^import .*from '(next/navigation|next/router)'" "$NAV_PURE"; then
+      fail "$NAV_PURE imports a client-only Next hook — a Server Component importing it fails the build; split the hooks into navigation.hooks.ts"
+    elif grep -qE "^import \{[^}]*\buse[A-Z][A-Za-z]*[^}]*\} from 'react'" "$NAV_PURE"; then
+      fail "$NAV_PURE imports a React hook — keep it pure and move the hooks to navigation.hooks.ts"
+    else
+      pass "Pure navigation module carries no client-hook import"
+      if [ -n "$NAV_HOOKS" ]; then
+        if head -3 "$NAV_HOOKS" | grep -q "use client"; then
+          pass "navigation.hooks module carries the 'use client' directive"
+        else
+          fail "$NAV_HOOKS holds the navigation hooks but lacks the 'use client' directive"
+        fi
+      elif grep -rqE "\buseLocalePath\b" app src 2>/dev/null; then
+        fail "useLocalePath is used but no navigation.hooks module exists"
+      fi
+    fi
     ;;
 
   vite-swc|vite-swc-lingui)

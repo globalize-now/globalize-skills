@@ -91,7 +91,7 @@ Known limitation worth stating to the user if it applies: a top-level route whos
 
 ### The hooks half
 
-Append to the same file. Only `useLocale` differs per framework; everything below it is identical everywhere.
+On every stack **except the Next.js App Router**, append this to the same file. On the Next.js App Router it goes in a separate `'use client'` module instead — see "One module or two" below before you write it. Only `useLocale` differs per framework; everything below it is identical everywhere.
 
 ```ts
 export function useLocale(): Locale { /* per framework — table below */ }
@@ -102,7 +102,7 @@ export function useLocalePath(): (path: string) => string {
 }
 ```
 
-Add `import { useCallback } from 'react'` and `import { resolveLocale } from './locales'` to the file header. `useCallback` is not decoration — without it, every consumer passing `localePath` down to a memoized child re-renders on each parent render.
+Add `import { useCallback } from 'react'` and `import { resolveLocale } from './locales'` to whichever file holds the hooks — plus `import { localePath } from './navigation'` when that file is the separate Next.js one. `useCallback` is not decoration — without it, every consumer passing `localePath` down to a memoized child re-renders on each parent render.
 
 | Stack | `useLocale()` body |
 |---|---|
@@ -122,14 +122,29 @@ Three notes on why these bodies are what they are:
 
 ### One module or two
 
-Keep the pure functions and the hooks in one unmarked `navigation.ts` — no `'use client'`, no `.client.ts` / `.server.ts` suffix. Next.js only errors when a client hook is *invoked* during a server render, not when its module is imported, and on React Router v7 and Remix a `.client.ts` suffix is a bundler directive that would strip `useLocalePath` from the server bundle and break SSR.
+**Next.js App Router — split it in two.** `useParams` from `next/navigation` is client-only via Next's `react-server` export condition, so a Server Component that imports *any* module transitively importing it fails the build. This is an **import-time** error, not an invoke-time one, and both Turbopack and webpack raise it:
 
-**Do not import this module from Next.js middleware or `proxy.ts`.** Middleware runs on the Edge runtime and does not need it — it builds paths from the `locales.ts` constants directly. If a Next build ever objects to the mixed module, split it into `navigation.ts` (pure) and `navigation.hooks.ts`, and say so in the progress file so the coding-rules step points at the right specifier.
+> You're importing a module that depends on `useParams` into a React Server Component module.
+
+Emit two files on this stack:
+
+| File | Directive | Exports |
+|---|---|---|
+| `<i18nDir>/navigation.ts` | none | `stripLocalePrefix`, `localePath`, `switchLocalePath` |
+| `<i18nDir>/navigation.hooks.ts` | `'use client'` | `useLocale`, `useLocalePath` |
+
+`navigation.hooks.ts` imports `localePath` from the pure module. Mark it `'use client'`: it is only ever imported by client components, and the directive turns a future accidental server import into a clear boundary error rather than a confusing one. Record the split in the progress file so the coding-rules step resolves `navHooksModule` to the `…/navigation.hooks` specifier.
+
+next-intl looks like a counter-example — its own `i18n/navigation.ts` mixes both halves. It gets away with it because the `next-intl` package ships separate `react-server` / `react-client` entry points in its export map. A module living inside the project has no such escape hatch, so the precedent does not transfer.
+
+**Every other stack — one unmarked `navigation.ts`**, no `'use client'`, no `.client.ts` / `.server.ts` suffix. React Router v7, Remix, Vite and TanStack have no RSC boundary, so the mixed module is correct there; a `.client.ts` suffix would be actively harmful, since it is a bundler directive that strips `useLocalePath` from the server bundle and breaks SSR.
+
+**Do not import the navigation module from Next.js middleware or `proxy.ts`.** Middleware runs on the Edge runtime and does not need it — it builds paths from the `locales.ts` constants directly.
 
 ## 5. Using it
 
 ```tsx
-// Inside a React component
+// Inside a React component — '<specifier>/navigation.hooks' on the Next.js App Router
 import { useLocalePath } from '<specifier>/navigation'
 const localePath = useLocalePath()
 <Link href={localePath('/about')}>About</Link>      // `href` on Next.js, `to` on React Router / Remix

@@ -8,9 +8,9 @@ description: >-
   numbers, currencies, dates, and plurals are wrapped correctly as code is
   written, so nothing needs fixing after the fact.
 template: lingui
-templateVersion: 2
+templateVersion: 3
 conditions: [router, perPageCatalogs, localeNavigation]
-values: [catalogPath, sourceLocale, targetLocales, localesModule, navModule]
+values: [catalogPath, sourceLocale, targetLocales, localesModule, navModule, navHooksModule]
 budget: { "router == \"app\"": 260, "default": 235 }
 # Never add a value named `locale`: the typed-links block contains `params={{ locale }}`
 # inside a fence, which the template linter would then flag as a `{{ }}` placeholder.
@@ -166,7 +166,7 @@ Import these from `<<localesModule>>` rather than re-deriving them inline:
 
 ## Locale-aware URLs
 
-Every internal path carries the active locale. `<<navModule>>` is the only place that knows this project's URL shape — never build a locale prefix with a template literal.
+Every internal path carries the active locale; never build a locale prefix with a template literal. Pure helpers: `<<navModule>>`. Hooks: `<<navHooksModule>>`.
 
 | Context | Use |
 |---------|-----|
@@ -177,7 +177,7 @@ Every internal path carries the active locale. `<<navModule>>` is the only place
 | A path with its locale prefix removed | `stripLocalePrefix(pathname).pathname` |
 
 ```tsx
-import { useLocalePath } from '<<navModule>>'
+import { useLocalePath } from '<<navHooksModule>>'
 const localePath = useLocalePath()
 <Link href={localePath('/about')}>About</Link>   // `href` on Next.js, `to` on React Router / Remix
 ```
@@ -194,7 +194,7 @@ Routes carry the locale as a `$locale` path param. Do **not** wrap TanStack Rout
 
 ```tsx
 import { Link } from '@tanstack/react-router'
-import { useLocale } from '<<navModule>>'
+import { useLocale } from '<<navHooksModule>>'
 const locale = useLocale()
 <Link to="/$locale/about" params={{ locale }}>About</Link>
 ```
