@@ -8,10 +8,10 @@ description: >-
   user-invocable. Ensures strings, plurals, interpolation, escaping, and
   do-not-translate runs are authored correctly as code is written.
 template: android-strings
-templateVersion: 1
+templateVersion: 2
 conditions: [uiToolkit, localeSwitcher]
 values: [resDir, sourceLocale, targetLocales]
-budget: { "default": 140 }
+budget: { "default": 180 }
 ---
 
 # Android String-Resource Coding Rules
@@ -109,6 +109,43 @@ Pass the count **twice**: once selects the category, once fills `%1$d`. Language
 Arabic, Czech, Ukrainian need additional categories (`few`/`many`/`zero`) — add the `<item>`s in those locales'
 files. **Never** pick between strings with `if (n == 1)` — it bakes English grammar into the code and breaks
 languages with more than two forms.
+
+## Numbers, currencies, dates — format, never concatenate
+
+`"$" + amount` hardcodes both the symbol and its position — many locales put it after the number — and
+`String.format("%.2f", amount)` renders `1234.50` with the wrong separators. Format through the framework,
+using the locale the resources actually resolved to:
+
+<!-- if: uiToolkit != "compose" -->
+- Views/Kotlin — `val locale = resources.configuration.locales[0]`
+<!-- /if -->
+<!-- if: uiToolkit != "views" -->
+- Compose — `val locale = LocalConfiguration.current.locales[0]`
+<!-- /if -->
+
+```kotlin
+NumberFormat.getCurrencyInstance(locale).apply { currency = Currency.getInstance("USD") }.format(amount)
+NumberFormat.getInstance(locale).format(count)
+NumberFormat.getPercentInstance(locale).format(ratio)
+
+DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale).format(date)
+DateUtils.formatDateTime(context, millis, FORMAT_SHOW_DATE or FORMAT_SHOW_TIME)
+```
+
+**The currency code is a property of the price, not of the reader.** Set it explicitly from your data
+(`Currency.getInstance("USD")`); never leave it defaulting to the device locale's currency, which would
+relabel a dollar price as euros for a German user. The locale decides *formatting*, the data decides *which
+currency*.
+
+**Never hardcode a date pattern.** `SimpleDateFormat("MM/dd/yyyy")` forces American field order everywhere.
+Use `FormatStyle` with `DateTimeFormatter`, or `DateUtils.formatDateTime()` — the latter also honours the
+user's 12/24-hour system setting, which a pattern string cannot.
+
+Format the value first, then pass the **formatted string** into the resource as `%1$s` — not `%1$d` / `%1$f`,
+which format the raw number without going through the locale-aware formatter.
+
+**Flag for review:** `"$" + amount`, `String.format("%.2f", price)`, `SimpleDateFormat("…")`, and any raw
+number or date interpolated into a Kotlin template that reaches the UI.
 
 ## Escaping and markup
 

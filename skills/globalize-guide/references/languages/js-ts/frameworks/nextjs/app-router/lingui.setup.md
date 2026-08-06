@@ -439,7 +439,7 @@ The 301 ensures search engines and browsers cache the redirect. Since the target
 
 **Only for Strategy 1 and 2.** If the user chose Option 3, skip this section.
 
-With the `[locale]` directory structure, all internal links must include the locale prefix. **`setup.navigation.md` owns this** — it creates `src/i18n/navigation.ts` with `useLocalePath()` for client components and a pure `localePath(path, locale)` for everywhere hooks don't run. Do not write a locale-prefixing helper here.
+With the `[locale]` directory structure, all internal links must include the locale prefix. **`setup.navigation.md` owns this.** On this stack it creates *two* modules: a pure `src/i18n/navigation.ts` (`localePath(path, locale)`, `switchLocalePath`, `stripLocalePrefix`) and a `'use client'` `src/i18n/navigation.hooks.ts` (`useLocale()`, `useLocalePath()`). The split is mandatory here — `useParams` is client-only, so a Server Component importing a module that pulls it in fails the build. Do not write a locale-prefixing helper here, and do not merge the two files.
 
 What this file is responsible for is the Next-specific consumption:
 
@@ -447,7 +447,7 @@ What this file is responsible for is the Next-specific consumption:
 // src/app/Navigation.tsx — client component
 'use client'
 import Link from 'next/link'
-import { useLocalePath } from '../i18n/navigation'
+import { useLocalePath } from '../i18n/navigation.hooks'
 
 export function Navigation() {
   const localePath = useLocalePath()
@@ -552,7 +552,8 @@ The component is a client component (`'use client'`), reads the current locale w
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { locales, localeDisplayName } from '../../i18n/locales'
-import { useLocale, switchLocalePath } from '../../i18n/navigation'
+import { switchLocalePath } from '../../i18n/navigation'
+import { useLocale } from '../../i18n/navigation.hooks'
 
 export function LanguageSwitcher() {
   const pathname = usePathname()
