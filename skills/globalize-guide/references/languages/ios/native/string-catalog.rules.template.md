@@ -9,10 +9,10 @@ description: >-
   format specifiers and plurals are authored correctly, translator comments are
   attached, and non-UI strings are left alone as code is written.
 template: string-catalog
-templateVersion: 1
+templateVersion: 2
 conditions: [uiFramework, bundleScope]
 values: [catalogPath, sourceLocale, targetLocales]
-budget: { "uiFramework == \"swiftui\"": 165, "default": 135 }
+budget: { "uiFramework == \"swiftui\"": 195, "default": 165 }
 ---
 
 # Apple String Catalog Coding Rules
@@ -177,6 +177,34 @@ The catalog entry (this is real `xcstringstool` output — author this exact sha
 ```
 
 Always include `other` — it is the required fallback every language uses, and the only category English uses alongside `one`. Other languages may need additional categories (`few`/`many` for Russian/Polish, etc.); a translator supplies them per locale. Do not pick between two translated strings with a Swift `if count == 1` conditional — that breaks every language with more than two plural forms.
+
+## Numbers, currencies, dates — format, never interpolate raw
+
+A raw `\(value)` renders `1234.5` and `2026-03-04 15:30:00 +0000` in every language. Format through Foundation so separators, currency placement, and date field order follow the reader's locale:
+
+```swift
+amount.formatted(.currency(code: "USD"))   // $1,234.50 · 1.234,50 $ · 1 234,50 $US
+count.formatted()                          // 1,234 · 1.234 · 1 234
+ratio.formatted(.percent)                  // 25.6% · 25,6 %
+date.formatted(date: .abbreviated, time: .omitted)
+date.formatted(date: .abbreviated, time: .shortened)
+```
+
+**The currency code is a property of the price, not of the reader.** Pass the currency your data actually carries (`"USD"`, `"EUR"`); never derive it from `Locale.current`, which would relabel a dollar price as euros for a German reader. The locale decides *formatting*; your data decides *which currency*.
+
+Interpolating an already-formatted value into a localized string is correct — it extracts as `%@`:
+
+```swift
+String(localized: "Total: \(amount.formatted(.currency(code: "USD")))")
+```
+
+**Never hardcode a date format string.** `DateFormatter().dateFormat = "MM/dd/yyyy"` forces American field order on every locale. Below the `.formatted()` availability floor (iOS 15 / macOS 12), set `dateStyle` / `timeStyle`, or use `setLocalizedDateFormatFromTemplate(_:)` for a specific field set — and **cache the formatter**, since constructing `DateFormatter` / `NumberFormatter` per call is a well-known performance trap.
+<!-- if: uiFramework == "swiftui" -->
+
+In SwiftUI prefer the `format:` initializer over formatting into a `String` — it re-formats automatically when the environment locale changes: `Text(amount, format: .currency(code: "USD"))`, `Text(date, format: .dateTime.day().month().year())`.
+<!-- /if -->
+
+**Flag for review:** `String(format: "%.2f", price)`, `"$\(amount)"`, `dateFormat = "…"`, and any raw number or `Date` interpolated straight into user-visible copy.
 
 ## Don't fight the serializer
 
