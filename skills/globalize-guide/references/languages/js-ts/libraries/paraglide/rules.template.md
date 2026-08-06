@@ -8,9 +8,9 @@ description: >-
   strings, numbers, currencies, dates, plurals, and translator comments are
   authored correctly as code is written.
 template: paraglide
-templateVersion: 1
+templateVersion: 2
 conditions: [catalogFormat, ssr]
-values: [catalogPath, sourceCatalog, sourceLocale, targetLocales, paraglideImportBase, hooksServerPath]
+values: [catalogPath, sourceCatalog, sourceLocale, targetLocales, paraglideImportBase, hooksServerPath, formatModule]
 budget: { "default": 200 }
 ---
 
@@ -234,16 +234,17 @@ const locale = getLocale()
 
 ## Numbers, currencies, dates
 
-Paraglide ships no number/date formatting helper. Format with the platform `Intl` APIs, passing the active locale from `getLocale()`:
+Paraglide has no formatting API. `<<formatModule>>` holds this project's presets and reads the active locale itself — never construct `Intl` at a call site:
 
 ```ts
-import { getLocale } from '<<paraglideImportBase>>/runtime.js'
-
-new Intl.NumberFormat(getLocale(), { style: 'currency', currency: 'USD' }).format(amount)
-new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium' }).format(new Date(timestamp))
+import { formatCurrency, formatDate } from '<<formatModule>>'
+formatCurrency(amount)   // not new Intl.NumberFormat(getLocale(), { style: 'currency', … })
+formatDate(timestamp)
 ```
 
-**Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`'$' + price`), hardcoded date format strings like `'MM/DD/YYYY'`.
+Need a format it has no preset for? Add one to `<<formatModule>>` — a currency code or date style written out at two call sites will drift.
+
+**Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`'$' + price`), hardcoded date formats like `'MM/DD/YYYY'`, any `new Intl.` outside `<<formatModule>>`.
 <!-- if: catalogFormat == "po" -->
 
 ## ICU-mode caveats (footguns)

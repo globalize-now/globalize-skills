@@ -208,16 +208,18 @@ Only wrap fields that are rendered as **copy**. IDs, slugs, and raw API payloads
 
 ## Numbers, currencies, dates
 
-Paraglide ships no formatting helper. Format with the platform `Intl` APIs, passing the active locale from `getLocale()`:
+Paraglide has no formatting API of its own, so setup created `src/lib/format.ts` with the project's presets. **Call those helpers — never construct `Intl` at a call site.** They read the active locale themselves, so nothing needs `getLocale()`:
 
 ```ts
-import { getLocale } from '$lib/paraglide/runtime.js'
+import { formatCurrency, formatDate } from '$lib/format'
 
-new Intl.NumberFormat(getLocale(), { style: 'currency', currency: 'USD' }).format(amount)
-new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium' }).format(new Date(timestamp))
+formatCurrency(amount)     // not new Intl.NumberFormat(getLocale(), { style: 'currency', … })
+formatDate(timestamp)
 ```
 
-When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), and hardcoded date formats (`'MM/DD/YYYY'`). Details in `paraglide/rules.template.md`. (ICU `number` skeletons inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup — prefer `Intl` for dates/times.)
+If a value needs a format the module has no preset for, **add the preset to `src/lib/format.ts`** and call it — do not inline an options object. A currency code or date style written out at two call sites will drift.
+
+When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), hardcoded date formats (`'MM/DD/YYYY'`), and any existing `new Intl.` construction outside the format module — a project that already hand-rolls `formatPrice()` should have that function rewritten to delegate to `formatCurrency()`, not have its call sites rewritten. Details in `paraglide/rules.template.md`. (ICU `number` skeletons inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup — prefer the format module for dates/times.)
 
 ---
 
