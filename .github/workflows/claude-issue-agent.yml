@@ -52,6 +52,10 @@ jobs:
           # subscription (no per-token billing); API key bills per-token.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Allow these bot accounts to trigger the action (default: humans
+          # only). Use "*" to allow all bots. Tighten if other bots also label
+          # your issues and you don't want them firing the agent.
+          allowed_bots: "claude"
           # Always give the agent the same instruction: load the playbook and act
           # accordingly. The action automatically passes the triggering issue +
           # comment as context, so the playbook's "Phase 4 — follow-up" rules
