@@ -249,6 +249,61 @@ if [ -n "$I18N_FILES" ]; then
   fi
 fi
 
+# 2.4 The shared helper modules are single-sourced.
+#
+# The shared Lingui setup references own everything under the i18n module directory;
+# framework references import from it and never redeclare. These checks are the
+# regression test for that — before the split, getDirection was emitted 19 times
+# across the reference set, 7 of those copies unexported and therefore unusable.
+
+SRC_ROOTS=$(ls -d app src 2>/dev/null || true)
+if [ -n "$SRC_ROOTS" ]; then
+  RTL_HITS=$(grep -rl "RTL_LOCALES" $SRC_ROOTS 2>/dev/null || true)
+  RTL_COUNT=$(printf '%s' "$RTL_HITS" | grep -c . || true)
+  if [ "$RTL_COUNT" -eq 0 ]; then
+    warn "No RTL_LOCALES / getDirection found — expected it in the locale module"
+  elif [ "$RTL_COUNT" -eq 1 ] && echo "$RTL_HITS" | grep -q "i18n"; then
+    pass "getDirection defined once, in the i18n locale module"
+    if grep -q "export function getDirection" $RTL_HITS 2>/dev/null; then
+      pass "getDirection is exported"
+    else
+      fail "getDirection is not exported — callers cannot reuse it ($RTL_HITS)"
+    fi
+  else
+    fail "getDirection/RTL_LOCALES defined in $RTL_COUNT places, expected 1 under */i18n/: $(echo "$RTL_HITS" | tr '\n' ' ')"
+  fi
+
+  DN_HITS=$(grep -rl "new Intl.DisplayNames" $SRC_ROOTS 2>/dev/null || true)
+  DN_COUNT=$(printf '%s' "$DN_HITS" | grep -c . || true)
+  if [ "$DN_COUNT" -le 1 ]; then
+    pass "Intl.DisplayNames constructed in at most one module ($DN_COUNT)"
+  else
+    fail "Intl.DisplayNames hand-built in $DN_COUNT files — use localeDisplayName(): $(echo "$DN_HITS" | tr '\n' ' ')"
+  fi
+
+  # Locale-prefixed URLs must go through the navigation module, never a template literal.
+  INLINE_PREFIX=$(grep -rl '`/\${locale}' $SRC_ROOTS 2>/dev/null | grep -v "i18n" || true)
+  if [ -z "$INLINE_PREFIX" ]; then
+    pass "No inline \`/\${locale}/…\` path building outside the i18n module"
+  else
+    warn "Inline locale-prefixed paths outside the i18n module: $(echo "$INLINE_PREFIX" | tr '\n' ' ')"
+  fi
+fi
+
+# 2.5 No flat/dir collision on the Vite variants. `src/i18n.ts` shadows
+# `src/i18n/index.ts` in Vite's and Node's resolution order, so leaving both on
+# disk means every import silently keeps resolving to the stale flat module.
+if [ -f src/i18n.ts ] || [ -f src/i18n.tsx ]; then
+  if [ -d src/i18n ]; then
+    fail "Both src/i18n.ts and src/i18n/ exist — the flat file shadows the directory"
+  else
+    warn "Flat src/i18n.ts present — the current reference emits src/i18n/"
+  fi
+fi
+if [ -f src/localePath.ts ]; then
+  fail "src/localePath.ts is superseded by the i18n navigation module"
+fi
+
 # ─── Variant-specific checks ───
 
 echo ""
@@ -320,6 +375,66 @@ case "$VARIANT" in
       pass "Lingui provider found in source"
     else
       fail "Lingui provider not found in source"
+    fi
+    ;;
+
+  remix-babel-lingui|remix-swc-lingui|react-router-framework-babel-lingui|react-router-framework-swc-lingui)
+    # Both stacks put the i18n runtime under app/i18n/.
+    if [ -f app/i18n/locales.ts ] || [ -f app/i18n/locales.js ]; then
+      pass "app/i18n/locales.ts (shared locale module) exists"
+    else
+      fail "app/i18n/locales.ts not found — the shared locale module was not emitted"
+    fi
+    if [ -f app/i18n/locale.server.ts ]; then
+      pass "app/i18n/locale.server.ts (server-only cookie/header helpers) exists"
+    else
+      fail "app/i18n/locale.server.ts not found"
+    fi
+    # getDirection must NOT be in the .server module — it is stripped from the
+    # client bundle, so a dir-sensitive client component could not import it.
+    if grep -q "getDirection" app/i18n/locale.server.ts 2>/dev/null; then
+      fail "getDirection is in locale.server.ts — client code cannot import it; move it to locales.ts"
+    else
+      pass "getDirection is not trapped in the server-only module"
+    fi
+    if grep -q "@lingui/vite-plugin" vite.config.ts 2>/dev/null; then
+      pass "@lingui/vite-plugin in vite.config.ts"
+    else
+      fail "@lingui/vite-plugin not found in vite.config.ts"
+    fi
+    if grep -rqE "I18nProvider|LinguiClientProvider" app 2>/dev/null; then
+      pass "Lingui provider found in app/"
+    else
+      fail "Lingui provider not found in app/"
+    fi
+    ;;
+
+  tanstack-start-babel-lingui|tanstack-start-swc-lingui)
+    if [ -f src/i18n/locales.ts ] || [ -f src/i18n/locales.js ]; then
+      pass "src/i18n/locales.ts (shared locale module) exists"
+    else
+      fail "src/i18n/locales.ts not found — the shared locale module was not emitted"
+    fi
+    if [ -f src/start.ts ]; then
+      pass "src/start.ts (global request middleware) exists"
+    else
+      fail "src/start.ts not found — locale middleware not registered"
+    fi
+    if grep -q "@lingui/vite-plugin" vite.config.ts 2>/dev/null; then
+      pass "@lingui/vite-plugin in vite.config.ts"
+    else
+      fail "@lingui/vite-plugin not found in vite.config.ts"
+    fi
+    if grep -rqE "I18nProvider|LinguiClientProvider" src 2>/dev/null; then
+      pass "Lingui provider found in src/"
+    else
+      fail "Lingui provider not found in src/"
+    fi
+    # The i18n module must not import the route tree — that inverts the dependency.
+    if grep -rq "routes/__root" src/i18n 2>/dev/null; then
+      fail "src/i18n/ imports the route tree — use useParams({ strict: false }) instead"
+    else
+      pass "src/i18n/ does not depend on the route tree"
     fi
     ;;
 

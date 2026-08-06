@@ -1,5 +1,8 @@
 # Remix v2 Setup (Babel)
 
+> This is one of three setup references for this stack — read them in the order `references.setup` lists. `setup.locale-module.md` runs first and owns `app/i18n/locales.ts`; `setup.navigation.md` runs last and owns `app/i18n/navigation.ts` plus the language switcher. **This file imports those modules and never defines them.**
+
+
 This covers projects built on [Remix v2](https://remix.run/) (`@remix-run/*` ≥ 2.7) using the Vite-based build. Remix renders HTML on every request via its `loader` chain, so locale must be resolved server-side to avoid hydration mismatches and flash-of-untranslated-content (FOUC). The setup leans on Remix's native primitives: a root `loader` resolves the locale (cookie → `Accept-Language` → source-locale fallback), `<html lang>` is rendered from that loader's data, and per-route `loader`s import their own compiled catalog on demand.
 
 **Detection signal:** any `@remix-run/*` runtime package in `dependencies`, `@remix-run/dev` ≥ 2.7 in `devDependencies`, and `vite` in `devDependencies` (the Vite-based build is required — the classic compiler is not supported). Babel variant: `@vitejs/plugin-react` (no `-swc` suffix) in `devDependencies`. Remix v1 and the classic (pre-Vite) compiler are rejected upstream by the orchestrator's hard-stop in `SKILL.md §1.2`.
@@ -129,28 +132,16 @@ Ignoring the compiled catalogs is only safe because `lingui compile` runs before
 
 ## Locale Resolution at the Edge
 
-Remix has no built-in i18n primitive — locale resolution lives entirely in the root `loader`. Create a shared locale module that holds the configured locales, validates incoming strings, and exposes the cookie session helper:
+Remix has no built-in i18n primitive — locale resolution lives entirely in the root `loader`.
+
+`app/i18n/locales.ts` — `sourceLocale`, `locales`, `Locale`, `resolveLocale`, `getDirection` — is created by `setup.locale-module.md` before this file runs. Confirm it is on disk; do not declare a second copy here.
+
+Now create the cookie session storage. A cookie-backed session is enough — we only need to read and write a single `locale` field. `pickFromAcceptLanguage` lives here rather than in `locales.ts`: it parses a request header, so it is server-only, like everything else in this file:
 
 ```ts
-// app/i18n/locales.ts
-export const sourceLocale = 'en'
-export const locales = ['en'] as const
-export type Locale = (typeof locales)[number]
-
-const RTL_LOCALES = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'yi'])
-
-export function getDirection(locale: string): 'ltr' | 'rtl' {
-  return RTL_LOCALES.has(locale.split('-')[0]) ? 'rtl' : 'ltr'
-}
-
-export function resolveLocale(raw: string | undefined | null): Locale {
-  if (!raw) return sourceLocale
-  if ((locales as readonly string[]).includes(raw)) return raw as Locale
-  // Regional fallback: es-MX → es
-  const base = raw.split('-')[0]
-  if ((locales as readonly string[]).includes(base)) return base as Locale
-  return sourceLocale
-}
+// app/i18n/locale.server.ts
+import { createCookieSessionStorage } from '@remix-run/node'
+import { resolveLocale, type Locale } from './locales'
 
 export function pickFromAcceptLanguage(header: string | null): string | undefined {
   if (!header) return undefined
@@ -158,14 +149,6 @@ export function pickFromAcceptLanguage(header: string | null): string | undefine
   // so taking the first segment is sufficient for the common case.
   return header.split(',')[0]?.split(';')[0]?.trim()
 }
-```
-
-Now create the cookie session storage. A cookie-backed session is enough — we only need to read and write a single `locale` field:
-
-```ts
-// app/i18n/locale.server.ts
-import { createCookieSessionStorage } from '@remix-run/node'
-import { pickFromAcceptLanguage, resolveLocale, type Locale } from './locales'
 
 const { getSession, commitSession } = createCookieSessionStorage<{ locale: Locale }>({
   cookie: {
@@ -493,55 +476,35 @@ import type { ActionFunctionArgs } from '@remix-run/node'
 import { redirect } from '@remix-run/node'
 import { writeLocaleCookie } from '../i18n/locale.server'
 import { resolveLocale } from '../i18n/locales'
+import { switchLocalePath } from '../i18n/navigation'
 
 export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData()
   const locale = resolveLocale(String(form.get('locale') ?? ''))
   const returnTo = String(form.get('returnTo') ?? '/')
   const setCookie = await writeLocaleCookie(locale)
-  return redirect(rewriteReturnTo(returnTo, locale), {
+  const url = new URL(returnTo, 'http://placeholder')
+  return redirect(switchLocalePath(url.pathname, locale) + url.search, {
     headers: { 'Set-Cookie': setCookie },
   })
 }
-
-function rewriteReturnTo(returnTo: string, locale: string): string {
-  // Strategy C (cookie-only) — return as-is.
-  // Strategies A/B may override this to swap the prefix; see the strategy notes below.
-  return returnTo
-}
 ```
 
-For Strategy A and B, `rewriteReturnTo` should swap the locale prefix on the path so the redirect target carries the new locale. Replace the function body with:
+`switchLocalePath` (from `app/i18n/navigation.ts`) strips whatever locale prefix `returnTo` carries and applies the new one, encoding the chosen strategy in one place — so this action is identical under Strategy A and Strategy B.
 
-```ts
-function rewriteReturnTo(returnTo: string, locale: string): string {
-  const url = new URL(returnTo, 'http://placeholder')
-  const segments = url.pathname.split('/').filter(Boolean)
-  if (segments[0] && (locales as readonly string[]).includes(segments[0])) {
-    segments.shift() // drop existing prefix
-  }
-  // Strategy A: source-locale URLs stay bare.
-  const needsPrefix = locale !== sourceLocale // Strategy A
-  // For Strategy B, replace the previous line with: const needsPrefix = true
-  const prefixed = needsPrefix ? `/${locale}/${segments.join('/')}` : `/${segments.join('/')}`
-  return prefixed.replace(/\/+$/, '') + url.search || '/'
-}
-```
-
-(Import `locales` and `sourceLocale` from `../i18n/locales` at the top of `set-locale.ts`.) Use the `needsPrefix = true` variant for Strategy B; keep the `locale !== sourceLocale` check for Strategy A.
+**Strategy C only:** there is no navigation module, and no prefix to swap. Redirect to `returnTo` unchanged and drop the `switchLocalePath` import.
 
 Now the switcher itself, placed inside the root layout (or a shared header component):
 
 ```tsx
 // app/components/LanguageSwitcher.tsx
-import { Form, useLocation, useLoaderData } from '@remix-run/react'
-import { locales } from '../i18n/locales'
-import type { loader as rootLoader } from '../root'
+import { Form, useLocation } from '@remix-run/react'
+import { locales, localeDisplayName } from '../i18n/locales'
+import { useLocale } from '../i18n/navigation'
 
 export function LanguageSwitcher() {
-  const { locale: currentLocale } = useLoaderData<typeof rootLoader>()
+  const currentLocale = useLocale()
   const location = useLocation()
-  const displayNames = new Intl.DisplayNames([currentLocale], { type: 'language' })
 
   return (
     <Form method="post" action="/set-locale" style={{ display: 'flex', gap: '0.5rem' }}>
@@ -560,7 +523,7 @@ export function LanguageSwitcher() {
             fontWeight: loc === currentLocale ? 600 : 400,
           }}
         >
-          {displayNames.of(loc) ?? loc}
+          {localeDisplayName(loc)}
         </button>
       ))}
     </Form>
@@ -570,7 +533,7 @@ export function LanguageSwitcher() {
 
 The `name="locale"` on each submit button is how form submission picks which locale to write — only the clicked button's value is sent. `returnTo` is captured from the current URL so the redirect lands the user back where they were, in the new locale.
 
-If `useLoaderData<typeof rootLoader>()` produces a TypeScript error about importing across route boundaries, add `// eslint-disable-next-line import/no-relative-packages` or fall back to `useRouteLoaderData('root')` from `@remix-run/react`. Both patterns are supported in Remix v2.
+`useLocale()` reads the root loader's data via `useRouteLoaderData('root')`, so the switcher works wherever it is mounted — including under a child route, where `useLoaderData()` would have returned that route's data instead and silently produced the wrong locale.
 
 Wire the switcher into `root.tsx`:
 
@@ -597,34 +560,11 @@ If the project already has a header or navigation component, place `<LanguageSwi
 
 **Only relevant for Strategy A and B.** If the user chose Strategy C, skip — URLs don't change between locales.
 
-Remix's `<Link>` and `<NavLink>` from `@remix-run/react` accept a plain string `to`, so a hook that prefixes paths with the current locale is the cleanest approach. It works for `<Link>`, `<NavLink>`, `<a href>`, `redirect()`, and `useNavigate()`.
-
-```ts
-// app/i18n/useLocalePath.ts
-import { useLoaderData } from '@remix-run/react'
-import { sourceLocale } from './locales'
-import type { loader as rootLoader } from '../root'
-
-export function useLocalePath() {
-  const { locale } = useLoaderData<typeof rootLoader>()
-
-  return function localePath(path: string): string {
-    const normalized = path.startsWith('/') ? path : `/${path}`
-    // Strategy A: source-locale paths stay bare.
-    if (locale === sourceLocale) return normalized
-    // Strategy B variant: drop the `locale === sourceLocale` early return — every locale gets a prefix.
-    return `/${locale}${normalized}`
-  }
-}
-```
-
-For Strategy B, remove the `if (locale === sourceLocale) return normalized` line so every locale gets a prefix.
-
-Usage:
+Remix's `<Link>` and `<NavLink>` from `@remix-run/react` accept a plain string `to`. `app/i18n/navigation.ts` — owned by `setup.navigation.md` — supplies `useLocalePath()` for components and a pure `localePath(path, locale)` for loaders, actions and `redirect()`. Do not build a path helper here.
 
 ```tsx
 import { Link } from '@remix-run/react'
-import { useLocalePath } from '~/i18n/useLocalePath'
+import { useLocalePath } from '~/i18n/navigation'
 
 export function Navigation() {
   const localePath = useLocalePath()
@@ -637,6 +577,8 @@ export function Navigation() {
 }
 ```
 
+Both forms bake in the chosen strategy, so nothing here differs between Strategy A and Strategy B.
+
 ### Existing link migration
 
 Tell the user:
@@ -646,11 +588,22 @@ Tell the user:
 > - `<NavLink to="/...">` — same wrapping
 > - `<a href="/...">` with internal paths — convert to `<Link>` with `localePath()`
 > - `navigate('/...')` / `useNavigate()` calls — wrap the path with `localePath()`
-> - `redirect('/...')` inside loaders/actions — prefix with the current locale: `` redirect(`/${locale}/...`) ``
+> - `redirect('/...')` inside loaders/actions — use the two-argument form: `redirect(localePath('/...', locale))`
+> - any `` `/${locale}/...` `` template literal already in the codebase — replace it with `localePath(...)`
 >
 > Navigation components (headers, sidebars, footers) are the highest priority since they appear on every page.
 
-For server-side `redirect()` inside loaders, `useLocalePath()` doesn't apply (it's a hook). Either prefix the path inline (`` redirect(`/${locale}${path}`) ``) or extract a tiny `localePathServer(locale, path)` helper alongside the hook.
+`useLocalePath()` is a hook, so it cannot run inside a loader or action. Import the pure `localePath` from the same module and pass the locale the loader already resolved:
+
+```ts
+import { redirect } from '@remix-run/node'
+import { localePath } from '~/i18n/navigation'
+
+export async function action({ request }: ActionFunctionArgs) {
+  const locale = await readLocale(request)
+  return redirect(localePath('/dashboard', locale))
+}
+```
 
 ## SEO
 

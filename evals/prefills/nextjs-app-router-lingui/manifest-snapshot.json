@@ -3,11 +3,15 @@
   "match": { "framework": "next", "router": "app", "library": "lingui" },
   "supportLevel": "stable",
   "packages": {
-    "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/macro@^5"],
+    "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
     "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6"]
   },
   "references": {
-    "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md"],
+    "setup": [
+      "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
+      "references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md",
+      "references/languages/js-ts/libraries/lingui/setup.navigation.md"
+    ],
     "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.convert.md"],
     "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
   }
