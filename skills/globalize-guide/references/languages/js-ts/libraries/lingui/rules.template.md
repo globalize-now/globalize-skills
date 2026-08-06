@@ -8,10 +8,12 @@ description: >-
   numbers, currencies, dates, and plurals are wrapped correctly as code is
   written, so nothing needs fixing after the fact.
 template: lingui
-templateVersion: 1
-conditions: [router, perPageCatalogs]
-values: [catalogPath, sourceLocale, targetLocales]
-budget: { "router == \"app\"": 230, "default": 200 }
+templateVersion: 2
+conditions: [router, perPageCatalogs, localeNavigation]
+values: [catalogPath, sourceLocale, targetLocales, localesModule, navModule]
+budget: { "router == \"app\"": 260, "default": 235 }
+# Never add a value named `locale`: the typed-links block contains `params={{ locale }}`
+# inside a fence, which the template linter would then flag as a `{{ }}` placeholder.
 ---
 
 # LinguiJS Coding Rules
@@ -95,9 +97,9 @@ Lingui auto-names a placeholder only when the interpolated value is a **bare var
 
 ```tsx
 const name = user.name
-t`Welcome back, ${name}!`                                                               // ✅ "{name}", not {0}
-t`Total: ${i18n.number(amount, { style: 'currency', currency: 'USD' })}`                // ❌ "Total: {0}"
-t`Total: ${ph({ total: i18n.number(amount, { style: 'currency', currency: 'USD' }) })}` // ✅ "Total: {total}"
+t`Welcome back, ${name}!`                                 // ✅ "{name}", not {0}
+t`Total: ${i18n.number(amount, CURRENCY)}`                // ❌ "Total: {0}"
+t`Total: ${ph({ total: i18n.number(amount, CURRENCY) })}` // ✅ "Total: {total}"
 <Trans>Welcome back, {ph({ username: getUser().name })}!</Trans>   // ph() also works in <Plural>, <Select>, <SelectOrdinal>
 ```
 
@@ -124,12 +126,13 @@ function Nav() {
 
 ## Numbers, currencies, dates
 
-Never hardcode formatted numbers, currency symbols or date strings. Use `i18n.number()` and `i18n.date()` — they apply the active locale through `Intl` automatically.
+Never hardcode formatted numbers, currency symbols or date strings. Use `i18n.number()` and `i18n.date()` — they apply the active locale through `Intl` automatically. Pass this project's shared presets from `<<localesModule>>` instead of retyping option objects; the currency code and date styles are project decisions and must not drift between call sites.
 
 ```tsx
+import { CURRENCY, DATE_MEDIUM } from '<<localesModule>>'
 const { i18n } = useLingui()
-<span>{i18n.number(amount, { style: 'currency', currency: 'USD' })}</span>
-<time>{i18n.date(new Date(timestamp), { dateStyle: 'medium' })}</time>
+<span>{i18n.number(amount, CURRENCY)}</span>
+<time>{i18n.date(new Date(timestamp), DATE_MEDIUM)}</time>
 ```
 
 Both are function calls, so `` t`Total: ${i18n.number(amount)}` `` extracts as `{0}`. Name it: `` t`Total: ${ph({ total: i18n.number(amount) })}` `` (see [Naming placeholders](#naming-placeholders)).
@@ -149,6 +152,59 @@ export default async function PricePage({ params }: { params: Promise<{ locale: 
 
 <!-- /if -->
 **Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`"$" + price`), date format strings like `"MM/DD/YYYY"`.
+
+## Locale metadata
+
+Import these from `<<localesModule>>` rather than re-deriving them inline:
+
+| Need | Use |
+|------|-----|
+| Text direction | `getDirection(locale)` → `'ltr'` / `'rtl'`. Never hardcode `dir="ltr"`. |
+| A language's name in the UI | `localeDisplayName(locale)`. Never hand-build `new Intl.DisplayNames(...)`. |
+| Validate an untrusted locale string | `resolveLocale(raw)` — falls back to the source locale. |
+<!-- if: localeNavigation == "path-helpers" -->
+
+## Locale-aware URLs
+
+Every internal path carries the active locale. `<<navModule>>` is the only place that knows this project's URL shape — never build a locale prefix with a template literal.
+
+| Context | Use |
+|---------|-----|
+| Inside a React component | `const localePath = useLocalePath()`, then `localePath('/about')` |
+| Server Components, loaders, actions, `redirect()`, metadata — anywhere hooks don't run | `localePath('/about', locale)` |
+| The active locale inside a component | `useLocale()` |
+| The same page in another locale (switcher, `hreflang`, canonical) | `switchLocalePath(pathname, targetLocale)` |
+| A path with its locale prefix removed | `stripLocalePrefix(pathname).pathname` |
+
+```tsx
+import { useLocalePath } from '<<navModule>>'
+const localePath = useLocalePath()
+<Link href={localePath('/about')}>About</Link>   // `href` on Next.js, `to` on React Router / Remix
+```
+
+Pass `localePath` a **locale-free** route path. Feeding it a path that already carries a prefix double-prefixes it — strip it first with `stripLocalePrefix()`.
+
+**Flag for review:** `` `/${locale}/…` `` template literals in an href, internal `<Link>` / `<a>` hrefs that skip `localePath`, `redirect('/…')` in a loader or action.
+<!-- /if -->
+<!-- if: localeNavigation == "typed-links" -->
+
+## Locale-aware URLs
+
+Routes carry the locale as a `$locale` path param. Do **not** wrap TanStack Router's `<Link>` — `to` and `params` are typed against the generated route tree and a wrapper erases that inference. Use the router's own API, taking the locale from `useLocale()`.
+
+```tsx
+import { Link } from '@tanstack/react-router'
+import { useLocale } from '<<navModule>>'
+const locale = useLocale()
+<Link to="/$locale/about" params={{ locale }}>About</Link>
+```
+
+Declare nav items once as an `as const` array of `` { label: msg`…`, to: '/…' } `` and render them in a single `map`. `as const` keeps `to` a literal type, so inference survives — and any source-vs-target-locale branch is then written once per nav component instead of once per link.
+
+For URLs that are not router navigation — canonical tags, `hreflang`, `window.location`, external redirects — use the string helpers in `<<navModule>>`: `localePath(path, locale)`, `switchLocalePath(pathname, targetLocale)`, `stripLocalePrefix(pathname)`.
+
+**Flag for review:** `` `/${locale}/…` `` template literals, an internal `<Link to>` without the matching `params`.
+<!-- /if -->
 
 ## Plurals, select, and ICU MessageFormat
 
@@ -185,7 +241,7 @@ Skip these — wrapping them would cause false extractions:
 - Object keys and internal codes
 - `ALL_CAPS` enum values
 - `data-testid` attributes
-- URL strings and API paths
+- URL strings and API paths — they are never *translated* (locale prefixing, where it applies, is a routing concern, not a macro)
 
 ## Translator comments
 

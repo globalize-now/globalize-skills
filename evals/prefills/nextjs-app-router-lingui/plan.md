@@ -17,14 +17,16 @@ Source locale: `en`. Target locales: `es`, `fr`. Routing: prefix-based (`/[local
 Subagent: `setup`
 Progress: `.globalize/progress/setup.json`
 References:
+- references/languages/js-ts/libraries/lingui/setup.locale-module.md
 - references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md
+- references/languages/js-ts/libraries/lingui/setup.navigation.md
 - references/languages/js-ts/libraries/lingui/rules.template.md
 
 Packages to install (orchestrator main thread, before subagent dispatch):
-- Runtime: `@lingui/core@^6`, `@lingui/react@^6`, `@lingui/macro@^5`
+- Runtime: `@lingui/core@^6`, `@lingui/react@^6`
 - Dev: `@lingui/cli@^6`, `@lingui/swc-plugin@^6`
 - Install command (npm, with quoted version specifiers for zsh safety):
-  - `npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/macro@^5'`
+  - `npm install '@lingui/core@^6' '@lingui/react@^6'`
   - `npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6'`
 
 Orchestrator-owned steps (main thread, before subagent dispatch):

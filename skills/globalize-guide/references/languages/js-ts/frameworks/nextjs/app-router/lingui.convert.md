@@ -137,15 +137,18 @@ import { sidebarItems } from './sidebar-data'
 
 export function Sidebar() {
   const { t } = useLingui()
+  const localePath = useLocalePath()   // only on projects with locale-prefixed URLs
   return (
     <nav>
       {sidebarItems.map(item => (
-        <a key={item.href} href={item.href}>{t(item.label)}</a>
+        <a key={item.href} href={localePath(item.href)}>{t(item.label)}</a>
       ))}
     </nav>
   )
 }
 ```
+
+**The `href` matters as much as the label.** Translating the label and leaving `href: '/'` bare gives a localized nav that sends every user back to the source locale. Read the project's generated i18n rules: if they describe a `navigation` module, take `useLocalePath()` from it in client components and the two-argument `localePath(path, locale)` in Server Components; if the project has no locale in its URLs, leave every `href` untouched. Never hand-build `` `/${locale}/about` ``. When a link looks wrong for the project's strategy and you are only here to wrap strings, **flag it** — name the file and the `href` — rather than silently rewriting routing.
 
 ---
 
@@ -185,21 +188,22 @@ export default function Error({ reset }: { reset: () => void }) {
 
 ## Numbers, currencies, and dates
 
-Use `i18n.number()` and `i18n.date()` for locale-aware formatting — they wrap `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale automatically.
+Use `i18n.number()` and `i18n.date()` for locale-aware formatting — they wrap `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale automatically. Pass the project's shared presets (`CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME`, exported from the locale module) rather than retyping an options object at each call site — the currency code in particular must not drift. The generated i18n rules file carries the real import path.
 
 ```tsx
 // In client components
 'use client'
 import { useLingui } from '@lingui/react/macro'
+import { CURRENCY, DATE_MEDIUM } from '<the project's locale module>'
 
 function Price({ amount }: { amount: number }) {
   const { i18n } = useLingui()
-  return <span>{i18n.number(amount, { style: 'currency', currency: 'USD' })}</span>
+  return <span>{i18n.number(amount, CURRENCY)}</span>
 }
 
 function EventDate({ timestamp }: { timestamp: number }) {
   const { i18n } = useLingui()
-  return <time>{i18n.date(new Date(timestamp), { dateStyle: 'medium' })}</time>
+  return <time>{i18n.date(new Date(timestamp), DATE_MEDIUM)}</time>
 }
 ```
 
@@ -214,7 +218,7 @@ export default async function PricePage({
 }) {
   const { locale } = await params
   const i18n = getI18nInstance(locale)
-  const price = i18n.number(29.99, { style: 'currency', currency: 'USD' })
+  const price = i18n.number(29.99, CURRENCY)
   return <p><Trans>Price: {price}</Trans></p>
 }
 ```
@@ -222,5 +226,5 @@ export default async function PricePage({
 If you don't have an `i18n` instance (e.g. in utility functions), use `Intl.NumberFormat` / `Intl.DateTimeFormat` directly with a locale string:
 
 ```tsx
-const price = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(29.99)
+const price = new Intl.NumberFormat(locale, CURRENCY).format(29.99)
 ```

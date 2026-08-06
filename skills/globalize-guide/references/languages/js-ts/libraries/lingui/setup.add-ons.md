@@ -1,6 +1,6 @@
 # LinguiJS: Coding Rules + Optional Add-Ons
 
-This file is invoked from the framework-specific lingui setup files (`nextjs/app-router/lingui.setup.md`, `vite/react-swc/lingui.setup.md`, `vite/react-babel/lingui.setup.md`, `tanstack-start/lingui.setup.md`, `tanstack-start/swc/lingui.setup.md`) after the core setup has been applied.
+This file is invoked from the framework-specific lingui setup files — `nextjs/app-router/lingui.setup.md`, `vite/react-swc/lingui.setup.md`, `vite/react-babel/lingui.setup.md`, `tanstack-start/lingui.setup.md`, `tanstack-start/swc/lingui.setup.md`, `remix/lingui.setup.md`, `remix/swc/lingui.setup.md`, `react-router-framework/lingui.setup.md`, `react-router-framework/swc/lingui.setup.md` — after the core setup has been applied, and after `setup.navigation.md` has emitted the navigation module (the `localeNavigation` condition below is resolved from its presence on disk).
 
 It has two parts. **The two core steps below always run** — they are not add-ons and are not gated on any selection. The add-ons after them are the ones `SKILL.md §1.10` lets the user multi-select: run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Every section here is independently re-runnable: if it has already been applied, detect that and skip without prompting.
 
@@ -40,6 +40,7 @@ Resolve every key listed in the template frontmatter's `conditions` and write th
 |---|---|
 | `router` | `.globalize/manifest-snapshot.json` → `match.router`. `"app"` on the Next.js App Router variant; the key is **absent** on the Vite and TanStack Start variants — treat absent as not-`"app"`. |
 | `perPageCatalogs` | `lingui.config.{ts,js}`: `"true"` when it sets `experimental.extractor`, `"false"` otherwise. That block is what switches the project to `lingui extract-experimental` and co-located per-route catalogs. |
+| `localeNavigation` | A composite of "does the URL carry a locale" × "which router". Resolve in two steps, both from disk. **(1)** Glob for the navigation module — `app/i18n/navigation.{ts,js}`, `src/i18n/navigation.{ts,js}`. **No match → `"none"`**: the shared navigation reference only emits it under a URL-based strategy, and it ran earlier in this same Phase 2, so its absence *is* the answer. **(2)** Match → read `package.json` dependencies: `@tanstack/react-router` or `@tanstack/react-start` → `"typed-links"`; anything else (`next`, `react-router`, `@remix-run/react`) → `"path-helpers"`. If both a TanStack router and `react-router` appear, open one route file and use whichever package it imports `Link` from. Cross-check `## Routing strategy` in `decisions.md`, but **disk wins** — it records what landed, not what was asked for. This condition cannot fail to resolve: a glob either matches or it doesn't, and `package.json` always exists. |
 
 ### 3. Eliminate branches, then resolve the surviving `values`
 
@@ -52,6 +53,8 @@ Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`
 | `catalogPath` | `catalogs[].path` in `lingui.config.{ts,js}` — e.g. `src/locales/{locale}/messages`. Keep the `{locale}` token exactly as the config writes it. If the config declares several catalog entries, use the one covering the project's source root. |
 | `sourceLocale` | `sourceLocale` in `lingui.config.{ts,js}`. |
 | `targetLocales` | `locales` in `lingui.config.{ts,js}` minus `sourceLocale`, comma-separated: `de, fr, ja`. |
+| `localesModule` | The import specifier for the shared locale module. Glob in this order: `app/i18n/locales.{ts,js}` → `src/i18n/locales.{ts,js}` → `src/i18n.{ts,js}`. Then express it the way project code imports it: use the path alias if `tsconfig.json` `compilerOptions.paths` declares one (`~/i18n/locales`, `@/i18n/locales`), otherwise the source-root-relative path (`app/i18n/locales`). **Never assume `@/` — read the config.** If the glob finds nothing, core setup did not complete: fail closed rather than guessing a path. |
+| `navModule` | Same rule, for `app/i18n/navigation.{ts,js}` / `src/i18n/navigation.{ts,js}`. Referenced only inside the two non-`"none"` `localeNavigation` branches, so on a cookie-only project the branch is already gone and this is never resolved. Read the specifier off the language switcher setup just wrote and reuse it verbatim. |
 
 ### 4. Render
 

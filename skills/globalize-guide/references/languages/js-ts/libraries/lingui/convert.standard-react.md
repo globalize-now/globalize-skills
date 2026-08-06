@@ -44,10 +44,11 @@ const sidebarItems: Array<{ label: MessageDescriptor; href: string }> = [
 // Resolve inside the rendering component
 function Sidebar() {
   const { t } = useLingui()
+  const localePath = useLocalePath()   // only on projects with locale-prefixed URLs — see below
   return (
     <nav>
       {sidebarItems.map(item => (
-        <a key={item.href} href={item.href}>
+        <a key={item.href} href={localePath(item.href)}>
           {t(item.label)}
         </a>
       ))}
@@ -57,6 +58,18 @@ function Sidebar() {
 ```
 
 > **Why not `t` at module scope?** `t` at module scope would be called once at module initialization, before the i18n instance is activated with the user's locale. `msg` returns a descriptor object that is resolved lazily when `t(descriptor)` is called inside a component.
+
+**The `href` matters as much as the label.** Translating the label and leaving `href: '/'` bare gives a localized nav that sends every user back to the source locale. Whether paths need the prefix is a project fact — check the project's i18n rules file, or look for a `navigation` module beside the locale constants.
+
+## Locale-aware links
+
+Read the project's generated i18n rules before touching an `href`; they state which of these applies.
+
+- **The project has an i18n `navigation` module** — take `useLocalePath()` from it inside components (`localePath('/about')`), and the two-argument `localePath(path, locale)` in loaders, actions, `redirect()` and Server Components, where hooks don't run. Never hand-build `` `/${locale}/about` ``.
+- **The project uses TanStack Router** — do not wrap `<Link>`; its `to` and `params` are typed against the route tree. Use `<Link to="/$locale/about" params={{ locale }}>` with the locale from `useLocale()`.
+- **The project has no locale in its URLs** (cookie-only or single-locale) — leave every `href` and `to` exactly as it is. There is nothing to prefix.
+
+When wrapping strings in a file whose links look wrong for the project's strategy, fix the label and **flag the link** rather than silently rewriting routing — say which file and which `href`.
 
 > **Translator comments:** Use the object form `msg({ message: \`...\`, comment: "..." })` when a string is ambiguous — short words like "Dashboard" benefit from context like "Main navigation sidebar" so translators know the UI location.
 
@@ -151,25 +164,28 @@ function SaveButton() {
 
 ## Numbers, currencies, and dates
 
-Use `i18n.number()` and `i18n.date()` for locale-aware formatting — they wrap `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale automatically.
+Use `i18n.number()` and `i18n.date()` for locale-aware formatting — they wrap `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale automatically. Pass the project's shared presets (`CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME`, exported from the locale module) rather than retyping an options object at each call site — the currency code in particular must not drift.
 
 ```tsx
 import { useLingui } from '@lingui/react/macro'
+import { CURRENCY, DATE_MEDIUM } from '<the project's locale module>'
 
 function PriceDisplay({ amount }: { amount: number }) {
   const { i18n } = useLingui()
-  return <span>{i18n.number(amount, { style: 'currency', currency: 'USD' })}</span>
+  return <span>{i18n.number(amount, CURRENCY)}</span>
 }
 
 function EventDate({ timestamp }: { timestamp: number }) {
   const { i18n } = useLingui()
-  return <time>{i18n.date(new Date(timestamp), { dateStyle: 'medium' })}</time>
+  return <time>{i18n.date(new Date(timestamp), DATE_MEDIUM)}</time>
 }
 ```
 
-In non-component code where you have a locale string but no `i18n` instance, use `Intl.NumberFormat` / `Intl.DateTimeFormat` directly:
+The generated i18n rules file carries the real import path. If a format the project needs has no preset yet, add one to the locale module rather than inlining the options.
+
+In non-component code where you have a locale string but no `i18n` instance, use `Intl.NumberFormat` / `Intl.DateTimeFormat` directly — still with the presets:
 
 ```tsx
-const formatted = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(amount)
-const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(timestamp))
+const formatted = new Intl.NumberFormat(locale, CURRENCY).format(amount)
+const date = new Intl.DateTimeFormat(locale, DATE_MEDIUM).format(new Date(timestamp))
 ```
