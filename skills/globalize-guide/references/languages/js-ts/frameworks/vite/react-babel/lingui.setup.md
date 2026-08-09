@@ -87,30 +87,40 @@ export default defineConfig({
 
 ## Provider Setup
 
-The setup depends on whether the project uses per-page catalogs (file-based routing) or a single global catalog.
+The setup depends on the project's **routing shape**, which also decides the catalog layout. Determine it first, by reading `package.json` and the app entry (`src/main.tsx`, `src/App.tsx`):
+
+| Shape | Signal | Catalogs | Follow |
+|---|---|---|---|
+| **File-based routing** | `@tanstack/react-router` in deps and a `src/routes/` tree | per-page, co-located | *Per-page catalogs* |
+| **Declarative React Router** | `react-router` in deps and **no** `@react-router/dev` — `<Routes>`/`<Route>` in `App.tsx`, or a `createBrowserRouter([...])` array | single | *Declarative React Router (SPA)* |
+| **No router** | neither of the above | single | *Single catalog (plain SPA without a router)* |
+
+A project with `@react-router/dev` is React Router **framework mode** and does not reach this file — it has its own setup reference. Nothing here applies to it.
 
 ### Locale Routing Strategy
 
-**If the project uses file-based routing (TanStack Router, React Router), STOP and present this to the user:**
+**Unless the project has no router at all, STOP and present this to the user:**
 
 > Choose a locale routing strategy:
-> 1. **Unprefixed source locale** — source locale (e.g., English) keeps original URLs (`/about`). Other locales use `/$locale/about` (e.g., `/fr/about`). Best for preserving existing URLs and SEO.
+> 1. **Unprefixed source locale** — source locale (e.g., English) keeps original URLs (`/about`). Other locales use `/fr/about`. Best for preserving existing URLs and SEO.
 > 2. **All locales prefixed** — every locale gets a prefix (`/en/about`, `/fr/about`). Bare paths (`/about`) redirect to the source locale (`/en/about`). Cleanest structure, single route tree.
 > 3. **Skip locale routing** — use query param / localStorage / browser detection only, no URL path changes. Simplest setup.
 
 **You MUST wait for the user to choose before proceeding. Do NOT default to option 1.**
 
-For plain SPAs without file-based routing, skip the routing choice — use option 3 (the single catalog setup at the end of this section).
+Both the file-based and the declarative React Router shape support all three. **Declarative React Router is not a reason to skip the question** — a `<Routes>` tree takes a locale segment as readily as a file-based one; see *Declarative React Router (SPA)* below. Only the third shape skips the choice: with no router there is no path to prefix, so use option 3 (the single catalog setup at the end of this section).
 
-> **Note on Strategy 1 trade-off:** Client-side routers cannot rewrite URLs (serve different content while keeping the URL unchanged) the way server middleware can. Strategy 1 requires defining source locale routes at both `/about` and `/$locale/about`, resulting in some route file duplication. Shared page components avoid duplicating the actual UI code. Strategy 2 avoids this with a single route tree under `/$locale/`.
+> **Note on Strategy 1 trade-off:** Client-side routers cannot rewrite URLs (serve different content while keeping the URL unchanged) the way server middleware can. Strategy 1 requires mounting the source locale routes at both `/about` and the prefixed path, resulting in some route duplication. Shared page components avoid duplicating the actual UI code. Strategy 2 avoids this with a single prefixed route tree.
 
-> **`lingui.config.ts` entries glob:** The default `entries` glob (`src/routes/**/*.tsx` for TanStack Router, `app/routes/**/*.tsx` for React Router) covers both unprefixed and `$locale/`-prefixed route files recursively — no glob changes needed for any strategy. Each route file gets its own co-located catalog regardless of whether it is prefixed or not.
+> **`lingui.config.ts` entries glob:** For file-based routing, the default `entries` glob (`src/routes/**/*.tsx`) covers both unprefixed and `$locale/`-prefixed route files recursively — no glob changes needed for any strategy, and each route file gets its own co-located catalog regardless of whether it is prefixed. Declarative React Router uses a single catalog, so its glob covers the whole source tree and does not change with the strategy either.
 
 ---
 
-### Per-page catalogs (TanStack Router, React Router with file-based routing)
+### Per-page catalogs (TanStack Router file-based routing)
 
-**This pattern modifies the root route file** (`__root.tsx` for TanStack Router, root layout for React Router) by wrapping it with `I18nProvider`. Show the user what changes before making them.
+**This pattern modifies the root route file** (`src/routes/__root.tsx`) by wrapping it with `I18nProvider`. Show the user what changes before making them.
+
+> **Declarative React Router does not belong in this section.** Without route files there is nothing for `lingui extract-experimental` to co-locate a catalog against, so that shape uses a single catalog — see *Declarative React Router (SPA)* below.
 
 > **Heads-up for Step 8 (first extract):** the per-route dynamic imports shown below (`import(\`./locales/{route}/${locale}.ts\`)`) must resolve at extract time, so every target path needs an `export const messages = {}` stub on first run. See *"Catalog artifacts: bootstrapping, scripts, `.gitignore`"* at the end of this file — follow its stub-bootstrapping step before running `lingui extract-experimental` the first time.
 
@@ -212,52 +222,6 @@ export const Route = createFileRoute('/$locale/about')({
 })
 ```
 
-**React Router:**
-
-```tsx
-// Root layout (unchanged)
-import { Outlet } from 'react-router'
-import { I18nProvider } from '@lingui/react'
-import { i18n } from './i18n'
-
-export default function RootLayout() {
-  return (
-    <I18nProvider i18n={i18n}>
-      <Outlet />
-    </I18nProvider>
-  )
-}
-```
-
-```tsx
-// app/routes/about.tsx — source locale (unprefixed)
-import { activateLocale, sourceLocale } from '../i18n'
-import { AboutPage } from '../pages/About'
-
-export async function loader() {
-  const { messages } = await import('./locales/about/' + sourceLocale + '.ts')
-  activateLocale(sourceLocale, messages)
-  return null
-}
-
-export default AboutPage
-```
-
-```tsx
-// app/routes/$locale/about.tsx — target locales (prefixed)
-import type { Route } from './+types/about'
-import { activateLocale } from '../../i18n'
-import { AboutPage } from '../../pages/About'
-
-export async function loader({ params }: Route.LoaderArgs) {
-  const { messages } = await import('./locales/about/' + params.locale + '.ts')
-  activateLocale(params.locale, messages)
-  return null
-}
-
-export default AboutPage
-```
-
 Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
 
 ---
@@ -342,26 +306,181 @@ function AboutPage() {
 }
 ```
 
-**React Router:**
+Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
 
-```tsx
-// Root layout — redirects bare paths to source locale
-import { Outlet, redirect } from 'react-router'
-import { I18nProvider } from '@lingui/react'
-import { i18n, locales, sourceLocale } from './i18n'
-import type { Route } from './+types/root'
+---
 
-export function loader({ request }: Route.LoaderArgs) {
-  const url = new URL(request.url)
-  const segments = url.pathname.split('/').filter(Boolean)
-  const firstSegment = segments[0]
-  if (!firstSegment || !locales.includes(firstSegment)) {
-    throw redirect(`/${sourceLocale}${url.pathname}`)
-  }
-  return null
+#### Option 3: Skip locale routing (per-page catalogs)
+
+No URL path changes. Locale is detected from query param (`?lang=`), localStorage, or browser settings. This is the simplest setup — add path-based routing later if needed.
+
+Create a minimal i18n setup file — catalog loading happens at the route level, not here:
+
+```ts
+// src/i18n/index.ts
+import { i18n } from '@lingui/core'
+import { detect, fromUrl, fromStorage, fromNavigator } from '@lingui/detect-locale'
+import { getDirection, resolveLocale, type Locale } from './locales'
+
+// Re-export the locale module so consumers need one import.
+export * from './locales'
+
+export function detectLocale(): Locale {
+  return resolveLocale(detect(fromUrl('lang'), fromStorage('lang'), fromNavigator()))
 }
 
-export default function RootLayout() {
+export function activateLocale(locale: string, messages: Record<string, string>) {
+  i18n.loadAndActivate({ locale, messages })
+  document.documentElement.lang = locale
+  document.documentElement.dir = getDirection(locale)
+}
+
+export function saveLocale(locale: string) {
+  localStorage.setItem('lang', locale)
+  // `detectLocale()` reads `?lang=` *before* localStorage, so the URL has to be updated too.
+  // Writing only storage would let a stale `?lang=` from a shared link win on the next reload.
+  const url = new URL(window.location.href)
+  url.searchParams.set('lang', locale)
+  history.replaceState(history.state, '', url)
+}
+
+export { i18n }
+```
+
+`detectLocale()` tries sources in order: `?lang=` URL parameter, `lang` key in localStorage, browser language settings. `resolveLocale` (from `src/i18n/locales.ts`) validates the result against the configured locales, falls back to the base language tag (`es-MX` → `es`), and finally to the source locale — so this file holds no locale list of its own. Call `saveLocale()` when the user explicitly switches locale so the choice persists across visits.
+
+**`saveLocale()` writes the URL as well as storage, and both writes are required.** `detectLocale()` reads `fromUrl` first, so a visitor who arrives on `/?lang=es` from a shared link, picks another locale, and reloads would be thrown back into Spanish if only `localStorage` had been updated — with no way out short of hand-editing the URL. Writing the param keeps read and write agreed, and has the useful side effect that the address bar always reflects the active locale, so the URL stays shareable. `history.replaceState` is deliberate over `pushState`: switching locale should not add a back-button entry.
+
+There is **no** `src/i18n/navigation.ts` under Option 3 — no URL carries a locale, so there is nothing to prefix.
+
+Wrap the app with `I18nProvider` at the root (same as single catalog — only the loading location changes).
+
+**TanStack Router** — wrap in `__root.tsx`, load catalogs in each route:
+
+```tsx
+// src/routes/__root.tsx
+import { createRootRoute, Outlet } from '@tanstack/react-router'
+import { I18nProvider } from '@lingui/react'
+import { i18n } from '../i18n'
+
+export const Route = createRootRoute({
+  component: () => (
+    <I18nProvider i18n={i18n}>
+      <Outlet />
+    </I18nProvider>
+  ),
+})
+```
+
+```tsx
+// src/routes/about.tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { Trans } from '@lingui/react/macro'
+import { activateLocale, detectLocale, sourceLocale } from '../i18n'
+
+export const Route = createFileRoute('/about')({
+  beforeLoad: async () => {
+    const locale = detectLocale()
+    try {
+      const { messages } = await import('./locales/about/' + locale + '.ts')
+      activateLocale(locale, messages)
+    } catch (e) {
+      console.error(`Failed to load "${locale}" catalog, falling back to "${sourceLocale}"`, e)
+      const { messages } = await import('./locales/about/' + sourceLocale + '.ts')
+      activateLocale(sourceLocale, messages)
+    }
+  },
+  component: AboutPage,
+})
+
+function AboutPage() {
+  return <h1><Trans>About us</Trans></h1>
+}
+```
+
+Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
+
+**Declarative React Router under Option 3** uses the single-catalog setup instead — see *Declarative React Router (SPA) → Option 3* below.
+
+---
+
+### Declarative React Router (SPA)
+
+A Vite project with `react-router` in `dependencies` but **no** `@react-router/dev` is a declarative SPA: routes are `<Route>` elements in `src/App.tsx` (or a `createBrowserRouter([...])` array), not files on disk. Two consequences shape everything in this section:
+
+- **There are no route modules.** `import type { Route } from './+types/…'`, route-module `loader` / `action` exports, and `react-router.config.ts` all belong to React Router framework mode. None of them exist here — do not write them, and if you find them in the project, it is framework mode and this file is the wrong reference.
+- **Catalogs are single, not per-page.** With no route files, `lingui extract-experimental` has nothing to co-locate against. Use the single-catalog layout (`src/locales/{locale}/messages`) that `lingui.config.ts` already declares, and **skip the per-page stub-bootstrapping step** in "Catalog artifacts" at the end of this file.
+
+**This pattern modifies `src/App.tsx`** (the route tree) **and `src/main.tsx`** (the provider). Show the user both files before making the change.
+
+Everything below is React Router v7 (`import … from 'react-router'`). On v6 the same components and hooks come from `react-router-dom` — check the installed major before writing imports.
+
+#### The i18n module (Strategy 1 and 2)
+
+Under a URL strategy the **path is the only locale source**. There is no `detectLocale()` here and no `@lingui/detect-locale` import — a query param or a stale localStorage value competing with the path is exactly the desync Option 3 exists to contain.
+
+```ts
+// src/i18n/index.ts
+import { i18n } from '@lingui/core'
+import { getDirection, sourceLocale, type Locale } from './locales'
+
+// Re-export the locale module so consumers need one import.
+export * from './locales'
+
+/** Load and activate a locale's catalog. Falls back to the source locale if the import fails. */
+export async function loadCatalog(locale: Locale) {
+  try {
+    const { messages } = await import(`../locales/${locale}/messages.ts`)
+    i18n.loadAndActivate({ locale, messages })
+  } catch (e) {
+    console.error(`Failed to load "${locale}" catalog, falling back to "${sourceLocale}"`, e)
+    const { messages } = await import(`../locales/${sourceLocale}/messages.ts`)
+    i18n.loadAndActivate({ locale: sourceLocale, messages })
+  }
+  document.documentElement.lang = i18n.locale
+  document.documentElement.dir = getDirection(i18n.locale)
+}
+
+export { i18n }
+```
+
+`locales`, `sourceLocale`, `Locale`, `resolveLocale` and `getDirection` live in `src/i18n/locales.ts`, created by the shared Lingui setup references — do not redeclare them here.
+
+#### The locale layout route
+
+Both strategies mount the same layout element. It reads the locale **from the path via `useParams()`**, validates it, loads the catalog, and only then renders the page — so no frame ever paints with the wrong catalog.
+
+```tsx
+// src/i18n/LocaleLayout.tsx
+import { useEffect, useState, type ReactNode } from 'react'
+import { Outlet, useParams } from 'react-router'
+import { I18nProvider } from '@lingui/react'
+import { i18n, loadCatalog, locales, sourceLocale, type Locale } from '.'
+
+export function LocaleLayout({ fallback }: { fallback?: ReactNode }) {
+  // Strategy 1 mounts this route twice: with a `:locale` param and without.
+  // No param means the unprefixed source-locale tree.
+  const { locale: param } = useParams()
+  const locale = (param ?? sourceLocale) as Locale
+  const known = (locales as readonly string[]).includes(locale)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    if (!known) return
+    let cancelled = false
+    setReady(false)
+    loadCatalog(locale).then(() => {
+      if (!cancelled) setReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [locale, known])
+
+  // An unknown first segment is not a locale — each strategy decides what that means.
+  if (!known) return <>{fallback ?? null}</>
+  if (!ready) return null   // swap in the project's own loading UI if it has one
+
   return (
     <I18nProvider i18n={i18n}>
       <Outlet />
@@ -370,30 +489,140 @@ export default function RootLayout() {
 }
 ```
 
-```tsx
-// app/routes/$locale/about.tsx
-import { Trans } from '@lingui/react/macro'
-import type { Route } from './+types/about'
-import { activateLocale } from '../../i18n'
+The `known` check is load-bearing, and the reason is how React Router matches: **routes are ranked, not tried in source order**, and a dynamic `:locale` segment matches *any* first segment. `/xyz/about` therefore lands on the `:locale` subtree with `locale === 'xyz'`. Only the static-vs-dynamic ranking rule (`/about` outranks `/:locale`) keeps real pages out of it; anything unrecognised falls through here.
 
-export async function loader({ params }: Route.LoaderArgs) {
-  const { messages } = await import('./locales/about/' + params.locale + '.ts')
-  activateLocale(params.locale, messages)
-  return null
+The `cancelled` flag matters for the same reason every fetch-in-effect needs one: two locale changes in quick succession resolve in whatever order the dynamic imports happen to finish, and without the guard the slower one can flip `ready` back on for a catalog that is no longer active.
+
+#### Strategy 2: All locales prefixed (declarative React Router)
+
+One subtree under `:locale`. Bare and unrecognised paths redirect to the source-locale prefix, preserving the rest of the URL:
+
+```tsx
+// src/App.tsx
+import { Routes, Route, Navigate, useLocation } from 'react-router'
+import { LocaleLayout } from './i18n/LocaleLayout'
+import { sourceLocale } from './i18n'
+import { Home } from './pages/Home'
+import { About } from './pages/About'
+import { NotFound } from './pages/NotFound'
+
+function RedirectToLocale() {
+  const { pathname, search, hash } = useLocation()
+  const rest = pathname === '/' ? '' : pathname
+  return <Navigate to={`/${sourceLocale}${rest}${search}${hash}`} replace />
 }
 
-export default function AboutPage() {
-  return <h1><Trans>About us</Trans></h1>
+export default function App() {
+  return (
+    <Routes>
+      <Route path=":locale" element={<LocaleLayout fallback={<RedirectToLocale />} />}>
+        <Route index element={<Home />} />
+        <Route path="about" element={<About />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+      {/* Bare paths: `/` → `/en`, `/about` → `/en/about` */}
+      <Route path="*" element={<RedirectToLocale />} />
+    </Routes>
+  )
 }
 ```
 
-Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
+Passing `RedirectToLocale` as the layout's `fallback` covers the second entry point into the same case: `/xyz/about` matches `:locale/about` before the outer `*` route ever gets a chance, so the redirect has to be reachable from inside the layout too. It resolves to `/en/xyz/about`, which the locale subtree's own `*` child then renders as a not-found **in the right locale** — which is why that child is worth adding even if the project had no 404 route before.
 
-#### Link handling
+Wrap the tree in `main.tsx` as the project already does — `<BrowserRouter>` around `<App />`. `I18nProvider` lives inside `LocaleLayout`, not in `main.tsx`, because the provider must sit below the route that knows the locale.
+
+#### Strategy 1: Unprefixed source locale (declarative React Router)
+
+Two subtrees over one shared page list. Declare the pages once as a fragment so adding a page means touching one place:
+
+```tsx
+// src/App.tsx
+import { Routes, Route } from 'react-router'
+import { LocaleLayout } from './i18n/LocaleLayout'
+import { NotFound } from './pages/NotFound'
+import { Home } from './pages/Home'
+import { About } from './pages/About'
+
+const pages = (
+  <>
+    <Route index element={<Home />} />
+    <Route path="about" element={<About />} />
+  </>
+)
+
+export default function App() {
+  return (
+    <Routes>
+      {/* Target locales: /fr, /fr/about */}
+      <Route path=":locale" element={<LocaleLayout fallback={<NotFound />} />}>{pages}</Route>
+      {/* Source locale, unprefixed: /, /about */}
+      <Route element={<LocaleLayout />}>{pages}</Route>
+    </Routes>
+  )
+}
+```
+
+Three things make this work, all of them consequences of React Router's matching rules rather than of the declaration order:
+
+- **`<Routes>` flattens fragments.** Children are converted by `createRoutesFromChildren` (exported publicly as `createRoutesFromElements`, whose own documented example passes a `<>…</>`), which recurses into `React.Fragment` children. The shared `pages` fragment is therefore legal in both subtrees.
+- **A static segment outranks a dynamic one.** `/about` matches the unprefixed subtree's static `about` route, not `:locale`; `/fr/about` matches `:locale/about`. Reordering the two `<Route>` blocks changes nothing.
+- **The second `<Route>` has no `path`.** It is a layout route: it contributes no URL segment, so its children mount at `/` and `/about`, and `useParams().locale` is `undefined` there — which is why `LocaleLayout` falls back to `sourceLocale`.
+
+The `fallback` differs by strategy. Under Strategy 1 an unknown first segment (`/xyz/about`) is genuinely not a page — render the project's not-found rather than redirecting, because there is no correct locale to redirect to.
+
+> **Canonicalization.** `/en/about` (when `en` is the source locale) renders the prefixed subtree with the English catalog rather than the canonical `/about`. For SEO hygiene on a public site, redirect it — add `useLocation` and `Navigate` to `LocaleLayout`'s imports and, before the `known` check, return the unprefixed path:
+> ```tsx
+> const { pathname, search, hash } = useLocation()
+> if (param === sourceLocale) {
+>   return <Navigate to={`${stripLocalePrefix(pathname).pathname}${search}${hash}`} replace />
+> }
+> ```
+> `stripLocalePrefix` comes from `src/i18n/navigation.ts`. This applies to Strategy 1 only — under Strategy 2 `/en/about` **is** the canonical URL.
+
+#### Option 3: Skip locale routing (declarative React Router)
+
+The route tree is not touched at all — no `:locale` segment, no layout route, no `LocaleLayout.tsx`. Follow *Single catalog (plain SPA without a router)* below; it is the same setup, and the presence of a router changes nothing about it. There is also no `src/i18n/navigation.ts` under Option 3 — no URL carries a locale, so there is nothing to prefix.
+
+#### `createBrowserRouter` projects
+
+If the project builds routes as an object array instead of JSX, the tree is the same shape — a layout route with an `element` and `children`:
+
+```tsx
+createBrowserRouter([
+  {
+    path: ':locale',
+    element: <LocaleLayout fallback={<RedirectToLocale />} />,
+    children: [
+      { index: true, element: <Home /> },
+      { path: 'about', element: <About /> },
+    ],
+  },
+  { path: '*', element: <RedirectToLocale /> },
+])
+```
+
+Everything else — `LocaleLayout`, the i18n module, the switcher, link handling — is unchanged. Do not add route-module `loader` functions to move the catalog load: the `useEffect` in `LocaleLayout` covers both router flavours, and a `loader` would only work on a data router.
+
+#### Server fallback for prefixed paths
+
+**Strategy 1 and 2 only.** A prefixed SPA serves `/fr/about` out of `index.html` — there is no `fr/about.html` on disk. Vite's dev server and `vite preview` already rewrite unknown paths to `index.html` (`appType: 'spa'`, the default), so `npm run dev` works with no configuration. **Production hosting must be configured to do the same**, or a hard refresh or shared link to `/fr/about` returns 404 while in-app navigation to the same path works — a failure that never shows up in dev.
+
+| Host | Configuration |
+|---|---|
+| Netlify | `public/_redirects` → `/*    /index.html    200` |
+| Cloudflare Pages | `public/_redirects`, same line as Netlify |
+| Vercel | `vercel.json` → `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }` |
+| nginx | `location / { try_files $uri $uri/ /index.html; }` |
+| Apache | `.htaccess` with `FallbackResource /index.html` |
+| GitHub Pages / plain static | no rewrite support — copy `index.html` to `404.html` at build time, or stay on Option 3 |
+
+Identify the host from the repo (a `netlify.toml`, `vercel.json`, `Dockerfile`, or deploy workflow) and make the change. If no host is evident, tell the user which rewrite their deployment needs rather than leaving it unsaid. Option 3 introduces no new paths, so none of this applies to it.
+
+### Link handling
 
 **Only relevant for Strategy 1 and 2.** If the user chose Option 3, skip this.
 
-When locale routing is enabled, internal links must include the locale prefix.
+When locale routing is enabled, internal links must include the locale prefix. This applies to both routing shapes — the TanStack Router half below covers file-based routing, the React Router half covers the declarative SPA.
 
 **TanStack Router** — do NOT wrap `<Link>`. TanStack Router's `<Link>` has deeply typed `to` and `params` props; wrapping it loses type safety. Instead, use the router's native API:
 
@@ -449,7 +678,7 @@ function Navigation() {
 
 `as const` keeps `to` and `localeTo` literal types, so `<Link>`'s inference survives the indirection. The branch remains — the router treats `/$locale/about` and `/about` as distinct routes with different param types — but it no longer scales with link count. Under Strategy 2, drop the `localeTo` column and the branch entirely.
 
-**React Router** — `<Link to="...">` takes a plain string, so use the helpers from `src/i18n/navigation.ts` (owned by the shared navigation reference — do not write a `src/localePath.ts` here):
+**React Router (declarative SPA)** — `<Link to="...">` takes a plain string, so use the helpers from `src/i18n/navigation.ts` (owned by the shared navigation reference — do not write a `src/localePath.ts` here). `useLocalePath()` is built on `useParams()`, the same source `LocaleLayout` reads, so links and layout can never disagree:
 
 ```tsx
 import { Link } from 'react-router'
@@ -498,148 +727,25 @@ Tell the user:
 
 ---
 
-#### Option 3: Skip locale routing (per-page catalogs)
-
-No URL path changes. Locale is detected from query param (`?lang=`), localStorage, or browser settings. This is the simplest setup — add path-based routing later if needed.
-
-Create a minimal i18n setup file — catalog loading happens at the route level, not here:
-
-```ts
-// src/i18n/index.ts
-import { i18n } from '@lingui/core'
-import { detect, fromUrl, fromStorage, fromNavigator } from '@lingui/detect-locale'
-import { getDirection, resolveLocale, type Locale } from './locales'
-
-// Re-export the locale module so consumers need one import.
-export * from './locales'
-
-export function detectLocale(): Locale {
-  return resolveLocale(detect(fromUrl('lang'), fromStorage('lang'), fromNavigator()))
-}
-
-export function activateLocale(locale: string, messages: Record<string, string>) {
-  i18n.loadAndActivate({ locale, messages })
-  document.documentElement.lang = locale
-  document.documentElement.dir = getDirection(locale)
-}
-
-export function saveLocale(locale: string) {
-  localStorage.setItem('lang', locale)
-}
-
-export { i18n }
-```
-
-`detectLocale()` tries sources in order: `?lang=` URL parameter, `lang` key in localStorage, browser language settings. `resolveLocale` (from `src/i18n/locales.ts`) validates the result against the configured locales, falls back to the base language tag (`es-MX` → `es`), and finally to the source locale — so this file holds no locale list of its own. Call `saveLocale()` when the user explicitly switches locale so the choice persists across visits.
-
-There is **no** `src/i18n/navigation.ts` under Option 3 — no URL carries a locale, so there is nothing to prefix.
-
-Wrap the app with `I18nProvider` at the root (same as single catalog — only the loading location changes).
-
-**TanStack Router** — wrap in `__root.tsx`, load catalogs in each route:
-
-```tsx
-// src/routes/__root.tsx
-import { createRootRoute, Outlet } from '@tanstack/react-router'
-import { I18nProvider } from '@lingui/react'
-import { i18n } from '../i18n'
-
-export const Route = createRootRoute({
-  component: () => (
-    <I18nProvider i18n={i18n}>
-      <Outlet />
-    </I18nProvider>
-  ),
-})
-```
-
-```tsx
-// src/routes/about.tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { Trans } from '@lingui/react/macro'
-import { activateLocale, detectLocale, sourceLocale } from '../i18n'
-
-export const Route = createFileRoute('/about')({
-  beforeLoad: async () => {
-    const locale = detectLocale()
-    try {
-      const { messages } = await import('./locales/about/' + locale + '.ts')
-      activateLocale(locale, messages)
-    } catch (e) {
-      console.error(`Failed to load "${locale}" catalog, falling back to "${sourceLocale}"`, e)
-      const { messages } = await import('./locales/about/' + sourceLocale + '.ts')
-      activateLocale(sourceLocale, messages)
-    }
-  },
-  component: AboutPage,
-})
-
-function AboutPage() {
-  return <h1><Trans>About us</Trans></h1>
-}
-```
-
-**React Router** — wrap in root layout, load catalogs in each route loader:
-
-```tsx
-// Root layout (unchanged)
-import { Outlet } from 'react-router'
-import { I18nProvider } from '@lingui/react'
-import { i18n } from './i18n'
-
-export default function RootLayout() {
-  return (
-    <I18nProvider i18n={i18n}>
-      <Outlet />
-    </I18nProvider>
-  )
-}
-```
-
-```tsx
-// app/routes/about.tsx
-import { Trans } from '@lingui/react/macro'
-import { activateLocale, detectLocale, sourceLocale } from '../i18n'
-
-export async function loader() {
-  const locale = detectLocale()
-  try {
-    const { messages } = await import('./locales/about/' + locale + '.ts')
-    activateLocale(locale, messages)
-  } catch (e) {
-    console.error(`Failed to load "${locale}" catalog, falling back to "${sourceLocale}"`, e)
-    const { messages } = await import('./locales/about/' + sourceLocale + '.ts')
-    activateLocale(sourceLocale, messages)
-  }
-  return null
-}
-
-export default function AboutPage() {
-  return <h1><Trans>About us</Trans></h1>
-}
-```
-
-Each route loads its own co-located catalog. Shared component strings are duplicated across route catalogs — this is the expected trade-off for smaller per-page bundles.
-
----
-
 ### `index.html` lang attribute
 
-Vite projects have an `index.html` at the project root with a static `<html lang="...">` attribute (typically `<html lang="en">`). Since `activateLocale()` sets `document.documentElement.lang` dynamically at runtime, the static value serves as the default before JavaScript executes.
+Vite projects have an `index.html` at the project root with a static `<html lang="...">` attribute (typically `<html lang="en">`). Whichever activation helper this file's chosen branch uses — `activateLocale()` for the per-page layouts, `loadCatalog()` for the single-catalog ones — sets `document.documentElement.lang` dynamically at runtime, so the static value serves only as the default before JavaScript executes.
 
 **Read `index.html` and check the `<html lang="...">` value.** Then update it:
 
 - Set `<html lang="...">` to the source locale value from `lingui.config.ts` (e.g., `<html lang="en">`). If it already matches, no change is needed.
 - If the existing value doesn't match `sourceLocale`, flag it to the user — the source locale config may need updating.
-- Remove any hardcoded `dir` attribute (e.g., `dir="ltr"`). The `activateLocale()` function sets `dir` dynamically, and a hardcoded value would flash incorrect direction for RTL locales.
+- Remove any hardcoded `dir` attribute (e.g., `dir="ltr"`). That same helper sets `dir` dynamically, and a hardcoded value would flash incorrect direction for RTL locales.
 
 Describe the exact change to the user before making it (e.g., 'I will update `<html lang="en">` to `<html lang="es">` in `index.html` to match the source locale').
 
-### Single catalog (plain SPA without file-based routing)
+---
+
+### Single catalog (plain SPA without a router)
 
 **This pattern modifies `main.tsx`** by wrapping the existing render tree with `I18nProvider`. Show the user the modified file before making the change.
 
-For plain SPAs without file-based routing, use the option 3 (skip locale routing) i18n setup — locale is detected from query param, localStorage, or browser settings:
+This is the Option 3 (skip locale routing) setup — locale is detected from query param, localStorage, or browser settings, and no path ever carries it. It is also the setup a **declarative React Router** project uses under Option 3: the route tree is left exactly as it is, so nothing here changes because a router happens to be present.
 
 ```ts
 // src/i18n/index.ts
@@ -669,6 +775,11 @@ export async function loadCatalog(locale: string) {
 
 export function saveLocale(locale: string) {
   localStorage.setItem('lang', locale)
+  // `detectLocale()` reads `?lang=` *before* localStorage, so the URL has to be updated too.
+  // Writing only storage would let a stale `?lang=` from a shared link win on the next reload.
+  const url = new URL(window.location.href)
+  url.searchParams.set('lang', locale)
+  history.replaceState(history.state, '', url)
 }
 
 // Detect and load the user's preferred locale
@@ -699,20 +810,24 @@ The component depends on the routing strategy.
 
 `switchLocalePath(pathname, loc)` from `src/i18n/navigation.ts` gives the current page under another locale, so **one component covers both strategies and both routers** — the four hand-written variants this section used to carry are gone.
 
+The switcher **navigates**; it does not write `localStorage`. Under a URL strategy the path is the only locale source, so a stored value would be a second source of truth that the next prefixed URL silently contradicts.
+
 ```tsx
 // src/components/LanguageSwitcher.tsx
+import { useLocation } from 'react-router'
 import { locales, localeDisplayName } from '../i18n'
 import { useLocale, switchLocalePath } from '../i18n/navigation'
 
 export function LanguageSwitcher() {
   const currentLocale = useLocale()
+  const { pathname, search, hash } = useLocation()
 
   return (
     <nav style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
       {locales.map((loc) => (
         <a
           key={loc}
-          href={switchLocalePath(window.location.pathname, loc)}
+          href={`${switchLocalePath(pathname, loc)}${search}${hash}`}
           hrefLang={loc}
           aria-current={loc === currentLocale ? 'true' : undefined}
           style={{
@@ -732,14 +847,20 @@ export function LanguageSwitcher() {
 }
 ```
 
-**Use a plain `<a>`, not a router `<Link>`, in the switcher — on both routers.** On TanStack Router the target route type is not statically known (`switchLocalePath` returns a string), and on either router a full document navigation is what re-runs the route's catalog load in the new locale. A client-side transition would leave the previously activated catalog in place.
+Three details are load-bearing:
 
-On React Router, `useLocation().pathname` is preferable to `window.location.pathname` so the switcher re-renders on navigation:
+- **Use a plain `<a>`, not a router `<Link>` — on both routers.** On TanStack Router the target route type is not statically known (`switchLocalePath` returns a string), and on either router a full document navigation is what re-runs the route's catalog load in the new locale. A client-side transition would leave the previously activated catalog in place. (On the declarative SPA, `LocaleLayout` would in fact reload the catalog on a client-side transition — but `<a>` keeps one behaviour across all three shapes, and costs nothing on a switch that changes the whole page's language anyway.)
+- **`useLocation()`, not `window.location`.** The switcher re-renders on navigation, so the target of each link tracks the page the user is actually on. Reading `window.location` directly gives a value React never invalidates, and the links go stale after the first in-app navigation.
+- **Re-append `search` and `hash`.** `switchLocalePath` takes and returns a *pathname*; feeding it a full URL would double-prefix. Without re-appending, switching locale on `/search?q=shoes#results` silently drops the query and the fragment — the user loses their results.
+
+The snippet above is the React Router form, where `useLocation()` returns `search` and `hash` as strings that already carry their leading `?` and `#`. **On TanStack Router the hook returns a `ParsedLocation`, whose `search` is the *parsed object* — interpolating it yields `[object Object]`.** Use `searchStr` there, and normalise the fragment:
 
 ```tsx
-import { useLocation } from 'react-router'
-const { pathname } = useLocation()
-// ... href={switchLocalePath(pathname, loc)}
+import { useLocation } from '@tanstack/react-router'
+
+const { pathname, searchStr, hash } = useLocation()
+const suffix = `${searchStr}${hash ? `#${hash.replace(/^#/, '')}` : ''}`
+// ... href={`${switchLocalePath(pathname, loc)}${suffix}`}
 ```
 
 #### Option 3 / plain SPA: No URL routing
@@ -821,19 +942,19 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher'
 </I18nProvider>
 ```
 
-**React Router** — in the root layout:
+**Declarative React Router, Strategy 1 or 2** — in `src/i18n/LocaleLayout.tsx`, inside the provider it already renders:
 
 ```tsx
-import { LanguageSwitcher } from './components/LanguageSwitcher'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
 
-// Inside the component function:
+// Inside LocaleLayout, replacing the bare <Outlet />:
 <I18nProvider i18n={i18n}>
   <LanguageSwitcher />
   <Outlet />
 </I18nProvider>
 ```
 
-**Plain SPA** — in `main.tsx` or `App.tsx`:
+**Plain SPA (no router, or any shape under Option 3)** — in `main.tsx` or `App.tsx`:
 
 ```tsx
 import { LanguageSwitcher } from './components/LanguageSwitcher'
@@ -857,7 +978,7 @@ Work through this section after the provider setup above and before the first `l
 
 ### Catalog stub bootstrapping (per-page catalogs only)
 
-Skip this if the project uses the single-catalog layout — it applies only to the per-page layout above.
+Skip this if the project uses the single-catalog layout — it applies only to the per-page layout above, which means **TanStack Router file-based routing only**. A declarative React Router SPA has no route files and therefore no per-page catalogs; do not create stubs for it.
 
 Every per-page route shown above loads its catalog via a dynamic `import()` of `./locales/{route}/{locale}.ts`. Lingui's per-page extractor resolves those dynamic imports with esbuild at extract time — *before* it writes any `.po` or compiled catalog files. On a fresh project the `locales/` directories don't exist yet, so the very first run of `lingui extract-experimental` fails with either `Could not resolve import(...)` or `No matches for the glob in ./locales/${locale}.ts`, and exits before generating anything.
 
@@ -876,11 +997,11 @@ src/routes/locales/dashboard/en.ts
 src/routes/locales/dashboard/fr.ts
 ```
 
-React Router projects use `app/routes/` in place of `src/routes/`. Prefixed routes resolve their specifier relative to their own directory, so `src/routes/$locale/about.tsx` needs its stubs at `src/routes/$locale/locales/about/{locale}.ts`.
+Prefixed routes resolve their specifier relative to their own directory, so `src/routes/$locale/about.tsx` needs its stubs at `src/routes/$locale/locales/about/{locale}.ts`.
 
 One `export const messages = {}` line per file — the extractor will overwrite these with real compiled catalogs after the first `lingui:extract` + `lingui:compile` cycle.
 
-If the route list is long, enumerate it with grep (adapt the locales to the project's `locales` array, and the directory to `app/routes/` for React Router):
+If the route list is long, enumerate it with grep (adapt the locales to the project's `locales` array):
 
 ```sh
 grep -rlE "import\\([^)]*\\./locales/" src/routes/ | while read f; do
