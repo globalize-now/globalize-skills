@@ -281,6 +281,11 @@ export function saveLocale(locale: string) {
   } catch {
     // Storage unavailable — the choice just won't persist
   }
+  // `detectLocale()` reads `?lang=` *before* localStorage, so the URL has to be updated too.
+  // Outside the try/catch on purpose: when storage is blocked, the URL is the only thing left.
+  const url = new URL(window.location.href)
+  url.searchParams.set('lang', locale)
+  history.replaceState(history.state, '', url)
 }
 
 export { i18n }
@@ -292,6 +297,7 @@ Notes:
 - `detectLocale()` tries sources in order: `?lang=` URL parameter → `lang` key in localStorage → browser language (with regional fallback, `es-MX` → `es`) → source locale.
 - `activateLocale()` also keeps `<html lang>` and `<html dir>` in sync, so RTL locales (Arabic, Hebrew, Farsi, Urdu…) flip the document direction automatically.
 - Call `saveLocale()` only on an explicit user choice (the language switcher), so the choice persists across visits.
+- `saveLocale()` writes the **URL as well as storage, and both writes are required.** Because `detectLocale()` reads `?lang=` first, a visitor who arrives on `/?lang=es` from a shared link, switches to another locale, and reloads would be thrown straight back into Spanish if only `localStorage` had been updated — with no way out short of hand-editing the URL. Writing the param keeps read and write agreed, and has the useful side effect that the address bar always reflects the active locale, so the URL stays shareable. `history.replaceState` rather than `pushState`: switching locale should not add a back-button entry.
 - Why the try/catch around storage: in sandboxed preview iframes and cookie-blocking browsers, touching `localStorage` throws a `SecurityError` — unguarded, that happens inside `detectLocale()` before first render and leaves the app blank.
 
 TypeScript doesn't know what a `.po` import is, so add a module declaration. Append to `src/vite-env.d.ts` (it exists in every Lovable Vite project), or create `src/po-modules.d.ts` if you prefer not to touch it:
