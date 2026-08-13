@@ -15,12 +15,13 @@ import { registerGitlabTools } from "./tools/gitlab.js";
 import { registerGithubTools } from "./tools/github.js";
 import { registerJobTools } from "./tools/jobs.js";
 import { registerNamespaceTools } from "./tools/namespaces.js";
+import { registerTranslationMemoriesTools } from "./tools/translation-memories.js";
 import { registerTranslationMemoryTools } from "./tools/translation-memory.js";
 import { registerBillingTools } from "./tools/billing.js";
 
 const server = new McpServer({
   name: "globalize",
-  version: "0.1.1",
+  version: "0.1.2",
 });
 
 const { apiKey, apiUrl } = await resolveAuth();
@@ -40,6 +41,7 @@ registerGitlabTools(server, client);
 registerGithubTools(server, client);
 registerJobTools(server, client);
 registerNamespaceTools(server, client);
+registerTranslationMemoriesTools(server, client);
 registerTranslationMemoryTools(server, client);
 registerBillingTools(server, client);
 

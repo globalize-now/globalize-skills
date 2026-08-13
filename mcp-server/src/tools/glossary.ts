@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ApiClient } from "@globalize-now/cli-client";
-import { listGlossary, createGlossaryEntry, deleteGlossaryEntry } from "@globalize-now/cli-client";
+import {
+  listGlossary,
+  createGlossaryEntry,
+  deleteGlossaryEntry,
+  bulkCreateGlossaryEntries,
+  previewGlossaryImport,
+} from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
 
 export function registerGlossaryTools(server: McpServer, client: ApiClient) {
@@ -32,9 +38,13 @@ export function registerGlossaryTools(server: McpServer, client: ApiClient) {
         targetTerm: z.string().describe("Target language translation"),
         sourceProjectLanguageId: z.string().uuid().describe("Source project language UUID"),
         targetProjectLanguageId: z.string().uuid().describe("Target project language UUID"),
+        doNotTranslate: z
+          .boolean()
+          .optional()
+          .describe("Keep the source term verbatim in translations instead of translating it"),
       },
     },
-    async ({ id, sourceTerm, targetTerm, sourceProjectLanguageId, targetProjectLanguageId }) => {
+    async ({ id, sourceTerm, targetTerm, sourceProjectLanguageId, targetProjectLanguageId, doNotTranslate }) => {
       try {
         return formatSuccess(
           await createGlossaryEntry(
@@ -44,8 +54,69 @@ export function registerGlossaryTools(server: McpServer, client: ApiClient) {
             targetTerm,
             sourceProjectLanguageId,
             targetProjectLanguageId,
+            doNotTranslate,
           ),
         );
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "bulk_create_glossary_entries",
+    {
+      description:
+        "Upsert many glossary entries in one transaction, each with its own language pair. Max 10000 entries",
+      inputSchema: {
+        id: z.string().uuid().describe("Project UUID"),
+        entries: z
+          .array(
+            z.object({
+              sourceTerm: z.string().min(1).describe("Source language term"),
+              targetTerm: z.string().describe("Target language translation"),
+              sourceProjectLanguageId: z.string().uuid().describe("Source project language UUID"),
+              targetProjectLanguageId: z.string().uuid().describe("Target project language UUID"),
+              doNotTranslate: z.boolean().optional().describe("Keep the source term verbatim"),
+            }),
+          )
+          .min(1)
+          .max(10000)
+          .describe("Glossary entries to upsert"),
+      },
+    },
+    async ({ id, entries }) => {
+      try {
+        return formatSuccess(await bulkCreateGlossaryEntries(client, id, entries));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "preview_glossary_import",
+    {
+      description:
+        "Preview a bulk glossary import: how many supplied keys would be created and how many updated. Writes nothing",
+      inputSchema: {
+        id: z.string().uuid().describe("Project UUID"),
+        keys: z
+          .array(
+            z.object({
+              sourceTerm: z.string().min(1).describe("Source language term"),
+              sourceProjectLanguageId: z.string().uuid().describe("Source project language UUID"),
+              targetProjectLanguageId: z.string().uuid().describe("Target project language UUID"),
+            }),
+          )
+          .min(1)
+          .max(10000)
+          .describe("Glossary keys to check"),
+      },
+    },
+    async ({ id, keys }) => {
+      try {
+        return formatSuccess(await previewGlossaryImport(client, id, keys));
       } catch (e) {
         return formatError(e);
       }

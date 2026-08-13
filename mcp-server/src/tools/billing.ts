@@ -26,7 +26,16 @@ export function registerBillingTools(server: McpServer, client: ApiClient) {
       description: "List credit ledger entries",
       inputSchema: {
         type: z
-          .enum(["purchase", "grant", "usage", "refund", "adjustment", "subscription_grant", "subscription_expiry"])
+          .enum([
+            "purchase",
+            "grant",
+            "usage",
+            "refund",
+            "adjustment",
+            "subscription_grant",
+            "subscription_expiry",
+            "grant_expiry",
+          ])
           .optional()
           .describe("Filter by entry type"),
         grouped: z.enum(["true", "false"]).optional().describe("Group entries by job"),

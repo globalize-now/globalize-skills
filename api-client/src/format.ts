@@ -24,6 +24,14 @@ export function output(data: unknown, opts: OutputOptions): void {
   }
 }
 
+/**
+ * Deprecation notices go to stderr so they reach a human without polluting the
+ * JSON on stdout that agents and scripts parse.
+ */
+export function warnDeprecated(message: string): void {
+  process.stderr.write(chalk.yellow(`Deprecated: ${message}`) + "\n");
+}
+
 export function outputError(message: string, opts: OutputOptions): void {
   if (isJsonMode(opts)) {
     process.stdout.write(JSON.stringify({ error: message }) + "\n");

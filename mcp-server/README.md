@@ -77,7 +77,7 @@ To pass the key via environment variable in your MCP config:
 
 ## Tools
 
-The server exposes 81 tools across 16 groups:
+The server exposes 93 tools across 17 groups:
 
 | Group | Tools | Description |
 |-------|-------|-------------|
@@ -87,7 +87,7 @@ The server exposes 81 tools across 16 groups:
 | **Project Languages** | `list_project_languages`, `add_project_language`, `remove_project_language` | Configure languages on a project |
 | **Repositories** | `list_repositories`, `create_repository`, `update_repository`, `delete_repository`, `detect_repository`, `list_repository_branches`, `discover_repository`, `translate_repository` | Connect and scan git repositories |
 | **Patterns** | `list_patterns`, `create_pattern`, `update_pattern`, `delete_pattern`, `reorder_pattern`, `bulk_create_patterns` | Manage repository locale path patterns |
-| **Glossary** | `list_glossary`, `create_glossary_entry`, `delete_glossary_entry` | Manage translation glossaries |
+| **Glossary** | `list_glossary`, `create_glossary_entry`, `delete_glossary_entry`, `bulk_create_glossary_entries`, `preview_glossary_import` | Manage translation glossaries |
 | **Style Guides** | `list_style_guides`, `upsert_style_guide`, `delete_style_guide`, `generate_style_guide`, `apply_style_guide`, `get_style_guide_quota` | Set translation style instructions |
 | **API Keys** | `list_api_keys`, `create_api_key`, `revoke_api_key` | Manage API keys |
 | **Members** | `list_members`, `invite_member`, `remove_member` | Manage organisation members |
@@ -95,7 +95,8 @@ The server exposes 81 tools across 16 groups:
 | **GitLab** | `gitlab_install`, `gitlab_install_status`, `list_gitlab_connections`, `delete_gitlab_connection`, `list_gitlab_projects`, `list_gitlab_project_branches`, `detect_gitlab_project` | GitLab connection and repositories |
 | **Jobs** | `list_jobs`, `get_job`, `start_job`, `retry_job`, `get_job_stats`, `get_qa_report`, `dismiss_qa`, `undismiss_qa`, `export_job`, `export_job_manifest`, `list_job_units`, `get_job_unit`, `list_job_files`, `redeliver_job` | Manage translation jobs |
 | **Namespaces** | `list_namespaces`, `update_namespace`, `delete_namespace` | Manage project namespaces |
-| **Translation Memory** | `list_translation_memory`, `delete_translation_memory_entry`, `count_translation_memory`, `fresh_count_translation_memory` | Browse and manage translation memory |
+| **Translation Memories** | `list_translation_memories`, `create_translation_memory`, `get_translation_memory`, `rename_translation_memory`, `delete_translation_memory`, `list_translation_memory_entries`, `delete_translation_memory_entry_by_id`, `clear_translation_memory`, `count_translation_memory_entries`, `fresh_count_translation_memory_entries` | Browse and manage translation memories and their entries |
+| **Translation Memory** (deprecated) | `list_translation_memory`, `delete_translation_memory_entry`, `count_translation_memory`, `fresh_count_translation_memory` | Project-addressed compatibility layer — resolves the project's memory and calls the tools above. Use the Translation Memories group instead |
 | **Billing** | `get_balance`, `get_ledger` | View billing balance and ledger |
 
 ## Development

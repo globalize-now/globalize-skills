@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Option, type Command } from "commander";
 import type { ApiClient } from "../client.js";
 import { extractError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
@@ -21,9 +21,10 @@ export async function createProject(
   sourceLanguage: string,
   targetLanguages: string[],
   config?: ProjectCreateBody["config"],
+  translationMemoryId?: string,
 ) {
   const { data, error, response } = await client.POST("/api/projects", {
-    body: { name, sourceLanguage, targetLanguages, config },
+    body: { name, sourceLanguage, targetLanguages, config, translationMemoryId },
   });
   if (error) throw new Error(extractError(response, error));
   return data!;
@@ -107,6 +108,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .requiredOption("--source-language <id>", "Source language ID")
     .requiredOption("--target-languages <ids...>", "Target language IDs (variadic or comma-separated)")
     .option("--config <json>", "Project config as JSON")
+    .option("--translation-memory-id <id>", "Attach to an existing translation memory (permanent)")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
@@ -130,7 +132,17 @@ export function register(group: Command, getClient: ClientFactory): void {
             throw new Error(`Invalid JSON for --config: ${cmdOpts.config}`);
           }
         }
-        output(await createProject(client, cmdOpts.name, cmdOpts.sourceLanguage, targetLanguages, config), opts);
+        output(
+          await createProject(
+            client,
+            cmdOpts.name,
+            cmdOpts.sourceLanguage,
+            targetLanguages,
+            config,
+            cmdOpts.translationMemoryId,
+          ),
+          opts,
+        );
       } catch (e) {
         outputError((e as Error).message, opts);
       }
@@ -144,12 +156,26 @@ export function register(group: Command, getClient: ClientFactory): void {
     .option("--source-language <id>", "Source language ID")
     .option("--target-languages <ids...>", "Target language IDs (variadic or comma-separated)")
     .option("--config <json>", "Project config as JSON")
+    .addOption(
+      new Option("--cdn-public <bool>", "Serve this project's catalogs from the public CDN").choices(["true", "false"]),
+    )
+    .addOption(
+      new Option("--auto-discover-locales <bool>", "Add locales found in the repository automatically").choices([
+        "true",
+        "false",
+      ]),
+    )
+    .option("--context <text>", "Project context passed to the translation engine")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         const updates: ProjectUpdateBody = {};
         if (cmdOpts.name !== undefined) updates.name = cmdOpts.name;
+        if (cmdOpts.cdnPublic !== undefined) updates.cdnPublic = cmdOpts.cdnPublic === "true";
+        if (cmdOpts.autoDiscoverLocales !== undefined)
+          updates.autoDiscoverLocales = cmdOpts.autoDiscoverLocales === "true";
+        if (cmdOpts.context !== undefined) updates.context = cmdOpts.context;
         if (cmdOpts.sourceLanguage !== undefined) updates.sourceLanguage = cmdOpts.sourceLanguage;
         if (cmdOpts.targetLanguages !== undefined) {
           updates.targetLanguages = Array.isArray(cmdOpts.targetLanguages)
