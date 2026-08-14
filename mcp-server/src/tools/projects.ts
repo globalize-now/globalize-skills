@@ -38,11 +38,20 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
         name: z.string().describe("Project name"),
         sourceLanguage: z.string().uuid().describe("Source language UUID"),
         targetLanguages: z.array(z.string().uuid()).describe("Target language UUIDs"),
+        translationMemoryId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe(
+            "Attach the project to an existing translation memory instead of creating one. Attachment is permanent",
+          ),
       },
     },
-    async ({ name, sourceLanguage, targetLanguages }) => {
+    async ({ name, sourceLanguage, targetLanguages, translationMemoryId }) => {
       try {
-        return formatSuccess(await createProject(client, name, sourceLanguage, targetLanguages));
+        return formatSuccess(
+          await createProject(client, name, sourceLanguage, targetLanguages, undefined, translationMemoryId),
+        );
       } catch (e) {
         return formatError(e);
       }
@@ -58,6 +67,12 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
         name: z.string().optional().describe("New project name"),
         sourceLanguage: z.string().uuid().optional().describe("New source language UUID"),
         targetLanguages: z.array(z.string().uuid()).optional().describe("New target language UUIDs"),
+        cdnPublic: z.boolean().optional().describe("Serve this project's catalogs from the public CDN"),
+        autoDiscoverLocales: z
+          .boolean()
+          .optional()
+          .describe("Add locales found in the connected repository automatically"),
+        context: z.string().nullable().optional().describe("Project context passed to the translation engine"),
         config: z
           .object({
             qa: z
@@ -87,7 +102,9 @@ export function registerProjectTools(server: McpServer, client: ApiClient) {
                 webhookUrl: z.string().optional(),
                 webhookSecret: z.string().optional(),
                 emailRecipients: z.array(z.string()).optional(),
-                enabledEvents: z.array(z.enum(["job_failed", "qa_issues", "delivery_failed", "job_completed"])).optional(),
+                enabledEvents: z
+                  .array(z.enum(["job_failed", "qa_issues", "delivery_failed", "job_completed"]))
+                  .optional(),
               })
               .optional(),
           })

@@ -48,7 +48,13 @@ export {
 export { FILE_FORMATS, type FileFormat } from "./file-formats.js";
 
 // Glossary
-export { listGlossary, createGlossaryEntry, deleteGlossaryEntry } from "./commands/glossary.js";
+export {
+  listGlossary,
+  createGlossaryEntry,
+  deleteGlossaryEntry,
+  bulkCreateGlossaryEntries,
+  previewGlossaryImport,
+} from "./commands/glossary.js";
 
 // Style guides
 export {
@@ -87,12 +93,28 @@ export {
 // Namespaces
 export { listNamespaces, updateNamespace, deleteNamespace } from "./commands/namespaces.js";
 
-// Translation memory
+// Translation memories (org-level resource)
 export {
+  listTranslationMemories,
+  createTranslationMemory,
+  getTranslationMemory,
+  renameTranslationMemory,
+  deleteTranslationMemory,
+  listTranslationMemoryEntries,
+  deleteTranslationMemoryEntryById,
+  clearTranslationMemory,
+  countTranslationMemoryEntries,
+  freshCountTranslationMemoryEntries,
+} from "./commands/translation-memories.js";
+
+// Translation memory, project-scoped (deprecated compatibility layer)
+export {
+  PROJECT_TM_DEPRECATION,
   listTranslationMemory,
   deleteTranslationMemoryEntry,
   countTranslationMemory,
   freshCountTranslationMemory,
+  clearProjectTranslationMemory,
 } from "./commands/translation-memory.js";
 
 // Billing

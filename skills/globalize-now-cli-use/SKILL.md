@@ -460,12 +460,32 @@ npx @globalize-now/cli-client glossary create \
 
 `--source-language-id` and `--target-language-id` are **project language UUIDs** from `project-languages list` (Step 3), not global language IDs.
 
+Pass `--do-not-translate` for terms that must stay verbatim in every language (brand names, product names, code identifiers). `--target-term` is still required — use the source spelling.
+
 **Delete** a glossary entry:
 
 ```bash
 npx @globalize-now/cli-client glossary delete \
   --project-id <PROJECT_ID> \
   --entry-id <ENTRY_ID> \
+  --json
+```
+
+**Bulk import** a whole glossary in one transaction (max 10 000 entries, each with its own language pair). Existing entries for the same key are updated rather than duplicated:
+
+```bash
+npx @globalize-now/cli-client glossary bulk \
+  --project-id <PROJECT_ID> \
+  --entries '[{"sourceTerm":"Dashboard","targetTerm":"Tableau de bord","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>"},{"sourceTerm":"Globalize","targetTerm":"Globalize","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>","doNotTranslate":true}]' \
+  --json
+```
+
+**Preview** the same import before writing anything — it reports how many entries would be created and how many updated:
+
+```bash
+npx @globalize-now/cli-client glossary preview \
+  --project-id <PROJECT_ID> \
+  --keys '[{"sourceTerm":"Dashboard","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>"}]' \
   --json
 ```
 
@@ -563,8 +583,8 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `orgs list` | | |
 | `orgs delete` | `--id` | |
 | `projects list` | | |
-| `projects create` | `--name`, `--source-language` (ID), `--target-languages` (IDs) | |
-| `projects update` | `--id` | `--name`, `--source-language`, `--target-languages`, `--config` (JSON) |
+| `projects create` | `--name`, `--source-language` (ID), `--target-languages` (IDs) | `--config` (JSON), `--translation-memory-id` |
+| `projects update` | `--id` | `--name`, `--source-language`, `--target-languages`, `--config` (JSON), `--cdn-public` (`true`/`false`), `--auto-discover-locales` (`true`/`false`), `--context` |
 | `projects get` | `--id` | |
 | `projects delete` | `--id` | |
 | `projects refs` | `--id` | |
@@ -604,8 +624,10 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `gitlab branches` | `--connection-id`, `--project-id` | |
 | `gitlab detect` | `--connection-id`, `--project-id` | |
 | `glossary list` | `--project-id` | |
-| `glossary create` | `--project-id`, `--source-term`, `--target-term`, `--source-language-id`, `--target-language-id` | |
+| `glossary create` | `--project-id`, `--source-term`, `--target-term`, `--source-language-id`, `--target-language-id` | `--do-not-translate` |
 | `glossary delete` | `--project-id`, `--entry-id` | |
+| `glossary bulk` | `--project-id`, `--entries` (JSON) | |
+| `glossary preview` | `--project-id`, `--keys` (JSON) | |
 | `style-guides list` | `--project-id` | |
 | `style-guides upsert` | `--project-id`, `--language-id`, `--instructions` | |
 | `style-guides delete` | `--project-id`, `--language-id` | |
@@ -621,10 +643,20 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `namespaces list` | `--project-id` | |
 | `namespaces update` | `--project-id`, `--namespace-id`, `--name` | |
 | `namespaces delete` | `--project-id`, `--namespace-id` | |
-| `translation-memory list` | `--project-id` | `--query`, `--source-language-id`, `--target-language-id`, `--limit`, `--cursor` |
-| `translation-memory delete` | `--project-id`, `--entry-id` | |
-| `translation-memory count` | `--project-id` | `--target-language-id` |
-| `translation-memory fresh-count` | `--project-id`, `--target-language-id` | |
+| `translation-memories list` | | |
+| `translation-memories create` | `--name` | |
+| `translation-memories get` | `--id` | |
+| `translation-memories rename` | `--id`, `--name` | |
+| `translation-memories delete` | `--id` | |
+| `translation-memories entries` | `--id` | `--query`, `--source-locale`, `--target-locale`, `--limit`, `--cursor` |
+| `translation-memories delete-entry` | `--id`, `--entry-id` | |
+| `translation-memories clear` | `--id` | `--target-locale` |
+| `translation-memories count` | `--id` | `--target-locale` |
+| `translation-memories fresh-count` | `--id`, `--target-locale` | |
+| `translation-memory list` _(deprecated)_ | `--project-id` | `--query`, `--source-language-id`, `--target-language-id`, `--limit`, `--cursor` |
+| `translation-memory delete` _(deprecated)_ | `--project-id`, `--entry-id` | |
+| `translation-memory count` _(deprecated)_ | `--project-id` | `--target-language-id` |
+| `translation-memory fresh-count` _(deprecated)_ | `--project-id`, `--target-language-id` | |
 | `jobs list` | | `--project-id`, `--status`, `--limit`, `--offset` |
 | `jobs get` | `--id` | |
 | `jobs start` | `--id` | |
@@ -681,14 +713,36 @@ There is no `namespaces create` command — namespaces are created automatically
 
 ### Translation memory
 
-Translation memory (TM) stores prior translations for reuse. `--source-language-id` / `--target-language-id` are **project language UUIDs** (from `project-languages list`):
+Translation memory (TM) stores prior translations for reuse. **A memory is an organisation-level resource, not a project one** — several projects can be attached to the same memory and then share its entries. Get a project's memory from `projects get` (`translationMemory.id`), or list every memory in the org:
 
 ```bash
-npx @globalize-now/cli-client translation-memory list --project-id <PROJECT_ID> --target-language-id <PROJECT_LANGUAGE_ID> --json
-npx @globalize-now/cli-client translation-memory count --project-id <PROJECT_ID> --json
-npx @globalize-now/cli-client translation-memory fresh-count --project-id <PROJECT_ID> --target-language-id <PROJECT_LANGUAGE_ID> --json
-npx @globalize-now/cli-client translation-memory delete --project-id <PROJECT_ID> --entry-id <ENTRY_ID> --json
+npx @globalize-now/cli-client translation-memories list --json
+npx @globalize-now/cli-client translation-memories get --id <TM_ID> --json   # attached projects + locales
 ```
+
+Entries are addressed by memory ID and **locale** (`en`, `fr-CA`), not by project language UUID:
+
+```bash
+npx @globalize-now/cli-client translation-memories entries --id <TM_ID> --target-locale fr --json
+npx @globalize-now/cli-client translation-memories count --id <TM_ID> --json
+npx @globalize-now/cli-client translation-memories fresh-count --id <TM_ID> --target-locale fr --json
+npx @globalize-now/cli-client translation-memories delete-entry --id <TM_ID> --entry-id <ENTRY_ID> --json
+```
+
+Managing the memory itself:
+
+```bash
+npx @globalize-now/cli-client translation-memories create --name "Marketing site" --json
+npx @globalize-now/cli-client translation-memories rename --id <TM_ID> --name "Marketing" --json
+npx @globalize-now/cli-client translation-memories clear --id <TM_ID> --target-locale fr --json   # omit the locale to clear everything
+npx @globalize-now/cli-client translation-memories delete --id <TM_ID> --json
+```
+
+Attach a new project to an existing memory at creation time with `projects create --translation-memory-id <TM_ID>`; attachment is permanent.
+
+**Destructive operations hit every attached project.** `clear`, `delete-entry` and `delete` act on the shared memory, so entries other projects contributed disappear too. Check `attachedProjectCount` (from `translation-memories list`/`get`) and confirm with the user before clearing or deleting. `translation-memories delete` only works on a memory with no attached projects.
+
+The older project-scoped commands (`translation-memory list|count|fresh-count|delete --project-id`) still work — they resolve the project's memory for you — but they are deprecated, print a warning, and return entries carrying `translationMemoryId` instead of `projectId`. Prefer the `translation-memories` commands above.
 
 ### Billing
 
@@ -707,7 +761,7 @@ npx @globalize-now/cli-client billing ledger --json
 
 - **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability.
 - **IDs are UUIDs (except `--installation-id`)**: All `--id`, `--project-id`, `--org-id`, etc. expect UUID values returned from prior create/list commands. **Two different installation ID flags exist — they take different value types.** `--installation-id` (used by `github repos`, `github branches`, `github detect`) expects the **numeric** GitHub installation ID (the `installationId` field from `github installations --json`, e.g. `122432012`). `--github-installation-id` (used by `repositories create/update`) expects the **UUID** (the `id` field from `github installations --json`). Always capture both IDs from the JSON response.
-- **Project language IDs vs global language IDs**: Glossary (`--source-language-id`, `--target-language-id`) and style guide (`--language-id`) commands use _project language_ UUIDs — the ID of a language within a specific project. Get these from `project-languages list`, not `languages list`.
+- **Project language IDs vs global language IDs**: Glossary (`--source-language-id`, `--target-language-id`) and style guide (`--language-id`) commands use _project language_ UUIDs — the ID of a language within a specific project. Get these from `project-languages list`, not `languages list`. The `translation-memories` commands are the exception: they take plain locales (`--source-locale`, `--target-locale`) because a memory is shared across projects.
 - **GitHub App required for GitHub repos**: When connecting a GitHub repository, use the GitHub App flow (`github installations` / `github install`) to obtain an installation ID and pass it via `--github-installation-id` on `repositories create`. Without this, Globalize cannot access repo contents. Use `github install --no-wait --json` to get the install URL without blocking, present it to the user, then check completion with `github install-status --nonce <NONCE> --json`.
 - **Patterns are managed separately**: After creating a repository, manage locale path patterns via `patterns list/create/update/delete/reorder`. The `--patterns` flag on `repositories create` is only for initial setup. Pattern changes after creation require the pattern CRUD commands.
 - **GitLab uses connections, not installations**: For GitLab repos, use `gitlab connections` (not `github installations`) and pass `--gitlab-connection-id` (not `--github-installation-id`) on `repositories create`. GitLab project IDs are **numeric** (not UUIDs).

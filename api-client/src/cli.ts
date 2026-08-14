@@ -20,6 +20,7 @@ import { register as registerPatterns } from "./commands/patterns.js";
 import { register as registerJobs } from "./commands/jobs.js";
 import { register as registerNamespaces } from "./commands/namespaces.js";
 import { register as registerTranslationMemory } from "./commands/translation-memory.js";
+import { register as registerTranslationMemories } from "./commands/translation-memories.js";
 import { register as registerBilling } from "./commands/billing.js";
 import { register as registerAuth } from "./commands/auth.js";
 
@@ -70,8 +71,13 @@ const groups = [
   { name: "jobs", description: "Manage translation jobs", register: registerJobs },
   { name: "namespaces", description: "Manage project namespaces", register: registerNamespaces },
   {
+    name: "translation-memories",
+    description: "Browse and manage translation memories and their entries",
+    register: registerTranslationMemories,
+  },
+  {
     name: "translation-memory",
-    description: "Browse and manage translation memory",
+    description: "(deprecated) Project-scoped translation memory — use `translation-memories`",
     register: registerTranslationMemory,
   },
   { name: "billing", description: "View billing balance and ledger", register: registerBilling },
