@@ -58,6 +58,33 @@
     "library": "lingui",
     "variant": "vite-babel-lingui"
   },
+  "webext-wxt-react-lingui": {
+    "category": "positive",
+    "type": "local",
+    "path": "fixtures/webext-wxt-react",
+    "library": "lingui",
+    "variant": "webext-babel-lingui",
+    "expectedDetection": "evals/expectations/detection/webext-wxt-react.json",
+    "expectedPlan": "evals/expectations/plan/webext-wxt-react-lingui.json"
+  },
+  "webext-wxt-react-native": {
+    "category": "positive",
+    "type": "local",
+    "path": "fixtures/webext-wxt-react",
+    "library": "webext-native",
+    "variant": "webext-native-messages",
+    "expectedDetection": "evals/expectations/detection/webext-wxt-react.json",
+    "expectedPlan": "evals/expectations/plan/webext-wxt-react-native.json"
+  },
+  "webext-mv2": {
+    "category": "hard-stop",
+    "type": "local",
+    "path": "fixtures/hard-stop/webext-mv2",
+    "library": null,
+    "variant": null,
+    "expectedDetection": "evals/expectations/detection/webext-mv2.json",
+    "expectedHardStop": "evals/expectations/hard-stop/webext-mv2.json"
+  },
   "shadcn-admin": {
     "category": "positive",
     "type": "git",

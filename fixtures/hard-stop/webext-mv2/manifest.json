@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Link Cleaner",
+  "version": "1.4.2",
+  "description": "Strips tracking parameters from links before you copy them",
+  "permissions": ["storage", "contextMenus", "<all_urls>"],
+  "background": {
+    "scripts": ["src/background.js"],
+    "persistent": false
+  },
+  "browser_action": {
+    "default_title": "Clean this link",
+    "default_popup": "src/popup.html"
+  }
+}

@@ -53,13 +53,18 @@ Expected shape:
   "catalogPath": "src/locales/{locale}/messages.po",
   "localePathPattern": "src/locales/{locale}/messages.po",
   "fileFormat": "po",
+  "pathLocales": [],
   "importMode": "ignore",
   "importScope": "new_keys_only",
   "mode": "orchestrated"
 }
 ```
 
-`localePathPattern` + `fileFormat` are the values to pass to `repositories create --patterns` (skip the server-side `github detect` / `gitlab detect` step — patterns are already known). Still run the interactive provider connection in Step 2 (GitHub App install / GitLab OAuth) if no installation/connection exists yet — that browser approval is unavoidable.
+`localePathPattern` + `fileFormat` are the values to pass to `repositories create --patterns` (skip the server-side `github detect` / `gitlab detect` step — patterns are already known).
+
+Still run the interactive provider connection in Step 2 (GitHub App install / GitLab OAuth) if no installation/connection exists yet — that browser approval is unavoidable.
+
+`pathLocales` is **optional** and usually absent or `[]`. When present it carries per-language on-disk spellings for the pattern's `{locale}` segment — see "Path-locale overrides" in Step 4b. Pass it straight through to `repositories create --path-locales`.
 
 **Otherwise** (no inputs file, standalone use), detect and prompt as described below.
 
@@ -172,13 +177,15 @@ During detection, also determine the **locale file path pattern** — a path tem
 | **Rails** | Pattern is always `config/locales/{locale}.yml`. Note in detection output that Rails projects may also have split files (e.g. `config/locales/devise.en.yml`) or subdirectories — the pattern targets the primary per-locale files. |
 | **Apple String Catalog** (`.xcstrings`) | A **single multi-locale file** holds every locale, so there is **no `{locale}` segment**. The pattern is the catalog path itself: `Localizable.xcstrings` (the default table), or `**/*.xcstrings` when there are multiple tables/directories (e.g. `InfoPlist.xcstrings`, a per-storyboard `Main.xcstrings`). `fileFormat: xcstrings`; the source language is the catalog's `sourceLanguage` / Info.plist `CFBundleDevelopmentRegion`. The `{locale}` "required" rule above does not apply to this format. |
 | **Android** | **No `{locale}` segment** — the locale lives in the directory qualifier (`res/values-<qualifier>/strings.xml`), so point the pattern at the source file `**/res/values/strings.xml` (or the module-specific `app/src/main/res/values/strings.xml`). The `android-strings` handler discovers the target `res/values-*/strings.xml` overlays and normalizes their qualifiers ⇄ BCP47 on its own. If the active CLI form cannot express a directory-qualifier (no-`{locale}`) source, fall back to Step 4 server-side detection (`github detect` / `gitlab detect`) for the pattern rather than forcing a `{locale}` token. |
+| **Browser extension** (`_locales`) | `_locales/{locale}/messages.json`. The `{locale}` segment **is** used, but Chrome spells locale directories with an **underscore** (`pt_BR`, `zh_CN`, `es_419`) while the platform's languages are BCP-47 (`pt-BR`). Set a **path-locale override** per affected language — see "Path-locale overrides" below. `fileFormat: chrome-messages`. |
+| **WXT** (`@wxt-dev/i18n`) | The authoring source, not the generated `_locales` output: `<srcDir>/locales/{locale}.yml` (also `.json`/`.json5`/`.toml`). `fileFormat: wxt-i18n`. Never point a pattern at the `_locales/` build output as well — it would re-import generated files as source. |
 | **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
 
 If no pattern can be determined locally, record as absent — Step 4 will attempt server-side detection.
 
 ### File format
 
-When a locale path pattern is determined, also determine the **file format**. The `fileFormat` value must be one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`.
+When a locale path pattern is determined, also determine the **file format**. The `fileFormat` value must be one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`, `chrome-messages`, `wxt-i18n`.
 
 | Source | fileFormat value |
 |--------|----------------|
@@ -193,6 +200,8 @@ When a locale path pattern is determined, also determine the **file format**. Th
 | **`.arb` files** | `arb` (Flutter Application Resource Bundle) |
 | **`.xcstrings` files** | `xcstrings` (Apple String Catalog) |
 | **`strings.xml` files** | `android-strings` (Android string resources) |
+| **`_locales/<code>/messages.json`** | `chrome-messages` (browser-extension message catalog — `{key: {message, description, placeholders}}`). Do **not** classify these as `json-nested`: that would treat `description` and `placeholders.*.content` as translatable leaves and corrupt the catalog. |
+| **`locales/<code>.yml` beside a `wxt.config.*`** | `wxt-i18n` (the `@wxt-dev/i18n` authoring format, which compiles to `_locales/`) |
 | **`.json` files** | Inspect content: if all top-level values are strings (`{"greeting": "Hello", "bye": "Goodbye"}`), use `json-flat`. If top-level values contain objects (`{"home": {"greeting": "Hello"}}`), use `json-nested`. |
 
 If the file format cannot be determined locally, record as absent — Step 4 server-side detection may provide it.
@@ -430,7 +439,40 @@ npx @globalize-now/cli-client repositories create \
   --json
 ```
 
-`<FORMAT>` must be exactly one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`. Do not use other values (e.g. `json`, `xliff`, or `yaml` alone are invalid). Refer to the "File format" table in Step 1 for how to determine the correct value.
+`<FORMAT>` must be exactly one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`, `chrome-messages`, `wxt-i18n`. Do not use other values (e.g. `json`, `xliff`, or `yaml` alone are invalid). Refer to the "File format" table in Step 1 for how to determine the correct value.
+
+#### Path-locale overrides
+
+Most layouts spell a locale directory exactly as the language code, so `{locale}` substitutes literally and nothing more is needed. Some do not: a **browser extension** keeps its catalogs in `_locales/pt_BR/messages.json` — an underscore — while the platform language is `pt-BR`. `{locale}` is a literal token substitution with no transform, so the pattern alone cannot bridge that.
+
+Pass the spellings at create time:
+
+```bash
+npx @globalize-now/cli-client repositories create \
+  --project-id <PROJECT_ID> \
+  --git-url <GIT_URL> \
+  --provider github \
+  --github-installation-id <INSTALLATION_UUID> \
+  --patterns '[{"pattern": "_locales/{locale}/messages.json", "fileFormat": "chrome-messages"}]' \
+  --path-locales '[{"pattern": "_locales/{locale}/messages.json", "locale": "pt-BR", "pathLocale": "pt_BR"}]' \
+  --json
+```
+
+Each entry names the `pattern` it applies to, the platform `locale` (BCP-47), and the `pathLocale` (the on-disk spelling). Only languages whose spelling differs need an entry — a plain `de` or `fr` needs none.
+
+To change one after the fact, or to clear it:
+
+```bash
+npx @globalize-now/cli-client patterns path-locale \
+  --repository-id <REPO_ID> --pattern-id <PATTERN_ID> \
+  --language-id <PROJECT_LANGUAGE_UUID> --path-locale pt_BR --json
+
+npx @globalize-now/cli-client patterns path-locale \
+  --repository-id <REPO_ID> --pattern-id <PATTERN_ID> \
+  --language-id <PROJECT_LANGUAGE_UUID> --clear --json
+```
+
+`--language-id` is the **project language** UUID (`project-languages list`), not the global language id.
 
 If no patterns were detected (neither in Step 1/supplied inputs nor in 4a), omit the `--patterns` flag. The `--import-mode` and `--import-scope` flags are optional (default to `ignore` and `new_keys_only`).
 

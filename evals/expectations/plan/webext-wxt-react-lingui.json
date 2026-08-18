@@ -1,0 +1,16 @@
+{
+  "variant": "webext-babel-lingui",
+  "library": "lingui",
+  "phasesIncluded": [
+    "setup"
+  ],
+  "phase2StepsContain": [
+    "create_config",
+    "build_tool_integration",
+    "scaffold_catalogs",
+    "gitignore_artifacts",
+    "extract_compile",
+    "generate_coding_rules",
+    "install_coding_rules"
+  ]
+}

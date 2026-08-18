@@ -1,0 +1,15 @@
+{
+  "variant": "webext-native-messages",
+  "library": "webext-native",
+  "phasesIncluded": [
+    "setup"
+  ],
+  "phase2StepsContain": [
+    "scaffold_catalogs",
+    "generate_coding_rules",
+    "install_coding_rules"
+  ],
+  "phase2StepsAbsent": [
+    "extract_compile"
+  ]
+}

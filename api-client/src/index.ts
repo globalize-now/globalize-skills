@@ -44,6 +44,7 @@ export {
   deletePattern,
   reorderPattern,
   bulkCreatePatterns,
+  setPatternPathLocale,
 } from "./commands/patterns.js";
 export { FILE_FORMATS, type FileFormat } from "./file-formats.js";
 

@@ -8,6 +8,7 @@ import {
   deletePattern,
   reorderPattern,
   bulkCreatePatterns,
+  setPatternPathLocale,
   FILE_FORMATS,
 } from "@globalize-now/cli-client";
 import { formatSuccess, formatError } from "../helpers.js";
@@ -131,6 +132,32 @@ export function registerPatternTools(server: McpServer, client: ApiClient) {
     async ({ repositoryId, patterns }) => {
       try {
         return formatSuccess(await bulkCreatePatterns(client, repositoryId, patterns));
+      } catch (e) {
+        return formatError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "set_pattern_path_locale",
+    {
+      description:
+        "Set or clear the on-disk spelling one language uses in a pattern's {locale} segment. Use where the directory layout diverges from the BCP-47 code — e.g. Chrome extension _locales dirs are underscored (pt_BR) while the language is pt-BR.",
+      inputSchema: {
+        repositoryId: z.string().uuid().describe("Repository UUID"),
+        patternId: z.string().uuid().describe("Pattern UUID"),
+        projectLanguageId: z.string().uuid().describe("Project language UUID"),
+        pathLocale: z
+          .string()
+          .nullable()
+          .describe("On-disk spelling (e.g. pt_BR), or null to clear the override"),
+      },
+    },
+    async ({ repositoryId, patternId, projectLanguageId, pathLocale }) => {
+      try {
+        return formatSuccess(
+          await setPatternPathLocale(client, repositoryId, patternId, projectLanguageId, pathLocale),
+        );
       } catch (e) {
         return formatError(e);
       }

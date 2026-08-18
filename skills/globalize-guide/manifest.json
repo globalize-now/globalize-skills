@@ -300,6 +300,90 @@
       }
     },
     {
+      "variant": "webext-native-messages",
+      "match": { "framework": "webext", "library": "webext-native" },
+      "supportLevel": "experimental",
+      "appliesAlsoTo": [
+        "WXT, CRXJS, plain Vite, Plasmo, webpack",
+        "Extensions with no build step at all",
+        "Chrome, Edge and Firefox MV3 (they share the _locales mechanism)"
+      ],
+      "packages": {
+        "runtime": [],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/webext/webext-native.setup.md"],
+        "convert": ["references/languages/js-ts/frameworks/webext/webext-native.convert.md"],
+        "rulesTemplate": ["references/languages/js-ts/frameworks/webext/webext-native.rules.template.md"],
+        "optional": {
+          "setup-add-ons": ["references/languages/js-ts/frameworks/webext/setup.add-ons.md"]
+        }
+      }
+    },
+    {
+      "variant": "webext-babel-lingui",
+      "match": { "framework": "webext", "compiler": "babel", "react": true, "library": "lingui" },
+      "supportLevel": "experimental",
+      "appliesAlsoTo": [
+        "WXT + React (the default: @wxt-dev/module-react wraps @vitejs/plugin-react, which is Babel)",
+        "CRXJS + React (Babel)",
+        "Plain Vite + React (Babel)"
+      ],
+      "packages": {
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
+        "dev": ["@lingui/cli@^6", "@lingui/format-po@^6", "@lingui/vite-plugin@^6", "babel-plugin-macros@^3"]
+      },
+      "references": {
+        "setup": [
+          "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
+          "references/languages/js-ts/frameworks/webext/lingui.setup.md"
+        ],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/frameworks/webext/lingui.convert.md"
+        ],
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"],
+        "optional": {
+          "setup-add-ons": [
+            "references/languages/js-ts/libraries/lingui/setup.add-ons.md",
+            "references/languages/js-ts/frameworks/webext/setup.add-ons.md"
+          ]
+        }
+      }
+    },
+    {
+      "variant": "webext-swc-lingui",
+      "match": { "framework": "webext", "compiler": "swc", "react": true, "library": "lingui" },
+      "supportLevel": "experimental",
+      "appliesAlsoTo": [
+        "WXT + React with @vitejs/plugin-react-swc",
+        "CRXJS + React (SWC)",
+        "Plain Vite + React (SWC)"
+      ],
+      "packages": {
+        "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
+        "dev": ["@lingui/cli@^6", "@lingui/format-po@^6", "@lingui/vite-plugin@^6", "@lingui/swc-plugin@^6", "@vitejs/plugin-react-swc@^4"]
+      },
+      "references": {
+        "setup": [
+          "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
+          "references/languages/js-ts/frameworks/webext/swc/lingui.setup.md"
+        ],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/frameworks/webext/lingui.convert.md"
+        ],
+        "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"],
+        "optional": {
+          "setup-add-ons": [
+            "references/languages/js-ts/libraries/lingui/setup.add-ons.md",
+            "references/languages/js-ts/frameworks/webext/setup.add-ons.md"
+          ]
+        }
+      }
+    },
+    {
       "variant": "rails-yaml",
       "match": { "language": "ruby", "framework": "rails", "library": "rails-i18n" },
       "supportLevel": "stable",

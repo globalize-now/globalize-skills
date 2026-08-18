@@ -1,0 +1,12 @@
+{
+  "match": {
+    "language": "js-ts",
+    "framework": "webext",
+    "extensionFramework": "none",
+    "manifestVersion": 2,
+    "compiler": null,
+    "router": "none",
+    "react": false, "vue": false, "svelte": false, "typescript": false
+  },
+  "ignore": ["candidateFiles", "routeEntries", "git", "localeSignals", "version", "sourceDir", "packageManager", "platform", "buildSystem", "uiFramework", "existing"]
+}

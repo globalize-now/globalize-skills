@@ -1,12 +1,20 @@
 # LinguiJS: the shared locale module
 
-This is the **first** of three setup references for every React/Lingui variant. Read it before the framework-specific file — `lingui.config.{ts,js}` imports from the module this file creates, so it must exist by the time the framework file writes the config.
+This is the **first** setup reference for every React/Lingui variant — of three on the web variants, of two on the browser-extension variants. Read it before the framework-specific file — `lingui.config.{ts,js}` imports from the module this file creates, so it must exist by the time the framework file writes the config.
 
-Read the three in the order `references.setup` lists them:
+Read them in the order `references.setup` lists them:
 
 1. **this file** — `<i18nDir>/locales.ts`
 2. the framework file — build config, `lingui.config.*`, provider and root-document wiring, routes, middleware, catalogs, `.gitignore`
 3. `setup.navigation.md` — `<i18nDir>/navigation.ts` and the language switcher
+
+**On the `webext-*-lingui` variants there is no step 3.** A browser extension has no URLs, so
+`setup.navigation.md` is deliberately absent from `references.setup` — nothing there applies.
+Its one non-routing export, `LanguageSwitcher.tsx`, is owned by the webext framework file
+instead, because an extension's switcher writes to `browser.storage.sync` rather than
+navigating. `<i18nDir>/navigation.ts` is never created on those variants. Everything in *this*
+file still applies unchanged: `resolveLocale` takes an untrusted string and normalizes it, so
+it works just as well on a value read out of `browser.storage` as on one read out of a URL.
 
 Apply the usual guided / unguided rules: guided mode describes the change and waits for confirmation, unguided mode applies it directly. Every section is independently re-runnable — if it has already been applied, detect that and skip without prompting.
 
@@ -23,8 +31,8 @@ A framework reference must never *define* a module listed in the inventory below
 | Path | Owner | Exports |
 |---|---|---|
 | `<i18nDir>/locales.ts` | this file | `sourceLocale`, `locales`, `Locale`, `resolveLocale`, `getDirection`, `localeDisplayName`, `CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME` |
-| `<i18nDir>/navigation.ts` | `setup.navigation.md` | `stripLocalePrefix`, `localePath`, `switchLocalePath`, `useLocale`, `useLocalePath` |
-| `<componentsDir>/LanguageSwitcher.tsx` | `setup.navigation.md` | the switcher |
+| `<i18nDir>/navigation.ts` | `setup.navigation.md` | `stripLocalePrefix`, `localePath`, `switchLocalePath`, `useLocale`, `useLocalePath` — **not created on the `webext-*` variants** |
+| `<componentsDir>/LanguageSwitcher.tsx` | `setup.navigation.md`, **or the framework file on the `webext-*` variants** | the switcher |
 
 Everything else under `<i18nDir>/` — `locale.server.ts`, `index.ts`, `appRouterI18n.ts`, the catalog loader — belongs to the framework file.
 
@@ -41,6 +49,7 @@ Read `.globalize/manifest-snapshot.json` → `variant` and look it up here. Use 
 | `tanstack-start-babel-lingui`, `tanstack-start-swc-lingui` | `src/i18n/` | `src/components/` |
 | `remix-babel-lingui`, `remix-swc-lingui` | `app/i18n/` | `app/components/` |
 | `react-router-framework-babel-lingui`, `react-router-framework-swc-lingui` | `app/i18n/` | `app/components/` |
+| `webext-babel-lingui`, `webext-swc-lingui` | `src/i18n/` | `src/components/` |
 
 **Source-root override.** If `.globalize/detection.json` reports no `src/` directory on a `src/`-rowed variant, substitute the detected source root — `i18n/` and `components/` at the repo root. Next.js projects without `src/` are common; this is the same rule the framework file already applies to catalog paths.
 
