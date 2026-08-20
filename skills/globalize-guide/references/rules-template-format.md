@@ -173,7 +173,7 @@ Installing no rules is recoverable — the user re-runs the step. Installing rul
 
 `.agents/globalize-rules.md` lives **outside** the skill, and both bridges point at that path rather than into wherever the skill happens to be installed. That is deliberate: **the user can delete the `globalize-guide` skill entirely once setup is done and the coding rules keep working.**
 
-Setup is a one-time, 20k-line, twenty-stack orchestrator. There is no reason for it to sit in the repo forever, and every reason for the rules to. The original mechanism coupled them: `CLAUDE.md` held `@.claude/skills/globalize-guide/references/.../code.md`, so removing the skill broke the import and every future session opened with a dangling `@` reference.
+Setup is a one-time, 20k-line, twenty-three-stack orchestrator. There is no reason for it to sit in the repo forever, and every reason for the rules to. The original mechanism coupled them: `CLAUDE.md` held `@.claude/skills/globalize-guide/references/.../code.md`, so removing the skill broke the import and every future session opened with a dangling `@` reference.
 
 Two rules follow, and `evals/verify-rules-template.sh` enforces both:
 

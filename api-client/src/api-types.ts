@@ -692,6 +692,12 @@ export interface paths {
                                 path: string;
                                 language: string;
                             }[];
+                            localeSpellings?: {
+                                pattern: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
+                            matchedFiles?: string[];
                             namespaces?: {
                                 name: string;
                                 filePattern: string;
@@ -1961,6 +1967,12 @@ export interface paths {
                                 path: string;
                                 language: string;
                             }[];
+                            localeSpellings?: {
+                                pattern: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
+                            matchedFiles?: string[];
                             namespaces?: {
                                 name: string;
                                 filePattern: string;
@@ -3959,6 +3971,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -3972,6 +3985,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -4215,6 +4229,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -4228,6 +4243,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -4635,6 +4651,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -4648,6 +4665,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -4935,6 +4953,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -4948,6 +4967,7 @@ export interface paths {
                                 languageId: string | null;
                                 name: string;
                                 locale: string;
+                                pathLocale: string | null;
                                 isSource: boolean;
                                 archivedAt: string | null;
                                 /** Format: date-time */
@@ -12806,6 +12826,11 @@ export interface paths {
                                 pattern: string;
                                 fileFormat: string;
                                 position: number;
+                                pathLocales: {
+                                    projectLanguageId: string;
+                                    locale: string;
+                                    pathLocale: string;
+                                }[];
                             }[];
                             webhookSecret?: string;
                             githubInstallationId: string | null;
@@ -12959,7 +12984,7 @@ export interface paths {
                         patterns?: {
                             pattern: string;
                             /** @enum {string} */
-                            fileFormat: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings";
+                            fileFormat: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings" | "chrome-messages" | "wxt-i18n";
                         }[];
                         /** Format: uuid */
                         githubInstallationId?: string;
@@ -12978,6 +13003,11 @@ export interface paths {
                          */
                         importScope?: "new_keys_only" | "all_keys";
                         detectedFramework?: string | null;
+                        pathLocales?: {
+                            pattern: string;
+                            locale: string;
+                            pathLocale: string;
+                        }[];
                     };
                 };
             };
@@ -12998,6 +13028,11 @@ export interface paths {
                                 pattern: string;
                                 fileFormat: string;
                                 position: number;
+                                pathLocales: {
+                                    projectLanguageId: string;
+                                    locale: string;
+                                    pathLocale: string;
+                                }[];
                             }[];
                             webhookSecret?: string;
                             githubInstallationId: string | null;
@@ -13166,6 +13201,11 @@ export interface paths {
                                 pattern: string;
                                 fileFormat: string;
                                 position: number;
+                                pathLocales: {
+                                    projectLanguageId: string;
+                                    locale: string;
+                                    pathLocale: string;
+                                }[];
                             }[];
                             webhookSecret?: string;
                             githubInstallationId: string | null;
@@ -13365,6 +13405,11 @@ export interface paths {
                                 pattern: string;
                                 fileFormat: string;
                                 position: number;
+                                pathLocales: {
+                                    projectLanguageId: string;
+                                    locale: string;
+                                    pathLocale: string;
+                                }[];
                             }[];
                             webhookSecret?: string;
                             githubInstallationId: string | null;
@@ -13545,6 +13590,12 @@ export interface paths {
                                 path: string;
                                 language: string;
                             }[];
+                            localeSpellings?: {
+                                pattern: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
+                            matchedFiles?: string[];
                             namespaces?: {
                                 name: string;
                                 filePattern: string;
@@ -13724,6 +13775,12 @@ export interface paths {
                                 path: string;
                                 language: string;
                             }[];
+                            localeSpellings?: {
+                                pattern: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
+                            matchedFiles?: string[];
                             namespaces?: {
                                 name: string;
                                 filePattern: string;
@@ -14200,6 +14257,11 @@ export interface paths {
                             position: number;
                             /** Format: date-time */
                             createdAt: string;
+                            pathLocales: {
+                                projectLanguageId: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
                         }[];
                     };
                 };
@@ -14333,7 +14395,7 @@ export interface paths {
                     "application/json": {
                         pattern: string;
                         /** @enum {string} */
-                        fileFormat: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings";
+                        fileFormat: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings" | "chrome-messages" | "wxt-i18n";
                         position?: number;
                     };
                 };
@@ -14353,6 +14415,11 @@ export interface paths {
                             position: number;
                             /** Format: date-time */
                             createdAt: string;
+                            pathLocales: {
+                                projectLanguageId: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
                         };
                     };
                 };
@@ -14501,7 +14568,7 @@ export interface paths {
                         patterns: {
                             pattern: string;
                             /** @enum {string} */
-                            fileFormat: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings";
+                            fileFormat: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings" | "chrome-messages" | "wxt-i18n";
                         }[];
                     };
                 };
@@ -14521,6 +14588,11 @@ export interface paths {
                             position: number;
                             /** Format: date-time */
                             createdAt: string;
+                            pathLocales: {
+                                projectLanguageId: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
                         }[];
                     };
                 };
@@ -14806,7 +14878,7 @@ export interface paths {
                     "application/json": {
                         pattern?: string;
                         /** @enum {string} */
-                        fileFormat?: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings";
+                        fileFormat?: "json-flat" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "arb" | "yaml-rails" | "xcstrings" | "android-strings" | "chrome-messages" | "wxt-i18n";
                         position?: number;
                     };
                 };
@@ -14826,6 +14898,11 @@ export interface paths {
                             position: number;
                             /** Format: date-time */
                             createdAt: string;
+                            pathLocales: {
+                                projectLanguageId: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
                         };
                     };
                 };
@@ -14988,6 +15065,11 @@ export interface paths {
                             position: number;
                             /** Format: date-time */
                             createdAt: string;
+                            pathLocales: {
+                                projectLanguageId: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
                         }[];
                     };
                 };
@@ -15105,6 +15187,178 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repositories/{repoId}/patterns/{patternId}/path-locale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set or clear a language's path spelling for a repo pattern */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    repoId: string;
+                    patternId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        projectLanguageId: string;
+                        pathLocale: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            repositoryId: string;
+                            pattern: string;
+                            fileFormat: string;
+                            position: number;
+                            /** Format: date-time */
+                            createdAt: string;
+                            pathLocales: {
+                                projectLanguageId: string;
+                                locale: string;
+                                pathLocale: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -15458,6 +15712,7 @@ export interface paths {
                             languageId: string | null;
                             name: string;
                             locale: string;
+                            pathLocale: string | null;
                             isSource: boolean;
                             archivedAt: string | null;
                             /** Format: date-time */
@@ -15616,6 +15871,7 @@ export interface paths {
                             languageId: string | null;
                             name: string;
                             locale: string;
+                            pathLocale: string | null;
                             isSource: boolean;
                             archivedAt: string | null;
                             /** Format: date-time */
@@ -15796,6 +16052,7 @@ export interface paths {
                         name?: string;
                         locale?: string;
                         isSource?: boolean;
+                        pathLocale?: string | null;
                     };
                 };
             };
@@ -15812,6 +16069,7 @@ export interface paths {
                             languageId: string | null;
                             name: string;
                             locale: string;
+                            pathLocale: string | null;
                             isSource: boolean;
                             archivedAt: string | null;
                             /** Format: date-time */

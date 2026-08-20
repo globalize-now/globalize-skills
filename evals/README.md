@@ -57,7 +57,7 @@ Fixtures are defined in `evals/fixtures.json`. Local fixture projects live under
 | Category | Meaning | Layers |
 |----------|---------|--------|
 | `positive` | A supported stack the skill should set up cleanly | A + B |
-| `hard-stop` | An incompatible stack the skill must refuse (CRA, Remix v1, non-React/Vue, …) | A only |
+| `hard-stop` | An incompatible stack the skill must refuse (CRA, Remix v1, non-React/Vue, Manifest V2 extensions, …) | A only |
 | `collapse` | i18n already configured — Phase 2 should reduce to verification-only steps | A (B once a collapse prefill exists) |
 
 ### Types
@@ -69,6 +69,22 @@ Fixtures are defined in `evals/fixtures.json`. Local fixture projects live under
 | `derived` | Copy `<base>/.`, then overlay `<overlay>/.` (overlay wins on conflict) |
 
 `derived` lets a collapse fixture reuse a positive fixture as its base and only check in the files that differ (e.g. the next-intl config + provider + catalogs that simulate an already-configured project).
+
+### One fixture, two variants
+
+A stack where §1.5 offers a genuine library choice needs one fixture entry per choice, sharing a
+`path` and a detection golden but carrying different plan goldens. `nextjs-app-router-lingui` and
+`nextjs-app-router-next-intl-configured` do this for Next.js; `webext-wxt-react-lingui` and
+`webext-wxt-react-native` do it for browser extensions, where a WXT + React project matches both
+`webext-babel-lingui` and `webext-native-messages`.
+
+### Detection regression guard
+
+`fixtures/webext-wxt-react` also exists to guard a detection ordering change: the browser-extension
+check runs **before** the `vite` fallback in §1.1's `framework` rules, because WXT, CRXJS and plain-Vite
+extensions all carry `vite` in devDependencies. Whenever that ordering is touched, re-run Layer A over
+`vite-swc`, `vite-babel`, `vite-swc-data-module` and `shadcn-admin` and confirm none of them reclassify
+to `webext`.
 
 ### `fixtures.json` schema
 

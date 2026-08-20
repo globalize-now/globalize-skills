@@ -389,7 +389,7 @@ npx @globalize-now/cli-client patterns create \
   --json
 ```
 
-Supported file formats: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`.
+Supported file formats: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`, `chrome-messages`, `wxt-i18n`.
 
 **Single-file formats (no `{locale}` segment).** Most formats use one file per locale, so the pattern carries a `{locale}` placeholder (`locales/{locale}/*.json`). The **`xcstrings`** format (Apple String Catalog) is different: a single multi-locale file holds every locale, so the pattern is the catalog path itself with **no `{locale}` segment** — e.g.
 
@@ -402,6 +402,19 @@ npx @globalize-now/cli-client patterns create \
 ```
 
 Use `"**/*.xcstrings"` instead when the project has multiple catalog tables/directories.
+
+**Path-locale overrides (when the directory spelling differs from the language code).** `{locale}` is a literal token substitution — there is no transform. A **browser extension** keeps its catalogs at `_locales/pt_BR/messages.json` (underscore) while the platform language is `pt-BR`, so the difference has to be recorded per language:
+
+```bash
+npx @globalize-now/cli-client patterns path-locale \
+  --repository-id <REPO_ID> \
+  --pattern-id <PATTERN_ID> \
+  --language-id <PROJECT_LANGUAGE_ID> \
+  --path-locale pt_BR \
+  --json
+```
+
+`--language-id` is the **project language** UUID from `project-languages list`, not the global language id. Pass `--clear` instead of `--path-locale` to remove an override and fall back to the language's own code. Languages whose spelling already matches (`de`, `fr`, `ja`) need no entry. At repository-create time the same information goes in one shot via `repositories create --path-locales '[{"pattern": …, "locale": "pt-BR", "pathLocale": "pt_BR"}]'`.
 
 **Update** a pattern:
 
@@ -610,6 +623,7 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `patterns delete` | `--repository-id`, `--pattern-id` | |
 | `patterns reorder` | `--repository-id`, `--pattern-id`, `--position` | |
 | `patterns bulk` | `--repository-id`, `--patterns` (JSON) | |
+| `patterns path-locale` | `--repository-id`, `--pattern-id`, `--language-id` | `--path-locale`, `--clear` |
 | `github install` | | `--no-wait` |
 | `github install-status` | `--nonce` | |
 | `github installations` | | |

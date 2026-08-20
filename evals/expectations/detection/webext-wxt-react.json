@@ -1,0 +1,23 @@
+{
+  "match": {
+    "language": "js-ts",
+    "framework": "webext",
+    "extensionFramework": "wxt",
+    "manifestVersion": 3,
+    "compiler": "babel",
+    "router": "none",
+    "react": true, "vue": false, "svelte": false, "typescript": true,
+    "packageManager": "npm",
+    "existing": { "library": "none", "configured": false, "providerWired": false,
+                  "catalogsScaffolded": false, "stringsWrapped": "no" }
+  },
+  "ignore": ["candidateFiles", "routeEntries", "git", "localeSignals", "version", "sourceDir", "platform", "buildSystem", "uiFramework"],
+  "softAssert": {
+    "candidateFilesMinCount": 3,
+    "candidateFilesMustContain": [
+      "entrypoints/popup/App.tsx",
+      "src/components/StashList.tsx",
+      "entrypoints/background.ts"
+    ]
+  }
+}

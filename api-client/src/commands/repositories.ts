@@ -25,6 +25,17 @@ export async function createRepository(
       pattern: string;
       fileFormat: FileFormat;
     }[];
+    /**
+     * Per-language on-disk spellings for a pattern's `{locale}` segment, for
+     * layouts whose directory names diverge from the BCP-47 language code —
+     * Chrome extension `_locales` dirs are underscored (`pt_BR`), the language
+     * is `pt-BR`. Each entry names the pattern it applies to.
+     */
+    pathLocales?: {
+      pattern: string;
+      locale: string;
+      pathLocale: string;
+    }[];
     githubInstallationId?: string;
     gitlabConnectionId?: string;
     importMode?: "ignore" | "reviewed" | "translated";
@@ -39,6 +50,7 @@ export async function createRepository(
       provider: options.provider,
       branches: options.branches,
       patterns: options.patterns,
+      pathLocales: options.pathLocales,
       githubInstallationId: options.githubInstallationId,
       gitlabConnectionId: options.gitlabConnectionId,
       importMode: options.importMode,
@@ -143,6 +155,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .addOption(new Option("--provider <provider>", "Git provider").choices(["github", "gitlab"]).makeOptionMandatory())
     .option("--branches <branches...>", "Branches to track")
     .option("--patterns <json>", "Patterns as JSON array of {pattern, fileFormat}")
+    .option("--path-locales <json>", "Path-locale overrides as JSON array of {pattern, locale, pathLocale}")
     .option("--github-installation-id <id>", "GitHub App installation ID")
     .option("--gitlab-connection-id <id>", "GitLab connection UUID")
     .addOption(new Option("--import-mode <mode>", "Import mode").choices(["ignore", "reviewed", "translated"]))
@@ -152,6 +165,7 @@ export function register(group: Command, getClient: ClientFactory): void {
       try {
         const client = await getClient();
         const patterns = cmdOpts.patterns ? JSON.parse(cmdOpts.patterns) : undefined;
+        const pathLocales = cmdOpts.pathLocales ? JSON.parse(cmdOpts.pathLocales) : undefined;
         output(
           await createRepository(client, {
             projectId: cmdOpts.projectId,
@@ -159,6 +173,7 @@ export function register(group: Command, getClient: ClientFactory): void {
             provider: cmdOpts.provider,
             branches: cmdOpts.branches,
             patterns,
+            pathLocales,
             githubInstallationId: cmdOpts.githubInstallationId,
             gitlabConnectionId: cmdOpts.gitlabConnectionId,
             importMode: cmdOpts.importMode,

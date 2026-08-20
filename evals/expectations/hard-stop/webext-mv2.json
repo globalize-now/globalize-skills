@@ -1,0 +1,11 @@
+{
+  "messageContains": "Manifest V2",
+  "mustNotCreate": [
+    ".globalize/plan.md",
+    ".globalize/manifest-snapshot.json"
+  ],
+  "mustCreate": [
+    ".globalize/detection.json"
+  ],
+  "depsMustBeUnchanged": true
+}

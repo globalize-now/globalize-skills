@@ -20,6 +20,8 @@ export const FILE_FORMATS = [
   "yaml-rails",
   "xcstrings",
   "android-strings",
+  "chrome-messages",
+  "wxt-i18n",
 ] as const satisfies readonly FileFormat[];
 
 // Compile-time drift guard. `satisfies` above rejects an INVALID entry; this
