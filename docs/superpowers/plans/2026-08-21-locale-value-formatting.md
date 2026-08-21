@@ -1751,6 +1751,21 @@ done
 
 A source line count above the declared budget is not automatically a failure — conditional branches shrink the render — but a template whose *source* is under budget cannot possibly render over it, so any template whose source exceeds its budget needs the by-hand render. Fix the frontmatter, not the prose.
 
+- [ ] **Step 2b: Make `templateVersion` coherent across all eight templates**
+
+Adding `formatModule` to a template's `values:` IS a rendering-contract change under the rule in `references/rules-template-format.md`, so **every** template gets exactly one bump for this feature. The task-by-task series drifted: next-intl added `formatModule` to `values:` and never bumped (still at 1). Audit all eight, and bump any that added `formatModule` without one:
+
+```bash
+grep -rn '^templateVersion:' skills/globalize-guide/references/languages/
+grep -rln 'formatModule' skills/globalize-guide/references/languages/ | grep 'rules.template.md'
+```
+
+Every file in the second list must have been bumped exactly once relative to its pre-feature value (`git log -p` the frontmatter line if unsure). Do not double-bump one that already moved.
+
+- [ ] **Step 2c: Correct the Paraglide alias-precision claim**
+
+`formatPercent` was `{ style: 'percent', maximumFractionDigits: 1 }`; the canonical `percent` is `{ style: 'percent' }`. `0.4567` renders `45.7%` before and `46%` after, so the deprecation paragraph's claim that the aliases mean "a re-run does not break call sites" is overstated. Add one clause to that paragraph naming the rounding change. Keep the alias and the canonical definition as they are — uniformity across stacks is the deliberate trade; the fix is to stop overclaiming.
+
 - [ ] **Step 3: Run a Layer A eval end to end**
 
 ```bash
