@@ -30,6 +30,7 @@ This setup phase covers **Ruby on Rails** projects using the **built-in `I18n` A
 | 4. Scaffold `config/locales/` | Additive | New `{locale}.yml` files; does not touch existing locale files |
 | 5. `ApplicationController` switcher | **Modifies existing file** | Adds `around_action` + `switch_locale` method; optional URL-locale routing edits `config/routes.rb` |
 | 6. Test-env `raise_on_missing_translations` | **Modifies existing file** | Adds one line to `config/environments/test.rb` |
+| Format helpers | Additive | Creates `app/helpers/format_helper.rb`; adds new catalog keys under `date.*` / `time.*` / `support.array.or.*` to `config/locales/{source_locale}.yml` — **always runs**, feeds Step 7 |
 | 7. Generate + wire coding rules | Additive (+ edits `CLAUDE.md` / `AGENTS.md`) | Writes `.agents/globalize-rules.md` via `setup.add-ons.md` and points `CLAUDE.md` and `AGENTS.md` at it — **always runs**, Phase 3 wraps against it |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify existing project files.** _(This rule is modified by the setup mode chosen below.)_
@@ -357,9 +358,186 @@ This setting is safe to emit unconditionally (no version-gated branches); on Rai
 
 ---
 
+## Format helpers (`generate_format_helpers`)
+
+Action View's number and date/time helpers already read the active locale's catalog — but nothing routes currency correctly by default, and every controller, model, and job that needs to format a value has to remember the right helper and the right options each time. This step creates one small module, `FormatHelper`, that gives every formatting concern a single name. Names are `format_`-prefixed and snake_case: the module is mixed into every view, so a bare `number` or `list` would collide with Action View or a local variable.
+
+**Always runs**, on every project — like Steps 2–6, it does not wait for a `SKILL.md §1.10` selection. Phase 3's wrap subagents route every hardcoded number, currency, date, and list through this module's ten methods.
+
+Create `app/helpers/format_helper.rb`. **If it already exists as project code, do not overwrite it** — add the methods below into it, and skip any method already defined there.
+
+```ruby
+# app/helpers/format_helper.rb
+module FormatHelper
+  # This project's default currency — used ONLY when a caller does not pass
+  # one explicitly (see format_money below). Grep for an existing
+  # number_to_currency call with an inline unit:, or a hardcoded symbol,
+  # before defaulting — a wrong currency that looks deliberate is worse than
+  # one that flags itself.
+  DEFAULT_CURRENCY = "USD" # adjust to this project's currency
+
+  # A minimal ISO 4217 -> symbol map for currencies passed explicitly (see
+  # currency_unit below). Extend as this project needs; an unmapped code
+  # falls back to its own ISO code, which is always unambiguous even when
+  # it isn't pretty.
+  CURRENCY_SYMBOLS = {
+    "USD" => "$", "EUR" => "€", "GBP" => "£", "JPY" => "¥", "CNY" => "¥",
+    "INR" => "₹", "BRL" => "R$", "CAD" => "CA$", "AUD" => "A$", "CHF" => "CHF"
+  }.freeze
+
+  # THE SEAM. Formatting follows the UI locale today. To give this project a
+  # separate regional preference, change this one method.
+  def format_locale
+    I18n.locale
+  end
+
+  # Currency belongs to the DATA, not the reader — see "The currency rule"
+  # below. Pass one whenever the amount carries one:
+  # format_money(order.total, order.currency). Omitting it formats
+  # DEFAULT_CURRENCY, and only then may the active locale's own configured
+  # symbol win.
+  def format_money(amount, currency = nil)
+    return number_to_currency(amount, locale: format_locale) if currency.nil?
+
+    number_to_currency(amount, locale: format_locale, unit: currency_unit(currency))
+  end
+
+  def format_number(value)
+    number_with_delimiter(value, locale: format_locale)
+  end
+
+  def format_percent(value)
+    number_to_percentage(value * 100, locale: format_locale, precision: 1)
+  end
+
+  def format_compact(value)
+    number_to_human(value, locale: format_locale)
+  end
+
+  def format_unit(value, unit)
+    "#{format_number(value)} #{unit}"
+  end
+
+  # I18n.l (== I18n.localize) accepts only Date, DateTime, and Time — see
+  # "l() raises on a numeric argument" below. The .to_date / .to_time calls
+  # are load-bearing: they are what let this accept the Date/Time/DateTime/
+  # parseable-String values callers actually have on hand.
+  def format_date(value, preset = :medium)
+    I18n.l(value.to_date, format: preset, locale: format_locale)
+  end
+
+  def format_time(value)
+    I18n.l(value.to_time, format: :time, locale: format_locale)
+  end
+
+  def format_date_time(value)
+    I18n.l(value.to_time, format: :date_time, locale: format_locale)
+  end
+
+  def format_relative_time(value, now = Time.current)
+    distance = distance_of_time_in_words(value, now, locale: format_locale)
+    # .to_time on both sides — a Date/Time/DateTime mix (e.g. value is a
+    # Date, now defaults to Time.current) otherwise risks a comparison
+    # ArgumentError, same reasoning as the .to_date/.to_time calls above.
+    if value.to_time < now.to_time
+      I18n.t("time.ago", distance: distance, locale: format_locale)
+    else
+      I18n.t("time.from_now", distance: distance, locale: format_locale)
+    end
+  end
+
+  # :and relies on Rails' own to_sentence i18n lookup (support.array.*,
+  # which rails-i18n already ships for every locale it covers) — no custom
+  # keys needed. :or has no Rails built-in, so it reads the connectors this
+  # project scaffolds under support.array.or.* below.
+  def format_list(items, type = :and)
+    return items.to_sentence(locale: format_locale) if type == :and
+
+    items.to_sentence(
+      locale: format_locale,
+      two_words_connector: I18n.t("support.array.or.two_words_connector", locale: format_locale),
+      last_word_connector: I18n.t("support.array.or.last_word_connector", locale: format_locale)
+    )
+  end
+
+  private
+
+  def currency_unit(currency)
+    CURRENCY_SYMBOLS.fetch(currency.to_s.upcase, currency.to_s.upcase)
+  end
+end
+```
+
+### The currency rule — data wins, never the locale
+
+**An explicitly passed currency always wins.** `format_money(order.total, order.currency)` renders in whatever currency the *order* carries, regardless of which locale the reader is browsing in — a German reader looking at a USD order sees `$1,234.50`, not a relabeled `1.234,50 €`. This is why `format_money`'s second argument defaults to `nil`, not to `DEFAULT_CURRENCY`: `nil` is the only way the method can tell "no currency was passed" apart from "the caller passed the project default explicitly," and only the former is allowed to defer to the locale.
+
+The locale's own configured `number.currency.format.unit` may be used **only** on that no-currency path — a genuinely project-wide amount (a flat fee, a plan price) with no currency of its own, where letting each locale's catalog supply its own familiar symbol for `DEFAULT_CURRENCY` is correct rather than a bug. `number_to_currency(amount, locale: format_locale)` with no `unit:` override already does exactly this — Rails resolves the symbol itself from that locale's `number.currency.format.unit`, falling back to `rails-i18n`'s own default (`"$"`) if the locale doesn't configure one. Nothing extra needs to be written for that branch.
+
+For an explicit currency, `format_money` overrides only the *symbol* (`unit:`) via the `CURRENCY_SYMBOLS` map above — precision, decimal separator, and thousands delimiter still come from the active locale's own `number.currency.format.*`, because those are genuinely locale conventions (`1.234,50` vs `1,234.50`), not currency ones. An ISO code with no entry in the map still renders unambiguously, as the ISO code itself (`SEK 1,234.50`) — never as another currency's symbol.
+
+### Catalog keys this helper depends on
+
+`rails-i18n` (Step 2) already ships `number.*`, `date.formats.{default,short,long}`, `time.formats.{default,short,long}`, and `support.array.{words_connector,two_words_connector,last_word_connector}` for every locale it covers — confirmed against `rails-i18n`'s own source and Rails' own `en.yml`. Only app-authored *overrides* of those belong in the connected catalog; this restates the existing `rails-i18n`-provided-defaults rule from Step 7's generated rules file.
+
+This helper adds six keys that **neither Rails core nor `rails-i18n` ships under any locale** — scaffold them into `config/locales/{source_locale}.yml` now, and into every target-locale file when that locale is added:
+
+```yaml
+# config/locales/en.yml — replace "en" with this project's real source locale (Step 1)
+en:
+  date:
+    formats:
+      medium: "%b %d, %Y"      # new — rails-i18n ships default/short/long, not medium
+  time:
+    formats:
+      time: "%-I:%M %p"                    # new — this preset name, distinct from time.formats.short
+      date_time: "%b %d, %Y, %-I:%M %p"    # new — this preset name, distinct from time.formats.long
+    ago: "%{distance} ago"     # new — distance_of_time_in_words returns the bare phrase
+    from_now: "in %{distance}" # new
+  support:
+    array:
+      or:
+        two_words_connector: " or "     # new — rails-i18n only ships the "and" connectors
+        last_word_connector: ", or "    # new
+```
+
+**`date.formats.long` is already shipped** (`rails-i18n` and Rails' own `en.yml` both provide `default`/`short`/`long`) — do not re-author it; only `medium` is new. Every non-English target locale needs its own translated `medium`/`time`/`date_time`/`ago`/`from_now`/`support.array.or.*` — `rails-i18n` never fills these in, no matter how well it covers that locale otherwise.
+
+### `l()` raises on a numeric argument
+
+`I18n.l` (aliased as `l` in views, controllers, and mailers) localizes `Date`, `DateTime`, and `Time` only — passing a `Float` or `Integer` raises `I18n::ArgumentError`. The `.to_date` / `.to_time` coercions inside `format_date`, `format_time`, and `format_date_time` above are load-bearing, not decoration: they are what let those three methods accept the `Date` / `Time` / `DateTime` / parseable-`String` values a caller actually has, and they still do nothing for a raw Unix timestamp or any other numeric — convert it to a `Time` (`Time.at(timestamp)`) before calling in.
+
+### Helper availability — views and mailers get it for free; everywhere else needs one extra line
+
+Every helper under `app/helpers/` — `FormatHelper` included — is mixed into every view and every mailer template automatically, the same default Rails uses for both. `format_money`, `format_date`, and the rest work with no extra step there.
+
+**Everywhere else — models, service objects, background jobs, rake tasks, `rails runner` — `include FormatHelper` on its own is not enough.** Six of the ten methods depend on Action View and won't raise a helpful error until called from the wrong context: `format_money` (`number_to_currency`), `format_number` (`number_with_delimiter`), `format_percent` (`number_to_percentage`), `format_compact` (`number_to_human`), `format_unit` (calls `format_number` above, so it inherits the same dependency), and `format_relative_time` (`distance_of_time_in_words`). Every one of those parenthesized names comes from `ActionView::Helpers::NumberHelper` / `DateHelper`, not from `FormatHelper` itself, and plain `include FormatHelper` does not pull either module in. Reach them one of two sanctioned ways:
+
+```ruby
+# Simplest — Rails' own helper proxy already mixes in every app helper plus
+# every Action View helper module. Works in models, jobs, rake tasks, and
+# `rails runner` with no include at all:
+ActionController::Base.helpers.format_money(order.total, order.currency)
+
+# Or include the two Action View modules this project's methods actually
+# need, alongside FormatHelper itself — useful when a class formats often
+# enough that the proxy indirection isn't worth it:
+class ReceiptBuilder
+  include ActionView::Helpers::NumberHelper
+  include ActionView::Helpers::DateHelper
+  include FormatHelper
+end
+```
+
+`format_locale`, `format_date`, `format_time`, `format_date_time`, and `format_list` need neither route — they call only `I18n.l` (core `i18n` gem, not Action View) and `Array#to_sentence` (a core `ActiveSupport` extension), both loaded everywhere a Rails app runs. Bare `l()` and `t()`, by contrast, **are** view/controller/mailer-only (`AbstractController::Translation`) — which is exactly why every method above calls `I18n.l` / `I18n.t` explicitly rather than the bare form, so the module behaves identically through either sanctioned route above.
+
+**Write `.globalize/format-module.json`** with `specifier: "FormatHelper"`, `path: "app/helpers/format_helper.rb"`, the ten-entry `surface` (`["format_money","format_number","format_percent","format_compact","format_unit","format_date","format_time","format_date_time","format_relative_time","format_list"]`), `defaultCurrency`, and `currencySource`. `generate_coding_rules` (Step 7) reads `specifier` back as the `formatModule` placeholder.
+
+---
+
 ## Step 7: Generate Coding Rules (`generate_coding_rules` — always runs)
 
-The Rails i18n coding rules — `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, and what not to wrap — are a **generated file**, not a shipped one. They are rendered from `references/languages/ruby/frameworks/rails/rails.rules.template.md` down to this project's actual configuration (routing decision, `rails-i18n` presence, real source and target locales) and written to `.agents/globalize-rules.md`.
+The Rails i18n coding rules — `with_locale`, lazy lookup, `%{name}` interpolation, `_html` keys, CLDR plural sub-keys, formatting, and what not to wrap — are a **generated file**, not a shipped one. They are rendered from `references/languages/ruby/frameworks/rails/rails.rules.template.md` down to this project's actual configuration (routing decision, `rails-i18n` presence, real source and target locales, and the `formatModule` specifier the step above wrote) and written to `.agents/globalize-rules.md`.
 
 Follow the **core coding-rules section** in `references/languages/ruby/frameworks/rails/setup.add-ons.md` — it carries the full procedure, including where each condition and value is read from and the fail-closed rule. **Never skip it**: it is not gated on a `SKILL.md §1.10` selection, because Phase 3's wrap subagents read the generated file as their authoring contract.
 
