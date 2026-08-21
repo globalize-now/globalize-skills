@@ -18,7 +18,21 @@
 - **Pin any package string a skill emits** to a SemVer-major caret (`pkg@^N`, `pkg@^0.M`), single-quoted in shell snippets (`'pkg@^N'`) so zsh `EXTENDED_GLOB` does not eat the caret. Applies to `npx` invocations too. (Constraint inherited from `CLAUDE.md`; this plan should not trigger it.)
 - **Rules-template grammar:** one key, one operator, one double-quoted literal per `<!-- if: -->`; no nesting, no `&&`/`||`/`elif`; `<!-- /if -->` required; markers alone on their own line. Placeholders are `<<name>>`, never `{{ }}`.
 - **Rules-template self-containment (hard):** a template body must not contain `.claude/`, a `references/…` path, or the literal `globalize-guide`. `evals/verify-rules-template.sh` fails the build on any of these. `<<formatModule>>` resolves to a path in the *user's* project — never into the skill.
-- **Every declared `values:` key must be used in the body, and every used `<<key>>` must be declared.** Both directions are hard failures in the linter. Add `formatModule` to `values:` and use it in the same commit.
+- **Every declared `values:` key must be used in the body, and every used `<<key>>` must be declared.** Both directions are hard failures in the linter. Add `formatModule` to `values:` and use it in the same commit — and when rewriting a section **removes** the last use of an existing key (Task 4 deletes a whole branch, which orphans several), delete that key from `values:` in the same commit or the linter fails.
+- **A new condition or value is not usable until its library's resolution table teaches the renderer how to resolve it.** `generate_coding_rules` fails closed on an unresolvable key, so every task that adds `formatModule` (all of Tasks 2–9) must also add a `formatModule` row — *read `.globalize/format-module.json` → `.specifier`* — to that library's "Resolve the template's `conditions`/`values`" table, and every task that adds the `ssr` condition (Tasks 2, 3, 4) must add an `ssr` row modelled on the existing Paraglide one. **That table is frequently in a different file from the one that creates the module**, and the second file is easy to miss:
+
+  | Library | Creates the module | Owns the resolution table |
+  |---|---|---|
+  | lingui | `lingui/setup.locale-module.md` | **`lingui/setup.add-ons.md`** |
+  | next-intl | `next-intl/setup.add-ons.md` | same file |
+  | vue-i18n | `vue-i18n/setup.shared.md` | same file |
+  | paraglide | `sveltekit/paraglide.setup.md` | **`paraglide/setup.add-ons.md`** |
+  | webext-native | `webext/webext-native.setup.md` | **`webext/setup.add-ons.md`** |
+  | rails | `rails/rails.setup.md` | **`rails/setup.add-ons.md`** |
+  | android | `android/native/android-strings.setup.md` | **`android/native/setup.add-ons.md`** |
+  | ios | `ios/native/string-catalog.setup.md` | same file |
+
+  `evals/verify-format-helpers.sh` checks the resolution host directly, so a missed row fails that task's own gate.
 - **BCP-47 locale variables are named `locale`, never `lang`.** The HTML `lang` attribute and DOM `.lang` property keep their own names.
 - **Guided/unguided:** every setup section describes the change and waits for confirmation in guided mode, applies directly in unguided mode, and is independently re-runnable (detect an already-applied state and skip without prompting).
 - **Never add a `Co-Authored-By: Claude` trailer** to commits, and never add a "Generated with Claude Code" line to PR bodies.
@@ -133,23 +147,31 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# The ten-function surface plus the seam. Grepped case-insensitively so a
-# stack's own naming convention (format_money, .money, formatLocale,
-# format_locale) still satisfies it. Deliberately excludes `number`, `date`,
-# `time` and `list` — those words appear in any i18n prose and would pass
-# vacuously. Project mode checks the real export list instead.
-SURFACE_TOKENS="money percent compact relative formatLocale"
+# Surface smoke test. Grepped case-insensitively as plain substrings, so a
+# stack's own naming convention (format_money, .money) still satisfies them.
+# Deliberately excludes `number`, `date`, `time` and `list` — those words
+# appear in any i18n prose and would pass vacuously. Project mode checks the
+# real export list instead.
+SURFACE_TOKENS="money percent compact relative"
 
-# tag|rules template (relative to REFS)|setup reference (relative to REFS)
+# The seam is checked separately: `format_locale` (Rails) does not contain the
+# substring "formatLocale", so a plain substring grep would fail it forever.
+SEAM_RE='formatLocale|format_locale|formatlocale'
+
+# tag|rules template|setup reference (creates the module)|resolution host
+# (owns the "Resolve the template's conditions/values" table). All paths are
+# relative to REFS. The third and fourth columns differ on five of the eight
+# libraries — the file that writes the module is often not the file that
+# teaches the renderer how to resolve <<formatModule>>.
 PAIRS=$(cat <<'ROWS'
-lingui|languages/js-ts/libraries/lingui/rules.template.md|languages/js-ts/libraries/lingui/setup.locale-module.md
-next-intl|languages/js-ts/libraries/next-intl/rules.template.md|languages/js-ts/libraries/next-intl/setup.add-ons.md
-vue-i18n|languages/js-ts/libraries/vue-i18n/rules.template.md|languages/js-ts/libraries/vue-i18n/setup.shared.md
-paraglide|languages/js-ts/libraries/paraglide/rules.template.md|languages/js-ts/frameworks/sveltekit/paraglide.setup.md
-webext-native|languages/js-ts/frameworks/webext/webext-native.rules.template.md|languages/js-ts/frameworks/webext/webext-native.setup.md
-rails|languages/ruby/frameworks/rails/rails.rules.template.md|languages/ruby/frameworks/rails/rails.setup.md
-android-strings|languages/android/native/android-strings.rules.template.md|languages/android/native/android-strings.setup.md
-string-catalog|languages/ios/native/string-catalog.rules.template.md|languages/ios/native/string-catalog.setup.md
+lingui|languages/js-ts/libraries/lingui/rules.template.md|languages/js-ts/libraries/lingui/setup.locale-module.md|languages/js-ts/libraries/lingui/setup.add-ons.md
+next-intl|languages/js-ts/libraries/next-intl/rules.template.md|languages/js-ts/libraries/next-intl/setup.add-ons.md|languages/js-ts/libraries/next-intl/setup.add-ons.md
+vue-i18n|languages/js-ts/libraries/vue-i18n/rules.template.md|languages/js-ts/libraries/vue-i18n/setup.shared.md|languages/js-ts/libraries/vue-i18n/setup.shared.md
+paraglide|languages/js-ts/libraries/paraglide/rules.template.md|languages/js-ts/frameworks/sveltekit/paraglide.setup.md|languages/js-ts/libraries/paraglide/setup.add-ons.md
+webext-native|languages/js-ts/frameworks/webext/webext-native.rules.template.md|languages/js-ts/frameworks/webext/webext-native.setup.md|languages/js-ts/frameworks/webext/setup.add-ons.md
+rails|languages/ruby/frameworks/rails/rails.rules.template.md|languages/ruby/frameworks/rails/rails.setup.md|languages/ruby/frameworks/rails/setup.add-ons.md
+android-strings|languages/android/native/android-strings.rules.template.md|languages/android/native/android-strings.setup.md|languages/android/native/setup.add-ons.md
+string-catalog|languages/ios/native/string-catalog.rules.template.md|languages/ios/native/string-catalog.setup.md|languages/ios/native/string-catalog.setup.md
 ROWS
 )
 
@@ -194,10 +216,27 @@ lint_pair() {
       fail "$tag: setup reference never names '$tok' — the surface is incomplete"
     fi
   done
+  if grep -qiE "$SEAM_RE" "$setup"; then
+    pass "$tag: setup reference names the formatLocale seam"
+  else
+    fail "$tag: setup reference never names the formatLocale seam"
+  fi
   if grep -qiE 'DEFAULT_CURRENCY|defaultCurrency|default_currency' "$setup"; then
     pass "$tag: setup reference resolves a default currency"
   else
     fail "$tag: setup reference never resolves a default currency"
+  fi
+
+  # 4. The library's condition/value resolution table must teach the renderer
+  # how to resolve formatModule, or generate_coding_rules fails closed on it.
+  # It is often a different file from the one that creates the module.
+  local host="$REFS/$4"
+  if [ ! -f "$host" ]; then
+    fail "$tag: resolution host not found at $4"
+  elif grep -qF 'formatModule' "$host"; then
+    pass "$tag: resolution table teaches formatModule ($(basename "$host"))"
+  else
+    fail "$tag: no formatModule row in the condition/value resolution table ($(basename "$host")) — the renderer cannot resolve <<formatModule>>"
   fi
 }
 
@@ -208,11 +247,11 @@ run_static_mode() {
     fail "references/ not found at $REFS — wrong repo root?"
     return
   fi
-  local count=0 row tag tpl setup
-  while IFS='|' read -r tag tpl setup; do
+  local count=0 tag tpl setup host
+  while IFS='|' read -r tag tpl setup host; do
     [ -z "$tag" ] && continue
     count=$((count + 1))
-    lint_pair "$tag" "$tpl" "$setup"
+    lint_pair "$tag" "$tpl" "$setup" "$host"
   done <<EOF
 $PAIRS
 EOF
@@ -313,7 +352,18 @@ chmod +x evals/verify-format-helpers.sh
 ./evals/verify-format-helpers.sh; echo "exit=$?"
 ```
 
-Expected: `exit=1`. Every one of the 8 pairs fails all 11 of its checks (2 template + 2 step/artifact + 5 surface tokens + 1 currency + 1 declared/used pairing folded in) — **Failed: 88, Passed: 0**. Confirm the pair count line reads `INFO: pairs checked: 8`. If any pair reports `not found`, a path in `PAIRS` is wrong — fix it now, before any content task depends on it.
+Expected: `exit=1`, with `INFO: pairs checked: 8` and a non-zero `Failed:` count.
+
+**Do not assert a specific total.** The per-pair failure count is not uniform: the Paraglide template already declares and uses `<<formatModule>>`, and several setup references already contain some of the surface tokens in unrelated prose, so those checks start green. Each later task asserts **zero failures for its own pair**, which is the gate that matters.
+
+Two things must hold in this first run, and both are cheap to check by eye:
+
+- **No pair reports `not found`.** All 16 referenced files exist today. A `not found` means a path in `PAIRS` is wrong — fix it now, before any content task depends on it.
+- **Record the per-pair failure counts** into the ledger, so each later task can confirm it moved its own pair to zero rather than trusting a predicted number:
+
+```bash
+./evals/verify-format-helpers.sh 2>&1 | awk '/^--- Pair: /{p=$3} /^  FAIL/{c[p]++} END{for (k in c) print k, c[k]}' | sort
+```
 
 - [ ] **Step 4: Confirm the existing linter is still green**
 
@@ -385,7 +435,7 @@ The verifier is red on all eight pairs by design; Tasks 2-9 turn them green."
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: lingui ---/,/--- Pair: next-intl ---/p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Extend `locales.ts` in `setup.locale-module.md` §3**
 
@@ -633,7 +683,7 @@ seam, and points the Lingui coding rules at it. Covers all 11 Lingui variants."
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: next-intl ---/,/--- Pair: vue-i18n ---/p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Add `## Core step 0: generate the format helpers (`generate_format_helpers` — always runs)`** at the top of `setup.add-ons.md`, before the existing Core step 1
 
@@ -772,7 +822,7 @@ preserved, and registers the named formats the module calls by name."
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: vue-i18n ---/,/--- Pair: paraglide ---/p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Add a `## Format helpers (`generate_format_helpers`)` section to `setup.shared.md`**
 
@@ -921,7 +971,7 @@ code, and adds the list/relativeTime helpers vue-i18n does not provide."
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: paraglide ---/,/--- Pair: webext-native ---/p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Replace the existing format-module block in `paraglide.setup.md`**
 
@@ -1009,7 +1059,7 @@ the previous exports as deprecated aliases so re-runs do not break call sites."
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: webext-native ---/,/--- Pair: rails ---/p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Add a `## Format helpers (`generate_format_helpers`)` section to `webext-native.setup.md`**
 
@@ -1091,7 +1141,7 @@ formatting the variant gets; formatLocale() bridges getUILanguage() and the pick
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: rails ---/,/--- Pair: android-strings ---/p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Add a `## Format helpers (`generate_format_helpers`)` section to `rails.setup.md`**
 
@@ -1211,7 +1261,7 @@ scaffolds the date.formats / time.* / support.array.or keys they depend on."
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: android-strings ---/,/--- Pair: string-catalog ---/p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Read the project's `minSdk` and resolve the API-level branches**
 
@@ -1380,7 +1430,7 @@ minSdk-branched fallbacks, plus a LocalFormatters CompositionLocal for Compose."
 ./evals/verify-format-helpers.sh 2>&1 | sed -n '/--- Pair: string-catalog ---/,$p' | grep -c '^  FAIL'
 ```
 
-Expected now: `11`.
+Expected now: a non-zero count (the exact number varies by pair — see the per-pair baseline the ledger recorded in Task 1). The gate is that it reaches `0` at the end of this task.
 
 - [ ] **Step 2: Add a `## Format helpers (`generate_format_helpers`)` section to `string-catalog.setup.md`**
 
