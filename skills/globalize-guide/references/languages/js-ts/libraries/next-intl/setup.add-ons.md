@@ -2,11 +2,129 @@
 
 This file is invoked from the framework-specific next-intl setup files (`nextjs/app-router/next-intl.setup.md`, `nextjs/pages-router/next-intl.setup.md`) after the core setup has been applied.
 
-It has two parts. **The two core steps below always run** — they are not add-ons and are not gated on any selection. The add-ons after them are the ones `SKILL.md §1.10` lets the user multi-select: run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Every section here is independently re-runnable: if it has already been applied, detect that and skip without prompting.
+It has two parts. **The three core steps below always run** — they are not add-ons and are not gated on any selection. The add-ons after them are the ones `SKILL.md §1.10` lets the user multi-select: run only the sub-steps that match the user's selections in `decisions.md` — skip the rest in silence. Every section here is independently re-runnable: if it has already been applied, detect that and skip without prompting.
 
 Apply the same guided / unguided rules used elsewhere in setup:
 - **Guided mode**: describe the change before making it and wait for confirmation.
 - **Unguided mode**: apply directly; only stop on hard errors.
+
+---
+
+## Core step 0: generate the format helpers (`generate_format_helpers` — always runs)
+
+**This is a core Phase 2 step, not an add-on**, and like the two steps that follow it, it is **not** gated on a `SKILL.md §1.10` selection. Phase 3's wrap subagents route every number, currency, date, and list they touch through this module, so conversion cannot start until it exists. It always runs first — Core step 1 below renders `<<formatModule>>` from what this step writes.
+
+next-intl is the one stack in this skill where delegation earns its keep over building on raw `Intl`. `useFormatter()` (any component) and `getFormatter()` (server-only async code) already read the active request's `now` and `timeZone` — set once in `getRequestConfig` — which a call straight to `Intl.DateTimeFormat` cannot see. The module below wraps next-intl's own formatter instead of replacing it, which is the whole point of this variant.
+
+### 1. Resolve `<i18nDir>`
+
+The same directory `i18nRequestPath` and `i18nNavigationPath` resolve against in Core step 1 below — `src/i18n/` on a project with a `src/` root, `i18n/` otherwise. Glob for it; do not assume.
+
+### 2. Create `<i18nDir>/format.ts`
+
+```ts
+// <i18nDir>/format.ts
+import { useFormatter } from 'next-intl'
+import { getFormatter } from 'next-intl/server'
+
+export type DateInput = Date | number | string
+export const DEFAULT_CURRENCY = 'USD'   // adjust to this project's currency
+
+export type Formatters = {
+  money(amount: number, currency?: string): string
+  number(value: number, opts?: Intl.NumberFormatOptions): string
+  percent(value: number): string
+  compact(value: number): string
+  unit(value: number, unit: string): string
+  date(value: DateInput, preset?: 'short' | 'medium' | 'long'): string
+  time(value: DateInput): string
+  dateTime(value: DateInput): string
+  relativeTime(value: DateInput, now?: DateInput): string
+  list(items: string[], type?: 'and' | 'or'): string
+}
+
+/**
+ * THE SEAM. next-intl resolves the locale for us, so there is nothing to override
+ * here today. To give this project a separate regional preference, stop calling
+ * next-intl's formatter and build an Intl-based one against a locale chosen here.
+ */
+export function formatLocale(uiLocale: string): string {
+  return uiLocale
+}
+
+const toDate = (v: DateInput): Date => (v instanceof Date ? v : new Date(v))
+
+type NextFormatter = ReturnType<typeof useFormatter>
+
+function bind(format: NextFormatter): Formatters {
+  return {
+    money: (amount, currency = DEFAULT_CURRENCY) =>
+      format.number(amount, { style: 'currency', currency }),
+    number: (value, opts) => format.number(value, opts),
+    percent: (value) => format.number(value, { style: 'percent' }),
+    compact: (value) => format.number(value, { notation: 'compact' }),
+    unit: (value, unit) => format.number(value, { style: 'unit', unit }),
+    date: (value, preset = 'medium') => format.dateTime(toDate(value), preset),
+    time: (value) => format.dateTime(toDate(value), 'time'),
+    dateTime: (value) => format.dateTime(toDate(value), 'dateTime'),
+    // Uses next-intl's request-scoped `now` when the second argument is omitted,
+    // which is what keeps server and client on one reference instant.
+    relativeTime: (value, now) =>
+      format.relativeTime(toDate(value), now === undefined ? undefined : toDate(now)),
+    list: (items, type = 'and') => format.list(items, type) as string,
+  }
+}
+
+/** In components — Client and Server alike. */
+export function useFormatters(): Formatters {
+  return bind(useFormatter())
+}
+
+/** In non-component async code: generateMetadata, route handlers, server actions. */
+export async function getFormatters(): Promise<Formatters> {
+  return bind(await getFormatter())
+}
+```
+
+**`useFormatter()` works in any component on next-intl v4** — Client and Server Components alike; it has not needed a hook-only environment since next-intl 3.0 added Server Component support. Reach for `getFormatters()` only in non-component async code — `generateMetadata`, route handlers, server actions — and **`await` it**: next-intl's server APIs throw at runtime when used unawaited, and this module's `getFormatters()` is no exception.
+
+### 3. Register the named formats the module calls by name
+
+`date`, `time`, `dateTime` and `list` above pass preset *names* (`'short'`, `'medium'`, `'time'`, `'and'`), which only resolve to real `Intl` options if they are registered. **An unregistered name does not throw — it silently falls back to next-intl's defaults**, so a missing registration is a silent failure, not a build error that would catch it. Add this object to what `getRequestConfig` returns (App Router) or the `formats` prop of `<NextIntlClientProvider>` in `_app.tsx` (Pages Router):
+
+```ts
+formats: {
+  dateTime: {
+    short: { dateStyle: 'short' },
+    medium: { dateStyle: 'medium' },
+    long: { dateStyle: 'long' },
+    time: { timeStyle: 'short' },
+    dateTime: { dateStyle: 'medium', timeStyle: 'short' },
+  },
+  list: { and: { style: 'long', type: 'conjunction' },
+          or:  { style: 'long', type: 'disjunction' } },
+}
+```
+
+next-intl's global `formats` also accepts `number` and `displayName` categories beyond the two the module uses today — extend the same object if this project later needs a named number or display-name preset. Verify the registration by rendering one of each preset once.
+
+**Set `timeZone` and `now` in the same config object**, and say why: `timeZone` otherwise defaults to the server's time zone, which is a hydration mismatch waiting to happen once the browser's zone disagrees — one that never shows up in development. `now: new Date()` gives server and client one shared reference instant for `relativeTime`. Both are request-scoped context that a raw `new Intl.DateTimeFormat()` call has no way to see — that request scoping is what makes wrapping `useFormatter()` worth more than calling `Intl` directly, and it is the reason this variant delegates instead of building its own formatters the way the other stacks do.
+
+### 4. Resolve `DEFAULT_CURRENCY`
+
+Grep the codebase for an existing `currency:` option, an `Intl.NumberFormat` / `toLocaleString` call, or a hardcoded symbol before defaulting. Record the hit as `currencySource` (`grep:<file>:<line>`); when nothing is findable leave `'USD'`, keep the `// adjust to this project's currency` comment, and record `currencySource: "default"`.
+
+### 5. No TypeScript `lib` gate here
+
+Lingui's format module needs `Intl.ListFormat` and `Intl.RelativeTimeFormat` types directly, which gates on `tsconfig.json`'s `compilerOptions.lib`. This module never constructs those types itself — every call goes through next-intl's own typed `format.number` / `format.dateTime` / `format.relativeTime` / `format.list`, not through `Intl.ListFormat` or any other `Intl` constructor directly. There is no `lib` requirement to check here; do not add one — it cannot fire.
+
+### 6. Do not overwrite existing project code
+
+If `<i18nDir>/format.ts` already exists as project code, do not overwrite it — add the exports into it, or create `<i18nDir>/i18n-format.ts` instead. Either way record the specifier actually used.
+
+### 7. Write `.globalize/format-module.json`
+
+With `specifier` (the project's alias when `tsconfig.json` declares one in `compilerOptions.paths`, else a relative specifier — check, do not assume `@/`), `path`, the ten-entry `surface`, `defaultCurrency` and `currencySource`. Core step 1 below reads it back as `<<formatModule>>`.
 
 ---
 
@@ -56,6 +174,7 @@ Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`
 | `catalogPath` | The message directory in the dynamic import inside `i18n/request.ts` — e.g. `messages/` from `` (await import(`../../messages/${locale}.json`)).default ``. Normalize to a project-root-relative directory. |
 | `sourceLocale` | `defaultLocale` in `routing.ts`. |
 | `targetLocales` | `locales` in `routing.ts` minus `defaultLocale`, comma-separated: `de, fr, ja`. |
+| `formatModule` | `.globalize/format-module.json` → `.specifier`, written by Core step 0's `generate_format_helpers`. That step always runs before this one, so the file already exists by the time this table is read. |
 
 ### 4. Render
 
