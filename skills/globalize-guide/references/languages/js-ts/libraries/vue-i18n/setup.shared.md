@@ -27,7 +27,7 @@ This setup phase covers **Vue 3** projects using the **Composition API** on **Vi
 |------|------|-------|
 | 1. Detect | Read-only | No changes to the project |
 | 2. Install packages | Additive | New dependencies only |
-| 3. Configure i18n instance | Additive | New `src/i18n/index.ts` (Vite/Quasar) or `i18n.config.ts` (Nuxt) |
+| 3. Configure i18n instance + format helpers | Additive | New `src/i18n/index.ts` (Vite/Quasar) or `i18n.config.ts` (Nuxt); new `<i18nDir>/format.ts`; registers `numberFormats`/`datetimeFormats` for every locale |
 | 4. Build tool / module | **Modifies existing file** | Changes `vite.config.*`, `nuxt.config.*`, or `quasar.config.*` |
 | 5. Provider | **Modifies existing file** | `main.ts` (Vite), boot file (Quasar); Nuxt module handles it |
 | 6. Language Switcher | **Modifies existing file** | New component file + wired into layout / header |
@@ -91,7 +91,7 @@ In unguided mode, apply the defaults below without prompting. Log each default c
 | **Catalog format** | JSON | Zero-config — no `poLoader` plugin, no Nuxt ICU pre-compile surprises. PO remains opt-in if the user explicitly picks it. |
 | **Vite-SPA locale routing strategy** (`references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`, when `vue-router` is in deps) | "Unprefixed default locale" — source-locale URLs stay bare, target locales get a prefix (`/es/about`) | Preserves existing URLs. |
 | **Nuxt routing strategy** (`references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md`, when Nuxt is detected) | `prefix_except_default` | Matches both `@nuxtjs/i18n`'s own default and the Vite-SPA default for consistency. |
-| **Default currency** (Step 3 `numberFormats` seeding) | Inferred from source locale (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`, `fr-FR` → `EUR`, `es-ES` → `EUR`, `ja-JP` → `JPY`) with `USD` fallback | Seed a working currency format so `n(amount, 'currency')` works out of the box. |
+| **Default currency** (Format helpers `numberFormats` seeding) | Inferred from source locale (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`, `fr-FR` → `EUR`, `es-ES` → `EUR`, `ja-JP` → `JPY`) with `USD` fallback | Seed a working currency format so `n(amount, 'currency')` works out of the box. This is the **one** currency code used for every locale — see "Format helpers" below for why. |
 | **`main.ts` / provider wrapping** | Apply silently | Consent gate suspended in unguided mode per the rule above. |
 | **Optional steps** (CI/CD, test wrapper) | Included | Unless the user named them to skip at mode-selection time. |
 
@@ -324,30 +324,9 @@ For **Nuxt**, the equivalent lives in `i18n.config.ts` — at project root on Nu
 
 > Why a custom `messageCompiler`? Without it, vue-i18n uses its built-in compiler which parses the native pipe-plural syntax and does not support ICU `plural`/`select`/`selectordinal`. Routing all messages through `intl-messageformat` gives us parity with ICU MessageFormat as used in next-intl and LinguiJS.
 
-### Number and date formats (optional, recommended)
+### Number and date formats (`generate_format_helpers`)
 
-The `n()` and `d()` composables in the vue-i18n coding rules accept named format keys (`n(1234.5, 'currency')`, `d(date, 'long')`). These names must be declared on the i18n instance — without them, `n()` / `d()` silently fall back to browser defaults and currency calls won't produce a currency symbol at all.
-
-Add a minimal baseline to the `createI18n(...)` call so the examples in the vue-i18n coding rules work out of the box. Ask the user for a default currency code (ISO 4217, e.g. `USD`, `EUR`, `GBP`) — infer from the source locale if obvious (`en-US` → `USD`, `en-GB` → `GBP`, `de-DE` → `EUR`), otherwise prompt.
-
-```ts
-// Inside createI18n({ ... }) — add alongside `messages`
-numberFormats: {
-  en: {
-    currency: { style: 'currency', currency: 'USD' },
-    percent:  { style: 'percent', minimumFractionDigits: 0, maximumFractionDigits: 1 },
-  },
-},
-datetimeFormats: {
-  en: {
-    short: { year: 'numeric', month: 'short', day: 'numeric' },
-    long:  { year: 'numeric', month: 'long',  day: 'numeric', weekday: 'long' },
-    time:  { hour: '2-digit', minute: '2-digit' },
-  },
-},
-```
-
-Replicate the per-locale block for each configured target locale, swapping the currency where the locale's region implies a different one. Teams that have no `n()` / `d()` usage planned can skip this block — `t()` works without it.
+Named number and date formats are no longer optional — they are configured by the "Format Helpers" step immediately after this one, which **always runs**. It registers `numberFormats` / `datetimeFormats` on the `createI18n(...)` call above (Vite / Quasar) or `i18n.config.ts` (Nuxt) for every configured locale, and creates `<i18nDir>/format.ts`, which is what the generated vue-i18n coding rules and Phase 3's conversion both target. See "Format Helpers" below for the exact block and — importantly — the rule about using one currency code across every locale, not swapping it per region.
 
 ### Scripts
 
@@ -362,6 +341,136 @@ Optional — some teams add a catalog-validation script:
 ```
 
 This is not required for the app to run; defer until Step 9 (CI/CD).
+
+---
+
+## Format Helpers (`generate_format_helpers` — always runs)
+
+**This step is not optional and is not gated on a `SKILL.md §1.10` selection**, exactly like Step 8 below. Phase 3's wrap subagents route every number, currency, date, and list they touch through this module, so conversion cannot start until it exists.
+
+vue-i18n's `n()` and `d()` are worth delegating to rather than replacing: they resolve the named-format registry configured on the i18n instance, which is what keeps a raw `n(x, 'currency')` call — or `$n` in a template that hasn't destructured — working everywhere else in the app off the same names. vue-i18n has **no list API and no relative-time API**, so `list()` and `relativeTime()` below are built on raw `Intl` instead.
+
+Create `<i18nDir>/format.ts`:
+
+```ts
+// <i18nDir>/format.ts
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+export type DateInput = Date | number | string
+export const DEFAULT_CURRENCY = 'USD'   // adjust to this project's currency
+
+/** THE SEAM. Change this one function to format against something other than the UI locale. */
+export function formatLocale(uiLocale: string): string {
+  return uiLocale
+}
+
+const memo = new Map<string, unknown>()
+function cached<T>(key: string, make: () => T): T {
+  let f = memo.get(key) as T | undefined
+  if (f === undefined) memo.set(key, (f = make()))
+  return f
+}
+
+const toDate = (v: DateInput): Date => (v instanceof Date ? v : new Date(v))
+
+// Identical to the unit table in the canonical module — see the Lingui shared
+// reference. Kept inline because this file must stand alone in the user's repo.
+const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ['second', 1000], ['minute', 60_000], ['hour', 3_600_000], ['day', 86_400_000],
+  ['week', 604_800_000], ['month', 2_629_746_000], ['year', 31_556_952_000],
+]
+
+export function pickRelativeUnit(deltaMs: number): [Intl.RelativeTimeFormatUnit, number] {
+  const abs = Math.abs(deltaMs)
+  for (let i = UNITS.length - 1; i >= 0; i--) {
+    const [unit, ms] = UNITS[i]
+    if (abs >= ms || i === 0) return [unit, Math.round(deltaMs / ms)]
+  }
+  return ['second', 0]
+}
+
+export function useFormatters() {
+  const { n, d, locale } = useI18n()
+  const active = computed(() => formatLocale(locale.value))
+
+  return {
+    // Registered named formats — see the numberFormats/datetimeFormats block below.
+    money: (amount: number, currency?: string) =>
+      currency ? n(amount, { style: 'currency', currency }) : n(amount, 'currency'),
+    number: (value: number, opts?: Intl.NumberFormatOptions) =>
+      opts ? n(value, opts) : n(value, 'decimal'),
+    percent: (value: number) => n(value, 'percent'),
+    compact: (value: number) => n(value, 'compact'),
+    unit: (value: number, unit: string) => n(value, { style: 'unit', unit }),
+    date: (value: DateInput, preset: 'short' | 'medium' | 'long' = 'medium') =>
+      d(toDate(value), preset),
+    time: (value: DateInput) => d(toDate(value), 'time'),
+    dateTime: (value: DateInput) => d(toDate(value), 'dateTime'),
+    // vue-i18n has no relative-time API.
+    relativeTime: (value: DateInput, now?: DateInput) => {
+      const from = now === undefined ? Date.now() : toDate(now).getTime()
+      const [unit, amount] = pickRelativeUnit(toDate(value).getTime() - from)
+      return cached(`r:${active.value}`, () =>
+        new Intl.RelativeTimeFormat(active.value, { numeric: 'auto' }),
+      ).format(amount, unit)
+    },
+    // vue-i18n has no list API.
+    list: (items: string[], type: 'and' | 'or' = 'and') =>
+      cached(`l:${active.value}:${type}`, () =>
+        new Intl.ListFormat(active.value, {
+          style: 'long', type: type === 'or' ? 'disjunction' : 'conjunction',
+        }),
+      ).format(items),
+  }
+}
+```
+
+**`useFormatters()` requires the same context `useI18n()` does** — a component's `setup()` / `<script setup>`, or a composable called from one. Unlike the Lingui and next-intl variants of this module, there is no non-hook counterpart (`getFormatters()`) exported here: Vue composables have no equivalent outside setup. Code that genuinely runs outside setup falls back to `<<globalI18n>>.n(...)` / `.d(...)` directly and does without `list()` / `relativeTime()` — those two exist only on this composable.
+
+### Register the presets — for the source locale, and every target locale
+
+**This is what makes `n()` / `d()` inside the composable above (and every other `n(x, 'currency')` call in the app) actually work.** A name that is not registered for the active locale does not throw: `n()` / `d()` silently fall back to browser defaults, and a currency call with no registered currency format emits **no currency symbol at all** — a silent failure, not a build error that would catch it. Add this to the `createI18n(...)` call from Step 3 (Vite / Quasar) or `i18n.config.ts` (Nuxt), generated for every configured locale:
+
+```ts
+const numberFormats = {
+  en: {
+    currency: { style: 'currency', currency: DEFAULT_CURRENCY },
+    decimal: { style: 'decimal' },
+    percent: { style: 'percent' },
+    compact: { notation: 'compact' },
+  },
+  // …the identical block for every target locale
+}
+const datetimeFormats = {
+  en: {
+    short: { dateStyle: 'short' },
+    medium: { dateStyle: 'medium' },
+    long: { dateStyle: 'long' },
+    time: { timeStyle: 'short' },
+    dateTime: { dateStyle: 'medium', timeStyle: 'short' },
+  },
+  // …the identical block for every target locale
+}
+```
+
+**Use the same currency code in every locale's entry. This is the single most important sentence in this section.** vue-i18n's own documentation registers `USD` under `en-US` and `JPY` under `ja-JP` in its `numberFormats` example — copying that pattern *converts* a price rather than formatting it, and a German reader would see a dollar amount relabelled as euros. The locale decides formatting (grouping, symbol placement, digit shapes); the data decides the currency. Every locale's block above shares one `DEFAULT_CURRENCY` — do not vary the `currency` field per locale, no matter how tempting the source library's own example makes it look.
+
+**Resolve `DEFAULT_CURRENCY` before writing `format.ts`**, by grepping the codebase for an existing `currency:` option, an `Intl.NumberFormat` / `toLocaleString` call, or a hardcoded symbol. Record the hit as `currencySource` (`grep:<file>:<line>`); when nothing is findable leave `'USD'`, keep the `// adjust to this project's currency` comment, and record `currencySource: "default"`.
+
+**If `<i18nDir>/format.ts` already exists as project code, do not overwrite it** — add the exports into it, or create `<i18nDir>/i18n-format.ts` instead. Either way record the specifier actually used.
+
+**The TypeScript `lib` gate.** `Intl.ListFormat` needs `es2021.intl`; `Intl.RelativeTimeFormat`, `notation: 'compact'` and `style: 'unit'` need `es2020.intl`. Read `tsconfig.json`'s `compilerOptions.lib` (falling back to what `target` implies). If it resolves below `ES2021`, do **not** silently emit a module that fails `tsc` — write `status: "needs_decision"` with:
+
+```json
+{ "step": "format_module_ts_lib",
+  "question": "format.ts needs Intl.ListFormat/RelativeTimeFormat types, which require tsconfig lib ES2021 or later (this project resolves to <current>). Raise lib to ES2021, or omit list() and relativeTime()?",
+  "options": ["raise_lib", "omit_two"] }
+```
+
+and stop. On `omit_two` the surface still has ten entries in `format-module.json`; the two omitted ones are emitted as `throw new Error('list() requires tsconfig lib ES2021')` stubs so the contract holds and the failure is loud rather than silent.
+
+**Write `.globalize/format-module.json`** with `specifier` (the project's alias when `tsconfig.json` declares one in `compilerOptions.paths`, else a relative specifier — check, do not assume `@/`), `path`, the ten-entry `surface`, `defaultCurrency` and `currencySource`. Step 8's `generate_coding_rules` reads it back as `<<formatModule>>`.
 
 ---
 
@@ -534,7 +643,7 @@ If any step fails, check the build tool integration (Step 4) first — most setu
 
 **This step is not optional and is not gated on a `SKILL.md §1.10` selection.** Phase 3's wrap subagents read `.agents/globalize-rules.md` as their authoring contract — composable decision tree, plural rules, skip-list, real catalog paths — so conversion cannot start until this step has produced it. Sub-step 7, which points `CLAUDE.md` and `AGENTS.md` at the generated file, always runs too — it edits files the user owns, so guided mode confirms each edit, but it is not a §1.10 selection.
 
-The vue-i18n coding rules are a **generated file**, not a shipped one. `references/languages/js-ts/libraries/vue-i18n/rules.template.md` covers every configuration vue-i18n supports — the composable decision tree, attribute binding, plurals and ICU, numbers/dates/currencies, reactivity pitfalls, the Nuxt routing and head APIs. This step renders it down to the one configuration this project actually has (only the branches that apply, with the project's real catalog path, instance import, format names, and locales substituted in) and writes the result to `.agents/globalize-rules.md`.
+The vue-i18n coding rules are a **generated file**, not a shipped one. `references/languages/js-ts/libraries/vue-i18n/rules.template.md` covers every configuration vue-i18n supports — the composable decision tree, attribute binding, plurals and ICU, numbers/dates/currencies, reactivity pitfalls, the Nuxt routing and head APIs. This step renders it down to the one configuration this project actually has (only the branches that apply, with the project's real catalog path, instance import, format module specifier, and locales substituted in) and writes the result to `.agents/globalize-rules.md`.
 
 **Read `references/rules-template-format.md` before rendering.** It is the whole rendering contract — template anatomy, the conditional grammar, the `<<placeholder>>` form, the step order, the header, the fail-closed rule. The steps below only add where *this library's* values come from.
 
@@ -561,13 +670,13 @@ Resolve every key listed in the template frontmatter's `conditions` and write th
 | `framework` | `.globalize/manifest-snapshot.json` → `match.framework`: `"nuxt"`, `"vite"`, or `"quasar"`. This is the variant dispatch from Step 1, so it is already decided — do not re-detect. |
 | `catalogFormat` | The `catalogFormat` choice recorded in `.globalize/decisions.md` (Step 1), confirmed on disk: `"po"` when the catalog directory holds `.po` files **and** `poLoader` is wired into the build config (`vite.config.*`, `vite: { plugins }` in `nuxt.config.*`, or `build.vitePlugins` in `quasar.config.*`); `"json"` otherwise. The disk wins if the two disagree. |
 | `icuCatalogSupport` | Composite of `framework` and `catalogFormat`, because the limitation needs both. `"limited"` — Nuxt with JSON catalogs loaded through `@nuxtjs/i18n`'s `langDir`: `unplugin-vue-i18n` pre-compiles those files with a non-ICU compiler, so `plural` / `select` / `selectordinal` fail the build (see Step 7's Nuxt seed exception). `"full"` — everything else, including a Nuxt project whose locale JSON is imported statically rather than via `langDir`. Check `nuxt.config.*` for `langDir` before deciding. |
-| `namedFormats` | `"registered"` when the `createI18n(...)` call (Vite / Quasar: the i18n instance module; Nuxt: `i18n.config.ts`) declares `numberFormats` **and** `datetimeFormats` for the source locale — the block Step 3 seeds. `"none"` when that block was skipped or only one of the two exists. Read the file on disk; the block is optional, so absence is a healthy project, not an error. |
+| `ssr` | Resolve per `framework` (from `.globalize/manifest-snapshot.json` → `match.framework`, already decided by Step 1's variant dispatch — do not re-detect the framework itself). **`vite`** → `"false"`: the Vite SPA variant never renders on a server. **`nuxt`** → `"true"` by default (Nuxt ships SSR out of the box); resolve `"false"` only when the root `nuxt.config.*` sets `ssr: false`. **`quasar`** → resolve `"true"` when `quasar.config.*` declares an `ssr` section, or the project's build scripts target `-m ssr`; resolve `"false"` otherwise (Quasar's default targets — SPA, PWA, Capacitor, Electron, BEX — are all client-only). When genuinely ambiguous, resolve `"true"` — the SSR branch is a strict superset of the client-only rules, so an over-broad `"true"` costs a few extra lines while an over-broad `"false"` would drop a rule that actually applies. |
 
 ### 3. Eliminate branches, then resolve the surviving `values`
 
 Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`, `<!-- /if -->` all disappear, kept branch or not). Only then resolve the `values` still referenced in what survived — from the files **on disk**, what Steps 3–7 actually wrote, not from `decisions.md`, which records what was asked for rather than what landed — appending them to the same `.globalize/rules-values.json`.
 
-**The order is load-bearing.** A value that lives inside a false branch has no value to resolve: a Vite SPA has no `strategy`, and a project that skipped the optional number/date-format block has no format names. Those placeholders sit inside branches that are already gone. Resolving up front would demand values that don't exist and trip sub-step 6 on a perfectly healthy project.
+**The order is load-bearing.** A value that lives inside a false branch has no value to resolve — a Vite SPA has no `nuxtStrategy`. Those placeholders sit inside branches that are already gone. Resolving up front would demand values that don't exist and trip sub-step 6 on a perfectly healthy project.
 
 | Value | Where to read it |
 |---|---|
@@ -576,10 +685,7 @@ Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`
 | `targetLocales` | `locales` in the same module minus `sourceLocale`, comma-separated: `de, fr, ja`. |
 | `globalImport` | The statement that yields the global i18n instance. **Vite / Quasar**: the import of the instance module Step 3 wrote — `import { i18n } from '@/i18n'` only when `tsconfig.json`'s `compilerOptions.paths` declares the `@/*` alias; otherwise the path the project actually resolves (e.g. `import { i18n } from '../i18n'` or `'./src/i18n'`). Confirm the module really exports a binding named `i18n`; if setup wrote a different name or location, use that. **Nuxt**: `const { $i18n } = useNuxtApp()` — there is no instance module on Nuxt (`i18n.config.ts` default-exports a config factory, not an instance). |
 | `globalI18n` | The accessor paired with `globalImport`: `i18n.global` on Vite / Quasar (or `<exportedName>.global` if the export was renamed), `$i18n` on Nuxt. Rendered as `<globalI18n>.t(...)` / `.n(...)` / `.d(...)`, so give the object, never a method. |
-| `currencyFormat` | The currency-style key under `numberFormats.<sourceLocale>` in the `createI18n(...)` call — Step 3 seeds `currency`. If several exist, use the one with `style: 'currency'`. |
-| `dateFormat` | A date-style key under `datetimeFormats.<sourceLocale>` — Step 3 seeds `short`. |
-| `numberFormats` | Every key under `numberFormats.<sourceLocale>`, comma-separated — Step 3 seeds `currency, percent`. |
-| `dateFormats` | Every key under `datetimeFormats.<sourceLocale>`, comma-separated — Step 3 seeds `short, long, time`. |
+| `formatModule` | `.globalize/format-module.json` → `.specifier`, written by the "Format Helpers" step's `generate_format_helpers` above. That step always runs before this one, so the file already exists by the time this table is read. |
 | `nuxtStrategy` | `strategy` in the `i18n:` block of `nuxt.config.*` — e.g. `prefix_except_default`. Read the literal value; do not assume the recommended default. |
 
 ### 4. Render
@@ -911,6 +1017,8 @@ const { t, n, d } = useI18n()
   <p>{{ d(new Date(), 'long') }}</p>
 </template>
 ```
+
+Both `'currency'` and `'long'` above only resolve because the Format Helpers step registered them on the i18n instance — see that step for the exact block and the rule about using one currency code across every locale. For `list()` and `relativeTime()`, which vue-i18n has no native API for, use the generated `useFormatters()` composable in `<i18nDir>/format.ts` instead of calling `n()` / `d()` directly.
 
 For comprehensive wrapping patterns, plural/ICU guidance, Pinia/composables edge cases, and Nuxt-specific helpers, see the generated `.agents/globalize-rules.md`, which `CLAUDE.md` and `AGENTS.md` both point at.
 

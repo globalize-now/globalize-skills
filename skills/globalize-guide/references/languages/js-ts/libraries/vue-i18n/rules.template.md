@@ -8,10 +8,10 @@ description: >-
   attributes, plurals, numbers, currencies, and dates are wrapped correctly as
   code is written, so nothing needs fixing after the fact.
 template: vue-i18n
-templateVersion: 1
-conditions: [framework, catalogFormat, icuCatalogSupport, namedFormats]
-values: [catalogPath, sourceLocale, targetLocales, globalImport, globalI18n, currencyFormat, dateFormat, numberFormats, dateFormats, nuxtStrategy]
-budget: { "framework == \"nuxt\"": 215, "default": 175 }
+templateVersion: 2
+conditions: [framework, catalogFormat, icuCatalogSupport, ssr]
+values: [catalogPath, sourceLocale, targetLocales, globalImport, globalI18n, formatModule, nuxtStrategy]
+budget: { "framework == \"nuxt\"": 270, "default": 220 }
 ---
 
 # vue-i18n Coding Rules
@@ -120,42 +120,78 @@ The named variable passed at the call site must match the name the message uses.
 
 ## Numbers, dates, currencies
 
-Do not hardcode formatted numbers, currency symbols, or date strings. Use vue-i18n's `n()` (numbers/currencies) and `d()` (dates) — both delegate to `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale.
+Do not hardcode formatted numbers, currency symbols, or date strings, and never call vue-i18n's `n()` / `d()` directly with a literal options object at a call site. Import this project's formatters from `<<formatModule>>` instead — the composable delegates to `n()` / `d()` internally (so the same named-format registry resolves whether you call it through `<<formatModule>>` or as a raw `n(x, 'currency')` elsewhere in the app), and adds `list()` / `relativeTime()`, which vue-i18n has no API for.
 
-<!-- if: namedFormats == "registered" -->
 ```vue
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t, n, d } = useI18n()
+import { useFormatters } from '<<formatModule>>'
+const f = useFormatters()
 </script>
 
 <template>
-  <p>{{ n(amount, '<<currencyFormat>>') }}</p>
-  <time>{{ d(timestamp, '<<dateFormat>>') }}</time>
+  <p>{{ f.money(amount) }}</p>
+  <time>{{ f.date(timestamp, 'long') }}</time>
 </template>
 ```
 
-Only names registered on the i18n instance resolve — for `n()`: `<<numberFormats>>`; for `d()`: `<<dateFormats>>`. An unregistered name silently falls back to browser defaults, and a currency call without a registered currency format produces no currency symbol at all. To add a format, register it under `numberFormats` / `datetimeFormats` on the i18n instance for `<<sourceLocale>>` **and** every target locale.
-<!-- else -->
-```vue
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t, n, d } = useI18n()
-</script>
+`useFormatters()` needs the same context `useI18n()` does — a component's `setup()` / `<script setup>`, or a composable called from one. There is no non-hook counterpart for plain non-Vue code; a call site truly outside setup falls back to `<<globalI18n>>.n(...)` / `.d(...)` directly and does without `list()` / `relativeTime()`.
 
-<template>
-  <p>{{ n(amount, { style: 'currency', currency: 'USD' }) }}</p>
-  <time>{{ d(timestamp, { dateStyle: 'medium' }) }}</time>
-</template>
+All ten:
+
+```ts
+f.money(amount)                        // '$42.50' — see below, currency comes from the data
+f.number(1234.5)                       // '1,234.5'
+f.percent(0.42)                        // '42%'
+f.compact(12000)                       // '12K'
+f.unit(5, 'kilometer')                 // '5 km'
+f.date(value, 'short')                 // 'medium' is the default if omitted — '8/21/26'
+f.date(value, 'long')                  // 'August 21, 2026'
+f.time(value)                          // '4:05 PM'
+f.dateTime(value)                      // 'Aug 21, 2026, 4:05 PM'
+f.relativeTime(value)                  // '3 days ago'
+f.list(['Alice', 'Bob', 'Carol'])      // 'and' is the default — 'Alice, Bob, and Carol'
+f.list(['Alice', 'Bob'], 'or')         // 'Alice or Bob'
 ```
 
-This project registers no named formats on the i18n instance, so pass an options object on every call — a bare name like `n(amount, 'currency')` would silently fall back to browser defaults and emit no currency symbol. When the same format recurs, register it under `numberFormats` / `datetimeFormats` for `<<sourceLocale>>` **and** every target locale first, then call it by name.
-<!-- /if -->
+**Currency comes from the data, not the reader.** `f.money(amount)` uses this project's default currency; when a record carries its own currency, pass it: `f.money(order.total, order.currency)`. Never derive a currency code from the active locale — vue-i18n's own documentation registers `USD` under `en-US` and `JPY` under `ja-JP` in its `numberFormats` example, and copying that pattern *converts* a price instead of formatting it: a German reader would see a dollar amount relabelled as euros. This project's `numberFormats` registers the **same** currency code under every locale — only the grouping and symbol placement change per locale, never the currency.
 
+`money`, `number`, `percent`, `compact`, `date`, `time`, and `dateTime` above resolve through `n()` / `d()` by passing preset *names* internally — `'currency'`, `'decimal'`, `'percent'`, `'compact'`, `'short'` / `'medium'` / `'long'`, `'time'`, `'dateTime'`. They only work because those names are registered under `numberFormats` / `datetimeFormats` on the i18n instance (`<<globalImport>>`) for `<<sourceLocale>>` **and** every target locale:
 
-**Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Intl.NumberFormat(...)` called directly inside a component.
+```ts
+numberFormats: {
+  en: {
+    currency: { style: 'currency', currency: DEFAULT_CURRENCY },
+    decimal: { style: 'decimal' },
+    percent: { style: 'percent' },
+    compact: { notation: 'compact' },
+  },
+  // …the identical block for every target locale
+},
+datetimeFormats: {
+  en: {
+    short: { dateStyle: 'short' },
+    medium: { dateStyle: 'medium' },
+    long: { dateStyle: 'long' },
+    time: { timeStyle: 'short' },
+    dateTime: { dateStyle: 'medium', timeStyle: 'short' },
+  },
+  // …the identical block for every target locale
+},
+```
+
+An unregistered name does not throw — `n()` / `d()` silently fall back to browser defaults, and a currency call with no registered currency format emits no currency symbol at all. **Needs a format with no matching preset? Register it there, not at the call site** — a preset written out at two call sites will drift.
+
+**Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` called directly inside a component instead of going through `<<formatModule>>`.
 
 Do not concatenate locale-formatted substrings into messages. If the value belongs inside a translated sentence, pass it as a named placeholder and format it in the catalog via an ICU number/date argument — `Your total is {amount, number, ::currency/USD}` — or pass the pre-formatted string as an interpolation value.
+<!-- if: ssr == "true" -->
+
+**Time zone.** `Intl.DateTimeFormat` uses the *runtime's* zone, so the server renders in the deploy region's zone and the browser in the reader's — a hydration mismatch that never appears in development. Render time-of-day in a client-only component, or pin an explicit `timeZone` in the registered date presets above.
+<!-- /if -->
+<!-- if: ssr == "true" -->
+
+**`relativeTime` needs an explicit `now` under SSR.** Server and client evaluate `Date.now()` at different instants and eventually land on different sides of a threshold. Pass a shared reference instant — `f.relativeTime(postedAt, pageRenderedAt)` — or render it client-side only.
+<!-- /if -->
 
 ## Reactivity pitfalls
 
