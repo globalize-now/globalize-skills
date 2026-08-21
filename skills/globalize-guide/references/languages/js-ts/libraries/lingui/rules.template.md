@@ -9,9 +9,9 @@ description: >-
   written, so nothing needs fixing after the fact.
 template: lingui
 templateVersion: 4
-conditions: [router, perPageCatalogs, localeNavigation, appTarget]
-values: [catalogPath, sourceLocale, targetLocales, localesModule, navModule, navHooksModule, manifestStringsModule, localesBridgeScript]
-budget: { "router == \"app\"": 260, "appTarget == \"browser-extension\"": 260, "default": 235 }
+conditions: [router, perPageCatalogs, localeNavigation, appTarget, ssr]
+values: [catalogPath, sourceLocale, targetLocales, localesModule, formatModule, navModule, navHooksModule, manifestStringsModule, localesBridgeScript]
+budget: { "router == \"app\"": 285, "appTarget == \"browser-extension\"": 265, "default": 275 }
 # Never add a value named `locale`: the typed-links block contains `params={{ locale }}`
 # inside a fence, which the template linter would then flag as a `{{ }}` placeholder.
 ---
@@ -129,32 +129,52 @@ function Nav() {
 
 ## Numbers, currencies, dates
 
-Never hardcode formatted numbers, currency symbols or date strings. Use `i18n.number()` and `i18n.date()` — they apply the active locale through `Intl` automatically. Pass this project's shared presets from `<<localesModule>>` instead of retyping option objects; the currency code and date styles are project decisions and must not drift between call sites.
+Never hardcode a formatted number, a currency symbol, or a date string. Never construct `Intl` directly at a call site. Import this project's formatters from `<<formatModule>>`.
 
 ```tsx
-import { CURRENCY, DATE_MEDIUM } from '<<localesModule>>'
-const { i18n } = useLingui()
-<span>{i18n.number(amount, CURRENCY)}</span>
-<time>{i18n.date(new Date(timestamp), DATE_MEDIUM)}</time>
+import { useFormatters } from '<<formatModule>>'
+const f = useFormatters()
+f.money(amount)            // in components
 ```
 
-Both are function calls, so `` t`Total: ${i18n.number(amount)}` `` extracts as `{0}`. Name it: `` t`Total: ${ph({ total: i18n.number(amount) })}` `` (see [Naming placeholders](#naming-placeholders)).
+```ts
+import { getFormatters } from '<<formatModule>>'
+const f = getFormatters(locale)   // loaders, route handlers, server code, tests
+```
 
-<!-- if: router == "app" -->
-In server components take `i18n` from `getI18nInstance(locale)`, not `useLingui()`:
+All ten:
 
 ```tsx
-// Server component — no 'use client'
-import { getI18nInstance } from '../appRouterI18n'
-export default async function PricePage({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params
-  const i18n = getI18nInstance(locale)
-  return <span>{i18n.number(42.5, { style: 'currency', currency: 'USD' })}</span>
-}
+f.money(amount)                        // '$42.50' — see below, currency comes from the data
+f.number(1234.5)                       // '1,234.5'
+f.percent(0.42)                        // '42%'
+f.compact(12000)                       // '12K'
+f.unit(5, 'kilometer')                 // '5 km'
+f.date(value, 'short')                 // 'medium' is the default if omitted — '8/21/26'
+f.time(value)                          // '4:05 PM'
+f.dateTime(value)                      // 'Aug 21, 2026, 4:05 PM'
+f.relativeTime(value)                  // '3 days ago'
+f.list(['Alice', 'Bob', 'Carol'])      // 'Alice, Bob, and Carol'
 ```
 
+**Currency comes from the data, not the reader.** `f.money(amount)` uses the project default; when a record carries its own currency, pass it: `f.money(order.total, order.currency)`. Never derive a currency code from the locale — that relabels a dollar price as euros for a German reader.
+
+**Needs a format the module has no preset for?** Add it to the module. A date style or currency code written out at two call sites will drift.
+
+`f.money(...)` is a function call, so `` t`Total: ${f.money(amount)}` `` extracts as positional `{0}`. Name it — `` t`Total: ${ph({ total: f.money(amount) })}` `` (see [Naming placeholders](#naming-placeholders)).
+
+**Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and any `new Intl.` outside the format module.
+<!-- if: ssr == "true" -->
+
+**Time zone.** `Intl.DateTimeFormat` uses the *runtime's* zone, so the server renders in the
+deploy region's zone and the browser in the reader's — a hydration mismatch that never appears
+in development. Render time-of-day in a client component, or pin an explicit `timeZone` in the
+module's date presets.
+
+**`relativeTime` needs an explicit `now` under SSR.** Server and client evaluate `Date.now()`
+at different instants and eventually land on different sides of a threshold. Pass a shared
+reference instant — `f.relativeTime(postedAt, pageRenderedAt)` — or render it client-side only.
 <!-- /if -->
-**Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`"$" + price`), date format strings like `"MM/DD/YYYY"`.
 
 ## Locale metadata
 
