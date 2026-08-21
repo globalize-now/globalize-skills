@@ -325,28 +325,35 @@ and stop.
 ### The API-level floors (verified, not recalled — re-check before reusing years from now)
 
 Four numbers below are load-bearing: get one wrong and the emitted code either wastes a branch that never
-protects anything (a floor set too high) or crashes on real devices (a floor set too low). Each was checked
-directly against the Android platform reference on **2026-08-22** (each page's own
-"Added in API level" annotation, cross-checked against a second independent source since `developer.android.com`
-is a JS-rendered SPA that doesn't always yield the annotation to a page fetch):
+protects anything (a floor set too high) or crashes on real devices (a floor set too low). Each is confirmed
+against the Android SDK's own API-diff pages (checked **2026-08-22**) — these list exactly what was added
+between two API levels, which is a stronger source than a single class's own reference page (a JS-rendered SPA
+that doesn't always yield its "Added in API level" annotation to a page fetch):
 
 | Constant | Class / member | API level | Source |
 |---|---|---|---|
-| `COMPACT_API` | `android.icu.text.CompactDecimalFormat` | **24** | https://developer.android.com/reference/android/icu/text/CompactDecimalFormat |
-| `RELATIVE_API` | `android.icu.text.RelativeDateTimeFormatter` | **24** | https://developer.android.com/reference/android/icu/text/RelativeDateTimeFormatter |
-| `LIST_API` | `android.icu.text.ListFormatter` | **26** | https://developer.android.com/reference/android/icu/text/ListFormatter |
-| `LOCALE_LIST_API` | `android.os.LocaleList` / `Configuration.getLocales()` | **24** | https://developer.android.com/reference/android/os/LocaleList |
+| `COMPACT_API` | `android.icu.text.CompactDecimalFormat` | **24** | https://developer.android.com/sdk/api_diff/24/changes/changes-summary — "Added Packages" lists `android.icu.text` itself as new at API 24 (the whole package, `CompactDecimalFormat` included, did not exist before) |
+| `RELATIVE_API` | `android.icu.text.RelativeDateTimeFormatter` | **24** | Same page and same "Added Packages" entry as `COMPACT_API` — `RelativeDateTimeFormatter` is in the same newly-added `android.icu.text` package. (Its nested `RelativeDateTimeFormatter.RelativeDateTimeUnit` enum is a *separate*, later addition — API 28 — and is not the enum this module uses; `Formatters.kt` calls `format(double, Direction, RelativeUnit)`, and `RelativeUnit` ships with the class at 24.) |
+| `LIST_API` | `android.icu.text.ListFormatter` | **26** | https://developer.android.com/sdk/api_diff/26/changes/pkg_android.icu.text.html — "Added Classes" lists `ListFormatter` specifically (the package itself is unchanged since API 24; only this one class is new at 26) |
+| `LOCALE_LIST_API` | `android.os.LocaleList` / `Configuration.getLocales()` | **24** | https://developer.android.com/sdk/api_diff/24/changes/pkg_android.os.html — "Added Classes" lists `LocaleList` |
 
 `java.time` itself (`LocalDate`, `DateTimeFormatter`, …) is a **platform** package starting at **API 26** —
-https://developer.android.com/reference/java/time/LocalDate. Below API 26 it is available only through **core
-library desugaring** (Android Gradle Plugin's D8 desugaring, via the `coreLibraryDesugaring` dependency), which
-has **no `minSdk` floor of its own** —
+https://developer.android.com/sdk/api_diff/26/changes/changes-summary, "Added Packages" lists `java.time` (and
+`java.time.chrono`/`format`/`temporal`/`zone`) as new at API 26; nothing under `java.time` existed on API 25 or
+earlier. Below API 26 it is available only through **core library desugaring** (Android Gradle Plugin's D8
+desugaring, via the `coreLibraryDesugaring` dependency), which has **no `minSdk` floor of its own** —
 https://developer.android.com/studio/write/java8-support: "Android Studio ... includes support for using a
 number of Java 8+ APIs without requiring a minimum API level for your app." (MultiDex is required in addition
 when `minSdk` ≤ 20, which is unrelated to desugaring itself.) This is why the `date`/`time`/`dateTime` methods
 below use `java.time` unconditionally rather than a `Build.VERSION.SDK_INT` branch: on `minSdk` ≥ 26 it's the
 platform API, below that the "needs_decision" gate above guarantees desugaring is on before the file is ever
 written.
+
+(A per-package "changes" diff page, like the `pkg_android.icu.text.html` one `LIST_API` cites, only exists for a
+package that existed on *both* API levels being compared — that's why `COMPACT_API`/`RELATIVE_API`'s package
+and the whole of `java.time` are cited from the "Added Packages" section of the level's `changes-summary`
+instead: both packages are wholly new at their respective levels, so there is nothing to diff a *former* version
+of them against.)
 
 `LOCALE_LIST_API` is not one of the three constants the design named, but it gates the exact same class of bug:
 `Configuration.getLocales()` — what `context.resources.configuration.locales[0]` compiles to — does not exist
@@ -374,7 +381,7 @@ import android.icu.text.CompactDecimalFormat
 import android.icu.text.ListFormatter
 import android.icu.text.RelativeDateTimeFormatter
 import android.os.Build
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.compositionLocalOf // Compose only — omit on a Views-only project (see below)
 import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -386,6 +393,16 @@ import kotlin.math.round
 
 class Formatters(private val locale: Locale, private val context: Context) {
 
+    /**
+     * This module's own unit set — deliberately NOT android.icu.text.RelativeDateTimeFormatter.RelativeUnit.
+     * A companion-object field's TYPE and INITIALIZER are both resolved at class-init time (unlike a method
+     * BODY guarded by Build.VERSION.SDK_INT, which Android verifies lazily) — so a field of the ICU type would
+     * throw NoClassDefFoundError on API < 24 the moment Formatters is first touched, on every method, not just
+     * relativeTime(). RelUnit never references android.icu, so it is safe everywhere; the mapping to the real
+     * ICU enum happens only inside the SDK_INT-guarded branch in relativeTime() below.
+     */
+    private enum class RelUnit { SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR }
+
     companion object {
         const val DEFAULT_CURRENCY = "USD" // adjust to this project's currency
 
@@ -395,14 +412,14 @@ class Formatters(private val locale: Locale, private val context: Context) {
         private const val LIST_API = 26        // android.icu.text.ListFormatter
         private const val LOCALE_LIST_API = 24 // android.os.LocaleList / Configuration.getLocales()
 
-        private val RELATIVE_UNITS: List<Pair<RelativeDateTimeFormatter.RelativeUnit, Long>> = listOf(
-            RelativeDateTimeFormatter.RelativeUnit.SECONDS to 1_000L,
-            RelativeDateTimeFormatter.RelativeUnit.MINUTES to 60_000L,
-            RelativeDateTimeFormatter.RelativeUnit.HOURS to 3_600_000L,
-            RelativeDateTimeFormatter.RelativeUnit.DAYS to 86_400_000L,
-            RelativeDateTimeFormatter.RelativeUnit.WEEKS to 604_800_000L,
-            RelativeDateTimeFormatter.RelativeUnit.MONTHS to 2_629_746_000L,
-            RelativeDateTimeFormatter.RelativeUnit.YEARS to 31_556_952_000L,
+        private val RELATIVE_THRESHOLDS: List<Pair<RelUnit, Long>> = listOf(
+            RelUnit.SECOND to 1_000L,
+            RelUnit.MINUTE to 60_000L,
+            RelUnit.HOUR to 3_600_000L,
+            RelUnit.DAY to 86_400_000L,
+            RelUnit.WEEK to 604_800_000L,
+            RelUnit.MONTH to 2_629_746_000L,
+            RelUnit.YEAR to 31_556_952_000L,
         )
 
         /**
@@ -472,11 +489,22 @@ class Formatters(private val locale: Locale, private val context: Context) {
     fun relativeTime(value: Long, now: Long = System.currentTimeMillis()): String {
         val (unit, amount) = pickRelativeUnit(value - now)
         return if (Build.VERSION.SDK_INT >= RELATIVE_API) {
+            // The only place RelUnit is mapped to the ICU enum — inside the guarded branch,
+            // so the mapping (and the ICU type) is never touched below RELATIVE_API.
+            val icuUnit = when (unit) {
+                RelUnit.SECOND -> RelativeDateTimeFormatter.RelativeUnit.SECONDS
+                RelUnit.MINUTE -> RelativeDateTimeFormatter.RelativeUnit.MINUTES
+                RelUnit.HOUR -> RelativeDateTimeFormatter.RelativeUnit.HOURS
+                RelUnit.DAY -> RelativeDateTimeFormatter.RelativeUnit.DAYS
+                RelUnit.WEEK -> RelativeDateTimeFormatter.RelativeUnit.WEEKS
+                RelUnit.MONTH -> RelativeDateTimeFormatter.RelativeUnit.MONTHS
+                RelUnit.YEAR -> RelativeDateTimeFormatter.RelativeUnit.YEARS
+            }
             RelativeDateTimeFormatter.getInstance(locale).format(
                 amount.toDouble(),
                 if (amount < 0) RelativeDateTimeFormatter.Direction.LAST
                 else RelativeDateTimeFormatter.Direction.NEXT,
-                unit,
+                icuUnit,
             )
         } else {
             // Below RELATIVE_API: same unit selection, rendered through a <plurals>
@@ -493,14 +521,23 @@ class Formatters(private val locale: Locale, private val context: Context) {
             joinWithResourceConnectors(items, type)
         }
 
-    /** Largest unit whose magnitude is at least 1; falls back to seconds. */
-    private fun pickRelativeUnit(deltaMs: Long): Pair<RelativeDateTimeFormatter.RelativeUnit, Long> {
+    /**
+     * Largest unit whose magnitude is at least 1; falls back to seconds. A delta under one
+     * second in the chosen unit rounds to 0 — clamped to a magnitude of 1 (keeping deltaMs's
+     * sign, defaulting to the future for an exact 0) so relativeTime() never renders "in 0
+     * seconds". No dedicated "just now" string; the smallest unit already reads naturally
+     * at magnitude 1 ("in 1 second" / "1 second ago").
+     */
+    private fun pickRelativeUnit(deltaMs: Long): Pair<RelUnit, Long> {
         val magnitude = abs(deltaMs)
-        for (i in RELATIVE_UNITS.indices.reversed()) {
-            val (unit, ms) = RELATIVE_UNITS[i]
-            if (magnitude >= ms || i == 0) return unit to round(deltaMs.toDouble() / ms).toLong()
+        for (i in RELATIVE_THRESHOLDS.indices.reversed()) {
+            val (unit, ms) = RELATIVE_THRESHOLDS[i]
+            if (magnitude >= ms || i == 0) {
+                val amount = round(deltaMs.toDouble() / ms).toLong()
+                return unit to if (amount == 0L) (if (deltaMs < 0) -1L else 1L) else amount
+            }
         }
-        return RelativeDateTimeFormatter.RelativeUnit.SECONDS to 0L
+        return RelUnit.SECOND to 1L
     }
 
     /**
@@ -508,23 +545,23 @@ class Formatters(private val locale: Locale, private val context: Context) {
      * resources, so the result pluralizes per CLDR and stays translatable — never a
      * hardcoded "$n days ago". Scaffolded into res/values/strings.xml — see below.
      */
-    private fun relativeFallback(unit: RelativeDateTimeFormatter.RelativeUnit, amount: Long): String {
+    private fun relativeFallback(unit: RelUnit, amount: Long): String {
         val n = abs(amount).toInt()
         val past = amount < 0
         val res = when (unit) {
-            RelativeDateTimeFormatter.RelativeUnit.SECONDS ->
+            RelUnit.SECOND ->
                 if (past) R.plurals.relative_seconds_ago else R.plurals.relative_seconds_from_now
-            RelativeDateTimeFormatter.RelativeUnit.MINUTES ->
+            RelUnit.MINUTE ->
                 if (past) R.plurals.relative_minutes_ago else R.plurals.relative_minutes_from_now
-            RelativeDateTimeFormatter.RelativeUnit.HOURS ->
+            RelUnit.HOUR ->
                 if (past) R.plurals.relative_hours_ago else R.plurals.relative_hours_from_now
-            RelativeDateTimeFormatter.RelativeUnit.DAYS ->
+            RelUnit.DAY ->
                 if (past) R.plurals.relative_days_ago else R.plurals.relative_days_from_now
-            RelativeDateTimeFormatter.RelativeUnit.WEEKS ->
+            RelUnit.WEEK ->
                 if (past) R.plurals.relative_weeks_ago else R.plurals.relative_weeks_from_now
-            RelativeDateTimeFormatter.RelativeUnit.MONTHS ->
+            RelUnit.MONTH ->
                 if (past) R.plurals.relative_months_ago else R.plurals.relative_months_from_now
-            else -> // YEARS
+            RelUnit.YEAR ->
                 if (past) R.plurals.relative_years_ago else R.plurals.relative_years_from_now
         }
         return context.resources.getQuantityString(res, n, n)
@@ -549,10 +586,19 @@ class Formatters(private val locale: Locale, private val context: Context) {
     }
 }
 
+// Compose only — omit this declaration entirely on a Views-only project (see below).
 val LocalFormatters = compositionLocalOf<Formatters> {
     error("LocalFormatters not provided — wrap your content in CompositionLocalProvider")
 }
 ```
+
+**On a Views-only project (`uiToolkit == "views"`), omit both Compose-only lines above** — the
+`import androidx.compose.runtime.compositionLocalOf` line and the entire `val LocalFormatters = ...`
+declaration. `androidx.compose.runtime` is not on that project's classpath, and importing from it fails to
+compile, the same class of harm as a dangling `R.` reference. Use `Formatters.of(context)` directly everywhere
+on that project; there is no Compose root to provide a `CompositionLocal` at, so the whole "Provide
+`LocalFormatters`" subsection below is skipped too. On `uiToolkit == "compose"` or `"both"`, keep both lines
+and follow that subsection.
 
 **Why the constructor takes a `Context`, not just a `Locale`.** The brief-level sketch of this class carries
 only a `Locale`; that is not enough to implement `relativeFallback` / `joinWithResourceConnectors`, both of
@@ -646,7 +692,7 @@ that guards each one:
 As with every non-English target locale in Step 4, add a translated `<plurals>`/`<string>` set (with whatever
 extra CLDR quantity categories that language needs) to each `values-<qualifier>/strings.xml` you scaffold.
 
-### Provide `LocalFormatters` once, at the Compose root
+### Provide `LocalFormatters` once, at the Compose root (skip entirely on a Views-only project)
 
 ```kotlin
 CompositionLocalProvider(
