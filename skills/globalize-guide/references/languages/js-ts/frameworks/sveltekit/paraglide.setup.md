@@ -231,64 +231,126 @@ Wire it into the root layout so it appears on every page:
 
 By default `setLocale()` reloads so the server re-renders under the new locale (correct under SSR). Use `localizeHref('/path')` for in-app links that should carry the active locale's prefix; see `paraglide/rules.template.md` for the markup conventions. Style the switcher to match the project (the inline markup above is a baseline).
 
-## Formatting helpers
+## Formatting helpers (`generate_format_helpers`)
 
 **This rides the `create_config` step** — it establishes the project's i18n module surface, the same unit of work. On the already-configured collapse path `create_config` does not run, so `generate_coding_rules` creates the module instead; see the `formatModule` row in `paraglide/setup.add-ons.md`.
 
-Paraglide has no formatting API of its own, so without a shared module every price and every date grows its own `new Intl.NumberFormat(getLocale(), { … })` and the currency code and date styles drift between call sites. Create `src/lib/format.ts`:
+Paraglide has no formatting API of its own, so without a shared module every price and every date grows its own `new Intl.NumberFormat(getLocale(), { … })` and the currency code and date styles drift between call sites. Create `src/lib/format.ts` — a sibling of `src/lib/paraglide/`, **never inside it**: that directory is the compiler's `outdir`, gitignored generated output (see below) that is overwritten on every compile, so a hand-authored file placed there is silently wiped:
 
 ```ts
 // src/lib/format.ts
 import { getLocale } from '$lib/paraglide/runtime.js'
 
+export type DateInput = Date | number | string
+export type DatePreset = 'short' | 'medium' | 'long'
+
+/** THE SEAM. Change this one function to format against something other than the UI locale. */
+export function formatLocale(): string {
+  return getLocale()
+}
+
 /** This project's currency. Change it here, never at a call site. */
-const CURRENCY = 'USD'
+const DEFAULT_CURRENCY = 'USD'   // adjust to this project's currency
 
-const NUMBER = {
-  currency: { style: 'currency', currency: CURRENCY },
-  percent: { style: 'percent', maximumFractionDigits: 1 },
-  decimal: {},
-} satisfies Record<string, Intl.NumberFormatOptions>
-
-const DATE = {
+const DATE_PRESETS: Record<DatePreset, Intl.DateTimeFormatOptions> = {
   short: { dateStyle: 'short' },
   medium: { dateStyle: 'medium' },
-  dateTime: { dateStyle: 'medium', timeStyle: 'short' },
-} satisfies Record<string, Intl.DateTimeFormatOptions>
+  long: { dateStyle: 'long' },
+}
 
-// Keyed by locale, so it holds no request state — safe under SSR.
-const memo = new Map<string, Intl.NumberFormat | Intl.DateTimeFormat>()
-
-function nf(preset: keyof typeof NUMBER): Intl.NumberFormat {
-  const locale = getLocale()
-  const key = `n:${preset}:${locale}`
-  let f = memo.get(key) as Intl.NumberFormat | undefined
-  if (!f) memo.set(key, (f = new Intl.NumberFormat(locale, NUMBER[preset])))
+// Keyed by locale + kind, so it holds no request state — safe under SSR.
+const memo = new Map<string, unknown>()
+function cached<T>(key: string, make: () => T): T {
+  let f = memo.get(key) as T | undefined
+  if (f === undefined) memo.set(key, (f = make()))
   return f
 }
 
-function df(preset: keyof typeof DATE): Intl.DateTimeFormat {
-  const locale = getLocale()
-  const key = `d:${preset}:${locale}`
-  let f = memo.get(key) as Intl.DateTimeFormat | undefined
-  if (!f) memo.set(key, (f = new Intl.DateTimeFormat(locale, DATE[preset])))
-  return f
+const toDate = (v: DateInput): Date => (v instanceof Date ? v : new Date(v))
+
+const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ['second', 1000],
+  ['minute', 60_000],
+  ['hour', 3_600_000],
+  ['day', 86_400_000],
+  ['week', 604_800_000],
+  ['month', 2_629_746_000],
+  ['year', 31_556_952_000],
+]
+
+/** Largest unit whose magnitude is at least 1; falls back to seconds. */
+function pickRelativeUnit(deltaMs: number): [Intl.RelativeTimeFormatUnit, number] {
+  const abs = Math.abs(deltaMs)
+  for (let i = UNITS.length - 1; i >= 0; i--) {
+    const [unit, ms] = UNITS[i]
+    if (abs >= ms || i === 0) return [unit, Math.round(deltaMs / ms)]
+  }
+  return ['second', 0]
 }
 
-export const formatCurrency = (amount: number) => nf('currency').format(amount)
-export const formatPercent = (value: number) => nf('percent').format(value)
-export const formatNumber = (value: number) => nf('decimal').format(value)
+function nf(key: string, opts: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const locale = formatLocale()
+  return cached(`n:${locale}:${key}`, () => new Intl.NumberFormat(locale, opts))
+}
+function df(key: string, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const locale = formatLocale()
+  return cached(`d:${locale}:${key}`, () => new Intl.DateTimeFormat(locale, opts))
+}
+function rtf(): Intl.RelativeTimeFormat {
+  const locale = formatLocale()
+  return cached(`r:${locale}`, () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }))
+}
+function lf(type: 'and' | 'or'): Intl.ListFormat {
+  const locale = formatLocale()
+  return cached(`l:${locale}:${type}`, () =>
+    new Intl.ListFormat(locale, { style: 'long', type: type === 'or' ? 'disjunction' : 'conjunction' }),
+  )
+}
 
-export const formatDateShort = (v: Date | number | string) => df('short').format(new Date(v))
-export const formatDate = (v: Date | number | string) => df('medium').format(new Date(v))
-export const formatDateTime = (v: Date | number | string) => df('dateTime').format(new Date(v))
+export const money = (amount: number, currency: string = DEFAULT_CURRENCY) =>
+  nf(`cur:${currency}`, { style: 'currency', currency }).format(amount)
+export const number = (value: number, opts?: Intl.NumberFormatOptions) =>
+  opts ? new Intl.NumberFormat(formatLocale(), opts).format(value) : nf('dec', { style: 'decimal' }).format(value)
+export const percent = (value: number) => nf('pct', { style: 'percent' }).format(value)
+export const compact = (value: number) => nf('cmp', { notation: 'compact' }).format(value)
+export const unit = (value: number, u: string) => nf(`unit:${u}`, { style: 'unit', unit: u }).format(value)
+export const date = (v: DateInput, preset: DatePreset = 'medium') => df(`p:${preset}`, DATE_PRESETS[preset]).format(toDate(v))
+export const time = (v: DateInput) => df('t', { timeStyle: 'short' }).format(toDate(v))
+export const dateTime = (v: DateInput) => df('dt', { dateStyle: 'medium', timeStyle: 'short' }).format(toDate(v))
+export const relativeTime = (v: DateInput, now?: DateInput) => {
+  const from = now === undefined ? Date.now() : toDate(now).getTime()
+  const [u, amount] = pickRelativeUnit(toDate(v).getTime() - from)
+  return rtf().format(amount, u)
+}
+export const list = (items: string[], type: 'and' | 'or' = 'and') => lf(type).format(items)
+
+/** @deprecated Use `money`. */   export const formatCurrency = money
+/** @deprecated Use `number`. */  export const formatNumber = number
+/** @deprecated Use `percent`. */ export const formatPercent = percent
+/** @deprecated Use `date(v, 'short')`. */ export const formatDateShort = (v: DateInput) => date(v, 'short')
+/** @deprecated Use `date`. */    export const formatDate = date
+/** @deprecated Use `dateTime`. */export const formatDateTime = dateTime
 ```
 
-**Set `CURRENCY` to the project's real currency** before writing the file. Grep for an existing `currency:` option, a `toLocaleString` / `Intl.NumberFormat` call, or a hardcoded symbol. If nothing is findable, leave `'USD'` and append `// adjust to this project's currency` to the line — a wrong currency that looks deliberate is worse than one that flags itself. Keep the preset list to what the codebase actually formats; presets nothing uses are dead exports.
+**The aliases exist so a re-run does not break call sites** from an earlier version of this skill. They are deprecated, not supported: a future `templateVersion` bump drops them.
 
-**The module-scope `memo` is safe under SSR.** It caches `Intl` formatters keyed by locale and holds no request state. This is not the module-scope caching the coding rules forbid — that rule is about caching the *locale itself*, which would pin one request's locale onto every later request. Constructing an `Intl` formatter is expensive enough that the memo earns its keep on a list of prices.
+**Set `DEFAULT_CURRENCY` to the project's real currency** before writing the file. Grep for an existing `currency:` option, a `toLocaleString` / `Intl.NumberFormat` call, or a hardcoded symbol. If nothing is findable, leave `'USD'` and append `// adjust to this project's currency` to the line — a wrong currency that looks deliberate is worse than one that flags itself. Record the hit as `currencySource` (`grep:<file>:<line>`, or `default` when nothing was findable) — one of the fields written to `.globalize/format-module.json` below.
 
-If `src/lib/format.ts` already exists as project code, **do not overwrite it** — add the locale-aware presets into it, or create `src/lib/i18n-format.ts` instead. Either way record the specifier you used; the coding-rules step reads it back as `formatModule`.
+**The module-scope `memo` is safe under SSR.** It caches `Intl` formatter instances — `NumberFormat`, `DateTimeFormat`, `RelativeTimeFormat`, and `ListFormat` alike — keyed by locale and kind, and holds no request state. This is not the module-scope caching the coding rules forbid — that rule is about caching the *locale itself*, which would pin one request's locale onto every later request. Constructing an `Intl` formatter is expensive enough that the memo earns its keep on a list of prices.
+
+**The TypeScript `lib` gate.** `Intl.ListFormat` needs `es2021.intl`; `Intl.RelativeTimeFormat`, `notation: 'compact'` and `style: 'unit'` need `es2020.intl`. Read `tsconfig.json` `compilerOptions.lib` (falling back to what `target` implies). If it resolves below `ES2021`, do **not** silently emit a module that fails `tsc` — write `status: "needs_decision"` with:
+
+```json
+{ "step": "format_module_ts_lib",
+  "question": "format.ts needs Intl.ListFormat/RelativeTimeFormat types, which require tsconfig lib ES2021 or later (this project resolves to <current>). Raise lib to ES2021, or omit list() and relativeTime()?",
+  "options": ["raise_lib", "omit_two"] }
+```
+
+and stop. On `omit_two` the surface still has ten entries in `format-module.json`; the two omitted ones are emitted as `throw new Error('list() requires tsconfig lib ES2021')` stubs so the contract holds and the failure is loud rather than silent.
+
+If `src/lib/format.ts` already exists as project code, **do not overwrite it** — add the ten-function surface into it, or create `src/lib/i18n-format.ts` instead. Either way, record the specifier actually used into `.globalize/format-module.json` below; the coding-rules step reads it back as `formatModule`.
+
+**Write `.globalize/format-module.json`** with `specifier` (`$lib/format` — `src/lib/*` maps to `$lib` through SvelteKit's built-in alias, the same mapping used above for the compiled Paraglide output, applied here to this hand-authored file; `$lib/i18n-format` if the fallback name above was used), `path` (`src/lib/format.ts` or `src/lib/i18n-format.ts`), the ten-entry `surface` (`["money","number","percent","compact","unit","date","time","dateTime","relativeTime","list"]`), `defaultCurrency`, and `currencySource`. `generate_coding_rules` reads `specifier` back as `formatModule`.
 
 ## `.gitignore`
 
@@ -307,6 +369,7 @@ The Paraglide compiler also emits a `.gitignore` of its own inside `outdir` by d
 2. Start the dev server (`npm run dev` or the detected manager's equivalent). It should boot without errors and the page should render the sample message. Switch locale via the switcher — the visible text changes and (with `url` in the strategy) the URL gains the locale prefix; reloading that URL keeps the chosen locale (cookie + URL persistence working under SSR).
 3. **Render a plural and confirm it selects the correct form.** Call `m.likes({ count: 1 })` and `m.likes({ count: 5 })` somewhere on a page and confirm the output is `1 like` and `5 likes` — **not** the raw `{count, plural, …}` source and not an empty string. Raw-source output means `messageFormat: "icu"` is missing (or the plugin URL is below `0.1.2`); fix that before continuing. This check is non-negotiable — it is the only signal that ICU is actually being evaluated (a malformed or unparsed ICU body is imported as literal text with no build error).
 4. Run the production build (`npm run build`) and confirm it completes — a missing or misconfigured `project.inlang/settings.json` surfaces here.
+5. **Render `list(['a', 'b', 'c'])` and `relativeTime(Date.now() - 86_400_000)`** on a page and confirm they read as `a, b, and c` and `yesterday` — **not** `[object Object]` and **not** `1 day ago`. `numeric: 'auto'` on the `Intl.RelativeTimeFormat` constructor is what produces `yesterday`; losing it (omitting the option, or passing `numeric: 'always'`) is a silent quality regression — the output stays grammatically valid, just worse.
 
 ## Coding rules + optional add-ons
 
