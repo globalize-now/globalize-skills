@@ -226,6 +226,21 @@ This is the PO parser used by the build-time `poLoader` Vite plugin installed in
 
 ## Step 3: Configure the i18n Instance
 
+### Resolve `<i18nDir>`
+
+Every reference to `<i18nDir>` in this file means:
+
+| `framework` | Nuxt major | `<i18nDir>` |
+|---|---|---|
+| `vite` | — | `src/i18n/` |
+| `quasar` | — | `src/i18n/` |
+| `nuxt` | 3 | `src/i18n/` — or `i18n/` at the project root when the project has no `src/` directory |
+| `nuxt` | 4 | `i18n/` |
+
+`framework` is the Step 1 variant dispatch; Nuxt major is the "Nuxt version" signal Step 1 already parses. This is where `locales.ts`, `messageCompiler.ts`, the i18n instance module, and (per "Format Helpers" below) `format.ts` all live.
+
+**This is not the same directory as the catalog files on Nuxt 3.** `@nuxtjs/i18n`'s conventional catalog directory is `locales/` at the project root (see `catalogPath` in Step 8 §3) — a sibling of `src/`, not a child of `<i18nDir>`. Do not assume the two coincide; glob for both independently. On Nuxt 4 and on Vite / Quasar they do coincide (catalogs live under `<i18nDir>/locales/`).
+
 Create the shared locale constants module first. This is the single source of truth for locale configuration — both the i18n setup and language switcher import from it:
 
 ```ts
@@ -354,7 +369,6 @@ Create `<i18nDir>/format.ts`:
 
 ```ts
 // <i18nDir>/format.ts
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 export type DateInput = Date | number | string
@@ -390,9 +404,30 @@ export function pickRelativeUnit(deltaMs: number): [Intl.RelativeTimeFormatUnit,
   return ['second', 0]
 }
 
+// Pure Intl, parameterized by the UI locale — no useI18n() dependency, so these
+// two work anywhere a locale string is available: components, Nuxt plugins and
+// server routes, plain .ts modules, tests. useFormatters() below delegates to
+// both instead of duplicating them.
+export function formatRelativeTime(uiLocale: string, value: DateInput, now?: DateInput): string {
+  const locale = formatLocale(uiLocale)
+  const from = now === undefined ? Date.now() : toDate(now).getTime()
+  const [unit, amount] = pickRelativeUnit(toDate(value).getTime() - from)
+  return cached(`r:${locale}`, () =>
+    new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
+  ).format(amount, unit)
+}
+
+export function formatList(uiLocale: string, items: string[], type: 'and' | 'or' = 'and'): string {
+  const locale = formatLocale(uiLocale)
+  return cached(`l:${locale}:${type}`, () =>
+    new Intl.ListFormat(locale, {
+      style: 'long', type: type === 'or' ? 'disjunction' : 'conjunction',
+    }),
+  ).format(items)
+}
+
 export function useFormatters() {
   const { n, d, locale } = useI18n()
-  const active = computed(() => formatLocale(locale.value))
 
   return {
     // Registered named formats — see the numberFormats/datetimeFormats block below.
@@ -407,32 +442,37 @@ export function useFormatters() {
       d(toDate(value), preset),
     time: (value: DateInput) => d(toDate(value), 'time'),
     dateTime: (value: DateInput) => d(toDate(value), 'dateTime'),
-    // vue-i18n has no relative-time API.
-    relativeTime: (value: DateInput, now?: DateInput) => {
-      const from = now === undefined ? Date.now() : toDate(now).getTime()
-      const [unit, amount] = pickRelativeUnit(toDate(value).getTime() - from)
-      return cached(`r:${active.value}`, () =>
-        new Intl.RelativeTimeFormat(active.value, { numeric: 'auto' }),
-      ).format(amount, unit)
-    },
-    // vue-i18n has no list API.
-    list: (items: string[], type: 'and' | 'or' = 'and') =>
-      cached(`l:${active.value}:${type}`, () =>
-        new Intl.ListFormat(active.value, {
-          style: 'long', type: type === 'or' ? 'disjunction' : 'conjunction',
-        }),
-      ).format(items),
+    // vue-i18n has no relative-time API — delegates to the standalone export above.
+    relativeTime: (value: DateInput, now?: DateInput) => formatRelativeTime(locale.value, value, now),
+    // vue-i18n has no list API — delegates to the standalone export above.
+    list: (items: string[], type: 'and' | 'or' = 'and') => formatList(locale.value, items, type),
   }
 }
 ```
 
-**`useFormatters()` requires the same context `useI18n()` does** — a component's `setup()` / `<script setup>`, or a composable called from one. Unlike the Lingui and next-intl variants of this module, there is no non-hook counterpart (`getFormatters()`) exported here: Vue composables have no equivalent outside setup. Code that genuinely runs outside setup falls back to `<<globalI18n>>.n(...)` / `.d(...)` directly and does without `list()` / `relativeTime()` — those two exist only on this composable.
+**`useFormatters()` requires the same context `useI18n()` does** — a component's `setup()` / `<script setup>`, or a composable called from one — **and requires the i18n instance to have been created with `legacy: false`** (Composition API mode), which Step 3 above already sets. Unlike the Lingui and next-intl variants of this module, there is no non-hook counterpart (`getFormatters()`) exported here: Vue composables have no equivalent outside setup.
+
+That split is why `relativeTime` and `list` are pulled out as the standalone `formatRelativeTime()` / `formatList()` exports above: they take no `useI18n()` context at all, so genuinely non-setup code imports them directly and passes a locale string —
+
+```ts
+import { formatList } from '<i18nDir>/format'
+formatList(locale, items)   // no useI18n() context needed
+```
+
+`money`, `number`, `percent`, `compact`, `unit`, `date`, `time`, and `dateTime` have no such standalone form — they resolve through vue-i18n's own `n()` / `d()`, which only exist on the instance. For code that truly has no setup context:
+
+- **Vite / Quasar** — read `i18n.global` (the same instance the Step 3 module exports) and call `.n(...)` / `.d(...)` directly: `i18n.global.n(amount, 'currency')`.
+- **Nuxt** — there is no equivalent outside a Nuxt context: `useNuxtApp().$i18n` only resolves inside a plugin, middleware, or a composable called from `setup()`. A Nitro `server/api/` route (or any code with no such context) has no i18n instance to read from at all — format on the client instead, or accept the formatter, or an already-formatted string, as a parameter from a caller that does have one.
+
+**Calling `.n(...)` / `.d(...)` on the global instance directly bypasses `formatLocale()`** — the instance's own `.locale` is read, not routed through the seam. A project that later gives `formatLocale()` a real translation (a separate display locale, say) must revisit every such call site.
 
 ### Register the presets — for the source locale, and every target locale
 
-**This is what makes `n()` / `d()` inside the composable above (and every other `n(x, 'currency')` call in the app) actually work.** A name that is not registered for the active locale does not throw: `n()` / `d()` silently fall back to browser defaults, and a currency call with no registered currency format emits **no currency symbol at all** — a silent failure, not a build error that would catch it. Add this to the `createI18n(...)` call from Step 3 (Vite / Quasar) or `i18n.config.ts` (Nuxt), generated for every configured locale:
+**This is what makes `n()` / `d()` inside the composable above (and every other `n(x, 'currency')` call in the app) actually work.** A name that is not registered for the active locale does not throw: `n()` / `d()` silently fall back to browser defaults, and a currency call with no registered currency format emits **no currency symbol at all** — a silent failure, not a build error that would catch it. Add this to the `createI18n(...)` call from Step 3 (Vite / Quasar) or `i18n.config.ts` (Nuxt) — **a different file from `<i18nDir>/format.ts`**, so import `DEFAULT_CURRENCY` from it (`import { DEFAULT_CURRENCY } from './format'`, adjusted to this file's real relative path to `<i18nDir>`) rather than repeating the literal — generated for every configured locale:
 
 ```ts
+import { DEFAULT_CURRENCY } from './format'   // adjust the specifier to this file's location
+
 const numberFormats = {
   en: {
     currency: { style: 'currency', currency: DEFAULT_CURRENCY },
