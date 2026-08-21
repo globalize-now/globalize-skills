@@ -30,6 +30,7 @@ This setup phase covers **native Apple (Swift) projects** localizing with an **A
 | 5. Register target locales | **Modifies project config** | Adds localizations / known regions to the Xcode project — describe the change and get confirmation |
 | 6. SPM: edit `Package.swift` | **Modifies existing file** | Adds `defaultLocalization` + processed-resource declaration — describe the change and get confirmation |
 | 7. Optional legacy migration | Additive (per table) | Converts existing `.strings`/`.stringsdict` to a catalog; non-blocking |
+| Format helpers | Additive | Creates `Formatters.swift`; below iOS 15 also adds an availability-gated fallback — **always runs**, feeds Step 8 |
 | 8. Generate + wire coding rules | Additive (+ edits `CLAUDE.md` / `AGENTS.md`) | Writes `.agents/globalize-rules.md` and points `CLAUDE.md` and `AGENTS.md` at it — **always runs**, Phase 3 wraps against it |
 
 **RULE: Steps that modify the Xcode project config or existing files require you to describe the exact change to the user and get confirmation before proceeding. Do NOT silently modify project configuration or existing files.** _(This rule is modified by the setup mode chosen below.)_
@@ -264,6 +265,323 @@ For Objective-C `NSLocalizedString` call sites, the conversion can ingest them a
 
 ---
 
+## Format helpers (`generate_format_helpers`)
+
+`.formatted()` / `FormatStyle` already reads whatever locale you hand it, but nothing routes currency to
+this project's own default, and every screen that formats a number, a date, or a list has to remember the
+right style and the right options each time. This step creates one small file, `Formatters.swift`, that
+gives every formatting concern a name — as `FormatStyle` extensions for the value styles, so
+`Text(amount, format: .money)` re-formats automatically when the environment locale changes, plus a
+`Formatters` namespace for the two concepts that need an argument no `FormatStyle` carries (`relativeTime`'s
+reference instant, `list`'s items) and for `measurement`, which Foundation's own API shape rules out of the
+`FormatStyle`-extension idiom (see "The `unit` hazard" below).
+
+**Always runs**, on every project — like Steps 2–7, it does not wait for a `SKILL.md §1.10` selection.
+Phase 3's wrap subagents route every hardcoded number, currency, date, and list through this file's surface.
+
+### Read the deployment target — it decides whether the fallback is emitted at all
+
+Read the project's **deployment target** before writing `Formatters.swift` (spec §Open items 2):
+
+- **Xcode target** — `IPHONEOS_DEPLOYMENT_TARGET` in the target's build settings (read alongside the other
+  project-structure signals Step 1 already collects).
+- **SPM target** — the `platforms:` array on the `Package` in `Package.swift`, e.g.
+  `platforms: [.iOS(.v16)]`. **If `platforms:` is absent entirely**, SwiftPM applies a default floor older
+  than iOS 15 (the exact value depends on the Swift tools version declared at the top of the file, but is
+  never higher) — treat this the same as an explicit floor below 15.0.
+
+If it can't be read at all (no build setting found, no `Package.swift`, or the project genuinely mixes
+signals), write `status: "needs_decision"` with:
+
+```json
+{ "step": "format_module_deployment_target",
+  "question": "Could not read this project's deployment target — does it need to support iOS versions older than 15?",
+  "options": ["ios_15_plus_no_fallback", "below_ios_15_emit_fallback"] }
+```
+
+and stop.
+
+### The availability floors (verified, not recalled — re-check before reusing years from now)
+
+Every API this module is built on lands at the **same** floor, confirmed directly against each symbol's own
+Apple Developer Documentation page (checked **2026-08-22** — Apple's documentation pages are a JS-rendered
+SPA that doesn't always yield an "Availability" section to a plain page fetch; the `/tutorials/data/...json`
+endpoint behind each page does, and is what was actually queried):
+
+| API (used for) | iOS floor | Source |
+|---|---|---|
+| `Date.FormatStyle` (`shortDate`/`mediumDate`/`timeOnly`/`dateAndTime`) | **15.0** | https://developer.apple.com/documentation/foundation/date/formatstyle |
+| `FloatingPointFormatStyle<Double>.Currency` (`money` on `Double`) | **15.0** | https://developer.apple.com/documentation/foundation/floatingpointformatstyle/currency |
+| `Decimal.FormatStyle.Currency` (`money` on `Decimal`) | **15.0** | https://developer.apple.com/documentation/Foundation/Decimal/FormatStyle/Currency |
+| `IntegerFormatStyle<Int>.Currency` (`money` on `Int`) | **15.0** | https://developer.apple.com/documentation/foundation/integerformatstyle/currency |
+| `FloatingPointFormatStyle<Double>.Percent` / plain `.number` (`percentage`/`plainNumber`/`compactNumber`) | **15.0** | https://developer.apple.com/documentation/foundation/floatingpointformatstyle/currency (sibling `.percent`/`.number` ship on the same type, same release) |
+| `Date.RelativeFormatStyle` (`relativeTime`) | **15.0** | https://developer.apple.com/documentation/foundation/date/relativeformatstyle |
+| `ListFormatStyle` (`list`) | **15.0** | https://developer.apple.com/documentation/foundation/listformatstyle |
+| `Measurement<UnitType: Dimension>.FormatStyle` (`measurement`) | **15.0** | https://developer.apple.com/documentation/foundation/measurement/formatstyle |
+
+Every one of the ten functions bottoms out at the identical floor, so there is exactly **one** branch to
+make for the whole file, not one per function — unlike Android, where `CompactDecimalFormat`/
+`RelativeDateTimeFormatter`/`ListFormatter` each landed at a different API level. Two **class**-based
+formatters from well before Swift itself existed are what the fallback below is built on —
+`NumberFormatter` and `DateFormatter`. For completeness, the class-based `RelativeDateTimeFormatter` and
+`ListFormatter` (distinct types from the `FormatStyle` structs above, same names) are also available, from
+**iOS 13.0** — https://developer.apple.com/documentation/foundation/relativedatetimeformatter and
+https://developer.apple.com/documentation/foundation/listformatter (checked 2026-08-22) — but the fallback
+below only implements `money`/`mediumDate` as the representative pair, per the spec's Open item 2, which
+names `NumberFormatter`/`DateFormatter` specifically; extend the identical `static let` + `#available`
+pattern to `relativeTime`/`list` (via the two class-based formatters above) only if this project's floor is
+also below 13.0, which in practice is vanishingly rare.
+
+### The decision
+
+- **Deployment target ≥ iOS 15.0** — every API above is available unconditionally. **Do not emit the
+  cached-formatter fallback.** Write the clean module below as-is; skip the "Below iOS 15" subsection
+  entirely.
+- **Deployment target < iOS 15.0** (including "unreadable, treated as below" per the `needs_decision`
+  answer `below_ios_15_emit_fallback`) — write the clean module **and** the fallback subsection below. Wrap
+  every `public extension FormatStyle where Self == …` block in `@available(iOS 15.0, *)` — referencing an
+  iOS-15-only type unguarded is a compile error at any deployment target below 15, not just a runtime risk.
+
+### The Swift module
+
+```swift
+// Formatters.swift
+import Foundation
+
+public enum Formatters {
+
+    /// This project's default currency — used only when a call site doesn't pass one explicitly.
+    /// See "Resolve the default currency" below.
+    public static let defaultCurrency = "USD" // adjust to this project's currency
+
+    /// THE SEAM. Formatting follows the UI locale today. `.autoupdatingCurrent`, not `.current` —
+    /// `.current` is a one-time snapshot taken the first time it's read and never changes again for
+    /// the life of the process; `.autoupdatingCurrent` is a live reference that always reflects the
+    /// system's current setting, with nothing to reconstruct on a change. Every style below chains
+    /// `.locale(formatLocale)` explicitly, rather than relying on each API's own default (which
+    /// happens to also be `.autoupdatingCurrent` today, but isn't a contract) — so this one property
+    /// is the single place to edit for a separate regional preference, exactly like every other
+    /// stack's `formatLocale()` / `format_locale`.
+    public static var formatLocale: Locale { .autoupdatingCurrent }
+
+    public static func relativeTime(_ value: Date, now: Date = Date()) -> String {
+        value.formatted(.relative(presentation: .named).locale(formatLocale))
+    }
+
+    public static func list(
+        _ items: [String],
+        type: ListFormatStyle<StringStyle, [String]>.ListType = .and
+    ) -> String {
+        items.formatted(.list(type: type).locale(formatLocale))
+    }
+
+    /// Foundation's `Measurement.FormatStyle` is generic over a concrete `Dimension` subclass
+    /// (`UnitLength`, `UnitMass`, `UnitDuration`, …) — there is no stringly-typed "unit" argument to
+    /// accept, so unlike every other stack's `unit(value, unit)`, the second argument here is a typed
+    /// unit, not `"km"`. `Formatters.measurement(5.2, UnitLength.kilometers)` → `"5.2 km"`. See "The
+    /// `unit` hazard" below.
+    public static func measurement<UnitType: Dimension>(
+        _ value: Double,
+        _ unit: UnitType,
+        width: Measurement<UnitType>.FormatStyle.UnitWidth = .abbreviated
+    ) -> String {
+        Measurement(value: value, unit: unit)
+            .formatted(.measurement(width: width, usage: .general, numberFormatStyle: .number).locale(formatLocale))
+    }
+}
+
+// MARK: - money — Double, Decimal, and Int each need their own extension (see "The Decimal/Int
+// hazard" below); this mirrors Foundation's own three separate `.currency(code:)` overloads.
+
+public extension FormatStyle where Self == FloatingPointFormatStyle<Double>.Currency {
+    /// `Text(amount, format: .money)` / `amount.formatted(.money)` — this project's default currency.
+    static var money: Self { .currency(code: Formatters.defaultCurrency).locale(Formatters.formatLocale) }
+    /// `Text(amount, format: .money(order.currency))` — when the data carries its own currency.
+    static func money(_ code: String) -> Self { .currency(code: code).locale(Formatters.formatLocale) }
+}
+
+public extension FormatStyle where Self == Decimal.FormatStyle.Currency {
+    static var money: Self { .currency(code: Formatters.defaultCurrency).locale(Formatters.formatLocale) }
+    static func money(_ code: String) -> Self { .currency(code: code).locale(Formatters.formatLocale) }
+}
+
+public extension FormatStyle where Self == IntegerFormatStyle<Int>.Currency {
+    static var money: Self { .currency(code: Formatters.defaultCurrency).locale(Formatters.formatLocale) }
+    static func money(_ code: String) -> Self { .currency(code: code).locale(Formatters.formatLocale) }
+}
+
+// MARK: - number, percent, compact — Double-scoped by design; see "Why only money gets the
+// Decimal/Int treatment" below.
+
+public extension FormatStyle where Self == FloatingPointFormatStyle<Double>.Percent {
+    /// `Text(ratio, format: .percentage)` — takes a ratio (0.42), not a whole percentage (42).
+    static var percentage: Self { .percent.locale(Formatters.formatLocale) }
+}
+
+public extension FormatStyle where Self == FloatingPointFormatStyle<Double> {
+    /// Not `.number` — `FloatingPointFormatStyle` already declares that member; redeclaring it would
+    /// not compile.
+    static var plainNumber: Self { .number.locale(Formatters.formatLocale) }
+    /// Not `.compact` — reads naturally beside `plainNumber`. `.notation(.compactName)` renders
+    /// `12000` as `"12K"`.
+    static var compactNumber: Self { .number.notation(.compactName).locale(Formatters.formatLocale) }
+}
+
+// MARK: - date, time, dateTime
+
+public extension FormatStyle where Self == Date.FormatStyle {
+    /// Not `.dateTime` — `Date.FormatStyle` already declares that member.
+    static var shortDate: Self { .dateTime.day().month(.abbreviated).year().locale(Formatters.formatLocale) }
+    /// The default `date` preset.
+    static var mediumDate: Self { .dateTime.day().month(.wide).year().locale(Formatters.formatLocale) }
+    static var timeOnly: Self { .dateTime.hour().minute().locale(Formatters.formatLocale) }
+    static var dateAndTime: Self {
+        .dateTime.day().month(.abbreviated).year().hour().minute().locale(Formatters.formatLocale)
+    }
+}
+```
+
+### Below iOS 15 — the cached-formatter fallback
+
+Only when the deployment target is below iOS 15. Cache each legacy formatter in a `static let` —
+constructing `NumberFormatter`/`DateFormatter` per call is a well-known performance trap, since each one
+parses locale data on `init`. Shown here for `money`/`mediumDate` as the representative pair (per "The
+availability floors" above); extend the identical `static let` cache + `if #available` branch to any other
+function this project actually calls from a context that must run below iOS 15:
+
+```swift
+public extension Formatters {
+    private static let legacyCurrencyFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        // .autoupdatingCurrent, not a snapshot — this formatter is constructed ONCE, at first access,
+        // and lives for the app's lifetime, so a fixed Locale would freeze it at whatever was active
+        // at launch and never pick up a later change.
+        f.locale = formatLocale
+        return f
+    }()
+
+    private static let legacyMediumDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        f.locale = formatLocale
+        return f
+    }()
+
+    /// Safe to call unconditionally, on any OS version this project ships to.
+    static func moneyCompat(_ amount: Double, currency: String = defaultCurrency) -> String {
+        if #available(iOS 15, *) {
+            return amount.formatted(.money(currency))
+        }
+        legacyCurrencyFormatter.currencyCode = currency
+        return legacyCurrencyFormatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
+    }
+
+    static func mediumDateCompat(_ value: Date) -> String {
+        if #available(iOS 15, *) {
+            return value.formatted(.mediumDate)
+        }
+        return legacyMediumDateFormatter.string(from: value)
+    }
+}
+```
+
+**A `…Compat` sibling exists for every function this project needs below iOS 15 — not the bare
+`FormatStyle` name.** `Text(amount, format: .money)` itself needs iOS 15 (the `format:` initializer, not
+just `FormatStyle` construction), so a SwiftUI view that must render on an older device can't call `.money`
+at all without its own `if #available` branch. When this branch fires, add a one-line header comment at the
+top of `Formatters.swift` naming exactly which functions got a `…Compat` sibling — the generated coding
+rules (Step 8) point the reader at that comment rather than hard-coding the list, since it's a property of
+*this* project's deployment target, not of the module in general. Calling `…Compat` uniformly (instead of
+branching every call site) is simpler and correct, at one honest cost: it loses the "re-formats
+automatically on a locale change" property `Text(_, format:)` gives for free on iOS 15+, since a plain
+`String` doesn't observe anything — a view on a pre-15 device needs its own mechanism (e.g. observing
+`NSLocale.currentLocaleDidChangeNotification`) to re-render after a locale change.
+
+### The Decimal/Int hazard — why `money` alone gets three extensions
+
+`FormatStyle where Self == FloatingPointFormatStyle<Double>.Currency` only applies when the value being
+formatted is a `Double`. **`Decimal` does not conform to `BinaryFloatingPoint`, so that extension does not
+apply to it at all** — and `Decimal` is the *correct* type for money in the first place, precisely to avoid
+the binary floating-point rounding error `Double` introduces (`0.1 + 0.2 != 0.3` in `Double`; exact in
+`Decimal`). A codebase that (rightly) stores prices as `Decimal` would hit a compile error on
+`Text(amount, format: .money)`, and the obvious workaround — converting to `Double` first — reintroduces the
+exact error `Decimal` exists to prevent. Foundation itself resolves this by shipping **three separate**
+`.currency(code:)` overloads — `static func currency<Value>(code:) -> Self where Self ==
+FloatingPointFormatStyle<Value>.Currency, Value: BinaryFloatingPoint`, one for `Self ==
+Decimal.FormatStyle.Currency`, and one for `Self == IntegerFormatStyle<V>.Currency, V: BinaryInteger` — so
+this module mirrors that with three parallel `.money` extensions above, one per numeric family, rather than
+picking one and leaving the others broken. Use whichever matches the type your data is actually stored as;
+never convert a `Decimal` price to `Double` to satisfy a formatter.
+
+**Why only `money` needs this and `plainNumber`/`percentage`/`compactNumber` don't:** `money` is the only
+value-style concept with a *project-level default* (`Formatters.defaultCurrency`) that has to be threaded
+through generically across numeric types. The other value styles have no project-specific default to
+thread — a `Decimal` quantity or an `Int` count can already call Foundation's own `.formatted()` /
+`.formatted(.number)` / `.formatted(.percent)` directly with no wrapper needed, since those are themselves
+already generic across every numeric type. `plainNumber`/`percentage`/`compactNumber` above stay
+`Double`-scoped, matching the common case (a ratio or a display count already computed as `Double`); reach
+for Foundation's own un-wrapped `.formatted()` when a `Decimal` or `Int` needs one of those three styles.
+
+### The `unit` hazard — why `measurement` isn't a bare `FormatStyle` extension like the other value styles
+
+Every other value-style concept in this ten-function contract follows the same shape on every stack:
+`unit(value, unit)` takes a raw number and a **unit string** (`"km"`, `"kg"`) — see Android's
+`fun unit(value: Number, unit: String): String = "${number(value)} $unit"`. That shape does not exist for
+Swift's `Measurement.FormatStyle`: it is generic over a concrete `Dimension` **subclass**
+(`UnitLength`, `UnitMass`, `UnitDuration`, …), not a bare string, because Foundation needs to know which
+family of units it's converting and localizing within (`UnitLength.kilometers` vs `UnitMass.kilograms` are
+not interchangeable the way two arbitrary strings are). There is no honest way to accept `measurement(5,
+"km")` — a string has no connection to Foundation's unit hierarchy, and a function that tried to parse one
+back into a `Dimension` would be inventing an API Foundation deliberately doesn't offer.
+
+`Formatters.measurement(_:_:width:)` above keeps the closest honest shape: two positional arguments, value
+first, unit second — but `unit` is typed as `Dimension`, not `String`. It is also a plain static function on
+the `Formatters` enum, not a `FormatStyle` extension — Foundation already ships the generic form as
+`static func measurement<UnitType>(width:usage:numberFormatStyle:) -> Self where Self ==
+Measurement<UnitType>.FormatStyle, UnitType: Dimension` directly on `FormatStyle`, so a project that already
+has a typed `Measurement` value and wants the `Text(_, format:)` idiom can use Apple's own form with no
+wrapper: `Text(Measurement(value: distanceKm, unit: UnitLength.kilometers), format: .measurement(width:
+.wide))`. `Formatters.measurement` exists for the common case of a call site that only has a raw `Double`
+and wants a `String` back in one call — the same convenience `relativeTime`/`list` provide.
+
+### `formatLocale` and the SPM `Bundle.module` question
+
+**`Formatters.swift` needs no `bundle:` argument, on any variant, including SPM.** `bundle: .module` (Step
+6 above, and the generated coding rules) matters only for **String Catalog lookups** —
+`String(localized:)`/`Text("…")` resolve a *bundle's own* `.xcstrings`-compiled resources, and the wrong
+bundle means a raw untranslated key. `NumberFormatter`, `DateFormatter`, and every `FormatStyle` in this
+file resolve by **`Locale`**, not by bundle — there is no resource lookup involved, so there is nothing for
+`Bundle.module` to scope. Formatting behaves identically whether `Formatters.swift` ships in an app target
+or an SPM target; do not add a `bundle:` parameter to any function above; it would not correspond to
+anything these APIs accept.
+
+### Resolve the default currency
+
+Grep the codebase for an existing hardcoded currency symbol (`"$" +`, `"€" +`, or an interpolated `"$\(`), a
+raw `String(format: "%.2f"` used for a price, or an existing `.currency(code:` call, before defaulting. If
+nothing is findable, leave `"USD"` and keep the `// adjust to this project's currency` comment — a wrong
+currency that looks deliberate is worse than one that flags itself. Record the hit as `currencySource`
+(`grep:<file>:<line>`); when nothing is findable, record `currencySource: "default"`.
+
+**If `Formatters.swift` already exists as project code, do not overwrite it** — add the members above into
+it, or create `I18nFormatters.swift` instead. Either way record the specifier actually used.
+
+Place `Formatters.swift` alongside this target's other Swift sources — the app target's source folder for
+an Xcode target, or `Sources/<Target>/Formatters.swift` for an SPM target (same target the catalog resources
+live under, Step 6) — never in a separate target, since every call site reaches it with no import.
+
+**Write `.globalize/format-module.json`** with `specifier: "Formatters"` (same module, no import needed —
+every call site references `Formatters`/`.money`/etc. directly), `path` pointing at the real
+`Formatters.swift` location just resolved, the ten-entry `surface`
+(`["money","plainNumber","percentage","compactNumber","measurement","mediumDate","timeOnly","dateAndTime","relativeTime","list"]`
+— `mediumDate` stands in for the `date` concept; `shortDate` is the file's second, non-canonical `date`
+variant), `defaultCurrency`, and `currencySource`. `generate_coding_rules` (Step 8) reads `specifier` back
+as the `formatModule` placeholder.
+
+---
+
 ## Step 8: Generate Coding Rules (`generate_coding_rules` — always runs)
 
 **This step is not optional and is not gated on a `SKILL.md §1.10` selection.** Phase 3's wrap subagents read `.agents/globalize-rules.md` as their authoring contract — which API localizes, plural authoring, skip-list, the real catalog path — so conversion cannot start until this step has produced it. Sub-step 7, which points `CLAUDE.md` and `AGENTS.md` at the generated file, always runs too — it edits files the user owns, so guided mode confirms each edit, but it is not a §1.10 selection.
@@ -304,6 +622,7 @@ Delete every false branch **and every marker line** (`<!-- if:`, `<!-- else -->`
 | `catalogPath` | Locate the `.xcstrings` file — glob `**/*.xcstrings` and take the default table (`Localizable.xcstrings`), the one created or confirmed in Step 3. On an SPM target that is `Sources/<Target>/Resources/Localizable.xcstrings` (Step 6). Record it **project-root-relative**. A String Catalog is a **single multi-locale file**, so this is the path of the file itself and must contain **no `{locale}` segment**. If several tables exist, name the default one. |
 | `sourceLocale` | The `sourceLanguage` field **inside the catalog file** — that is what the build honours. Info.plist `CFBundleDevelopmentRegion` and the project development region are the inputs Step 3 used; the catalog on disk wins if they disagree. |
 | `targetLocales` | The project localizations registered in Step 5 minus the catalog's `sourceLanguage`, comma-separated: `de, fr, ja`. Cross-check against the locale keys present in the catalog's `localizations` blocks. |
+| `formatModule` | Read `.globalize/format-module.json` → `.specifier`, written by the `generate_format_helpers` step (the "Format helpers" section above) that runs immediately before this one. It is always the literal string `Formatters` — the type name used directly at call sites, with no import, since the module lives in the same target as the code that calls it. If the file is absent, `generate_format_helpers` did not complete — this is the fail-closed case in sub-step 6 below, not a value to guess. |
 
 ### 4. Render
 
