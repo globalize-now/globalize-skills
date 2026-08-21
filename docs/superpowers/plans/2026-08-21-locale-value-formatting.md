@@ -1766,6 +1766,17 @@ Every file in the second list must have been bumped exactly once relative to its
 
 `formatPercent` was `{ style: 'percent', maximumFractionDigits: 1 }`; the canonical `percent` is `{ style: 'percent' }`. `0.4567` renders `45.7%` before and `46%` after, so the deprecation paragraph's claim that the aliases mean "a re-run does not break call sites" is overstated. Add one clause to that paragraph naming the rounding change. Keep the alias and the canonical definition as they are — uniformity across stacks is the deliberate trade; the fix is to stop overclaiming.
 
+- [ ] **Step 2d: Audit the `formatLocale()` seam across all eight stacks**
+
+The seam is the load-bearing half of the spec's formatting-locale decision: formatting follows the UI locale *today*, but every formatter routes through one function so a project can change it in one place later. A seam that is declared but never called is decorative, and worse than none — it advertises a property the module does not have. Task 9 caught exactly that in its own sample.
+
+For each of the eight modules, confirm which of the ten functions actually route their locale through `formatLocale()`, and that the prose tells the truth about it:
+
+- **Fully wired** (expected: Lingui, Paraglide, webext-native, Rails, Android, iOS) — every function goes through the seam. Verify, do not assume.
+- **Partially wired by design** (expected: next-intl, vue-i18n) — the library owns locale resolution, so `money`/`number`/`percent`/`date` delegate to `useFormatter()` / `n()`/`d()` and never consult the seam, while raw-`Intl` functions like `list`/`relativeTime` do. This is legitimate, but **each such module must say so explicitly**, naming which functions bypass the seam and what a project must revisit if it ever changes it. vue-i18n already carries a version of this sentence for its `i18n.global` escape hatch; check it covers the in-composable path too.
+
+Any module that neither wires the seam fully nor documents the bypass is a defect. Fix by documenting, not by forcing a uniformity the library will not support.
+
 - [ ] **Step 3: Run a Layer A eval end to end**
 
 ```bash
