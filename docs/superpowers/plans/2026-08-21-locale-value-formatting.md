@@ -405,7 +405,7 @@ Then add a subsection after `### Generated-file header`:
 grep -c 'format-module.json' skills/globalize-guide/references/rules-template-format.md
 ```
 
-Expected: `3` or more.
+Expected: exactly `2` — the new rendering step and the new subsection heading. (`grep -c` counts matching *lines*, not occurrences.) A higher count means prose was padded to satisfy the check; a lower one means a section is missing.
 
 - [ ] **Step 7: Commit**
 
