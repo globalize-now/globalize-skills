@@ -43,6 +43,7 @@ This setup phase covers **native Android** apps (Kotlin and/or Java, Views and/o
 | 3. Source catalog `res/values/strings.xml` | Additive | New/edited source file; if one exists, augment, don't clobber |
 | 4. Scaffold `res/values-<qualifier>/` | Additive | New per-locale `strings.xml`; does not touch existing locale dirs |
 | 5. Locale-selection wiring (optional) | **Modifies existing files** | Per-app language: manifest + `build.gradle` + an Activity/Application call — describe and confirm |
+| Format helpers | Additive | Creates `Formatters.kt`; may add `<plurals>`/`<string>` fallback resources to `res/values/strings.xml` — **always runs**, feeds Step 6 |
 | 6. Generate + wire coding rules | Additive (+ edits `CLAUDE.md` / `AGENTS.md`) | Writes `.agents/globalize-rules.md` via `setup.add-ons.md` and points `CLAUDE.md` and `AGENTS.md` at it — **always runs**, Phase 3 wraps against it |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get
@@ -278,6 +279,438 @@ Step 5 if the user doesn't want an in-app switcher.
 
 **This step modifies `AndroidManifest.xml`, a `build.gradle`, and a source file.** In guided mode, describe each
 change and get confirmation. Off by default in unguided mode.
+
+---
+
+## Format helpers (`generate_format_helpers`)
+
+`java.text.NumberFormat` and `java.time.format.DateTimeFormatter` already read whatever locale you hand them,
+but nothing routes currency correctly by default, and every screen that formats a number, a date, or a list has
+to remember the right class and the right options each time. This step creates one small class, `Formatters`,
+that gives every formatting concern a single method — plus a Compose `CompositionLocal` so components don't have
+to thread a `Context` through to reach it.
+
+**Always runs**, on every project — like Steps 2–5, it does not wait for a `SKILL.md §1.10` selection. Phase 3's
+wrap subagents route every hardcoded number, currency, date, and list through this class's ten methods.
+
+### Read `minSdk` and resolve the API-level branches
+
+Read `minSdk` (or `minSdkVersion`) from the module's `build.gradle` / `build.gradle.kts` (`defaultConfig { minSdk
+= N }`, or a version-catalog alias), and whether core library desugaring is enabled in `compileOptions`
+(`isCoreLibraryDesugaringEnabled = true` in the Kotlin DSL, `coreLibraryDesugaringEnabled true` in Groovy). This
+value decides which branches `Formatters.kt` takes below — resolve it before writing the file.
+
+If `minSdk` cannot be read, write `status: "needs_decision"` with:
+
+```json
+{ "step": "format_module_min_sdk",
+  "question": "Could not read minSdk from build.gradle — which API level does this module target?",
+  "options": ["21", "24", "26", "34"] }
+```
+
+and stop.
+
+`date`/`time`/`dateTime` use `java.time` unconditionally — see "The API-level floors" below for why that's safe
+even on a low `minSdk`. If `minSdk` is below the `java.time` floor (API 26) **and** core library desugaring is
+**not** enabled, do not emit the file: write `status: "needs_decision"` with:
+
+```json
+{ "step": "format_module_desugaring",
+  "question": "date/time formatting uses java.time, which needs core library desugaring at this minSdk. Enable coreLibraryDesugaring, or fall back to java.text.DateFormat?",
+  "options": ["enable_desugaring", "use_dateformat"] }
+```
+
+and stop.
+
+### The API-level floors (verified, not recalled — re-check before reusing years from now)
+
+Four numbers below are load-bearing: get one wrong and the emitted code either wastes a branch that never
+protects anything (a floor set too high) or crashes on real devices (a floor set too low). Each was checked
+directly against the Android platform reference on **2026-08-22** (each page's own
+"Added in API level" annotation, cross-checked against a second independent source since `developer.android.com`
+is a JS-rendered SPA that doesn't always yield the annotation to a page fetch):
+
+| Constant | Class / member | API level | Source |
+|---|---|---|---|
+| `COMPACT_API` | `android.icu.text.CompactDecimalFormat` | **24** | https://developer.android.com/reference/android/icu/text/CompactDecimalFormat |
+| `RELATIVE_API` | `android.icu.text.RelativeDateTimeFormatter` | **24** | https://developer.android.com/reference/android/icu/text/RelativeDateTimeFormatter |
+| `LIST_API` | `android.icu.text.ListFormatter` | **26** | https://developer.android.com/reference/android/icu/text/ListFormatter |
+| `LOCALE_LIST_API` | `android.os.LocaleList` / `Configuration.getLocales()` | **24** | https://developer.android.com/reference/android/os/LocaleList |
+
+`java.time` itself (`LocalDate`, `DateTimeFormatter`, …) is a **platform** package starting at **API 26** —
+https://developer.android.com/reference/java/time/LocalDate. Below API 26 it is available only through **core
+library desugaring** (Android Gradle Plugin's D8 desugaring, via the `coreLibraryDesugaring` dependency), which
+has **no `minSdk` floor of its own** —
+https://developer.android.com/studio/write/java8-support: "Android Studio ... includes support for using a
+number of Java 8+ APIs without requiring a minimum API level for your app." (MultiDex is required in addition
+when `minSdk` ≤ 20, which is unrelated to desugaring itself.) This is why the `date`/`time`/`dateTime` methods
+below use `java.time` unconditionally rather than a `Build.VERSION.SDK_INT` branch: on `minSdk` ≥ 26 it's the
+platform API, below that the "needs_decision" gate above guarantees desugaring is on before the file is ever
+written.
+
+`LOCALE_LIST_API` is not one of the three constants the design named, but it gates the exact same class of bug:
+`Configuration.getLocales()` — what `context.resources.configuration.locales[0]` compiles to — does not exist
+below API 24; only the deprecated singular `Configuration.locale` field does. Shipping `formatLocale()`
+unguarded, as a naive reading of "read the locale off `context.resources.configuration`" suggests, would crash
+on every device below API 24. The Kotlin below branches on it exactly like the other three.
+
+### The Kotlin module
+
+Create `Formatters.kt` under this module's source set — `<module>/src/main/java/<packagePath>/i18n/` in the
+default Android Studio layout, or `<module>/src/main/kotlin/<packagePath>/i18n/` if this module declares a
+Kotlin-only source set (check `build.gradle` for a `sourceSets { main { kotlin.srcDirs ... } }` block, or
+whether `src/main/kotlin/` already exists on disk). `<packagePath>` is this module's Kotlin package with dots
+replaced by `/` — the `namespace` in `android {}` (AGP 7+) if declared, otherwise `applicationId`; the two are
+not always the same once flavors are involved, so check `build.gradle` rather than assuming.
+
+```kotlin
+// Formatters.kt
+package <applicationId>.i18n
+
+import <applicationId>.R
+import android.content.Context
+import android.content.res.Configuration
+import android.icu.text.CompactDecimalFormat
+import android.icu.text.ListFormatter
+import android.icu.text.RelativeDateTimeFormatter
+import android.os.Build
+import androidx.compose.runtime.compositionLocalOf
+import java.text.NumberFormat
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.time.temporal.TemporalAccessor
+import java.util.Currency
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.round
+
+class Formatters(private val locale: Locale, private val context: Context) {
+
+    companion object {
+        const val DEFAULT_CURRENCY = "USD" // adjust to this project's currency
+
+        // See "The API-level floors" above for the source and check date on each of these.
+        private const val COMPACT_API = 24     // android.icu.text.CompactDecimalFormat
+        private const val RELATIVE_API = 24    // android.icu.text.RelativeDateTimeFormatter
+        private const val LIST_API = 26        // android.icu.text.ListFormatter
+        private const val LOCALE_LIST_API = 24 // android.os.LocaleList / Configuration.getLocales()
+
+        private val RELATIVE_UNITS: List<Pair<RelativeDateTimeFormatter.RelativeUnit, Long>> = listOf(
+            RelativeDateTimeFormatter.RelativeUnit.SECONDS to 1_000L,
+            RelativeDateTimeFormatter.RelativeUnit.MINUTES to 60_000L,
+            RelativeDateTimeFormatter.RelativeUnit.HOURS to 3_600_000L,
+            RelativeDateTimeFormatter.RelativeUnit.DAYS to 86_400_000L,
+            RelativeDateTimeFormatter.RelativeUnit.WEEKS to 604_800_000L,
+            RelativeDateTimeFormatter.RelativeUnit.MONTHS to 2_629_746_000L,
+            RelativeDateTimeFormatter.RelativeUnit.YEARS to 31_556_952_000L,
+        )
+
+        /**
+         * THE SEAM. Formatting follows the UI locale today. To give this app a separate
+         * regional preference, change this function — both overloads below route through it.
+         */
+        fun formatLocale(configuration: Configuration): Locale =
+            if (Build.VERSION.SDK_INT >= LOCALE_LIST_API) {
+                configuration.locales[0]
+            } else {
+                @Suppress("DEPRECATION")
+                configuration.locale
+            }
+
+        fun formatLocale(context: Context): Locale = formatLocale(context.resources.configuration)
+
+        /**
+         * Views/Activities/Fragments. Pass an Activity (or a View's) context — never
+         * `applicationContext`. See the per-app-language note in this project's generated
+         * `.agents/globalize-rules.md` if this project has an in-app language picker: below
+         * API 33, `applicationContext` silently returns the system locale, not the user's
+         * per-app choice.
+         */
+        fun of(context: Context): Formatters = Formatters(formatLocale(context), context)
+    }
+
+    fun money(amount: Number, currency: String = DEFAULT_CURRENCY): String {
+        val isoCurrency = try {
+            Currency.getInstance(currency)
+        } catch (e: IllegalArgumentException) {
+            // Fail loud, not wrong: silently substituting DEFAULT_CURRENCY here would
+            // display the wrong amount's currency with no signal anything was off.
+            throw IllegalArgumentException(
+                "Formatters.money(): '$currency' is not a valid ISO 4217 currency code — " +
+                    "validate currency data at its source; do not catch this and substitute a default.",
+                e,
+            )
+        }
+        return NumberFormat.getCurrencyInstance(locale).apply { this.currency = isoCurrency }.format(amount)
+    }
+
+    fun number(value: Number): String = NumberFormat.getInstance(locale).format(value)
+
+    fun percent(value: Number): String = NumberFormat.getPercentInstance(locale).format(value)
+
+    fun compact(value: Number): String =
+        if (Build.VERSION.SDK_INT >= COMPACT_API) {
+            CompactDecimalFormat
+                .getInstance(locale, CompactDecimalFormat.CompactStyle.SHORT)
+                .format(value)
+        } else {
+            number(value) // no compact notation below COMPACT_API — still locale-correct
+        }
+
+    fun unit(value: Number, unit: String): String = "${number(value)} $unit"
+
+    fun date(value: TemporalAccessor, preset: FormatStyle = FormatStyle.MEDIUM): String =
+        DateTimeFormatter.ofLocalizedDate(preset).withLocale(locale).format(value)
+
+    fun time(value: TemporalAccessor): String =
+        DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).format(value)
+
+    fun dateTime(value: TemporalAccessor): String =
+        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+            .withLocale(locale).format(value)
+
+    fun relativeTime(value: Long, now: Long = System.currentTimeMillis()): String {
+        val (unit, amount) = pickRelativeUnit(value - now)
+        return if (Build.VERSION.SDK_INT >= RELATIVE_API) {
+            RelativeDateTimeFormatter.getInstance(locale).format(
+                amount.toDouble(),
+                if (amount < 0) RelativeDateTimeFormatter.Direction.LAST
+                else RelativeDateTimeFormatter.Direction.NEXT,
+                unit,
+            )
+        } else {
+            // Below RELATIVE_API: same unit selection, rendered through a <plurals>
+            // resource so it stays translatable. Never a hardcoded "n days ago".
+            relativeFallback(unit, amount)
+        }
+    }
+
+    fun list(items: List<String>, type: String = "and"): String =
+        if (Build.VERSION.SDK_INT >= LIST_API) {
+            ListFormatter.getInstance(locale).format(items)
+        } else {
+            // Below LIST_API: the locale's own connectors, from string resources.
+            joinWithResourceConnectors(items, type)
+        }
+
+    /** Largest unit whose magnitude is at least 1; falls back to seconds. */
+    private fun pickRelativeUnit(deltaMs: Long): Pair<RelativeDateTimeFormatter.RelativeUnit, Long> {
+        val magnitude = abs(deltaMs)
+        for (i in RELATIVE_UNITS.indices.reversed()) {
+            val (unit, ms) = RELATIVE_UNITS[i]
+            if (magnitude >= ms || i == 0) return unit to round(deltaMs.toDouble() / ms).toLong()
+        }
+        return RelativeDateTimeFormatter.RelativeUnit.SECONDS to 0L
+    }
+
+    /**
+     * Below RELATIVE_API. Reads one <plurals> per unit+direction from this project's own
+     * resources, so the result pluralizes per CLDR and stays translatable — never a
+     * hardcoded "$n days ago". Scaffolded into res/values/strings.xml — see below.
+     */
+    private fun relativeFallback(unit: RelativeDateTimeFormatter.RelativeUnit, amount: Long): String {
+        val n = abs(amount).toInt()
+        val past = amount < 0
+        val res = when (unit) {
+            RelativeDateTimeFormatter.RelativeUnit.SECONDS ->
+                if (past) R.plurals.relative_seconds_ago else R.plurals.relative_seconds_from_now
+            RelativeDateTimeFormatter.RelativeUnit.MINUTES ->
+                if (past) R.plurals.relative_minutes_ago else R.plurals.relative_minutes_from_now
+            RelativeDateTimeFormatter.RelativeUnit.HOURS ->
+                if (past) R.plurals.relative_hours_ago else R.plurals.relative_hours_from_now
+            RelativeDateTimeFormatter.RelativeUnit.DAYS ->
+                if (past) R.plurals.relative_days_ago else R.plurals.relative_days_from_now
+            RelativeDateTimeFormatter.RelativeUnit.WEEKS ->
+                if (past) R.plurals.relative_weeks_ago else R.plurals.relative_weeks_from_now
+            RelativeDateTimeFormatter.RelativeUnit.MONTHS ->
+                if (past) R.plurals.relative_months_ago else R.plurals.relative_months_from_now
+            else -> // YEARS
+                if (past) R.plurals.relative_years_ago else R.plurals.relative_years_from_now
+        }
+        return context.resources.getQuantityString(res, n, n)
+    }
+
+    /**
+     * Below LIST_API. Joins using this project's own connector string resources — never
+     * a hardcoded ", " / " and ". Scaffolded into res/values/strings.xml — see below.
+     */
+    private fun joinWithResourceConnectors(items: List<String>, type: String): String {
+        if (items.isEmpty()) return ""
+        if (items.size == 1) return items[0]
+        val twoWords = context.getString(
+            if (type == "or") R.string.list_two_words_connector_or else R.string.list_two_words_connector
+        )
+        if (items.size == 2) return items[0] + twoWords + items[1]
+        val lastWord = context.getString(
+            if (type == "or") R.string.list_last_word_connector_or else R.string.list_last_word_connector
+        )
+        val wordsConnector = context.getString(R.string.list_words_connector)
+        return items.dropLast(1).joinToString(wordsConnector) + lastWord + items.last()
+    }
+}
+
+val LocalFormatters = compositionLocalOf<Formatters> {
+    error("LocalFormatters not provided — wrap your content in CompositionLocalProvider")
+}
+```
+
+**Why the constructor takes a `Context`, not just a `Locale`.** The brief-level sketch of this class carries
+only a `Locale`; that is not enough to implement `relativeFallback` / `joinWithResourceConnectors`, both of
+which must read this project's own `<plurals>` / `<string>` resources. Reusing the same `Context` that
+`formatLocale()` already reads keeps the resources and the locale in agreement by construction — `of(context)`
+derives both from the one context it was given, so there is never a mismatch between "which locale `Formatters`
+thinks it's in" and "which locale the fallback strings are read from." `Formatters` instances are cheap —
+construct one per call site or per composition; do not cache one in a `ViewModel` or a singleton across
+configuration changes, which would pin whatever `Context` (and locale) built it past that context's lifetime.
+
+**Only scaffold the fallback resources this project actually needs**, gated on `minSdk` against the constant
+that guards each one:
+
+- `minSdk < RELATIVE_API` (24) — scaffold the 14 `<plurals>` below (7 units × ago/from-now).
+- `minSdk < LIST_API` (26) — scaffold the 5 connector `<string>`s below.
+- **If `minSdk` is at or above the relevant constant, skip that scaffold** — the `Build.VERSION.SDK_INT` branch
+  in `Formatters.kt` stays (it's free, and survives a later `minSdk` drop), but the fallback resources would be
+  dead code no path ever reaches. Say so plainly in the end-of-run summary: "Skipped relative-time fallback
+  plurals — minSdk N ≥ 24 already covers RelativeDateTimeFormatter unconditionally" (and the equivalent for the
+  list connectors against 26).
+
+```xml
+<!-- res/values/strings.xml — only if minSdk < RELATIVE_API (24) -->
+<plurals name="relative_seconds_ago">
+    <item quantity="one">%1$d second ago</item>
+    <item quantity="other">%1$d seconds ago</item>
+</plurals>
+<plurals name="relative_seconds_from_now">
+    <item quantity="one">in %1$d second</item>
+    <item quantity="other">in %1$d seconds</item>
+</plurals>
+<plurals name="relative_minutes_ago">
+    <item quantity="one">%1$d minute ago</item>
+    <item quantity="other">%1$d minutes ago</item>
+</plurals>
+<plurals name="relative_minutes_from_now">
+    <item quantity="one">in %1$d minute</item>
+    <item quantity="other">in %1$d minutes</item>
+</plurals>
+<plurals name="relative_hours_ago">
+    <item quantity="one">%1$d hour ago</item>
+    <item quantity="other">%1$d hours ago</item>
+</plurals>
+<plurals name="relative_hours_from_now">
+    <item quantity="one">in %1$d hour</item>
+    <item quantity="other">in %1$d hours</item>
+</plurals>
+<plurals name="relative_days_ago">
+    <item quantity="one">%1$d day ago</item>
+    <item quantity="other">%1$d days ago</item>
+</plurals>
+<plurals name="relative_days_from_now">
+    <item quantity="one">in %1$d day</item>
+    <item quantity="other">in %1$d days</item>
+</plurals>
+<plurals name="relative_weeks_ago">
+    <item quantity="one">%1$d week ago</item>
+    <item quantity="other">%1$d weeks ago</item>
+</plurals>
+<plurals name="relative_weeks_from_now">
+    <item quantity="one">in %1$d week</item>
+    <item quantity="other">in %1$d weeks</item>
+</plurals>
+<plurals name="relative_months_ago">
+    <item quantity="one">%1$d month ago</item>
+    <item quantity="other">%1$d months ago</item>
+</plurals>
+<plurals name="relative_months_from_now">
+    <item quantity="one">in %1$d month</item>
+    <item quantity="other">in %1$d months</item>
+</plurals>
+<plurals name="relative_years_ago">
+    <item quantity="one">%1$d year ago</item>
+    <item quantity="other">%1$d years ago</item>
+</plurals>
+<plurals name="relative_years_from_now">
+    <item quantity="one">in %1$d year</item>
+    <item quantity="other">in %1$d years</item>
+</plurals>
+
+<!-- res/values/strings.xml — only if minSdk < LIST_API (26) -->
+<!-- Whitespace-preserving quotes are load-bearing here — see "Escaping and markup"
+     in the coding rules: an unquoted leading/trailing space collapses away. -->
+<string name="list_words_connector">", "</string>
+<string name="list_two_words_connector">" and "</string>
+<string name="list_last_word_connector">", and "</string>
+<string name="list_two_words_connector_or">" or "</string>
+<string name="list_last_word_connector_or">", or "</string>
+```
+
+As with every non-English target locale in Step 4, add a translated `<plurals>`/`<string>` set (with whatever
+extra CLDR quantity categories that language needs) to each `values-<qualifier>/strings.xml` you scaffold.
+
+### Provide `LocalFormatters` once, at the Compose root
+
+```kotlin
+CompositionLocalProvider(
+    LocalFormatters provides Formatters(
+        Formatters.formatLocale(LocalConfiguration.current),
+        LocalContext.current,
+    )
+) {
+    AppContent()
+}
+```
+
+Reading `LocalConfiguration.current` — not just `LocalContext.current` — is what makes this recompose on a
+locale change even when the Activity is **not** recreated (`android:configChanges` includes `locale`); when it
+*is* recreated (the default), the whole Compose tree is torn down and rebuilt anyway, so this is cheap insurance
+either way. `LocalFormatters` itself is `compositionLocalOf { error(...) }`: a composable that reads
+`LocalFormatters.current` **above** this provider — or before it runs at all — throws immediately with that
+message. That is deliberate: a loud, first-frame crash during development is a better outcome than every
+formatted value in the subtree silently going unformatted or falling back to a wrong default.
+
+<!-- if: localeSwitcher == "true" -->
+**This project has an in-app language picker. Below API 33, never build a `Formatters` from
+`applicationContext`.** `AppCompatDelegate.setApplicationLocales` patches only `Activity` contexts below API 33
+— `applicationContext.resources.configuration` keeps returning the *system* locale there, silently, with no
+error (confirmed against
+[developer.android.com/guide/topics/resources/app-languages](https://developer.android.com/guide/topics/resources/app-languages),
+checked 2026-08-22: "the backward compatible APIs work with the AppCompatActivity context, not the application
+context, for Android 12 (API level 32) and earlier"). Always pass an Activity or Compose (`LocalContext.current`)
+context into `Formatters.of()` / the provider above. A `Service`, a `WorkManager` `Worker`, or anything else with
+no Activity context must read `AppCompatDelegate.getApplicationLocales()` (backed by AppCompat's own store, kept
+in sync everywhere, not by `Configuration`) and build `Formatters` from that instead of a `Context`. On API 33+
+the system `LocaleManager` applies the per-app locale at the process level, so `applicationContext` is safe there
+too — the workaround above is only needed to also cover API 21–32.
+<!-- /if -->
+
+### The currency rule and the `%1$s` rule survive unchanged
+
+`Formatters.money()` still requires a valid ISO 4217 code — `Currency.getInstance(currency)` throws
+`IllegalArgumentException` on anything else, and `money()` lets that exception propagate (wrapped with a
+clearer message) rather than silently catching it and substituting `DEFAULT_CURRENCY`. A wrong currency that
+renders without complaint is a worse bug than a crash a developer notices in QA; validate currency codes where
+they enter this project's data, not inside the formatter.
+
+The **generated rules file** (Step 6) restates the "currency is a property of the price, not the reader" rule
+and the "format the value first, then interpolate as `%1$s`, never `%1$d`/`%1$f`" rule, retargeted at this
+module — see `android-strings.rules.template.md`.
+
+### Resolve `DEFAULT_CURRENCY`
+
+Grep the codebase for an existing hardcoded currency symbol (`"$" +`, `"€" +`), a raw `DecimalFormat(` currency
+pattern, or an existing `Currency.getInstance(` call before defaulting. If nothing is findable, leave `"USD"`
+and keep the `// adjust to this project's currency` comment — a wrong currency that looks deliberate is worse
+than one that flags itself. Record the hit as `currencySource` (`grep:<file>:<line>`); when nothing is
+findable, record `currencySource: "default"`.
+
+**If `Formatters.kt` already exists as project code, do not overwrite it** — add the methods above into it, or
+create `I18nFormatters.kt` instead. Either way record the specifier actually used.
+
+**Write `.globalize/format-module.json`** with `specifier: "<applicationId>.i18n.Formatters"` (adjusted to
+whatever specifier was actually used above), `path` pointing at the real `Formatters.kt` location under this
+module's source set (e.g. `app/src/main/java/com/example/myapp/i18n/Formatters.kt`), the ten-entry `surface`
+(`["money","number","percent","compact","unit","date","time","dateTime","relativeTime","list"]`),
+`defaultCurrency`, and `currencySource`. `generate_coding_rules` (Step 6) reads `specifier` back as the
+`formatModule` placeholder.
 
 ---
 
