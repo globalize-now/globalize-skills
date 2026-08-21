@@ -1605,6 +1605,19 @@ Expected: `wired 19`, `manifest valid JSON`. **Inspect the diff** — if `json.d
 
 Add a `## Convert hand-rolled formatting` section to `rails.convert.md`, `android-strings.convert.md` and `string-catalog.convert.md`. Each carries the same "what this is for" framing and "what NOT to convert" list as Step 2, with a rewrite table in that language: Rails `strftime(` → `format_date`, `"$#{amount}"` → `format_money`, `.round(2)` in a view → `format_number`, `.join(", ")` → `format_list`; Android `SimpleDateFormat("…")` → `date(...)`, `String.format("%.2f", x)` → `number(x)`, `"$" + amount` → `money(amount)`, `%1$d`/`%1$f` in a resource → format first and pass `%1$s`; Swift `String(format: "%.2f", x)` → `x.formatted(.number)`, `"$\(amount)"` → `amount.formatted(.money)`, `dateFormat = "…"` → `.formatted(.mediumDate)`.
 
+- [ ] **Step 4b: Retire superseded formatting guidance from the existing convert references**
+
+Tasks 2, 4 and 5 each found a convert reference still teaching the pre-module formatting API as the *correct* form. None of them fixed it — convert references are this task's to own — and left unfixed they contradict the rules file the wrap subagent reads alongside them. Known sites, each confirmed by the task that found it:
+
+| File | What it still teaches |
+|---|---|
+| `js-ts/libraries/lingui/convert.standard-react.md` | `i18n.number()` / `i18n.date()` with the `CURRENCY` / `DATE_*` option objects |
+| `js-ts/frameworks/nextjs/app-router/lingui.convert.md` | the same |
+| `js-ts/libraries/vue-i18n/convert.shared.md` (~line 259) | an inline `n(amount, { currency: 'USD' })`, plus a stale "seeded in setup Step 3" pointer — that block has moved |
+| `js-ts/frameworks/sveltekit/paraglide.convert.md` | `formatCurrency` / `formatDate`, now deprecated aliases |
+
+Repoint each at the project's format module. **Do not delete the deprecated aliases** — they exist so a re-run does not break existing call sites; the point is that the convert references must stop teaching them as the form to write. Grep for the old names again after editing and confirm the only surviving mentions are the alias declarations themselves.
+
 - [ ] **Step 5: Add `formatCandidateFiles` to SKILL.md §1.1**
 
 In each language's detection table, add a `formatCandidateFiles` row beneath `candidateFiles`:
