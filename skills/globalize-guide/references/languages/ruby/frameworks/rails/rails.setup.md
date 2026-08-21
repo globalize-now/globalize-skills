@@ -379,11 +379,20 @@ module FormatHelper
   # A minimal ISO 4217 -> symbol map for currencies passed explicitly (see
   # currency_unit below). Extend as this project needs; an unmapped code
   # falls back to its own ISO code, which is always unambiguous even when
-  # it isn't pretty.
+  # it isn't pretty. NOTE: JPY and CNY both conventionally use "¥" — this
+  # map cannot disambiguate them. A project that displays both must pass an
+  # explicit unit at the call site for at least one of them; do not try to
+  # resolve the collision here.
   CURRENCY_SYMBOLS = {
     "USD" => "$", "EUR" => "€", "GBP" => "£", "JPY" => "¥", "CNY" => "¥",
     "INR" => "₹", "BRL" => "R$", "CAD" => "CA$", "AUD" => "A$", "CHF" => "CHF"
   }.freeze
+
+  # ISO 4217 minor-unit exceptions. Rails' own precision: 2 default is right
+  # for most currencies; these are the ones where it's wrong — the number of
+  # decimal places is a property of the CURRENCY, never of the locale.
+  ZERO_DECIMAL_CURRENCIES = %w[JPY KRW VND CLP ISK XAF XOF].freeze
+  THREE_DECIMAL_CURRENCIES = %w[KWD BHD OMR TND JOD].freeze
 
   # THE SEAM. Formatting follows the UI locale today. To give this project a
   # separate regional preference, change this one method.
@@ -399,7 +408,23 @@ module FormatHelper
   def format_money(amount, currency = nil)
     return number_to_currency(amount, locale: format_locale) if currency.nil?
 
-    number_to_currency(amount, locale: format_locale, unit: currency_unit(currency))
+    code = currency.to_s.upcase
+    unit = currency_unit(currency)
+    # A bare ISO code — unmapped, or (like CHF above) explicitly mapped to
+    # itself — needs a space before the amount. Rails' own default format,
+    # "%u%n", has none: correct for a real symbol ("€1,234.50") but wrong for
+    # a bare code jammed against the number ("SEK1,234.50"). Detected by
+    # comparing the resolved unit against the code itself, not by which
+    # branch produced it, so CHF gets the same treatment as an unmapped code.
+    bare_code = (unit == code)
+    number_to_currency(
+      amount,
+      locale: format_locale,
+      unit: unit,
+      precision: currency_precision(currency),
+      format: bare_code ? "%u %n" : "%u%n",
+      negative_format: bare_code ? "-%u %n" : "-%u%n"
+    )
   end
 
   def format_number(value)
@@ -453,10 +478,14 @@ module FormatHelper
   def format_list(items, type = :and)
     return items.to_sentence(locale: format_locale) if type == :and
 
+    # default: below matches the graceful English fallback :and already gets
+    # for free from to_sentence's own i18n merge (I18n.translate(:'support.array',
+    # default: {})) — without it, an untranslated target locale would inject
+    # "translation missing: ..." into the middle of a rendered sentence.
     items.to_sentence(
       locale: format_locale,
-      two_words_connector: I18n.t("support.array.or.two_words_connector", locale: format_locale),
-      last_word_connector: I18n.t("support.array.or.last_word_connector", locale: format_locale)
+      two_words_connector: I18n.t("support.array.or.two_words_connector", locale: format_locale, default: " or "),
+      last_word_connector: I18n.t("support.array.or.last_word_connector", locale: format_locale, default: ", or ")
     )
   end
 
@@ -464,6 +493,14 @@ module FormatHelper
 
   def currency_unit(currency)
     CURRENCY_SYMBOLS.fetch(currency.to_s.upcase, currency.to_s.upcase)
+  end
+
+  def currency_precision(currency)
+    code = currency.to_s.upcase
+    return 0 if ZERO_DECIMAL_CURRENCIES.include?(code)
+    return 3 if THREE_DECIMAL_CURRENCIES.include?(code)
+
+    2
   end
 end
 ```
@@ -474,13 +511,17 @@ end
 
 The locale's own configured `number.currency.format.unit` may be used **only** on that no-currency path — a genuinely project-wide amount (a flat fee, a plan price) with no currency of its own, where letting each locale's catalog supply its own familiar symbol for `DEFAULT_CURRENCY` is correct rather than a bug. `number_to_currency(amount, locale: format_locale)` with no `unit:` override already does exactly this — Rails resolves the symbol itself from that locale's `number.currency.format.unit`, falling back to `rails-i18n`'s own default (`"$"`) if the locale doesn't configure one. Nothing extra needs to be written for that branch.
 
-For an explicit currency, `format_money` overrides only the *symbol* (`unit:`) via the `CURRENCY_SYMBOLS` map above — precision, decimal separator, and thousands delimiter still come from the active locale's own `number.currency.format.*`, because those are genuinely locale conventions (`1.234,50` vs `1,234.50`), not currency ones. An ISO code with no entry in the map still renders unambiguously, as the ISO code itself (`SEK 1,234.50`) — never as another currency's symbol.
+For an explicit currency, `format_money` overrides the *symbol* (`unit:`) via the `CURRENCY_SYMBOLS` map above, and the *decimal precision* (`precision:`) via `ZERO_DECIMAL_CURRENCIES` / `THREE_DECIMAL_CURRENCIES`. Decimal separator and thousands-delimiter placement (`1.234,50` vs `1,234.50`) are left to the active locale's own `number.currency.format.*` — those genuinely are locale conventions. **Precision is not**: the number of minor units is a property of the *currency* under ISO 4217, not of the reader's locale — Rails' `precision: 2` default is right for most currencies, but wrong for JPY/KRW (0 decimals) and KWD/BHD (3), and both are currencies this map already ships. Passing `precision: 2` unconditionally — the locale-only reading this section used to claim — renders `¥1,234.00` for a JPY amount, which is not just cosmetically off; ¥1,234.00 and ¥123,400 are different amounts of money.
+
+An ISO code with no entry in `CURRENCY_SYMBOLS` still renders unambiguously as the bare code — `SEK 1,234.50`, not `SEK1,234.50`. Rails' default `format: "%u%n"` has no space, which is correct for a real symbol (`€1,234.50`) but wrong for a bare code; `format_money` switches to `"%u %n"` whenever the resolved unit equals the currency code itself — which includes `CHF` above, mapped to itself deliberately, not just genuinely unmapped codes.
+
+**`JPY` and `CNY` collide** — both conventionally render `¥`, and a hand-written symbol map keyed only on the ISO code cannot resolve that ambiguity in general (the "right" disambiguating glyph — `CN¥`, `元`, `RMB` — varies by house style, so guessing one into the shared default would just trade a known collision for someone else's wrong assumption). A project that displays both currencies must disambiguate for at least one of them explicitly — either call `number_to_currency(amount, locale: format_locale, unit: 'CN¥')` directly for that one case, bypassing `format_money`, or edit this project's own `CURRENCY_SYMBOLS` entry once the choice is made. Do not leave the collision silent.
 
 ### Catalog keys this helper depends on
 
 `rails-i18n` (Step 2) already ships `number.*`, `date.formats.{default,short,long}`, `time.formats.{default,short,long}`, and `support.array.{words_connector,two_words_connector,last_word_connector}` for every locale it covers — confirmed against `rails-i18n`'s own source and Rails' own `en.yml`. Only app-authored *overrides* of those belong in the connected catalog; this restates the existing `rails-i18n`-provided-defaults rule from Step 7's generated rules file.
 
-This helper adds six keys that **neither Rails core nor `rails-i18n` ships under any locale** — scaffold them into `config/locales/{source_locale}.yml` now, and into every target-locale file when that locale is added:
+This helper adds seven keys that **neither Rails core nor `rails-i18n` ships under any locale** — scaffold them into `config/locales/{source_locale}.yml` now, and into every target-locale file when that locale is added:
 
 ```yaml
 # config/locales/en.yml — replace "en" with this project's real source locale (Step 1)
