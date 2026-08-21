@@ -84,7 +84,7 @@ from the project **on disk**, what core setup actually created — appending the
 `.globalize/rules-values.json`. The order is load-bearing: resolving up front would demand values that
 live only inside a deleted branch.
 
-The template declares `values: [localesDir, sourceLocale, targetLocales, manifestFile]`.
+The template declares `values: [localesDir, sourceLocale, targetLocales, manifestFile, formatModule]`.
 
 | Value | Where to read it |
 |---|---|
@@ -92,6 +92,7 @@ The template declares `values: [localesDir, sourceLocale, targetLocales, manifes
 | `sourceLocale` | BCP-47. Read the authored manifest's `default_locale`, which is spelled with an **underscore**, and hyphenate it: `pt_BR` → `pt-BR`, `zh_CN` → `zh-CN`, `es_419` → `es-419`. Cross-check `decisions.setup.sourceLocale`; the manifest wins, because that is what the browser loads. |
 | `targetLocales` | Every other locale directory under `localesDir`, normalized to BCP-47, source locale removed, comma-separated: `_locales/de`, `_locales/fr`, `_locales/pt_BR` → `de, fr, pt-BR`. Cross-check `decisions.setup.targetLocales`; the directories on disk win. |
 | `manifestFile` | The file a **developer edits**, which is not always the shipped manifest: `wxt.config.ts` (the `manifest:` key) for WXT; `manifest.config.ts` — or `manifest.json` — for CRXJS; `manifest.json` for plain Vite, webpack and no-build projects; `package.json` for Plasmo (`displayName` / `description` / the `manifest` override key). Project-root-relative. Never name the build output. |
+| `formatModule` | The **import specifier** written to `.globalize/format-module.json` by `generate_format_helpers` (`webext-native.setup.md`, the format-helpers section — always runs, unconditionally, immediately before this step). Read `specifier` back from that file directly; do not glob for `src/i18n/format.ts` yourself and do not guess the alias. Default is `@/src/i18n/format` (`@/src/i18n/i18n-format` if the project already had a `format.ts` and the fallback name was used) — but the file on disk is authoritative, not this default. If `.globalize/format-module.json` is missing, `generate_format_helpers` did not complete; fail closed (step 6) rather than inventing a path — a rules file pointing at an import that doesn't exist is worse than no rules file. |
 
 ### 4. Render
 
@@ -128,8 +129,8 @@ All four must hold:
 - zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
 - zero occurrences of `<<`
 - the header is on line 1
-- the line count is within the template's `budget` for the resolved condition — `205` when
-  `localeSwitcher == "custom-loader"`, `180` otherwise
+- the line count is within the template's `budget` for the resolved condition — `250` when
+  `localeSwitcher == "custom-loader"`, `225` otherwise
 
 ### 6. Fail closed
 

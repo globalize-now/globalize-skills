@@ -57,6 +57,7 @@ This setup phase covers the **native `chrome.i18n` / `_locales` mechanism** on *
 | 5. Wire the manifest | **Modifies existing file** | Adds `default_locale` and rewrites `name`/`description`/… to `__MSG_` — describe and confirm |
 | 6. Runtime accessor | Additive (+ edits entrypoints) | New `src/i18n/*` modules; the entrypoint wiring edits existing files |
 | 7. Plural helper | Additive | New module; inert until a plural key exists |
+| Format helpers | Additive | New `src/i18n/format.ts`; the only locale-aware formatting `chrome.i18n` gets — **always runs** |
 | 8. Generate + wire coding rules | Additive (+ edits `CLAUDE.md` / `AGENTS.md`) | Writes `.agents/globalize-rules.md` via `setup.add-ons.md` and points `CLAUDE.md` and `AGENTS.md` at it — **always runs**, Phase 3 wraps against it |
 
 **RULE: Steps that modify existing files require you to describe the exact change to the user and get
@@ -746,17 +747,241 @@ which is wrong in every language with more than two forms.
 
 ---
 
+## Format helpers (`generate_format_helpers`)
+
+**`chrome.i18n` has no formatting API at all** — no number, currency, date, or list formatting, on top
+of the no-plurals gap Step 7 already works around. This module is the *only* locale-aware formatting
+the variant will ever get. It is always created, on every extension framework and under both
+`localeSwitcher` modes — like Steps 3–7, it does not wait for a `SKILL.md §1.10` selection.
+
+Create `src/i18n/format.ts`, a sibling of `browser.ts`, `t.ts` / `loader.ts`, `dom.ts` and `plural.ts`
+from Step 6. **If it already exists as project code, do not overwrite it** — add the ten-function
+surface into it, or create `src/i18n/i18n-format.ts` instead; either way record the specifier actually
+used in `.globalize/format-module.json` below.
+
+```ts
+// src/i18n/format.ts
+import { browser } from './browser'
+
+export type DateInput = Date | number | string
+export type DatePreset = 'short' | 'medium' | 'long'
+```
+
+### The seam
+
+An extension has no URL to read a locale from, and `getMessage()` takes no locale argument — nothing
+else in the extension knows which locale to format in, so `formatLocale()` is load-bearing on day one.
+It branches on `decisions.setup.localeSwitcher`, the same condition Step 6 branches on.
+
+**`localeSwitcher === "native"`** — the browser is the source of truth, same as Step 6 Branch A.
+`getUILanguage()` is synchronous, so there is nothing else to do:
+
+```ts
+/**
+ * THE SEAM. An extension has no URL to read a locale from and `chrome.i18n`
+ * exposes none, so this is the only place that knows which locale to format in.
+ */
+export function formatLocale(): string {
+  return browser.i18n.getUILanguage()
+}
+```
+
+**`getUILanguage()` returns a hyphenated BCP-47 tag** (`pt-BR`), while `_locales` directories are
+spelled with an **underscore** (`pt_BR`, Step 4). `Intl` wants the hyphenated form — pass
+`getUILanguage()` straight through. Do **not** run it through the `toChromeCode()` /
+`code.replace(/_/g, '-')` normalization used elsewhere in this project for `_locales` lookups; that
+normalization goes the other way and passing its output to `Intl` produces a silently wrong locale.
+
+**`localeSwitcher === "custom-loader"`** — the extension stores its own choice in
+`browser.storage.sync`, same as Step 6 Branch B, but every formatter below is synchronous and
+`storage` is not. `current` is a synchronous cache; `primeFormatLocale()` is what keeps it correct:
+
+```ts
+let current = browser.i18n.getUILanguage()
+
+/**
+ * THE SEAM. Call once during startup — before the first render, same point
+ * `initI18n()` is awaited in Step 6 — and again from the storage listener and
+ * on every service-worker restart. See "The async-priming gotcha" below.
+ */
+export async function primeFormatLocale(): Promise<void> {
+  const { locale } = await browser.storage.sync.get('locale')
+  if (typeof locale === 'string' && locale) current = locale
+}
+
+export function formatLocale(): string {
+  return current
+}
+```
+
+`browser.storage.sync` needs no permission beyond what Step 6 Branch B's locale picker already
+requires, and is reachable from every context this module loads into — the popup, the options page,
+the side panel, content scripts, and the MV3 service worker.
+
+#### The async-priming gotcha
+
+`formatLocale()` on this branch returns `current` — a value primed by an `await`, read by functions
+that cannot `await` anything. That gap is real, and it is silent when it goes wrong:
+
+- **Call `primeFormatLocale()` once at startup, before the first render** — alongside `initI18n()` in
+  Step 6's bootstrap (both read the same `locale` key; call them together). A render that runs before
+  it resolves formats against `browser.i18n.getUILanguage()`, not the stored choice.
+- **Call it again from the `storage.onChanged` listener** in Step 6, so a locale switch made in one
+  open context (say, the options page) updates formatting in every other open context, the same way it
+  already updates `t()`'s catalog.
+- **Call it again at the top of the MV3 service worker, every time the worker starts** — the same
+  place Step 6 does `const ready = initI18n()` in `entrypoints/background.ts`. The service worker is
+  torn down and restarted at any time, and module-scope state — `current` included — does not survive
+  that. A worker that just restarted and formats something before the new `primeFormatLocale()` call
+  resolves silently falls back to the browser's UI language instead of the user's chosen one. No error,
+  no warning — just a wrong locale in a notification or a context-menu label.
+- **A context that cannot `await` it** — a synchronous render path, or a handler that must reply
+  before a promise can settle — cannot correctly format the stored locale on that one call. Do not
+  block it on `chrome.storage`; let it read whatever `current` already holds (the browser's UI language
+  until the first successful prime) and let the next scheduled render pick up the corrected value. This
+  is the same tradeoff `t()` already makes before `initI18n()` resolves, applied to formatting too —
+  it introduces no new failure mode.
+
+### The rest of the module
+
+Carries `pickRelativeUnit`, `UNITS`, `toDate`, `DATE_PRESETS`, `DEFAULT_CURRENCY`, the memo and
+`cached` inline, so the file stands alone — there is no `locales.ts` on this variant to import them
+from:
+
+```ts
+/** This project's currency. Change it here, never at a call site. */
+const DEFAULT_CURRENCY = 'USD'   // adjust to this project's currency
+
+const DATE_PRESETS: Record<DatePreset, Intl.DateTimeFormatOptions> = {
+  short: { dateStyle: 'short' },
+  medium: { dateStyle: 'medium' },
+  long: { dateStyle: 'long' },
+}
+
+// Keyed by locale + kind. Cheap to rebuild, so the service worker restarting
+// and clearing this along with everything else module-scope is not a bug.
+const memo = new Map<string, unknown>()
+function cached<T>(key: string, make: () => T): T {
+  let f = memo.get(key) as T | undefined
+  if (f === undefined) memo.set(key, (f = make()))
+  return f
+}
+
+const toDate = (v: DateInput): Date => (v instanceof Date ? v : new Date(v))
+
+const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ['second', 1000],
+  ['minute', 60_000],
+  ['hour', 3_600_000],
+  ['day', 86_400_000],
+  ['week', 604_800_000],
+  ['month', 2_629_746_000],
+  ['year', 31_556_952_000],
+]
+
+/** Largest unit whose magnitude is at least 1; falls back to seconds. */
+function pickRelativeUnit(deltaMs: number): [Intl.RelativeTimeFormatUnit, number] {
+  const abs = Math.abs(deltaMs)
+  for (let i = UNITS.length - 1; i >= 0; i--) {
+    const [unit, ms] = UNITS[i]
+    if (abs >= ms || i === 0) return [unit, Math.round(deltaMs / ms)]
+  }
+  return ['second', 0]
+}
+
+function nf(key: string, opts: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const locale = formatLocale()
+  return cached(`n:${locale}:${key}`, () => new Intl.NumberFormat(locale, opts))
+}
+function df(key: string, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const locale = formatLocale()
+  return cached(`d:${locale}:${key}`, () => new Intl.DateTimeFormat(locale, opts))
+}
+function rtf(): Intl.RelativeTimeFormat {
+  const locale = formatLocale()
+  return cached(`r:${locale}`, () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }))
+}
+function lf(type: 'and' | 'or'): Intl.ListFormat {
+  const locale = formatLocale()
+  return cached(`l:${locale}:${type}`, () =>
+    new Intl.ListFormat(locale, { style: 'long', type: type === 'or' ? 'disjunction' : 'conjunction' }),
+  )
+}
+
+export const money = (amount: number, currency: string = DEFAULT_CURRENCY) =>
+  nf(`cur:${currency}`, { style: 'currency', currency }).format(amount)
+export const number = (value: number, opts?: Intl.NumberFormatOptions) =>
+  opts ? new Intl.NumberFormat(formatLocale(), opts).format(value) : nf('dec', { style: 'decimal' }).format(value)
+export const percent = (value: number) => nf('pct', { style: 'percent' }).format(value)
+export const compact = (value: number) => nf('cmp', { notation: 'compact' }).format(value)
+export const unit = (value: number, u: string) => nf(`unit:${u}`, { style: 'unit', unit: u }).format(value)
+export const date = (v: DateInput, preset: DatePreset = 'medium') =>
+  df(`p:${preset}`, DATE_PRESETS[preset]).format(toDate(v))
+export const time = (v: DateInput) => df('t', { timeStyle: 'short' }).format(toDate(v))
+export const dateTime = (v: DateInput) =>
+  df('dt', { dateStyle: 'medium', timeStyle: 'short' }).format(toDate(v))
+export const relativeTime = (v: DateInput, now?: DateInput) => {
+  const from = now === undefined ? Date.now() : toDate(now).getTime()
+  const [u, amount] = pickRelativeUnit(toDate(v).getTime() - from)
+  return rtf().format(amount, u)
+}
+export const list = (items: string[], type: 'and' | 'or' = 'and') => lf(type).format(items)
+```
+
+**A locale the extension cannot *translate* into may still *format* correctly.** `chrome.i18n` only
+ever loads a catalog from Chrome's ~55-entry `_locales` table (Step 4); `Intl` supports far more
+locales than that, and unsupported `_locales` directories are silently ignored regardless. Do not gate
+`formatLocale()` or any call into this module on whether a locale has a `_locales` directory — the two
+lists have no relationship.
+
+**MV3's CSP (`script-src 'self' 'wasm-unsafe-eval'; object-src 'self';`) is irrelevant here.** `Intl` is
+built into the JavaScript engine, not loaded or `eval`'d as a string — there is nothing to configure,
+same as Step 2.
+
+**Set `DEFAULT_CURRENCY` to the project's real currency** before writing the file. Grep for an existing
+`currency:` option, an `Intl.NumberFormat` / `toLocaleString` call, or a hardcoded symbol. If nothing is
+findable, leave `'USD'` and keep the `// adjust to this project's currency` comment — a wrong currency
+that looks deliberate is worse than one that flags itself. Record the hit as `currencySource`
+(`grep:<file>:<line>`, or `default` when nothing was findable).
+
+**The TypeScript `lib` gate.** `Intl.ListFormat` needs `es2021.intl`; `Intl.RelativeTimeFormat`,
+`notation: 'compact'` and `style: 'unit'` need `es2020.intl`. Read `tsconfig.json`
+`compilerOptions.lib` (falling back to what `target` implies). If it resolves below `ES2021`, do **not**
+silently emit a module that fails `tsc` — write `status: "needs_decision"` with:
+
+```json
+{ "step": "format_module_ts_lib",
+  "question": "format.ts needs Intl.ListFormat/RelativeTimeFormat types, which require tsconfig lib ES2021 or later (this project resolves to <current>). Raise lib to ES2021, or omit list() and relativeTime()?",
+  "options": ["raise_lib", "omit_two"] }
+```
+
+and stop. On `omit_two` the surface still has ten entries in `format-module.json`; the two omitted ones
+are emitted as `throw new Error('list() requires tsconfig lib ES2021')` stubs so the contract holds and
+the failure is loud rather than silent.
+
+**Write `.globalize/format-module.json`** with `specifier` (the project's path alias when
+`tsconfig.json` / `wxt.config.ts` declares one — `@/src/i18n/format` is this file's own convention, see
+the `@/src/i18n/dom` import in Step 6 — otherwise a relative specifier; do not assume `@/`, check),
+`path` (`src/i18n/format.ts`, or `src/i18n/i18n-format.ts` if the fallback name was used), the
+ten-entry `surface` (`["money","number","percent","compact","unit","date","time","dateTime","relativeTime","list"]`),
+`defaultCurrency`, and `currencySource`. `generate_coding_rules` (Step 8) reads `specifier` back as
+the `formatModule` placeholder.
+
+---
+
 ## Step 8: Generate Coding Rules (`generate_coding_rules` — always runs)
 
 The browser-extension i18n coding rules are a **generated file**, not a shipped one:
 `references/languages/js-ts/frameworks/webext/webext-native.rules.template.md` covers string externalization,
 the `data-i18n` markup contract, `t()` usage, key charset and case-insensitivity, `description` authoring,
-placeholders and the 9-substitution cap, the plural convention, manifest field legality, and what not to wrap.
+placeholders and the 9-substitution cap, the plural convention, manifest field legality, formatting, and what
+not to wrap.
 Follow the **core coding-rules section** in
 `references/languages/js-ts/frameworks/webext/setup.add-ons.md`: it renders the template down to this project's
 one configuration — condition `localeSwitcher` picks the native or custom-loader branch, and the values
-`localesDir` (the `<localesRoot>` from Step 1), `sourceLocale`, `targetLocales` and `manifestFile` (the
-authored manifest from Step 1) are substituted in — then writes `.agents/globalize-rules.md`. That section carries the missing-template handling (stop in guided
+`localesDir` (the `<localesRoot>` from Step 1), `sourceLocale`, `targetLocales`, `manifestFile` (the
+authored manifest from Step 1) and `formatModule` (the `specifier` written by `generate_format_helpers`
+above) are substituted in — then writes `.agents/globalize-rules.md`. That section carries the missing-template handling (stop in guided
 mode / record a skipped-warning in unguided mode; never recreate the file) and the fail-closed rule — there is
 no generic `code.md` to fall back to.
 
