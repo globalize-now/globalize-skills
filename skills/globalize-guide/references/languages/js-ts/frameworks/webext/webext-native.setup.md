@@ -786,11 +786,13 @@ export function formatLocale(): string {
 }
 ```
 
-**`getUILanguage()` returns a hyphenated BCP-47 tag** (`pt-BR`), while `_locales` directories are
-spelled with an **underscore** (`pt_BR`, Step 4). `Intl` wants the hyphenated form — pass
-`getUILanguage()` straight through. Do **not** run it through the `toChromeCode()` /
-`code.replace(/_/g, '-')` normalization used elsewhere in this project for `_locales` lookups; that
-normalization goes the other way and passing its output to `Intl` produces a silently wrong locale.
+**On this branch, `getUILanguage()` returns a hyphenated BCP-47 tag** (`pt-BR`), while `_locales`
+directories are spelled with an **underscore** (`pt_BR`, Step 4). `Intl` wants the hyphenated form —
+pass `getUILanguage()` straight through. Do **not** run it through `toChromeCode()`
+(`code.replace(/-/g, '_')`, Step 6) — that is the *hyphen → underscore* direction used for `_locales`
+lookups, and passing its output to `Intl` produces a silently wrong locale. (The `custom-loader`
+branch below needs the **opposite** conversion, for a different reason — see its
+`primeFormatLocale()`.)
 
 **`localeSwitcher === "custom-loader"`** — the extension stores its own choice in
 `browser.storage.sync`, same as Step 6 Branch B, but every formatter below is synchronous and
@@ -806,13 +808,27 @@ let current = browser.i18n.getUILanguage()
  */
 export async function primeFormatLocale(): Promise<void> {
   const { locale } = await browser.storage.sync.get('locale')
-  if (typeof locale === 'string' && locale) current = locale
+  // Step 6's setLocale() persists this as toChromeCode(locale) — underscored,
+  // e.g. "pt_BR". Intl needs hyphens: "pt_BR" is not a structurally valid BCP-47
+  // tag and throws a RangeError from every Intl constructor. Convert on the way
+  // in — this is toBcp47() from Step 6's loader.ts, inlined so this file still
+  // stands alone.
+  if (typeof locale === 'string' && locale) current = locale.replace(/_/g, '-')
 }
 
 export function formatLocale(): string {
   return current
 }
 ```
+
+**`current` must always hold a hyphenated tag — never store the raw value read out of
+`browser.storage.sync`.** The seed above (`browser.i18n.getUILanguage()`) is already hyphenated;
+`primeFormatLocale()` converts on the way in so the two assignments to `current` never disagree on
+spelling. Getting this backwards — assigning the stored value verbatim — is not a cosmetic bug: it
+throws a `RangeError` from every formatter, on every region-qualified locale (`pt_BR`, `zh_CN`,
+`es_419`, …), not just a wrong-locale silent failure. It is easy to miss in testing because the
+loader's own `AVAILABLE` sample list (Step 6) is `['en', 'es', 'pt_BR']` — the bare `en`/`es` entries
+are already valid BCP-47 on their own and mask the bug.
 
 `browser.storage.sync` needs no permission beyond what Step 6 Branch B's locale picker already
 requires, and is reachable from every context this module loads into — the popup, the options page,
@@ -829,18 +845,23 @@ that cannot `await` anything. That gap is real, and it is silent when it goes wr
 - **Call it again from the `storage.onChanged` listener** in Step 6, so a locale switch made in one
   open context (say, the options page) updates formatting in every other open context, the same way it
   already updates `t()`'s catalog.
-- **Call it again at the top of the MV3 service worker, every time the worker starts** — the same
-  place Step 6 does `const ready = initI18n()` in `entrypoints/background.ts`. The service worker is
-  torn down and restarted at any time, and module-scope state — `current` included — does not survive
-  that. A worker that just restarted and formats something before the new `primeFormatLocale()` call
-  resolves silently falls back to the browser's UI language instead of the user's chosen one. No error,
-  no warning — just a wrong locale in a notification or a context-menu label.
-- **A context that cannot `await` it** — a synchronous render path, or a handler that must reply
-  before a promise can settle — cannot correctly format the stored locale on that one call. Do not
-  block it on `chrome.storage`; let it read whatever `current` already holds (the browser's UI language
-  until the first successful prime) and let the next scheduled render pick up the corrected value. This
-  is the same tradeoff `t()` already makes before `initI18n()` resolves, applied to formatting too —
-  it introduces no new failure mode.
+- **In the MV3 service worker, follow the exact `const ready = initI18n()` / `await ready` pattern
+  Step 6 already uses for the catalog** — module-scope `const primed = primeFormatLocale()` in
+  `entrypoints/background.ts`, then **`await primed` at the top of every handler that formats
+  something**, before it calls into this module. Service-worker handlers are async, so they *can*
+  await this — the worker is not a "cannot `await` it" context (that's the next bullet, and it does
+  not apply here). The worker is torn down and restarted at any time, and module-scope state —
+  `current` and the `primed` promise both — does not survive that; a handler that formats without
+  awaiting a fresh `primed` after a restart silently falls back to the browser's UI language instead
+  of the user's chosen one. No error, no warning — just a wrong locale in a notification or a
+  context-menu label.
+- **Reserve the stale-read fallback for a context that is genuinely synchronous** — a render path
+  with no `await` anywhere in its call chain, or a handler that must reply before any promise can
+  settle. Only there is it correct to skip awaiting and let the call read whatever `current` already
+  holds (the browser's UI language until the first successful prime), picking up the corrected value
+  on the next scheduled render. This is the same tradeoff `t()` already makes before `initI18n()`
+  resolves, applied to formatting too — it introduces no new failure mode. Do not reach for this
+  fallback anywhere an `await` is actually possible, including the service worker above.
 
 ### The rest of the module
 
