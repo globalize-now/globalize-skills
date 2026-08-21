@@ -11,7 +11,7 @@ template: next-intl
 templateVersion: 1
 conditions: [router, localeNavigation, catalogFormat, paramsShape]
 values: [i18nRequestPath, i18nNavigationPath, importPrefix, localeSegment, catalogPath, sourceLocale, targetLocales, formatModule]
-budget: { "router == \"app\"": 265, "default": 230 }
+budget: { "router == \"app\"": 300, "default": 260 }
 ---
 
 # next-intl Coding Rules
@@ -43,9 +43,12 @@ Server Component (the file has no 'use client' directive)?
 Client Component ('use client'), or a custom hook used by one?
   YES → const t = useTranslations('Namespace')          // 'next-intl'
 
-Need a number, date, currency, or relative time?
-  YES → useFormatters() (components) / await getFormatters() (generateMetadata,
-        route handlers, server actions) — both from <<formatModule>>
+Need a number, date, currency, or relative time — from <<formatModule>>?
+  Async Server Component, or non-component async code (generateMetadata,
+  route handlers, server actions)?
+    YES → const f = await getFormatters()
+  Client Component, or a Server Component with no `await` in its body?
+    YES → const f = useFormatters()
 ```
 <!-- else -->
 
@@ -76,10 +79,14 @@ Check the plural question first. Two separate keys ("oneItem" / "manyItems") plu
 | `Link`, `redirect`, `useRouter`, `usePathname`, `getPathname` | `<<i18nNavigationPath>>` (locale-aware wrappers from `createNavigation`) |
 <!-- /if -->
 
-`useFormatter` / `getFormatter` above are what `<<formatModule>>` wraps internally. Call `useFormatters()` / `getFormatters()` from that module at the call site instead of importing `useFormatter` / `getFormatter` directly — see "Numbers, currencies, dates, relative time" below.
 <!-- if: router == "app" -->
 
+`useFormatter` / `getFormatter` above are what `<<formatModule>>` wraps internally. Call `useFormatters()` / `getFormatters()` from that module at the call site instead of importing `useFormatter` / `getFormatter` directly — see "Numbers, currencies, dates, relative time" below.
+
 Server async APIs (`getTranslations`, `getFormatter`, `getMessages`, …) **must be `await`ed**. They throw at runtime if used unawaited — the same rule applies to this project's `getFormatters()`.
+<!-- else -->
+
+`useFormatter` above is what `<<formatModule>>` wraps internally. Call `useFormatters()` from that module at the call site instead of importing `useFormatter` directly — see "Numbers, currencies, dates, relative time" below. There is no `getFormatter` row above and no `getFormatters()` in `<<formatModule>>` on the Pages Router.
 <!-- /if -->
 
 ## Common patterns
@@ -159,7 +166,8 @@ Keep keys statically analysable: a string literal, or a member of an `as const` 
 Decide **server vs client** before choosing a pattern.
 
 **Server components** (no `'use client'`):
-- Use `getTranslations()` for strings and `getFormatters()` from `<<formatModule>>` for numbers, currencies, dates and lists — both async, both must be `await`ed.
+- Use `getTranslations()` for strings — async, must be `await`ed.
+- For numbers, currencies, dates and lists: **an `async` component can't call a hook.** Almost every Server Component that renders translated text is `async` (it `await`s `getTranslations()`), so use `await getFormatters()` from `<<formatModule>>` in it — same await rule as `getTranslations()`. Only a Server Component with no `await` anywhere in its body may call `useFormatters()` instead, the same as a Client Component would.
 - Every page rendered under `generateStaticParams` (or any static segment) **must call `setRequestLocale(locale)` before any translation lookup** — in the page itself, not only in the layout. Without it the page silently drops back to dynamic rendering on every request, and the tests still pass.
 - Leave `<NextIntlClientProvider>` in `app/<<localeSegment>>/layout.tsx` without an explicit `messages` prop unless you need to filter; next-intl then serialises only what the client tree references. Passing every message ships the whole catalog to every page.
 
@@ -272,13 +280,20 @@ Never hardcode a formatted number, a currency symbol, or a date string. Never ca
 ```tsx
 import { useFormatters } from '<<formatModule>>'
 const f = useFormatters()
-f.money(amount)            // in components — Client and Server alike
+f.money(amount)
 ```
+
+`useFormatters()` is a hook: call it from Client Components, and from any Server Component that has no `await` in its body.
+<!-- if: router == "app" -->
+An `async` Server Component can't call a hook — almost every Server Component that renders translated text is `async` (it `await`s `getTranslations()`), so in practice most Server Components reach for the awaitable form instead:
 
 ```ts
 import { getFormatters } from '<<formatModule>>'
-const f = await getFormatters()   // generateMetadata, route handlers, server actions — must be awaited
+const f = await getFormatters()   // async Server Components, generateMetadata, route handlers, server actions — must be awaited
 ```
+<!-- else -->
+There is no `getFormatters()` on the Pages Router, and `<<formatModule>>` does not export one here — `next-intl/server` (where the underlying `getFormatter` lives) is App Router only. `useFormatters()` is the only form; there is no Server/Client Component split on the Pages Router for it to disagree with.
+<!-- /if -->
 
 All ten:
 
@@ -297,14 +312,29 @@ f.list(['Alice', 'Bob', 'Carol'])      // 'and' is the default — 'Alice, Bob, 
 f.list(['Alice', 'Bob'], 'or')         // 'Alice or Bob'
 ```
 
-**Currency comes from the data, not the reader.** `f.money(amount)` uses the project default; when a record carries its own currency, pass it: `f.money(order.total, order.currency)`. Never derive a currency code from the locale — that relabels a dollar price as euros for a German reader.
+**Currency comes from the data, not the reader.** `f.money(amount)` uses the project default; when a record carries its own currency, pass it: `f.money(order.total, order.currency)`. Never derive a currency code from the locale — that relabels a dollar price as euros for a German reader. Keep currency codes in code, not in messages — a catalog entry that spells out `'$'` or `'USD'` can't adapt when a record's currency differs, and duplicates work `f.money` already does.
 
 **`date`, `time`, `dateTime` and `list` above pass preset names, not options** — `'short'`, `'medium'`, `'time'`, `'and'`.
 <!-- if: router == "app" -->
-They only resolve if the preset is registered in the `formats` object that setup added to `<<i18nRequestPath>>`'s `getRequestConfig`.
+They only resolve if the preset is registered in the `formats` object that setup added to `<<i18nRequestPath>>`'s `getRequestConfig`:
 <!-- else -->
-They only resolve if the preset is registered in the `formats` prop of `<NextIntlClientProvider>` in `_app.tsx`.
+They only resolve if the preset is registered in the `formats` prop of `<NextIntlClientProvider>` in `_app.tsx`:
 <!-- /if -->
+
+```ts
+formats: {
+  dateTime: {
+    short: { dateStyle: 'short' },
+    medium: { dateStyle: 'medium' },
+    long: { dateStyle: 'long' },
+    time: { timeStyle: 'short' },
+    dateTime: { dateStyle: 'medium', timeStyle: 'short' },
+  },
+  list: { and: { style: 'long', type: 'conjunction' },
+          or:  { style: 'long', type: 'disjunction' } },
+}
+```
+
 An unregistered name does not throw — it silently falls back to next-intl's defaults, so a missing registration is a silent failure, not a build error. **Needs a format with no matching preset? Register it there, not at the call site** — a preset written out at two call sites will drift.
 
 **Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and any `useFormatter()` / `getFormatter()` call outside `<<formatModule>>`.
@@ -317,6 +347,11 @@ Fix it at the source: set `timeZone` in `_app.tsx`'s `NextIntlClientProvider` pr
 <!-- /if -->
 
 **`relativeTime` needs one reference instant, shared by server and client.** Evaluating `Date.now()` independently on each side eventually lands them on different sides of a threshold. `f.relativeTime(value)` — called with no second argument — already uses the request config's `now` for exactly this reason; pass an explicit second argument only when this particular call needs a different reference instant than the rest of the page.
+<!-- if: router == "app" -->
+That `now` comes from `<<i18nRequestPath>>`'s `getRequestConfig` — set once per request, on the server, before anything renders.
+<!-- else -->
+On the Pages Router, `now` must be produced once in `getStaticProps` / `getServerSideProps`, serialized into `props`, and passed through to `<NextIntlClientProvider now={...}>` in `_app.tsx`. **Never** write `now={new Date()}` directly in `_app.tsx`'s render body — that expression re-evaluates on every render, server and client independently, which is the exact failure this rule exists to avoid.
+<!-- /if -->
 <!-- if: localeNavigation == "create-navigation" -->
 
 ## Locale-aware navigation

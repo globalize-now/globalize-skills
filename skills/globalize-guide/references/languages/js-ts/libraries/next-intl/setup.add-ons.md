@@ -22,6 +22,10 @@ The same directory `i18nRequestPath` and `i18nNavigationPath` resolve against in
 
 ### 2. Create `<i18nDir>/format.ts`
 
+**The module's shape differs by router.** `next-intl/server` — where `getFormatter` lives — is App Router only. Read `.globalize/manifest-snapshot.json` → `match.router` and emit the matching version below; do not emit both, and do not emit the App Router version's `getFormatters` on a Pages Router project.
+
+**App Router** (`match.router == "app"`):
+
 ```ts
 // <i18nDir>/format.ts
 import { useFormatter } from 'next-intl'
@@ -75,18 +79,80 @@ function bind(format: NextFormatter): Formatters {
   }
 }
 
-/** In components — Client and Server alike. */
+/** In Client Components, and in a Server Component that has no `await` in its body. */
 export function useFormatters(): Formatters {
   return bind(useFormatter())
 }
 
-/** In non-component async code: generateMetadata, route handlers, server actions. */
+/** In an `async` Server Component, `generateMetadata`, route handlers, server actions. */
 export async function getFormatters(): Promise<Formatters> {
   return bind(await getFormatter())
 }
 ```
 
-**`useFormatter()` works in any component on next-intl v4** — Client and Server Components alike; it has not needed a hook-only environment since next-intl 3.0 added Server Component support. Reach for `getFormatters()` only in non-component async code — `generateMetadata`, route handlers, server actions — and **`await` it**: next-intl's server APIs throw at runtime when used unawaited, and this module's `getFormatters()` is no exception.
+**`useFormatter()` is a hook — it cannot be called from an `async` component.** That is precisely why the awaitable `getFormatter()` exists. Almost every Server Component that renders translated text is itself `async` (it `await`s `getTranslations()`), so in practice most Server Components need `getFormatters()`, not `useFormatters()` — the same async/sync split `getTranslations()` already forces on translation. Reach for `getFormatters()` in an `async` Server Component, or in non-component async code — `generateMetadata`, route handlers, server actions — and **`await` it**: next-intl's server APIs throw at runtime when used unawaited, and this module's `getFormatters()` is no exception. `useFormatters()` stays available in Client Components and in the rare Server Component with no `await` anywhere in its body.
+
+**Pages Router** (`match.router == "pages"`):
+
+```ts
+// <i18nDir>/format.ts
+import { useFormatter } from 'next-intl'
+
+export type DateInput = Date | number | string
+export const DEFAULT_CURRENCY = 'USD'   // adjust to this project's currency
+
+export type Formatters = {
+  money(amount: number, currency?: string): string
+  number(value: number, opts?: Intl.NumberFormatOptions): string
+  percent(value: number): string
+  compact(value: number): string
+  unit(value: number, unit: string): string
+  date(value: DateInput, preset?: 'short' | 'medium' | 'long'): string
+  time(value: DateInput): string
+  dateTime(value: DateInput): string
+  relativeTime(value: DateInput, now?: DateInput): string
+  list(items: string[], type?: 'and' | 'or'): string
+}
+
+/**
+ * THE SEAM. next-intl resolves the locale for us, so there is nothing to override
+ * here today. To give this project a separate regional preference, stop calling
+ * next-intl's formatter and build an Intl-based one against a locale chosen here.
+ */
+export function formatLocale(uiLocale: string): string {
+  return uiLocale
+}
+
+const toDate = (v: DateInput): Date => (v instanceof Date ? v : new Date(v))
+
+type NextFormatter = ReturnType<typeof useFormatter>
+
+function bind(format: NextFormatter): Formatters {
+  return {
+    money: (amount, currency = DEFAULT_CURRENCY) =>
+      format.number(amount, { style: 'currency', currency }),
+    number: (value, opts) => format.number(value, opts),
+    percent: (value) => format.number(value, { style: 'percent' }),
+    compact: (value) => format.number(value, { notation: 'compact' }),
+    unit: (value, unit) => format.number(value, { style: 'unit', unit }),
+    date: (value, preset = 'medium') => format.dateTime(toDate(value), preset),
+    time: (value) => format.dateTime(toDate(value), 'time'),
+    dateTime: (value) => format.dateTime(toDate(value), 'dateTime'),
+    relativeTime: (value, now) =>
+      format.relativeTime(toDate(value), now === undefined ? undefined : toDate(now)),
+    list: (items, type = 'and') => format.list(items, type) as string,
+  }
+}
+
+/** In every page and component. There is no `getFormatters()` on the Pages Router. */
+export function useFormatters(): Formatters {
+  return bind(useFormatter())
+}
+```
+
+**No `getFormatters`, and no `next-intl/server` import, on this branch — do not "restore" it on a later pass.** `next-intl/server` (where `getFormatter` lives) is App Router only; this repo's own Pages Router setup states every import comes from `next-intl`, never `next-intl/server`. Calling `getFormatter` from the client stub throws `` `getFormatter` is not supported in Client Components ``, and there is no per-request server context here for it to read from anyway — the Pages Router setup's `request.ts` is a no-op stub that exists only to satisfy `next-intl/plugin`'s load-time assertion, not to serve real request data. `useFormatters()` is a plain hook here, and there is no Server/Client Component split on the Pages Router, so it works the same in every page and every component underneath it.
+
+**The ten-entry `surface` recorded in `.globalize/format-module.json` (step 7) is identical on both routers.** Only the *access form* differs: `useFormatters()` alone on the Pages Router, `useFormatters()` plus `getFormatters()` on the App Router.
 
 ### 3. Register the named formats the module calls by name
 
@@ -108,7 +174,10 @@ formats: {
 
 next-intl's global `formats` also accepts `number` and `displayName` categories beyond the two the module uses today — extend the same object if this project later needs a named number or display-name preset. Verify the registration by rendering one of each preset once.
 
-**Set `timeZone` and `now` in the same config object**, and say why: `timeZone` otherwise defaults to the server's time zone, which is a hydration mismatch waiting to happen once the browser's zone disagrees — one that never shows up in development. `now: new Date()` gives server and client one shared reference instant for `relativeTime`. Both are request-scoped context that a raw `new Intl.DateTimeFormat()` call has no way to see — that request scoping is what makes wrapping `useFormatter()` worth more than calling `Intl` directly, and it is the reason this variant delegates instead of building its own formatters the way the other stacks do.
+**Set `timeZone` and `now`**, and say why: `timeZone` otherwise defaults to the server's time zone, which is a hydration mismatch waiting to happen once the browser's zone disagrees — one that never shows up in development. `now` gives server and client one shared reference instant for `relativeTime`. Both are request-scoped context that a raw `new Intl.DateTimeFormat()` call has no way to see — that request scoping is what makes wrapping `useFormatter()` worth more than calling `Intl` directly, and it is the reason this variant delegates instead of building its own formatters the way the other stacks do.
+
+- **App Router**: set both directly in the same object `getRequestConfig` returns — `timeZone: 'Europe/Berlin'`, `now: new Date()`. `getRequestConfig` runs fresh per request, on the server, before anything renders, so this naturally produces one shared instant.
+- **Pages Router**: `_app.tsx`'s `<NextIntlClientProvider>` re-renders on both server and client, so a `now={new Date()}` written directly in its render body is **not** one shared instant — the expression re-evaluates every render, server and client independently, exactly the failure `relativeTime` needs one instant to avoid. Compute `now` once, in `getStaticProps` / `getServerSideProps`, alongside `messages`; serialize it (`now: new Date().toISOString()`) into `props`; then in `_app.tsx` parse it back and pass it through: `<NextIntlClientProvider now={new Date(pageProps.now)} timeZone="...">`. `timeZone` has no such trap — it is a static string, safe to hardcode directly on the provider prop as the existing setup already does.
 
 ### 4. Resolve `DEFAULT_CURRENCY`
 
