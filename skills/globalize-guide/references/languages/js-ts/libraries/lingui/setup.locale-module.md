@@ -265,6 +265,8 @@ export const getFormatters = createFormatters
 
 **Why the locale comes from `useLingui()` and not from the module-scope `i18n` singleton.** Reading the singleton at module scope pins one request's locale onto every later request on every server-rendering variant. `useLingui()` reads it from `<I18nProvider>` context, which is per-render. This is the point of the hook; do not "simplify" it to a module-scope read.
 
+**On the Next.js App Router, `useFormatters()` requires a Client Component.** It calls `useLingui()`, which needs `<I18nProvider>` context that a Server Component does not have. A Server Component must use `getFormatters(locale)` instead, taking `locale` from the route's `params` — the same instance `setI18n()` is built from via `getI18nInstance(locale)`, but formatting and translation are resolved separately: `getFormatters` for formatting, `getI18nInstance` + `setI18n` for `<Trans>` / `useLingui()`. Do **not** add a `'use client'` directive to `format.ts` itself to work around this — that would break `getFormatters` for every server caller (loaders, route handlers, other Server Components).
+
 **Resolve `DEFAULT_CURRENCY` before writing `locales.ts`**, by grepping for an existing `currency:` option, an `Intl.NumberFormat` / `toLocaleString` call, or a hardcoded symbol. Record the hit as `currencySource` (`grep:<file>:<line>`); when nothing is findable leave `'USD'`, keep the `// adjust to this project's currency` comment, and record `currencySource: "default"`.
 
 **The TypeScript `lib` gate.** `Intl.ListFormat` needs `es2021.intl`; `Intl.RelativeTimeFormat`, `notation: 'compact'` and `style: 'unit'` need `es2020.intl`. Read `tsconfig.json` `compilerOptions.lib` (falling back to what `target` implies). If it resolves below `ES2021`, do **not** silently emit a module that fails `tsc` — write `status: "needs_decision"` with:
@@ -306,7 +308,7 @@ grep -rn "RTL_LOCALES" <source root> | grep -v "/i18n/locales"     # → no outp
 grep -rn "new Intl.DisplayNames" <source root> | grep -v "/i18n/locales"   # → no output
 # Vite variants only: the flat module is gone.
 test -f src/i18n.ts && echo "FAIL: flat src/i18n.ts still present alongside src/i18n/"
-# Exactly one Intl construction site outside the format module.
+# No Intl construction outside the format and locale modules.
 grep -rn "new Intl\." <source root> | grep -v "/i18n/format" | grep -v "/i18n/locales"   # → no output
 # The contract artifact exists and lists ten functions.
 jq -e '.surface | length == 10' .globalize/format-module.json
