@@ -183,23 +183,23 @@ Always include `other` — it is the required fallback every language uses, and 
 A raw `\(value)` renders `1234.5` and `2026-03-04 15:30:00 +0000` in every language. Never construct `NumberFormatter`, `DateFormatter`, or a bare `FormatStyle` at a call site — route every formatted value through `<<formatModule>>`, this project's one formatting surface, so separators, currency placement, and date field order follow the reader's locale and every call agrees on which locale that is:
 
 ```swift
-amount.formatted(.money)                              // '$1,234.50' — this project's default currency
-Text(amount, format: .money(order.currency))           // when the data carries its own currency
-count.formatted(.plainNumber)                          // '1,234.5'
-ratio.formatted(.percentage)                            // '42%' — a ratio (0.42), not a whole percentage
-value.formatted(.compactNumber)                          // '12K'
-<<formatModule>>.measurement(5.2, UnitLength.kilometers) // '5.2 km' — unit is a typed Dimension, not a string
-date.formatted(.mediumDate)                              // 'Aug 21, 2026' — the default date preset
-date.formatted(.shortDate)                                // 'Aug 21, 2026' in abbreviated month form
-date.formatted(.timeOnly)                                 // '4:05 PM'
-date.formatted(.dateAndTime)                              // 'Aug 21, 2026, 4:05 PM'
-<<formatModule>>.relativeTime(date)                       // '3 days ago' / 'yesterday'
-<<formatModule>>.list(["Alice", "Bob", "Carol"])          // 'Alice, Bob, and Carol'
+amount.formatted(.money)                                 // '$1,234.50' — this project's default currency
+amount.formatted(.money(order.currency))                  // when the data carries its own currency
+rating.formatted(.plainNumber)                             // '4.5' — Double only; see note below for Int/Decimal
+ratio.formatted(.percentage)                               // '42%' — a ratio (0.42), not a whole percentage
+value.formatted(.compactNumber)                            // '12K'
+<<formatModule>>.measurement(5.2, UnitLength.kilometers)   // '5.2 km' — unit is a typed Dimension, not a string
+date.formatted(.mediumDate)                                // 'August 21, 2026' — the default date preset
+date.formatted(.shortDate)                                 // 'Aug 21, 2026' — abbreviated month form
+date.formatted(.timeOnly)                                  // '4:05 PM'
+date.formatted(.dateAndTime)                               // 'Aug 21, 2026, 4:05 PM'
+<<formatModule>>.relativeTime(date)                         // '3 days ago' / 'yesterday'
+<<formatModule>>.list(["Alice", "Bob", "Carol"])            // 'Alice, Bob, and Carol'
 ```
 
-**The currency code is a property of the price, not of the reader.** Pass the currency your data actually carries — `Text(order.total, format: .money(order.currency))`; never derive it from `Locale.current`, which would relabel a dollar price as euros for a German reader. Omitting the argument formats `<<formatModule>>`'s own project default, never the reader's locale. The locale decides *formatting*; your data decides *which currency*.
+**The currency code is a property of the price, not of the reader.** Pass the currency your data actually carries — `amount.formatted(.money(order.currency))`; never derive it from `Locale.current`, which would relabel a dollar price as euros for a German reader. Omitting the argument formats `<<formatModule>>`'s own project default, never the reader's locale. The locale decides *formatting*; your data decides *which currency*.
 
-**`money` amounts stored as `Decimal` or `Int` both have their own `.money`** — `<<formatModule>>` declares three parallel extensions, one per numeric family, because `Decimal` does not conform to `BinaryFloatingPoint` and so does not satisfy the `Double` one. Use whichever matches how your data is actually typed; never convert a `Decimal` price to `Double` to satisfy a formatter — that reintroduces the binary floating-point rounding error `Decimal` exists to avoid.
+**`money` amounts stored as `Decimal` or `Int` both have their own `.money`** — `<<formatModule>>` declares three parallel extensions, one per numeric family, because `Decimal` does not conform to `BinaryFloatingPoint` and so does not satisfy the `Double` one. Use whichever matches how your data is actually typed; never convert a `Decimal` price to `Double` to satisfy a formatter — that reintroduces the binary floating-point rounding error `Decimal` exists to avoid. **`plainNumber`/`percentage`/`compactNumber` stay `Double`-only** — there is no `Decimal`/`Int` overload for these three; format an `Int` or `Decimal` value with Foundation's own un-wrapped `.formatted(.number)` / `.formatted(.percent)` instead.
 
 Interpolating an already-formatted value into a localized string is correct — it extracts as `%@`:
 
@@ -207,10 +207,12 @@ Interpolating an already-formatted value into a localized string is correct — 
 String(localized: "Total: \(amount.formatted(.money))")
 ```
 
-**Never hardcode a date format string.** `DateFormatter().dateFormat = "MM/dd/yyyy"` forces American field order on every locale. If this project's deployment target is below iOS 15, `<<formatModule>>` additionally exposes `…Compat` siblings (`moneyCompat`, `mediumDateCompat`, …) backed by a **cached** `NumberFormatter` / `DateFormatter` — check the header comment at the top of the generated file for which functions have one before assuming the bare `FormatStyle` name above is safe to call from a `Text(_, format:)` context on this project; constructing `DateFormatter` / `NumberFormatter` per call instead of caching them is a well-known performance trap either way.
+**Never hardcode a date format string.** `DateFormatter().dateFormat = "MM/dd/yyyy"` forces American field order on every locale. If this project's deployment target is below iOS 15, `<<formatModule>>` additionally exposes `…Compat` siblings (`moneyCompat`, `mediumDateCompat`, …) backed by a **cached** `NumberFormatter` / `DateFormatter` — check the header comment at the top of the generated file for which functions have one before assuming the bare style name above compiles unconditionally on this project; constructing `DateFormatter` / `NumberFormatter` per call instead of caching them is a well-known performance trap either way.
+
+**This module's formatting locale is `Formatters.formatLocale`, not the ambient SwiftUI environment.** Every style above chains `.locale(Formatters.formatLocale)` explicitly, so a `.environment(\.locale, …)` override (SwiftUI Previews, an in-app switcher) has **no effect** on anything routed through `<<formatModule>>` — the style already carries its own explicit locale. To preview or switch locales for values formatted through this module, set `Formatters.formatLocale` itself; `.environment(\.locale, …)` alone will not touch it.
 <!-- if: uiFramework == "swiftui" -->
 
-In SwiftUI prefer the `format:` initializer over formatting into a `String` — it re-formats automatically when the environment locale changes: `Text(amount, format: .money)`, `Text(date, format: .mediumDate)`.
+Prefer the `format:` initializer over formatting into a `String`: `Text(amount, format: .money)` re-reads `Formatters.formatLocale` every time this view's body runs, so it never goes stale the way a `String` captured once via `.formatted()` and stored does. Same styles as above: `Text(amount, format: .money(order.currency))`, `Text(date, format: .mediumDate)`.
 <!-- /if -->
 
 **Needs a format `<<formatModule>>` has no preset for?** Add it to the module. A date style or currency default written out at two call sites will drift.

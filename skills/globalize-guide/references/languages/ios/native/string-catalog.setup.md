@@ -271,10 +271,11 @@ For Objective-C `NSLocalizedString` call sites, the conversion can ingest them a
 this project's own default, and every screen that formats a number, a date, or a list has to remember the
 right style and the right options each time. This step creates one small file, `Formatters.swift`, that
 gives every formatting concern a name — as `FormatStyle` extensions for the value styles, so
-`Text(amount, format: .money)` re-formats automatically when the environment locale changes, plus a
-`Formatters` namespace for the two concepts that need an argument no `FormatStyle` carries (`relativeTime`'s
-reference instant, `list`'s items) and for `measurement`, which Foundation's own API shape rules out of the
-`FormatStyle`-extension idiom (see "The `unit` hazard" below).
+`Text(amount, format: .money)` re-reads this project's formatting locale on every view-body evaluation
+instead of going stale the way a `String` captured once does — plus a `Formatters` namespace for the two
+concepts that need an argument no `FormatStyle` carries (`relativeTime`'s reference instant, `list`'s items)
+and for `measurement`, which Foundation's own API shape rules out of the `FormatStyle`-extension idiom (see
+"The `unit` hazard" below).
 
 **Always runs**, on every project — like Steps 2–7, it does not wait for a `SKILL.md §1.10` selection.
 Phase 3's wrap subagents route every hardcoded number, currency, date, and list through this file's surface.
@@ -338,9 +339,29 @@ also below 13.0, which in practice is vanishingly rare.
   cached-formatter fallback.** Write the clean module below as-is; skip the "Below iOS 15" subsection
   entirely.
 - **Deployment target < iOS 15.0** (including "unreadable, treated as below" per the `needs_decision`
-  answer `below_ios_15_emit_fallback`) — write the clean module **and** the fallback subsection below. Wrap
-  every `public extension FormatStyle where Self == …` block in `@available(iOS 15.0, *)` — referencing an
-  iOS-15-only type unguarded is a compile error at any deployment target below 15, not just a runtime risk.
+  answer `below_ios_15_emit_fallback`) — write the clean module **and** the fallback subsection below, but
+  first annotate every declaration that references an iOS-15-only type, or the file does not compile at all
+  on this project's own deployment target — not just at runtime:
+  - The six `public extension FormatStyle where Self == …` blocks (three `money` blocks — `Double`,
+    `Decimal`, `Int` — plus `percentage`, `plainNumber`/`compactNumber` together, and
+    `shortDate`/`mediumDate`/`timeOnly`/`dateAndTime` together) — mark each whole `extension`
+    `@available(iOS 15.0, *)`; that covers every member inside it.
+  - `Formatters.relativeTime`, `Formatters.list`, and `Formatters.measurement` **individually**. These
+    three live on the base `Formatters` enum itself, beside `defaultCurrency`/`formatLocale`, not inside a
+    separate extension — and each names an iOS-15-only type directly: `Date.RelativeFormatStyle` in
+    `relativeTime`'s body (via `.relative(presentation:)`), `ListFormatStyle<StringStyle,
+    [String]>.ListType` in `list`'s own parameter type, `Measurement<UnitType>.FormatStyle.UnitWidth` in
+    `measurement`'s own parameter type. Each needs its own annotation:
+    ```swift
+    @available(iOS 15.0, *)
+    public static func relativeTime(_ value: Date, now: Date = Date()) -> String {
+        value.formatted(.relative(presentation: .named).locale(formatLocale))
+    }
+    ```
+    Apply the identical `@available(iOS 15.0, *)` annotation to `list` and `measurement`.
+  - **Leave `defaultCurrency` and `formatLocale` unannotated.** `String` and `Locale` predate iOS 15 by a
+    wide margin, and the `…Compat` functions below (which themselves must stay unconditionally available)
+    call both regardless of which branch of their own `if #available` runs.
 
 ### The Swift module
 
@@ -361,7 +382,10 @@ public enum Formatters {
     /// `.locale(formatLocale)` explicitly, rather than relying on each API's own default (which
     /// happens to also be `.autoupdatingCurrent` today, but isn't a contract) — so this one property
     /// is the single place to edit for a separate regional preference, exactly like every other
-    /// stack's `formatLocale()` / `format_locale`.
+    /// stack's `formatLocale()` / `format_locale`. One consequence: a SwiftUI `.environment(\.locale,
+    /// …)` override (Previews, an in-app switcher) has NO effect on anything formatted through this
+    /// file, because every style already carries its own explicit locale — edit this property
+    /// instead of relying on the environment.
     public static var formatLocale: Locale { .autoupdatingCurrent }
 
     public static func relativeTime(_ value: Date, now: Date = Date()) -> String {
@@ -451,9 +475,17 @@ function this project actually calls from a context that must run below iOS 15:
 
 ```swift
 public extension Formatters {
-    private static let legacyCurrencyFormatter: NumberFormatter = {
+    // Fixed to defaultCurrency and locale AT CONSTRUCTION, and never mutated again after that —
+    // safe to read concurrently, since Swift guarantees the initializer above runs exactly once and
+    // nothing here touches a property post-init. NEVER add code that mutates a shared cached
+    // formatter's properties per call (e.g. `legacyDefaultCurrencyFormatter.currencyCode = …`) —
+    // that races two concurrent callers against each other's currency/locale, and would format one
+    // call's amount using whichever currency the OTHER call last set. See moneyCompat below for how
+    // a non-default currency is handled instead.
+    private static let legacyDefaultCurrencyFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .currency
+        f.currencyCode = defaultCurrency
         // .autoupdatingCurrent, not a snapshot — this formatter is constructed ONCE, at first access,
         // and lives for the app's lifetime, so a fixed Locale would freeze it at whatever was active
         // at launch and never pick up a later change.
@@ -469,13 +501,21 @@ public extension Formatters {
         return f
     }()
 
-    /// Safe to call unconditionally, on any OS version this project ships to.
+    /// Safe to call unconditionally, on any OS version this project ships to, from any thread.
     static func moneyCompat(_ amount: Double, currency: String = defaultCurrency) -> String {
         if #available(iOS 15, *) {
             return amount.formatted(.money(currency))
         }
-        legacyCurrencyFormatter.currencyCode = currency
-        return legacyCurrencyFormatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
+        if currency == defaultCurrency {
+            return legacyDefaultCurrencyFormatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
+        }
+        // A non-default currency below iOS 15: build a short-lived formatter instead of mutating the
+        // shared cached one — see the comment on legacyDefaultCurrencyFormatter above for why.
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = currency
+        f.locale = formatLocale
+        return f.string(from: NSNumber(value: amount)) ?? "\(amount)"
     }
 
     static func mediumDateCompat(_ value: Date) -> String {
@@ -494,10 +534,10 @@ at all without its own `if #available` branch. When this branch fires, add a one
 top of `Formatters.swift` naming exactly which functions got a `…Compat` sibling — the generated coding
 rules (Step 8) point the reader at that comment rather than hard-coding the list, since it's a property of
 *this* project's deployment target, not of the module in general. Calling `…Compat` uniformly (instead of
-branching every call site) is simpler and correct, at one honest cost: it loses the "re-formats
-automatically on a locale change" property `Text(_, format:)` gives for free on iOS 15+, since a plain
-`String` doesn't observe anything — a view on a pre-15 device needs its own mechanism (e.g. observing
-`NSLocale.currentLocaleDidChangeNotification`) to re-render after a locale change.
+branching every call site) is simpler and correct, at one honest cost: a plain `String` doesn't get
+re-read on the next view-body evaluation the way `Text(_, format:)` does on iOS 15+, so a view on a pre-15
+device needs its own mechanism (e.g. observing `NSLocale.currentLocaleDidChangeNotification`) to re-render
+after a locale change.
 
 ### The Decimal/Int hazard — why `money` alone gets three extensions
 
@@ -544,7 +584,9 @@ Measurement<UnitType>.FormatStyle, UnitType: Dimension` directly on `FormatStyle
 has a typed `Measurement` value and wants the `Text(_, format:)` idiom can use Apple's own form with no
 wrapper: `Text(Measurement(value: distanceKm, unit: UnitLength.kilometers), format: .measurement(width:
 .wide))`. `Formatters.measurement` exists for the common case of a call site that only has a raw `Double`
-and wants a `String` back in one call — the same convenience `relativeTime`/`list` provide.
+and wants a `String` back in one call — the same convenience `relativeTime`/`list` provide. This is a
+deliberate deviation from a `FormatStyle`-returning `measurement(_:)`: it returns `String`, matching
+`relativeTime`/`list` rather than the other seven `FormatStyle`-extension concepts.
 
 ### `formatLocale` and the SPM `Bundle.module` question
 
