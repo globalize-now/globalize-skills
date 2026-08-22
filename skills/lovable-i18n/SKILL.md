@@ -538,7 +538,7 @@ export function useFormatters(): Formatters {
   return useMemo(() => createFormatters(i18n.locale), [i18n.locale])
 }
 
-/** Outside components: server functions, middleware, stores, plain utilities, tests. */
+/** In loaders, server code, route handlers and tests — anywhere there is no React context. */
 export const getFormatters = createFormatters
 ```
 
@@ -1057,7 +1057,7 @@ Mechanics:
 - If it exists, append the block at the end.
 - The block is wrapped in `<!-- lovable-i18n:rules:start -->` / `<!-- lovable-i18n:rules:end -->` markers. If those markers already exist in the file, **replace** everything between them and keep the marker lines themselves — this makes re-running the skill safe.
 - Substitute the real source locale for `en` in the catalog-upkeep section if it differs.
-- **Path B (TanStack Start) projects only:** append the "Time zone" and "`relativeTime` needs a shared `now`" paragraphs (shown below, inside the block) to the end of the "Numbers, currencies, dates" section. **Path A (Vite SPA) has no server rendering** — omit both paragraphs entirely there; a hydration note that can never fire is dead weight in every future edit's context.
+- The block below already carries the "Time zone" and "`relativeTime` needs a shared `now`" paragraphs at the end of the "Numbers, currencies, dates" section, written for TanStack Start. **On a Path A (Vite SPA) project, delete both paragraphs before writing the file** — Path A has no server rendering, so neither hazard can occur, and a hydration note that can never fire is dead weight in every future edit's context. **On a Path B (TanStack Start) project, keep them as-is** — do not duplicate them.
 
 Write this block (everything between and including the markers):
 
@@ -1151,10 +1151,10 @@ f.money(amount)            // in components — reads the locale from Lingui con
 ```ts
 import { getFormatters } from '@/i18n/format'
 const f = getFormatters(locale)   // outside components: a plain .ts utility, a store,
-                                   // (Path B) a server function or lingui-middleware.ts
+                                   // or, on TanStack Start, a server function / middleware
 ```
 
-`useFormatters()` is a React hook — it only works inside a component. Reaching for it in a plain `.ts` file, a store, or a Path B server-function handler throws "Invalid hook call." Use `getFormatters(locale)` there instead. On Path B, `locale` is the same value `getLocaleFromRequest(request)` already resolved in `i18n.server.ts` — thread it through, don't re-derive it. On Path A, a non-component helper can read it off the imported `i18n` singleton (`i18n.locale`).
+`useFormatters()` is a React hook — it only works inside a component. Reaching for it in a plain `.ts` file, a store, or (on TanStack Start) a server-function handler throws "Invalid hook call." Use `getFormatters(locale)` there instead. On TanStack Start, `locale` is the value `getLocaleFromRequest(request)` already resolves in `src/modules/lingui/i18n.server.ts` — thread it through rather than re-deriving it. In a Vite SPA with no server rendering, a non-component helper can read the locale off the imported `i18n` singleton from `@/i18n` (`i18n.locale`).
 
 The ten functions, one example each:
 
@@ -1179,7 +1179,7 @@ The ten functions, one example each:
 
 **Time zone.** `Intl.DateTimeFormat` uses the runtime's zone, so the Cloudflare Workers server renders in its deploy region's zone while the browser renders in the reader's — a hydration mismatch that never shows up in local dev. Render time-of-day in a client-only component, or pin an explicit `timeZone` in `DATE_PRESETS`.
 
-**`relativeTime` needs a shared `now` under SSR.** The server and the client evaluate `Date.now()` at different instants and can land on opposite sides of a threshold (`an hour ago` on the server, `2 hours ago` after hydration). Resolve one reference instant per request — alongside the locale, in `lingui-middleware.ts` — and pass it explicitly: `f.relativeTime(postedAt, requestNow)`.
+**`relativeTime` needs a shared `now` under SSR.** The server and the client evaluate `Date.now()` at different instants and can land on opposite sides of a threshold (`an hour ago` on the server, `2 hours ago` after hydration). Resolve one reference instant per request — alongside the locale, in `src/modules/lingui/lingui-middleware.ts` — and pass it explicitly: `f.relativeTime(postedAt, requestNow)`.
 
 ## What not to wrap
 
