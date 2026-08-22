@@ -384,12 +384,17 @@ public enum Formatters {
     /// system's current setting, with nothing to reconstruct on a change. Every style below chains
     /// `.locale(formatLocale)` explicitly, rather than relying on each API's own default (which
     /// happens to also be `.autoupdatingCurrent` today, but isn't a contract) — so this one property
-    /// is the single place to edit for a separate regional preference, exactly like every other
+    /// is the single place to assign for a separate regional preference, exactly like every other
     /// stack's `formatLocale()` / `format_locale`. One consequence: a SwiftUI `.environment(\.locale,
     /// …)` override (Previews, an in-app switcher) has NO effect on anything formatted through this
-    /// file, because every style already carries its own explicit locale — edit this property
-    /// instead of relying on the environment.
-    public static var formatLocale: Locale { .autoupdatingCurrent }
+    /// file, because every style already carries its own explicit locale — assign this property
+    /// instead of relying on the environment, e.g. `Formatters.formatLocale = Locale(identifier:
+    /// "fr_FR")` from a Previews harness or an in-app locale switcher. Stored, not computed, so it's
+    /// actually assignable; `nonisolated(unsafe)` is required for a mutable static under Swift 6
+    /// strict concurrency — safe here because writes are expected to be rare, deliberate, main-thread
+    /// UI actions, not concurrent writers racing each other. If this project assigns it from multiple
+    /// threads/tasks, add explicit synchronization instead of relying on this annotation.
+    public static nonisolated(unsafe) var formatLocale: Locale = .autoupdatingCurrent
 
     public static func relativeTime(_ value: Date, now: Date = Date()) -> String {
         value.formatted(.relative(presentation: .named).locale(formatLocale))

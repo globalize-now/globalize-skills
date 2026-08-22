@@ -4,7 +4,10 @@
 library API and no import path, because the real specifier, the access form (a `useFormatters()` hook,
 an awaited `getFormatters()`, or bare module exports) and the helper list all live in the generated
 rules file, which is written against *this* project. Where this file and the rules file disagree about
-how to call a helper, **the rules file wins**.
+how to call a helper, **the rules file wins**. If `.agents/globalize-rules.md` or the formatters module
+it points at is missing (`generate_format_helpers` or `generate_coding_rules` failed earlier in Phase 2),
+skip this pass's formatting concern for the affected files, record why, and do not guess an import path
+or specifier.
 
 ## What this pass is for
 

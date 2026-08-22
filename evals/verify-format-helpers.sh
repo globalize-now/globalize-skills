@@ -181,7 +181,7 @@ run_project_mode() {
   pass ".globalize/format-module.json is valid JSON"
 
   local key
-  for key in specifier path surface defaultCurrency; do
+  for key in specifier path surface defaultCurrency currencySource; do
     if jq -e --arg k "$key" 'has($k)' "$fm" >/dev/null 2>&1; then
       pass "format-module.json has '$key'"
     else
@@ -195,6 +195,14 @@ run_project_mode() {
     pass "defaultCurrency '$cur' is a 3-letter ISO 4217 code"
   else
     fail "defaultCurrency '$cur' is not a 3-letter ISO 4217 code"
+  fi
+
+  local src
+  src=$(jq -r '.currencySource // ""' "$fm")
+  if [[ "$src" == "default" ]] || [[ "$src" =~ ^grep:.+:[0-9]+$ ]]; then
+    pass "currencySource '$src' is 'default' or a 'grep:<file>:<line>' hit"
+  else
+    fail "currencySource '$src' is neither 'default' nor a 'grep:<file>:<line>' hit"
   fi
 
   local n
