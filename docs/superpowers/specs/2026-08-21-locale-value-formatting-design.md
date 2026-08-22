@@ -128,7 +128,7 @@ comments:
 | Variants | Module | Shape | Delegates to |
 |---|---|---|---|
 | Lingui × 11 (9 web + 2 browser-extension) | `<i18nDir>/format.ts` | `useFormatters()` hook + `getFormatters(locale)` for loaders, server code and tests | `i18n.number()` / `i18n.date()` off the `useLingui()` instance — no module-scope singleton read, which is what makes this safe under SSR |
-| next-intl × 3 | `<i18nDir>/format.ts` | `useFormatters()` + `await getFormatters()` | `useFormatter()` / `getFormatter()`; presets registered as next-intl **named formats** in the request config (App Router) or the provider prop (Pages Router) |
+| next-intl × 2 | `<i18nDir>/format.ts` | `useFormatters()` + `await getFormatters()` | `useFormatter()` / `getFormatter()`; presets registered as next-intl **named formats** in the request config (App Router) or the provider prop (Pages Router) |
 | vue-i18n × 3 | `<i18nDir>/format.ts` | `useFormatters()` composable | `n()` / `d()` for money/number/percent/date; raw `Intl` for `list`, `relativeTime`, `unit`, `compact`. Presets registered under `numberFormats`/`datetimeFormats` for **every** locale, same currency code in each |
 | Paraglide × 1 | `src/lib/format.ts` (exists) | plain module functions | raw `Intl`; extended with `relativeTime`, `list`, `unit`, `compact`; old names kept as deprecated aliases |
 | webext-native × 1 | `src/i18n/format.ts` | plain module functions | raw `Intl`. `formatLocale()` reads `chrome.i18n.getUILanguage()`, **or** the stored choice when `decisions.setup.localeSwitcher === "custom-loader"` — the one variant where the seam is load-bearing on day one |
@@ -205,12 +205,16 @@ The self-containment invariant is unaffected — `<<formatModule>>` resolves to 
 ### 5. Convert references
 
 New shared `references/languages/js-ts/convert.format-pass.md`, added to `references.convert` for
-all 19 JS/TS variants (**the only `manifest.json` change**). Rails and Android are one variant each
+all 18 JS/TS variants (**the only `manifest.json` change**). Rails and Android are one variant each
 and the three iOS variants already share `string-catalog.convert.md`, so their pass is a section
 inside the existing convert reference rather than a shared file.
 
-Variant arithmetic, for the record: 11 Lingui (9 web + 2 browser-extension) + 3 next-intl +
-3 vue-i18n + 1 Paraglide + 1 webext-native = **19 JS/TS**; + 1 Rails + 1 Android + 3 iOS = **23**.
+Variant arithmetic, for the record — **counted from `manifest.json`, not asserted**: 11 Lingui
+(9 web + 2 browser-extension) + **2** next-intl + 3 vue-i18n + 1 Paraglide + 1 webext-native =
+**18 JS/TS**; + 1 Rails + 1 Android + 3 iOS = **23**.
+
+*(An earlier revision of this line said 3 next-intl and 19 JS/TS, which summed to 24 against a
+stated total of 23. next-intl has exactly two variants — App Router and Pages Router.)*
 
 ### 6. `lovable-i18n`
 

@@ -73,7 +73,7 @@ These refine the spec. Surface them in the PR body.
 | `…/ios/native/string-catalog.setup.md` | `Formatters.swift` — `FormatStyle` extensions | Modify |
 | `…/ios/native/string-catalog.rules.template.md` | Same rewrite | Modify |
 | `…/js-ts/convert.format-pass.md` | Shared Phase 3 pass: find hardcoded formatting, rewrite toward the module | Create |
-| `skills/globalize-guide/manifest.json` | Add `convert.format-pass.md` to `references.convert` on 19 JS/TS variants | Modify |
+| `skills/globalize-guide/manifest.json` | Add `convert.format-pass.md` to `references.convert` on 18 JS/TS variants | Modify |
 | `skills/globalize-guide/SKILL.md` | `formatCandidateFiles`; `generate_format_helpers` in Phase 2 + collapse-case; §3.2 / §3.5 / §3.5.1 | Modify |
 | `skills/lovable-i18n/SKILL.md` | Single-file equivalent: module, AGENTS.md rules section, wrap-phase sweep | Modify |
 | `CLAUDE.md` | Delivery-mechanisms section: note the generated format module | Modify |
@@ -1574,7 +1574,7 @@ Library-agnostic on purpose — it names no library API, because the real import
 - **The dependency the pass does not remove.** Flag `dayjs` / `date-fns` / `moment` call sites and convert the formatting; do not remove the package or rewrite non-formatting uses (parsing, arithmetic, timezone math). Record what was left.
 - **Progress reporting**: same atomic-write protocol as the wrap pass; record converted sites under the file's entry.
 
-- [ ] **Step 3: Wire it into the manifest for the 19 JS/TS variants**
+- [ ] **Step 3: Wire it into the manifest for the 18 JS/TS variants**
 
 Append `"references/languages/js-ts/convert.format-pass.md"` to `references.convert` on every stack whose `match` has no `language` key other than js-ts — i.e. all except `rails-yaml`, `android-strings`, and the three `ios-*` entries.
 
@@ -1670,7 +1670,7 @@ git add skills/globalize-guide/SKILL.md skills/globalize-guide/manifest.json ski
 git commit -m "feat(globalize-guide): detect and convert hand-rolled value formatting
 
 Adds formatCandidateFiles to Phase 1, a shared convert.format-pass.md wired into
-19 JS/TS variants plus native sections, and formatViolations to the verify gate."
+18 JS/TS variants plus native sections, and formatViolations to the verify gate."
 ```
 
 ---
@@ -1776,6 +1776,8 @@ For each of the eight modules, confirm which of the ten functions actually route
 - **Partially wired by design** (expected: next-intl, vue-i18n) — the library owns locale resolution, so `money`/`number`/`percent`/`date` delegate to `useFormatter()` / `n()`/`d()` and never consult the seam, while raw-`Intl` functions like `list`/`relativeTime` do. This is legitimate, but **each such module must say so explicitly**, naming which functions bypass the seam and what a project must revisit if it ever changes it. vue-i18n already carries a version of this sentence for its `i18n.global` escape hatch; check it covers the in-composable path too.
 
 Any module that neither wires the seam fully nor documents the bypass is a defect. Fix by documenting, not by forcing a uniformity the library will not support.
+
+**One known hole to close, introduced by a controller instruction during Task 9's fix round.** iOS's `plainNumber` / `percentage` / `compactNumber` are `Double`-scoped, and the sanctioned alternative written into the rules for `Int` and `Decimal` values was `value.formatted(.number)` / `.formatted(.percent)`. Those are **Foundation's own members, not the project's**, so they bypass `Formatters.formatLocale` entirely — the rules file now instructs the reader to defeat the seam for every non-`Double` number. Close it by adding `Int` and `Decimal` overloads of `plainNumber` / `percentage` / `compactNumber` that chain `.locale(Formatters.formatLocale)` like the three `money` overloads already do, and repoint the prose at them. Do not leave the Foundation members as the advice.
 
 - [ ] **Step 3: Run a Layer A eval end to end**
 
