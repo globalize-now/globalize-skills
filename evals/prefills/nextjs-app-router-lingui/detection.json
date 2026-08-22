@@ -20,6 +20,7 @@
     { "path": "app/page.tsx", "matchCount": 10 },
     { "path": "app/layout.tsx", "matchCount": 2 }
   ],
+  "formatCandidateFiles": [],
   "localeSignals": {
     "existingLocaleDirs": [],
     "envHints": [],

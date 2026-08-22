@@ -8,7 +8,7 @@ description: >-
   numbers, currencies, dates, and plurals are wrapped correctly as code is
   written, so nothing needs fixing after the fact.
 template: next-intl
-templateVersion: 1
+templateVersion: 2
 conditions: [router, localeNavigation, catalogFormat, paramsShape]
 values: [i18nRequestPath, i18nNavigationPath, importPrefix, localeSegment, catalogPath, sourceLocale, targetLocales, formatModule]
 budget: { "router == \"app\"": 300, "default": 260 }
@@ -336,6 +336,14 @@ formats: {
 ```
 
 An unregistered name does not throw — it silently falls back to next-intl's defaults, so a missing registration is a silent failure, not a build error. **Needs a format with no matching preset? Register it there, not at the call site** — a preset written out at two call sites will drift.
+
+**`<<formatModule>>` exports a `formatLocale()` seam, and on this stack nothing calls it.** All ten functions delegate to next-intl, which resolves the locale itself — so unlike other stacks, editing `formatLocale()` changes nothing. Do not "fix" a formatting-locale problem there. To format against something other than the UI locale,
+<!-- if: router == "app" -->
+set `locale` in what `getRequestConfig` returns in `<<i18nRequestPath>>`
+<!-- else -->
+set `locale` on `<NextIntlClientProvider>` in `_app.tsx`
+<!-- /if -->
+— that moves every formatter and every message lookup together. Anything narrower means rebuilding the ten on raw `Intl`, which also gives up the request-scoped `timeZone` and `now` below.
 
 **Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and any `useFormatter()` / `getFormatter()` call outside `<<formatModule>>`.
 

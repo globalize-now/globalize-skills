@@ -185,8 +185,8 @@ A raw `\(value)` renders `1234.5` and `2026-03-04 15:30:00 +0000` in every langu
 ```swift
 amount.formatted(.money)                                 // '$1,234.50' — this project's default currency
 amount.formatted(.money(order.currency))                  // when the data carries its own currency
-rating.formatted(.plainNumber)                             // '4.5' — Double only; see note below for Int/Decimal
-ratio.formatted(.percentage)                               // '42%' — a ratio (0.42), not a whole percentage
+rating.formatted(.plainNumber)                             // '4.5' — Double, Decimal and Int each have one
+ratio.formatted(.percentage)                               // '42%' — Double/Decimal take a ratio (0.42); Int takes 42
 value.formatted(.compactNumber)                            // '12K'
 <<formatModule>>.measurement(5.2, UnitLength.kilometers)   // '5.2 km' — unit is a typed Dimension, not a string
 date.formatted(.mediumDate)                                // 'August 21, 2026' — the default date preset
@@ -199,7 +199,11 @@ date.formatted(.dateAndTime)                               // 'Aug 21, 2026, 4:0
 
 **The currency code is a property of the price, not of the reader.** Pass the currency your data actually carries — `amount.formatted(.money(order.currency))`; never derive it from `Locale.current`, which would relabel a dollar price as euros for a German reader. Omitting the argument formats `<<formatModule>>`'s own project default, never the reader's locale. The locale decides *formatting*; your data decides *which currency*.
 
-**`money` amounts stored as `Decimal` or `Int` both have their own `.money`** — `<<formatModule>>` declares three parallel extensions, one per numeric family, because `Decimal` does not conform to `BinaryFloatingPoint` and so does not satisfy the `Double` one. Use whichever matches how your data is actually typed; never convert a `Decimal` price to `Double` to satisfy a formatter — that reintroduces the binary floating-point rounding error `Decimal` exists to avoid. **`plainNumber`/`percentage`/`compactNumber` stay `Double`-only** — there is no `Decimal`/`Int` overload for these three; format an `Int` or `Decimal` value with Foundation's own un-wrapped `.formatted(.number)` / `.formatted(.percent)` instead.
+**`.money`, `.plainNumber`, `.percentage` and `.compactNumber` are each declared over all three numeric families — `Double`, `Decimal` and `Int`** — because `Decimal` does not conform to `BinaryFloatingPoint` and so does not satisfy the `Double` extension. Each is spelled the same way whichever family the value is stored in. (`measurement` is the exception, and not for this reason: Foundation's `Measurement.FormatStyle` takes a typed `Dimension`, so it is a `<<formatModule>>` function rather than a `FormatStyle` extension.) Use whichever matches how your data is actually typed; never convert a `Decimal` price to `Double` to satisfy a formatter — that reintroduces the binary floating-point rounding error `Decimal` exists to avoid.
+
+**Never reach for Foundation's own un-wrapped `.formatted(.number)` / `.formatted(.percent)` / `.formatted(.currency(code:))`.** They compile, and they are wrong here: they resolve their locale from Foundation's default and never consult `<<formatModule>>`'s `formatLocale`, so a value formatted that way silently ignores this project's formatting-locale seam. Always use the project's styles above.
+
+**`.percentage` scales differently per family, and that is Foundation's behaviour, not this project's.** `Double` and `Decimal` take a **ratio** — `0.4567` renders `45.67%`, and `Decimal(42)` renders `4,200%`. `Int` takes a **whole percentage** — `42` renders `42%`. Pass the shape the overload expects instead of converting between families.
 
 Interpolating an already-formatted value into a localized string is correct — it extracts as `%@`:
 

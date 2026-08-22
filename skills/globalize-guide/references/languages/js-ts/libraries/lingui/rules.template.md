@@ -8,7 +8,7 @@ description: >-
   numbers, currencies, dates, and plurals are wrapped correctly as code is
   written, so nothing needs fixing after the fact.
 template: lingui
-templateVersion: 4
+templateVersion: 5
 conditions: [router, perPageCatalogs, localeNavigation, appTarget, ssr]
 values: [catalogPath, sourceLocale, targetLocales, localesModule, formatModule, navModule, navHooksModule, manifestStringsModule, localesBridgeScript]
 budget: { "router == \"app\"": 285, "appTarget == \"browser-extension\"": 265, "default": 275 }

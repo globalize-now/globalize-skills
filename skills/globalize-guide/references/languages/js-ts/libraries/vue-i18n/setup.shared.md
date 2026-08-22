@@ -374,7 +374,13 @@ import { useI18n } from 'vue-i18n'
 export type DateInput = Date | number | string
 export const DEFAULT_CURRENCY = 'USD'   // adjust to this project's currency
 
-/** THE SEAM. Change this one function to format against something other than the UI locale. */
+/**
+ * THE SEAM. Change this one function to format against something other than the UI locale.
+ * PARTIAL ON THIS STACK: only `relativeTime` and `list` (the two raw-Intl concepts) route
+ * through here. The other eight delegate to vue-i18n's n() / d(), which read the locale off
+ * the i18n instance and never call this. Changing this function alone will NOT change them —
+ * see the note under this module in the generated .agents/globalize-rules.md.
+ */
 export function formatLocale(uiLocale: string): string {
   return uiLocale
 }
@@ -464,7 +470,9 @@ formatList(locale, items)   // no useI18n() context needed
 - **Vite / Quasar** — read `i18n.global` (the same instance the Step 3 module exports) and call `.n(...)` / `.d(...)` directly: `i18n.global.n(amount, 'currency')`.
 - **Nuxt** — there is no equivalent outside a Nuxt context: `useNuxtApp().$i18n` only resolves inside a plugin, middleware, or a composable called from `setup()`. A Nitro `server/api/` route (or any code with no such context) has no i18n instance to read from at all — format on the client instead, or accept the formatter, or an already-formatted string, as a parameter from a caller that does have one.
 
-**Calling `.n(...)` / `.d(...)` on the global instance directly bypasses `formatLocale()`** — the instance's own `.locale` is read, not routed through the seam. A project that later gives `formatLocale()` a real translation (a separate display locale, say) must revisit every such call site.
+**`formatLocale()` is deliberately only half-wired on this stack, and the module says so at its own declaration.** `relativeTime` and `list` are built on raw `Intl` and route their locale through the seam. The other eight — `money`, `number`, `percent`, `compact`, `unit`, `date`, `time`, `dateTime` — delegate to `n()` / `d()`, which resolve the locale from the i18n instance and never call `formatLocale()`. This is the price of delegating, and delegating is the right call here (it is what keeps the named-format registry shared with every raw `n(x, 'currency')` elsewhere in the app) — but it must be stated, not left for someone to discover. **Calling `.n(...)` / `.d(...)` on the global instance directly bypasses the seam the same way** — the instance's own `.locale` is read.
+
+A project that later gives `formatLocale()` a real translation (a separate display locale, say) therefore **cannot** get there by editing the seam alone. It must either drive the i18n instance's own `locale` from `formatLocale()`, or rebuild those eight on raw `Intl` the way `formatRelativeTime` / `formatList` already are — and revisit every direct `.n(...)` / `.d(...)` call site. Carry this into the generated rules file; do not let the seam's one-line promise stand unqualified here.
 
 ### Register the presets — for the source locale, and every target locale
 

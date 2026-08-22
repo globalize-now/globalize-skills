@@ -342,10 +342,13 @@ also below 13.0, which in practice is vanishingly rare.
   answer `below_ios_15_emit_fallback`) — write the clean module **and** the fallback subsection below, but
   first annotate every declaration that references an iOS-15-only type, or the file does not compile at all
   on this project's own deployment target — not just at runtime:
-  - The six `public extension FormatStyle where Self == …` blocks (three `money` blocks — `Double`,
-    `Decimal`, `Int` — plus `percentage`, `plainNumber`/`compactNumber` together, and
+  - The ten `public extension FormatStyle where Self == …` blocks (three `money` blocks — `Double`,
+    `Decimal`, `Int`; three `percentage` blocks over the same three families; three
+    `plainNumber`/`compactNumber` blocks over the same three families; and
     `shortDate`/`mediumDate`/`timeOnly`/`dateAndTime` together) — mark each whole `extension`
-    `@available(iOS 15.0, *)`; that covers every member inside it.
+    `@available(iOS 15.0, *)`; that covers every member inside it. Do not skip the `Decimal` and
+    `Int` blocks: an unannotated extension naming an iOS-15-only type fails the build on this
+    project's own deployment target, and these three concepts now have three families each.
   - `Formatters.relativeTime`, `Formatters.list`, and `Formatters.measurement` **individually**. These
     three live on the base `Formatters` enum itself, beside `defaultCurrency`/`formatLocale`, not inside a
     separate extension — and each names an iOS-15-only type directly: `Date.RelativeFormatStyle` in
@@ -434,13 +437,28 @@ public extension FormatStyle where Self == IntegerFormatStyle<Int>.Currency {
     static func money(_ code: String) -> Self { .currency(code: code).locale(Formatters.formatLocale) }
 }
 
-// MARK: - number, percent, compact — Double-scoped by design; see "Why only money gets the
-// Decimal/Int treatment" below.
+// MARK: - percentage — one per numeric family, same reason as money: every style in this file must
+// carry `.locale(Formatters.formatLocale)`, and Foundation's own `.percent` does not.
 
 public extension FormatStyle where Self == FloatingPointFormatStyle<Double>.Percent {
-    /// `Text(ratio, format: .percentage)` — takes a ratio (0.42), not a whole percentage (42).
+    /// `Text(ratio, format: .percentage)` — takes a ratio (0.42 → "45.67%"), not a whole percentage.
     static var percentage: Self { .percent.locale(Formatters.formatLocale) }
 }
+
+public extension FormatStyle where Self == Decimal.FormatStyle.Percent {
+    /// Like the `Double` one: a ratio (`Decimal(string: "0.4567")` → "45.67%").
+    static var percentage: Self { .percent.locale(Formatters.formatLocale) }
+}
+
+public extension FormatStyle where Self == IntegerFormatStyle<Int>.Percent {
+    /// **Takes a WHOLE percentage, not a ratio** — `42.formatted(.percentage)` → "42%". Foundation's
+    /// integer percent style does not scale by 100 the way the `Double` and `Decimal` ones do
+    /// (`Decimal(42)` renders "4,200%"). This asymmetry is Foundation's, not this module's; pick the
+    /// overload that matches how the value is stored and read this comment before assuming.
+    static var percentage: Self { .percent.locale(Formatters.formatLocale) }
+}
+
+// MARK: - number, compact — one per numeric family, same reason.
 
 public extension FormatStyle where Self == FloatingPointFormatStyle<Double> {
     /// Not `.number` — `FloatingPointFormatStyle` already declares that member; redeclaring it would
@@ -448,6 +466,16 @@ public extension FormatStyle where Self == FloatingPointFormatStyle<Double> {
     static var plainNumber: Self { .number.locale(Formatters.formatLocale) }
     /// Not `.compact` — reads naturally beside `plainNumber`. `.notation(.compactName)` renders
     /// `12000` as `"12K"`.
+    static var compactNumber: Self { .number.notation(.compactName).locale(Formatters.formatLocale) }
+}
+
+public extension FormatStyle where Self == Decimal.FormatStyle {
+    static var plainNumber: Self { .number.locale(Formatters.formatLocale) }
+    static var compactNumber: Self { .number.notation(.compactName).locale(Formatters.formatLocale) }
+}
+
+public extension FormatStyle where Self == IntegerFormatStyle<Int> {
+    static var plainNumber: Self { .number.locale(Formatters.formatLocale) }
     static var compactNumber: Self { .number.notation(.compactName).locale(Formatters.formatLocale) }
 }
 
@@ -539,7 +567,7 @@ re-read on the next view-body evaluation the way `Text(_, format:)` does on iOS 
 device needs its own mechanism (e.g. observing `NSLocale.currentLocaleDidChangeNotification`) to re-render
 after a locale change.
 
-### The Decimal/Int hazard — why `money` alone gets three extensions
+### The Decimal/Int hazard — why each `FormatStyle` value style gets three extensions
 
 `FormatStyle where Self == FloatingPointFormatStyle<Double>.Currency` only applies when the value being
 formatted is a `Double`. **`Decimal` does not conform to `BinaryFloatingPoint`, so that extension does not
@@ -555,14 +583,23 @@ this module mirrors that with three parallel `.money` extensions above, one per 
 picking one and leaving the others broken. Use whichever matches the type your data is actually stored as;
 never convert a `Decimal` price to `Double` to satisfy a formatter.
 
-**Why only `money` needs this and `plainNumber`/`percentage`/`compactNumber` don't:** `money` is the only
-value-style concept with a *project-level default* (`Formatters.defaultCurrency`) that has to be threaded
-through generically across numeric types. The other value styles have no project-specific default to
-thread — a `Decimal` quantity or an `Int` count can already call Foundation's own `.formatted()` /
-`.formatted(.number)` / `.formatted(.percent)` directly with no wrapper needed, since those are themselves
-already generic across every numeric type. `plainNumber`/`percentage`/`compactNumber` above stay
-`Double`-scoped, matching the common case (a ratio or a display count already computed as `Double`); reach
-for Foundation's own un-wrapped `.formatted()` when a `Decimal` or `Int` needs one of those three styles.
+**`plainNumber`/`percentage`/`compactNumber` need the same three-way treatment, for a different reason.**
+`money` needs it because `Formatters.defaultCurrency` has to be threaded through generically. These three
+carry no project-level default — but they do carry `.locale(Formatters.formatLocale)`, and **that** is the
+project-level value they have to thread. Foundation's own `.formatted(.number)` / `.formatted(.percent)`
+are indeed generic over every numeric type, so it is tempting to tell a `Decimal` or `Int` call site to
+use them un-wrapped. **Do not.** Those are Foundation's members, not this project's: they resolve their
+locale from Foundation's own default and never consult `Formatters.formatLocale`, so every non-`Double`
+number in the app would silently bypass the seam — and the seam's whole promise is that changing one
+property changes every formatted value. That is why the module above declares all three concepts over all
+three numeric families, exactly as `money` does. A call site formats an `Int`, a `Decimal` or a `Double`
+with the same `.plainNumber` / `.percentage` / `.compactNumber` spelling, and every one of them routes
+through `formatLocale`.
+
+**One asymmetry to know about, and it is Foundation's, not this module's.** `.percent` scales by 100 for
+`Double` and `Decimal` (a ratio: `0.4567` → `"45.67%"`, `Decimal(42)` → `"4,200%"`) but **not** for `Int`
+(a whole percentage: `42` → `"42%"`). The `Int` overload's doc comment says so at the declaration. Pick
+the overload matching how the value is stored rather than converting between families to reach one.
 
 ### The `unit` hazard — why `measurement` isn't a bare `FormatStyle` extension like the other value styles
 

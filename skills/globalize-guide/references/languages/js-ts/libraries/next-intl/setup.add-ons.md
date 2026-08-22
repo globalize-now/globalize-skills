@@ -48,9 +48,12 @@ export type Formatters = {
 }
 
 /**
- * THE SEAM. next-intl resolves the locale for us, so there is nothing to override
- * here today. To give this project a separate regional preference, stop calling
- * next-intl's formatter and build an Intl-based one against a locale chosen here.
+ * THE SEAM — and on this stack it is a DECLARATION, not a call site. next-intl owns
+ * locale resolution, so all ten functions below go through its formatter and NONE of
+ * them call this. It is here so the concept has one named home on every stack; today
+ * it changes nothing. To give this project a separate regional preference you must
+ * stop delegating: rebuild the ten on raw Intl against the locale chosen here, or feed
+ * that locale into next-intl's own request config. Editing this alone does nothing.
  */
 export function formatLocale(uiLocale: string): string {
   return uiLocale
@@ -115,9 +118,12 @@ export type Formatters = {
 }
 
 /**
- * THE SEAM. next-intl resolves the locale for us, so there is nothing to override
- * here today. To give this project a separate regional preference, stop calling
- * next-intl's formatter and build an Intl-based one against a locale chosen here.
+ * THE SEAM — and on this stack it is a DECLARATION, not a call site. next-intl owns
+ * locale resolution, so all ten functions below go through its formatter and NONE of
+ * them call this. It is here so the concept has one named home on every stack; today
+ * it changes nothing. To give this project a separate regional preference you must
+ * stop delegating: rebuild the ten on raw Intl against the locale chosen here, or feed
+ * that locale into next-intl's own request config. Editing this alone does nothing.
  */
 export function formatLocale(uiLocale: string): string {
   return uiLocale
@@ -153,6 +159,10 @@ export function useFormatters(): Formatters {
 **No `getFormatters`, and no `next-intl/server` import, on this branch — do not "restore" it on a later pass.** `next-intl/server` (where `getFormatter` lives) is App Router only; this repo's own Pages Router setup states every import comes from `next-intl`, never `next-intl/server`. Calling `getFormatter` from the client stub throws `` `getFormatter` is not supported in Client Components ``, and there is no per-request server context here for it to read from anyway — the Pages Router setup's `request.ts` is a no-op stub that exists only to satisfy `next-intl/plugin`'s load-time assertion, not to serve real request data. `useFormatters()` is a plain hook here, and there is no Server/Client Component split on the Pages Router, so it works the same in every page and every component underneath it.
 
 **The ten-entry `surface` recorded in `.globalize/format-module.json` (step 7) is identical on both routers.** Only the *access form* differs: `useFormatters()` alone on the Pages Router, `useFormatters()` plus `getFormatters()` on the App Router.
+
+**`formatLocale()` is uncalled on this stack, on both routers, and that is deliberate — but it must be stated rather than left to be discovered.** Every other stack routes its formatters' locale through that function. Here all ten delegate to next-intl's `format.number` / `format.dateTime` / `format.relativeTime` / `format.list`, and next-intl resolves the locale itself from the request config — so **none of the ten consults `formatLocale()`**, not even `list` and `relativeTime` (unlike Vue, next-intl has real APIs for both, so there is no raw-`Intl` remainder to wire). The function still ships, because the concept having one named home on every stack is what makes the seam findable at all; it just has nothing to intercept today.
+
+The consequence to write down, and the reason the doc comment above spells it out at the declaration: **a project that later wants a separate regional preference cannot get there by editing `formatLocale()`.** It has two real routes — set `locale` in what `getRequestConfig` returns (App Router) or on `<NextIntlClientProvider>` (Pages Router) from the value `formatLocale()` computes, which moves every formatter *and* every message lookup at once; or stop delegating and rebuild the ten on raw `Intl` against `formatLocale(uiLocale)`, which then also means re-adding the TypeScript `lib` gate that step 5 correctly says cannot fire today, and reproducing the request-scoped `timeZone` / `now` that delegating is buying. Neither is a one-line edit. Say so rather than implying the seam already covers it.
 
 ### 3. Register the named formats the module calls by name
 
