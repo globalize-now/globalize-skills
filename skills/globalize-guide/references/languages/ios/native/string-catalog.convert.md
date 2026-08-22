@@ -182,6 +182,78 @@ This is the common shape for a simple extracted literal whose English text is th
 
 ---
 
+## Convert hand-rolled formatting
+
+Making a string localizable makes it **translatable**; it does not make a number, a price or a date
+**render correctly**. `$1,234.50` stays `$1,234.50` for a German reader who expects `1.234,50 $`, however
+good the translation around it is. This pass routes hand-rolled formatting through `Formatters.swift`,
+which Phase 2 created (`generate_format_helpers`) — it already exists, so you are rewriting call sites.
+
+It lives in the same target as the calling code, so there is **no import**. It exposes two shapes, and
+`.agents/globalize-rules.md` states which applies where:
+
+- **`FormatStyle` extensions**, used as `value.formatted(.style)` or `Text(value, format: .style)`:
+  `.money` (and `.money(code)` when the data carries its own currency), `.percentage`, `.plainNumber`,
+  `.compactNumber`, `.shortDate`, `.mediumDate`, `.timeOnly`, `.dateAndTime`.
+- **Static functions** for what `FormatStyle` cannot express: `Formatters.relativeTime(_:)`,
+  `Formatters.list(_:)`, `Formatters.measurement(_:_:)`.
+
+| Found | Replace with |
+|---|---|
+| `String(format: "%.2f", x)` in user-visible text | `x.formatted(.money)` when it is a price, `x.formatted(.plainNumber)` otherwise |
+| `"$\(amount)"`, `"\(amount) USD"` | `amount.formatted(.money)` — or `Text(amount, format: .money)` in SwiftUI |
+| `formatter.dateFormat = "MM/dd/yyyy"` + `.string(from:)`, or a `DateFormatter` built at a call site | `value.formatted(.mediumDate)` (`.shortDate` / `.timeOnly` / `.dateAndTime` as the pattern needs) |
+| `NumberFormatter()` built at a call site | the matching `.formatted(…)` style |
+| `"\(Int(ratio * 100))%"` | `ratio.formatted(.percentage)` — the style takes a **ratio**, not an already-multiplied percentage |
+| `RelativeDateTimeFormatter()` at a call site, a hand-built `"3 days ago"` | `Formatters.relativeTime(date)` |
+| `items.joined(separator: ", ")` in user-visible copy | `Formatters.list(items)` |
+| `"\(n / 1000)K"` | `n.formatted(.compactNumber)` |
+| `"\(km) km"` | `Formatters.measurement(km, UnitLength.kilometers)` |
+
+**Use `.plainNumber`, not `.number`.** Foundation already declares `.number` on
+`FloatingPointFormatStyle`, and it does **not** carry `Formatters.formatLocale` — calling it silently
+bypasses the project's formatting-locale seam. The same applies to `.dateTime` versus `.mediumDate`.
+
+**Below iOS 15**, `FormatStyle` is unavailable and the setup step emitted `…Compat` siblings instead
+(`Formatters.moneyCompat(_:)`, `Formatters.mediumDateCompat(_:)`, …). The header comment at the top of
+`Formatters.swift` names exactly which ones exist; use those on a pre-15 deployment target and do not
+invent a `.formatted(…)` call the target cannot compile.
+
+**Interpolate the formatted result into the localizable string**, never the raw value:
+`Text("Total: \(amount.formatted(.money))")` — a raw `\(amount)` inside a `Text` or
+`String(localized:)` argument is the exact defect this pass exists to remove.
+
+### What NOT to convert
+
+Locale formatting in machine-readable output is a **bug**, not a fix. Leave alone: `os_log` / `print`
+and crash reporting; IDs, filenames, cache keys, `UserDefaults` keys, Core Data attribute values;
+JSON bodies and every `Codable` conformance; anything compared against a literal or parsed back; test
+fixtures and snapshot expectations; **any date going into an ISO-8601 field**
+(`ISO8601DateFormatter`, `.formatted(.iso8601)` — both must stay); values a `TextField` round-trips; and
+`Formatters.swift` itself, which constructs formatters on purpose. When in doubt whether a value is
+user-visible, leave it and record it.
+
+### Ordering
+
+Convert formatting **after** making the strings in the same file localizable. A formatted value usually
+ends up interpolated inside a localizable string, and the interpolation and placeholder rules in Step 3
+apply to it. Never split a sentence to isolate a number — one `Text("Total: \(…)")` is one catalog
+entry; `Text("Total: ") + Text(…)` is a fragment no translator can reorder.
+
+### What this pass does not remove
+
+Leave date libraries and any `Calendar` math in place. Convert their **display formatting** only; leave
+parsing, arithmetic (`date(byAdding:)`), and timezone conversion as written. Do not edit
+`Package.swift` or the project's dependencies. Record what you left, with file and line.
+
+### Progress reporting
+
+Same atomic-write protocol as the wrap pass. Under each file's entry record `formatSitesConverted` (how
+many call sites, to which style or function) and `formatSitesFlagged` (each site left, with a one-line
+reason). A file in scope for `formatting` that needed no change still gets a zero-conversion entry.
+
+---
+
 ## Step 4: Populate and verify the catalog
 
 ### Preferred — a normal Xcode build

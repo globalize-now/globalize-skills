@@ -188,28 +188,34 @@ export default function Error({ reset }: { reset: () => void }) {
 
 ## Numbers, currencies, and dates
 
-Use `i18n.number()` and `i18n.date()` for locale-aware formatting — they wrap `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale automatically. Pass the project's shared presets (`CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME`, exported from the locale module) rather than retyping an options object at each call site — the currency code in particular must not drift. The generated i18n rules file carries the real import path.
+**Call the project's formatters module.** Phase 2 created it (`generate_format_helpers`) and
+`.agents/globalize-rules.md` carries its real import specifier. Do **not** reach for `i18n.number()` /
+`i18n.date()` off the Lingui instance, and never construct `Intl` at a call site — both bypass the
+module's currency default, its date presets and its formatting-locale seam.
+
+**Formatting and translation are resolved separately on this router**, and the split is not the same
+one. `getI18nInstance(locale)` + `setI18n(i18n)` is for `<Trans>` and `useLingui()`; formatting comes
+from the formatters module regardless of which side of the boundary you are on.
 
 ```tsx
-// In client components
+// Client components — the hook reads the locale from <I18nProvider> context
 'use client'
-import { useLingui } from '@lingui/react/macro'
-import { CURRENCY, DATE_MEDIUM } from '<the project's locale module>'
+import { useFormatters } from '<the specifier from .agents/globalize-rules.md>'
 
 function Price({ amount }: { amount: number }) {
-  const { i18n } = useLingui()
-  return <span>{i18n.number(amount, CURRENCY)}</span>
+  const f = useFormatters()
+  return <span>{f.money(amount)}</span>
 }
 
 function EventDate({ timestamp }: { timestamp: number }) {
-  const { i18n } = useLingui()
-  return <time>{i18n.date(new Date(timestamp), DATE_MEDIUM)}</time>
+  const f = useFormatters()
+  return <time>{f.date(timestamp)}</time>
 }
 ```
 
 ```tsx
-// In server components — get i18n from server-side setup
-import { getI18nInstance } from '@/i18n'
+// Server components — no provider context, so take the locale from params
+import { getFormatters } from '<the specifier from .agents/globalize-rules.md>'
 
 export default async function PricePage({
   params,
@@ -217,14 +223,18 @@ export default async function PricePage({
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
-  const i18n = getI18nInstance(locale)
-  const price = i18n.number(29.99, CURRENCY)
+  const price = getFormatters(locale).money(29.99)
   return <p><Trans>Price: {price}</Trans></p>
 }
 ```
 
-If you don't have an `i18n` instance (e.g. in utility functions), use `Intl.NumberFormat` / `Intl.DateTimeFormat` directly with a locale string:
+`useFormatters()` requires a Client Component — it calls `useLingui()`, which needs `<I18nProvider>`
+context a Server Component does not have. Never add `'use client'` to the formatters module to work
+around that; it would break `getFormatters` for every server caller.
 
-```tsx
-const price = new Intl.NumberFormat(locale, CURRENCY).format(29.99)
-```
+The ten helpers are `money`, `number`, `percent`, `compact`, `unit`, `date`, `time`, `dateTime`,
+`relativeTime`, `list`. In utility functions, route handlers and `generateMetadata`, use
+`getFormatters(locale)` with an explicit locale — never `Intl` directly.
+
+For the full find-and-replace table, what must never be converted, and the ordering rule, follow
+`references/languages/js-ts/convert.format-pass.md`.
