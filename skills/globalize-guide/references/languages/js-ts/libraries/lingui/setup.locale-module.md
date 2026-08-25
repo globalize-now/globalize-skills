@@ -20,6 +20,25 @@ Apply the usual guided / unguided rules: guided mode describes the change and wa
 
 ---
 
+## Runtime preconditions — check before installing
+
+Lingui 6 has two hard install-time preconditions. Neither is advisory, both are cheap to check, and both produce failures that look like something else if you meet them after the fact rather than before.
+
+**1. Node ≥ 22.19.0.** Seven of the eight `@lingui/*` v6 packages declare `engines: { "node": ">=22.19.0" }` — `@lingui/core`, `@lingui/cli`, `@lingui/react`, `@lingui/detect-locale`, `@lingui/vite-plugin`, `@lingui/babel-plugin-lingui-macro` and `@lingui/format-po`. Read `node -v`, plus any `.nvmrc` and the project's own `package.json` `engines` field. npm emits `EBADENGINE` for a violation and refuses the install outright when `engine-strict` is set; other package managers vary, so do not rely on the installer to stop you.
+
+> **`@lingui/swc-plugin` is the trap.** It is the one family member that declares **no** `engines` field at all (it ships a `.wasm` binary). A version check that inspects only the plugin passes on Node 20 and the project still fails on `@lingui/cli`. Check the floor against `@lingui/core` or `@lingui/cli`, never against the swc plugin.
+
+**2. ESM-only — no CJS consumer can `require()` these packages.** Every v6 package is `"type": "module"` with **no `main` field and no `require` condition in its `exports` map**. That is stricter than "ships an ESM build": there is no CJS entry point to fall back to. The practical consequences:
+
+- `lingui.config.js` in a project whose `package.json` has no `"type": "module"` is a CJS file. It will throw `ERR_REQUIRE_ESM` at config load — *after* a successful install, which is why this reads as a build bug rather than a compatibility one. Use `lingui.config.ts` (the form every reference in this repo writes) or `lingui.config.mjs`.
+- Any CJS build script, codemod or test helper that `require()`s `@lingui/core` has the same problem. Convert it to ESM or load it with a dynamic `import()`.
+
+**If the project is below the Node floor, or is locked to CJS config files it cannot convert, stop and tell the user** rather than installing a runtime they cannot run. This mirrors the orchestrator-level check in `SKILL.md` §2.0; the check is repeated here because this file is the first reference read on every Lingui variant, and the orchestrator installs packages before dispatching the setup subagent.
+
+*Verified against the `@lingui/*` 6.6.0 packuments.*
+
+---
+
 ## Ownership
 
 **The two shared Lingui references own every file under `<i18nDir>/`, plus the language switcher component. The framework reference owns everything else.**
