@@ -8,8 +8,8 @@ description: >-
   numbers, currencies, dates, and plurals are wrapped correctly as code is
   written, so nothing needs fixing after the fact.
 template: next-intl
-templateVersion: 1
-conditions: [router, localeNavigation, catalogFormat, paramsShape]
+templateVersion: 2
+conditions: [router, localeNavigation, catalogFormat, paramsShape, localeSource]
 values: [i18nRequestPath, i18nNavigationPath, importPrefix, localeSegment, catalogPath, sourceLocale, targetLocales]
 budget: { "router == \"app\"": 240, "default": 200 }
 ---
@@ -157,7 +157,6 @@ Decide **server vs client** before choosing a pattern.
 
 **Server components** (no `'use client'`):
 - Use `getTranslations()` and `getFormatter()` — both async, both must be `await`ed.
-- Every page rendered under `generateStaticParams` (or any static segment) **must call `setRequestLocale(locale)` before any translation lookup** — in the page itself, not only in the layout. Without it the page silently drops back to dynamic rendering on every request, and the tests still pass.
 - Leave `<NextIntlClientProvider>` in `app/<<localeSegment>>/layout.tsx` without an explicit `messages` prop unless you need to filter; next-intl then serialises only what the client tree references. Passing every message ships the whole catalog to every page.
 
 **Client components** (`'use client'`):
@@ -194,7 +193,7 @@ Route `params` is a **Promise** on Next.js 15+ — `await` it before anything el
 ```tsx
 export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  setRequestLocale(locale);          // before any translation lookup
+  // then apply the locale-resolution rule below
 }
 ```
 
@@ -204,11 +203,31 @@ Route `params` is a **plain object** on Next.js 13–14 — destructure it direc
 
 ```tsx
 export default async function Page({ params: { locale } }: { params: { locale: string } }) {
-  setRequestLocale(locale);          // before any translation lookup
+  // `locale` is available synchronously; then apply the locale-resolution rule below
 }
 ```
 
 <!-- /if -->
+<!-- if: localeSource == "request-locale" -->
+## Locale resolution (server)
+
+Every page rendered under `generateStaticParams` (or any static segment) **must call `setRequestLocale(locale)` before any translation lookup** — in the page itself, not only in the layout. Next does not propagate the layout's call into pages. Without it the page silently drops back to dynamic rendering on every request, and the tests still pass.
+
+```tsx
+import {setRequestLocale} from 'next-intl/server';
+setRequestLocale(locale);            // first statement, before any getTranslations/useTranslations
+```
+
+Client components (`'use client'`) do not need it — static rendering applies to server components only.
+<!-- /if -->
+<!-- if: localeSource == "root-params" -->
+## Locale resolution (server)
+
+Locale is resolved once in `<<i18nRequestPath>>` via `await rootParams.locale()`. **Never call `setRequestLocale`** — it is deprecated and does nothing this project needs. Pages under `generateStaticParams` still need `generateStaticParams` itself for static rendering; nothing else per page.
+
+`next/root-params` does not work in **Route Handlers or Server Actions**. There, take the locale as an explicit function argument and pass it through: `getTranslations({locale})`.
+<!-- /if -->
+
 ## Plurals, select, and ICU MessageFormat
 
 Any time a string's wording depends on a number — singular/plural nouns, subject-verb agreement, anything count-sensitive — it is a plural string. Keep every form inside a single message; never branch in JS.

@@ -37,6 +37,8 @@ export default async function Page({
 
 The component itself stays `async` in both versions because `getTranslations` is async. `setRequestLocale(locale)` / `unstable_setRequestLocale(locale)` runs after locale is resolved, so the shape change cascades through every server-component page and `generateMetadata` under `app/[locale]/...`. Inline reminders appear lower in the file; this section is the canonical reference.
 
+> **Next.js 16.3+ / next-intl 4.13.5+.** `setRequestLocale` is deprecated in favour of [`next/root-params`](https://next-intl.dev/blog/nextjs-root-params). If the project resolves locale via `await rootParams.locale()` in `i18n/request.ts` (see `next-intl.setup.md` → Request Configuration), there are no `setRequestLocale` calls to add during convert — the `params` shape still matters for everything else on the page. Deprecated, not removed: `next-intl@^4` supports both, and below Next 16.3 `setRequestLocale` remains required.
+
 ---
 
 ## Which API works where
@@ -137,7 +139,7 @@ For Next.js 13-14 (synchronous params): use `params: {locale: string}` without `
 
 ## Root `app/layout.tsx` metadata
 
-The root layout at `app/layout.tsx` (above `app/[locale]/`) renders before the locale is known. Do not call `setRequestLocale` / `getTranslations` there. For static metadata (`<title>`, `<description>`) in this outer layout, leave it as English or move it down into `app/[locale]/layout.tsx`'s `generateMetadata` — where locale is available and messages can be loaded. Dynamic `<html lang>` belongs in `app/[locale]/layout.tsx`, not the root.
+The root layout at `app/layout.tsx` (above `app/[locale]/`) renders before the locale is known. Do not call `setRequestLocale` / `getTranslations` there. (On the `next/root-params` path this pass-through root layout should not exist at all — the locale layout becomes the topmost layout, and root-level 404s move to `global-not-found`.) For static metadata (`<title>`, `<description>`) in this outer layout, leave it as English or move it down into `app/[locale]/layout.tsx`'s `generateMetadata` — where locale is available and messages can be loaded. Dynamic `<html lang>` belongs in `app/[locale]/layout.tsx`, not the root.
 
 ---
 
