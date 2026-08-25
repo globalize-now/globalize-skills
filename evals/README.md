@@ -33,6 +33,19 @@ With `KEEP_WORKDIR=1` the temp dir survives, so you can re-run a verifier agains
 ./evals/verify-orchestration.sh /tmp/tmp.XXXX nextjs-app-router-lingui
 ```
 
+## Static verifiers (no model, no network)
+
+Two scripts run standalone against a checkout and need neither `claude` nor a fixture:
+
+```bash
+./evals/verify-manifest.sh        # manifest.json: schema, path resolution, cross-file invariants
+./evals/verify-rules-template.sh  # rules templates: frontmatter, marker grammar, budgets
+```
+
+`verify-manifest.sh` validates `skills/globalize-guide/manifest.json` against `skills/globalize-guide/manifest.schema.json`, checks that **every** path-shaped string in the manifest resolves on disk (not only those under a `references` block), and asserts the invariants a schema cannot express — unique `variant` ids, `rulesTemplate` coverage, and that `$schema` itself points at a file that exists. It also asserts the schema *rejects* four deliberately malformed manifests, so a schema that has quietly stopped constraining anything fails rather than passing.
+
+Layer 1 needs `jsonschema` (`pip install jsonschema`); without it that layer warns and skips, and Layers 2 and 3 still run.
+
 ## How It Works
 
 **Layer A** (`run-eval-layer-a.sh`):
