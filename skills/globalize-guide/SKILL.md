@@ -118,6 +118,9 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 >   "buildSystem": "xcode" | "spm" | null,
 >   "uiFramework": "swiftui" | "uikit" | null,
 >   "version": string | null,
+>   "nodeVersion": string | null,
+>   "nodeEngines": string | null,
+>   "viteVersion": string | null,
 >   "sourceDir": "src" | "app" | string,
 >   "routeEntries": ["src/app/**/page.tsx", ...] | null,
 >   "git": { "isRepo": true | false, "branch": string | null, "remote": string | null },
@@ -154,6 +157,9 @@ Dispatch a subagent (foreground, blocking — small output, no progress polling 
 > | `vue` | `vue` in deps or devDeps. |
 > | `svelte` | `svelte` in deps or devDeps. |
 > | `packageManager` | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
+> | `nodeVersion` | The Node the project will actually install with. Read `node -v` and strip the leading `v` (`"22.14.0"`). If a `.nvmrc`, `.node-version`, `.tool-versions` or `volta.node` pins something **different**, report the pinned value instead — that is what the user's shell will resolve to — and mention both in `decisions`. `null` only if genuinely unreadable. |
+> | `nodeEngines` | The **project's own** `engines.node` from its root `package.json`, verbatim, or `null` if absent. This is not the same claim as `nodeVersion`: it is what the user's CI will enforce on everyone else, so a stack floor above it is a finding even when the local machine is fine. |
+> | `viteVersion` | The resolved Vite version, not the declared range: read it from the lockfile first, falling back to `devDependencies.vite` / `dependencies.vite` with the range stripped (`"^5.4.11"` → `"5.4.11"`, which is a floor, so say so in `decisions` when it came from the range rather than the lockfile). `null` when the project has no Vite — which is the correct value for Next.js, Rails, Android, iOS and build-less extensions, and is **not** a failure. |
 > | `routeEntries` | App Router: `<root>/src/app/**/page.tsx`. TanStack file-based: `<root>/src/routes/**/*.tsx`. Remix v2 or React Router v7 framework mode: `<root>/app/routes/**/*.{tsx,jsx,ts,js}`. SvelteKit: `<root>/src/routes/**/*.svelte`. Browser extension: `null` (entrypoints are not routes). None if no file-based routing detected. |
 > | `existing.library` | First match in deps/devDeps from the union of i18n libraries listed above. For `framework === "webext"`, a dependency match still wins (an extension using Lingui reports `lingui`); if there is none and a `_locales/*/messages.json` exists anywhere in the project, report `webext-native` — extension message catalogs are a platform built-in with no package to depend on. |
 > | `existing.configured` | `lingui.config.*` present AND macro plugin wired in build config; OR `next-intl` config present AND plugin wired; OR (Vue) `createI18n(` present in `src/i18n/index.*` (Vite/Quasar) or `defineI18nConfig(` in `i18n.config.*` (Nuxt) AND `messageCompiler` wired; OR (Paraglide) `project.inlang/settings.json` present AND `paraglideVitePlugin` in `vite.config.*`. |
@@ -358,6 +364,32 @@ Use AskUserQuestion if multiple variants apply. If only one variant matches, sur
 
 The iOS variants are `supportLevel: "experimental"` — when confirming, tell the user so: e.g. "Setting up the Apple String Catalog path (built into the SDK — no install). Heads up: iOS/`.xcstrings` support is **experimental** — the live Globalize.now round-trip for this format hasn't been verified end-to-end yet, so double-check the Phase-4 connection."
 
+### 1.5a Install-constraint check
+
+The chosen variant is now known, so its host constraints are too. Read `requires[]` on the selected `manifest.json` entry — **do not hand-write ranges into this check or into a setup reference**; the manifest is the only place a floor is recorded, so an upstream change is one manifest edit rather than a search across reference files. A stack with no `requires` block constrains nothing; skip straight to 1.6.
+
+This runs **here**, after 1.5, and not in 1.2, because a floor is a property of the *chosen stack*, not of the project: a Next.js project on Node 20 is fine on next-intl and broken on Lingui, and a Vite 5 project is fine on vue-i18n and broken on Lingui. If *every* variant 1.3 resolved fails its own `requires[]`, this section is also where that is surfaced — there is no earlier place for it, since 1.2 runs before the candidate set exists.
+
+For each row, compare the detected value against `range`:
+
+| `enforcement` | What it means | What to do when unsatisfied |
+|---|---|---|
+| `warn` | An `engines` declaration. npm prints `EBADENGINE` and installs anyway; pnpm and Yarn Berry can be configured to fail; bun ignores it. | **Warn, do not block.** The install will appear to succeed and the failure lands later, at `lingui extract` or at build — say that explicitly, because a user who reads "warning" as "cosmetic" will hit it two phases downstream. |
+| `stop` | An unsatisfiable **required** peer. `ERESOLVE` on npm ≥ 7 and on pnpm by default; Yarn Berry and bun warn and then load the plugin against an unsupported host, which fails at build instead. | **Stop and ask**, before the plan is rendered. This install cannot succeed. |
+
+Message shape — name the package, both versions, and the way out, and offer `fallback` when the row has one:
+
+> This stack installs **{setBy}**, which requires **{tool} {range}**. This project is on **{detected}**.
+> — for `warn`: "npm will install anyway with an `EBADENGINE` warning, but `lingui extract` will not run. Upgrade {tool} to {range}, or pick a stack without that floor. Proceeding."
+> — for `stop`: "The install will fail with `ERESOLVE`. {fallback, if present.} Upgrade {tool} to {range}, or choose one of the other variants from 1.5."
+
+Two details the comparison must not get wrong:
+
+- **A range can be disjoint.** `@vitejs/plugin-react{,-swc}` declares `^20.19.0 || >=22.12.0`, which excludes all of Node 21 **and** Node 22.0–22.11. "Node 22, fine" is wrong there. Evaluate the whole range; never reduce it to a minimum.
+- **`nodeEngines` is a second, separate comparison.** If the project declares `engines.node` and the stack's floor is *above* it, say so even when `nodeVersion` satisfies the floor: the local machine passing does not stop the project's CI, or a colleague on the declared floor, from failing.
+
+Record the outcome — satisfied, warned, or stopped, with the values compared — in `decisions`, so 1.11's `plan.md` carries it and Phase 2 does not re-derive it.
+
 ### 1.6 Journey scope
 
 > **User-facing message** (before asking):
@@ -477,7 +509,7 @@ Single setup subagent. Orchestrator installs packages on the main thread first, 
 
 Read `manifest-snapshot.json`'s `packages.runtime` and `packages.dev`. Run the install commands in the foreground using the package manager from `detection.json`. Stream output to the user.
 
-> **Lingui (v6+) requires Node ≥ 22.19 or ≥ 24** — it ships ESM-only and fails to load on older Node. If the resolved stack installs `@lingui/*`, check the project's Node version (`node -v`, plus any `.nvmrc` / `engines` field) before installing. If it's older, tell the user and pause rather than installing a runtime they can't run.
+> **Lingui (v6+) requires Node ≥ 22.19 or ≥ 24** — it ships ESM-only and fails to load on older Node. If the resolved stack installs `@lingui/*`, check the project's Node version (`node -v`, plus any `.nvmrc` / `engines` field) before installing. If it's older, tell the user and pause rather than installing a runtime they can't run. **§1.5a should already have caught this** from the stack's `requires[]`, before the plan was approved rather than after; this check stays as the backstop for the case where §1.5a was skipped or the environment changed between phases, and it is the only Node check the setup subagent sees on its own thread. The authoritative floor is `manifest.json`, not this sentence — if the two disagree, the manifest is right and this line is stale.
 
 | Package manager | Runtime command | Dev command |
 |---|---|---|
