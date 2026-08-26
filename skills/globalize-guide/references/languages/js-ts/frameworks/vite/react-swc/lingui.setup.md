@@ -17,13 +17,18 @@ In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@ling
 | `@lingui/detect-locale` | runtime | Browser locale detection (navigator, URL, storage, cookie) |
 | `@lingui/swc-plugin` | dev | SWC macro transform |
 | `@lingui/vite-plugin` | dev | Vite integration for catalog compilation |
+| `@vitejs/plugin-react-swc` | dev | The SWC host the macro plugin runs inside — **`^4` is a floor, not a preference** (see below) |
 
 **Example (npm):**
 
 ```bash
 npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/detect-locale@^6'
-npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6' '@lingui/vite-plugin@^6'
+npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6' '@lingui/vite-plugin@^6' '@vitejs/plugin-react-swc@^4'
 ```
+
+> **Why `@vitejs/plugin-react-swc@^4` is in that install line.** This variant is selected *because* the project already uses `@vitejs/plugin-react-swc`, so the package is normally present — but the version matters. `@lingui/swc-plugin@6.2.0`+ is built against `swc_core@66.0.3` under SWC's post-1.15 Wasm plugin ABI; `@vitejs/plugin-react-swc` only reaches `@swc/core >= 1.15.11` at **4.2.3**, and the whole 3.x line sits below it (`3.11.0` → `@swc/core@^1.12.11`, `3.8.1` → `^1.11.11`). On a 3.x host the macros hit a pre-cbor runtime and the build fails with an AST schema or plugin-invocation error. The four sibling SWC stacks (`tanstack-start`, `remix`, `react-router-framework`, `webext`) already install this package at `^4`; this one did not, and was the only Lingui-SWC stack shipping no host at all.
+>
+> **This can upgrade an existing `@vitejs/plugin-react-swc@3.x` to 4.x.** That is a major bump of the project's build plugin — describe it to the user before running the install. `@vitejs/plugin-react-swc@^4` accepts `vite ^4 || ^5 || ^6 || ^7 || ^8`, so it does not itself constrain Vite. If the project cannot move off 3.x, use the **Babel** variant of this stack instead of forcing the SWC one.
 
 **Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema or plugin invocation error, look up the compatible version at https://plugins.swc.rs and pin it exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. See "SWC plugin version mismatch" in Common Gotchas.
 
