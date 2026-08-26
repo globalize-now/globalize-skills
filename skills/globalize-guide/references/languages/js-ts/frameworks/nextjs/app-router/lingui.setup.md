@@ -24,7 +24,9 @@ npm install '@lingui/core@^6' '@lingui/react@^6'
 npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6'
 ```
 
-**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by the project's Next.js version. Installing without a version specifier grabs the latest, which may not be compatible. Look up the correct version at https://plugins.swc.rs (select "next" + the project's Next.js version), then pin it exactly — e.g. `npm install -D @lingui/swc-plugin@4.0.8`. See "SWC plugin version mismatch" in Common Gotchas if the build fails with an AST schema error.
+**Version compatibility:** on this stack the plugin runs inside **Next.js's own bundled SWC**, whose `swc_core` version is not readable from npm metadata — so unlike the Vite stacks, `plugins.swc.rs` (select "next" + the project's Next.js version) remains the right lookup when something breaks. Start with `^6` regardless: SWC's Wasm plugin ABI has been backward-compatible since `@swc/core` 1.15.0 ([announcement](https://blog.swc.rs/2025-11-4-wasm-backward-compatibility)), `@lingui/swc-plugin@6.2.0`+ is built against `swc_core@66.0.3` under that scheme, and any Next release bundling SWC at or past that point needs no pin at all.
+
+If the build fails with an AST schema or plugin invocation error, the project's Next.js is older than that. Look the host range up at `plugins.swc.rs`, then pin a `@lingui/swc-plugin` version **whose `@lingui/core` peer admits the major this project installs** — for a v6 project that is `6.0.0`-`6.1.0` (`swc_core@50.2.3`) and nothing older. Do **not** pin into the `5.x` or `4.x` lines here: every `5.x` requires `@lingui/core@5`, and `4.0.8` requires `@lingui/macro@4`, a package this stack does not install in any version. Both are required peers, so both are an `ERESOLVE` failure on npm and pnpm rather than a fix. If no compatible pair exists, upgrade Next.js or use `@lingui/babel-plugin-lingui-macro` with a `.babelrc` instead.
 
 Note: No `@lingui/vite-plugin` — Next.js has its own build pipeline.
 

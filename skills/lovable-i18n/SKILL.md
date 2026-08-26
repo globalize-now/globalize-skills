@@ -163,7 +163,7 @@ Dev dependencies:
 | `@lingui/vite-plugin` | `^6` | Compiles `.po` catalogs when the app imports them |
 | `@lingui/format-po` | `^6` | PO catalog formatter for `lingui.config.ts` |
 
-**Version pinning caveat:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the preview build fails with an AST schema error or a plugin invocation error after this setup, look up the compatible version at https://plugins.swc.rs and pin `@lingui/swc-plugin` to that exact version (e.g. `5.8.0` — no caret). This exact pin overrides the `^6` default for this one package only.
+**Version compatibility caveat:** SWC's Wasm plugin ABI has been backward-compatible since `@swc/core` 1.15.0 ([announcement](https://blog.swc.rs/2025-11-4-wasm-backward-compatibility)), and `@lingui/swc-plugin@6.2.0`+ is built against `swc_core@66.0.3` under that scheme, so `^6` needs no pin on a host at `@vitejs/plugin-react-swc >= 4.2.3` (`@swc/core >= 1.15.11`). If the preview build fails with an AST schema error or a plugin invocation error after this setup, the Lovable scaffold is on an older `@vitejs/plugin-react-swc` — raise it to `^4` first. If it cannot move, look the host range up at https://plugins.swc.rs and pin a `@lingui/swc-plugin` version **whose `@lingui/core` peer admits the major installed here** — for `^6` that is `6.0.0`-`6.1.0` and nothing older, since every `5.x` requires `@lingui/core@5` (a required peer, so `ERESOLVE` rather than a fix).
 
 ### A2. `vite.config.ts`
 
@@ -1330,7 +1330,7 @@ npx @globalize-now/cli-client repositories create \
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Preview build error mentioning "AST schema mismatch" or "failed to invoke plugin" (Path A) | `@lingui/swc-plugin` compiled against a different `swc_core` than `@vitejs/plugin-react-swc` ships | Look up the compatible version at https://plugins.swc.rs and pin `@lingui/swc-plugin` to that **exact** version (no caret) — see the A1 caveat |
+| Preview build error mentioning "AST schema mismatch" or "failed to invoke plugin" (Path A) | The `swc_core` inside `@vitejs/plugin-react-swc` predates the compatible Wasm plugin ABI — the host resolved below `4.2.3` | Raise the host to `@vitejs/plugin-react-swc@^4`; only if it cannot move, pin `@lingui/swc-plugin` to a `6.0`-`6.1` build via https://plugins.swc.rs — see the A1 caveat |
 | Build fails resolving `@lingui/vite-plugin`, or ESM/`ERR_REQUIRE_ESM`-style errors from Lingui packages | The build image's Node is too old for Lingui 6 (ESM-only, needs Node ≥ 22.19) | Pin **all** `@lingui/*` packages to `@^5` instead. Keep `lingui.config.ts` as-is — the `formatter(...)` form from `@lingui/format-po` works in v5 too |
 | TS error `Cannot find module './locales/en/messages.po'` | Missing the `*.po` module declaration | Add the declaration from A4 (`src/vite-env.d.ts` or `src/po-modules.d.ts`) |
 | Strings render as raw ICU (`{count, plural, ...}`) or stay in the source language after switching | Catalog not loaded for that locale (typo in the dynamic import path, missing `.po` file) or the entry is missing from that locale's catalog | Check the `src/locales/<locale>/messages.po` file exists with a valid header (A7) and contains the entry (PO protocol) |

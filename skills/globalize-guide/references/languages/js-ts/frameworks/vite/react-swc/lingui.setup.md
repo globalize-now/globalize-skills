@@ -25,7 +25,13 @@ npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/detect-locale@^6'
 npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6' '@lingui/vite-plugin@^6'
 ```
 
-**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema or plugin invocation error, look up the compatible version at https://plugins.swc.rs and pin it exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. See "SWC plugin version mismatch" in Common Gotchas.
+**Version compatibility for `@lingui/swc-plugin`.** SWC's Wasm plugin ABI has been backward-compatible since **`@swc/core` 1.15.0** ([announcement](https://blog.swc.rs/2025-11-4-wasm-backward-compatibility)), and `@lingui/swc-plugin@6.2.0`+ is built against `swc_core@66.0.3` under that scheme. So `^6` needs no pinning against any reasonably current host: it works on `@swc/core >= 1.15.33` — the version Lingui builds and tests it against — which is what `@vitejs/plugin-react-swc >= 4.2.3` installs. **Do not pin the plugin backwards by default.**
+
+If the build fails with an AST schema or plugin invocation error (`failed to invoke plugin: ...`, `swc_core version mismatch`), the host is older than that. In order:
+
+1. **Raise the host** — `npm install -D '@vitejs/plugin-react-swc@^4'`. The 3.x line pulls `@swc/core` ~1.11-1.12, from before the compatible ABI existed.
+2. If the project must stay on `@vitejs/plugin-react-swc@3.x`, the plugin has to match the host's `swc_core` exactly. Look up the host's range at <https://plugins.swc.rs> and pin a `@lingui/swc-plugin` version **whose `@lingui/core` peer admits the major this project installs**. For a v6 project that means `6.0.0`-`6.1.0` (`swc_core@50.2.3`) and nothing older: every `5.x` requires `@lingui/core@5` and every `4.x` requires `@lingui/macro@4`, so both fail `ERESOLVE` here.
+3. If no such pair exists, switch to the **Babel** variant of this stack rather than downgrading `@lingui/core`.
 
 ## Build Tool Integration
 

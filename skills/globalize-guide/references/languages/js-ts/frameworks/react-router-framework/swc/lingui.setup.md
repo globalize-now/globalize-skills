@@ -28,7 +28,13 @@ The orchestrator (Phase 2.0) pre-installed these on the main thread before dispa
 
 Treat the install step as already done. Do **not** re-run `npm install` / `yarn add` / `pnpm add` / `bun add` for those packages.
 
-**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema error or a plugin invocation error, look up the compatible pair at <https://plugins.swc.rs> and pin `@lingui/swc-plugin` exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. This exact pin overrides the `^6` SemVer-major default for this package only, and is the standard remediation documented across every Lingui-SWC reference in this repo.
+**Version compatibility for `@lingui/swc-plugin`.** SWC's Wasm plugin ABI has been backward-compatible since **`@swc/core` 1.15.0** ([announcement](https://blog.swc.rs/2025-11-4-wasm-backward-compatibility)), and `@lingui/swc-plugin@6.2.0`+ is built against `swc_core@66.0.3` under that scheme. So `^6` needs no pinning against any reasonably current host: it works on `@swc/core >= 1.15.33` — the version Lingui builds and tests it against — which is what `@vitejs/plugin-react-swc >= 4.2.3` installs. **Do not pin the plugin backwards by default.**
+
+If the build fails with an AST schema or plugin invocation error (`failed to invoke plugin: ...`, `swc_core version mismatch`), the host is older than that. In order:
+
+1. **Raise the host** — `npm install -D '@vitejs/plugin-react-swc@^4'`. The 3.x line pulls `@swc/core` ~1.11-1.12, from before the compatible ABI existed.
+2. If the project must stay on `@vitejs/plugin-react-swc@3.x`, the plugin has to match the host's `swc_core` exactly. Look up the host's range at <https://plugins.swc.rs> and pin a `@lingui/swc-plugin` version **whose `@lingui/core` peer admits the major this project installs**. For a v6 project that means `6.0.0`-`6.1.0` (`swc_core@50.2.3`) and nothing older: every `5.x` requires `@lingui/core@5` and every `4.x` requires `@lingui/macro@4`, so both fail `ERESOLVE` here.
+3. If no such pair exists, switch to the **Babel** variant of this stack rather than downgrading `@lingui/core`.
 
 > **Switching from `@vitejs/plugin-react` to `@vitejs/plugin-react-swc`.** If `@vitejs/plugin-react` was previously installed (perhaps the project briefly tried the Babel variant), uninstall it after the SWC switch — leaving both in devDeps can lead to Vite resolving the wrong one depending on import order and lockfile state. The orchestrator should run `npm uninstall @vitejs/plugin-react` on the main thread (or the package-manager equivalent). Describe this swap to the user before touching `package.json` — it's a dev-dep change, not a breaking one, but it should be explicit.
 
@@ -847,7 +853,7 @@ If `npm run build` fails with `Trans is not defined` or `<Trans>` renders as raw
 - `@vitejs/plugin-react-swc` is installed (Section 1) and `@vitejs/plugin-react` is **not** also installed (uninstall it if both are present — Vite may resolve the wrong one).
 - `vite.config.ts` has the exact plugin order from Section 2: `reactRouter()`, then `react({ plugins: [['@lingui/swc-plugin', {}]] })`, then `lingui()`.
 - The SWC plugin is passed as a tuple `['@lingui/swc-plugin', {}]` (string + options object), not a bare string — bare strings are silently ignored.
-- `@lingui/swc-plugin`'s `swc_core` version matches the one shipped by `@vitejs/plugin-react-swc` — see the version-pinning note in Section 1.
+- the SWC host is at `@vitejs/plugin-react-swc >= 4.2.3` (`@swc/core >= 1.15.11`), so `@lingui/swc-plugin@^6` needs no pin — see the version-compatibility note in Section 1.
 - The macro import is `import { Trans } from '@lingui/react/macro'` (not the deprecated `@lingui/macro`; non-React macros like `t` come from `@lingui/core/macro`).
 
 ## 13. Coding rules + optional add-ons
