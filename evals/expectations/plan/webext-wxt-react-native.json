@@ -6,6 +6,7 @@
   ],
   "phase2StepsContain": [
     "scaffold_catalogs",
+    "generate_format_helpers",
     "generate_coding_rules",
     "install_coding_rules"
   ],

@@ -10,10 +10,10 @@ description: >-
   and plurals are authored correctly, and that manifest and store copy stay
   localizable.
 template: webext-native
-templateVersion: 1
+templateVersion: 2
 conditions: [localeSwitcher]
-values: [localesDir, sourceLocale, targetLocales, manifestFile]
-budget: { "localeSwitcher == \"custom-loader\"": 205, "default": 180 }
+values: [localesDir, sourceLocale, targetLocales, manifestFile, formatModule]
+budget: { "localeSwitcher == \"custom-loader\"": 250, "default": 225 }
 ---
 
 # Browser-Extension Message-Catalog Coding Rules
@@ -123,6 +123,59 @@ t(pluralKey('popup_item_count', n, locale), [String(n)])
 ```
 
 Every category name must be one of `zero`, `one`, `two`, `few`, `many`, `other` — `Intl.PluralRules` returns exactly those, and translators for Arabic, Russian, Polish and Czech will add the categories their language needs. Say the category in each `description`, because the translator sees the keys separately and cannot infer it. Always ship an `_other` key: it is the fallback every locale has.
+
+## Numbers, currencies, dates
+
+`chrome.i18n` has no formatting API of any kind — no number, currency, date, or list formatting, on top of the no-plurals gap above. `<<formatModule>>` is this project's *only* source of locale-aware formatting; it reads the active locale itself via `formatLocale()` — never construct `Intl` directly at a call site. Import the functions you need as plain module-level imports — there is no hook and no factory to call first:
+
+```ts
+import { money, date, relativeTime } from '<<formatModule>>'
+
+money(amount)              // '$42.50' — see below, currency comes from the data
+date(value, 'short')       // 'medium' is the default if omitted — '8/21/26'
+relativeTime(value)        // '3 days ago'
+```
+
+All ten:
+
+```ts
+money(amount)                        // '$42.50'
+number(1234.5)                       // '1,234.5'
+percent(0.42)                        // '42%'
+compact(12000)                       // '12K'
+unit(5, 'kilometer')                 // '5 km'
+date(value, 'short')                 // '8/21/26'
+date(value, 'long')                  // 'August 21, 2026'
+time(value)                          // '4:05 PM'
+dateTime(value)                      // 'Aug 21, 2026, 4:05 PM'
+relativeTime(value)                  // '3 days ago'
+list(['Alice', 'Bob', 'Carol'])      // 'and' is the default — 'Alice, Bob, and Carol'
+list(['Alice', 'Bob'], 'or')         // 'Alice or Bob'
+```
+
+**Currency comes from the data, not the reader.** `money(amount)` uses the project default; when a record carries its own currency, pass it: `money(order.total, order.currency)`. Never derive a currency code from the locale — that relabels a dollar price as euros for a German reader.
+
+**A locale this extension cannot *translate* into may still *format* correctly.** `chrome.i18n` only ever loads a catalog from Chrome's ~55-entry `_locales` table (see "Adding a locale" below); `Intl` supports far more locales than that. Never gate a `<<formatModule>>` call, or `formatLocale()` itself, on whether a locale has a `_locales` directory — the two lists are unrelated.
+
+**Never build a formatted value into a `messages.json` entry.** `getMessage()` only fills `$1`–`$9` placeholder *positions* — it applies no formatting of its own. Format first with `<<formatModule>>`, then pass the result in as a substitution:
+
+```ts
+// Wrong — the catalog can't format $1; every locale sees the raw JS number
+t('cart_total', [String(9.5)])
+
+// Right — money() formats for the active locale; the catalog only substitutes it
+t('cart_total', [money(9.5)])
+```
+
+**Needs a format the module has no preset for?** Add it to `<<formatModule>>`. A date style or currency code written out at two call sites will drift.
+
+**Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), hardcoded date formats like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, any `new Intl.` outside `<<formatModule>>`.
+
+MV3's CSP (`script-src 'self' 'wasm-unsafe-eval'`) does not affect any of this — `Intl` is built into the JavaScript engine, not loaded or evaluated as a string.
+
+<!-- if: localeSwitcher == "custom-loader" -->
+**`formatLocale()` reads a cache primed by an async `browser.storage.sync.get()`, not storage itself.** Every formatter above is synchronous; storage is not. In the MV3 service worker, `await` the priming promise at the top of every handler that formats something — the same `const ready = initI18n(); await ready` pattern the catalog already uses — because module-scope state does not survive a worker restart; the worker can await, so do not treat it as a context that can't. Only a genuinely synchronous render path may skip the await and read the cache as-is. Calling into `<<formatModule>>` before `primeFormatLocale()` has resolved for the first time silently formats against the browser's UI language instead of the picked one, with no error. Prime it once at startup before the first render, again in the `storage.onChanged` listener, and again — awaited — at the top of every service-worker handler.
+<!-- /if -->
 
 ## HTML is not substituted
 

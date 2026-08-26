@@ -242,32 +242,45 @@ Scan `.vue` and `.ts` files systematically. Apply the confidence tiers to decide
   }
   ```
 
-  **Recipe**: move the formatting into the component via vue-i18n's `n()` / `d()` helpers — they read the current locale from the i18n instance and stay reactive:
+  **Recipe**: call the project's formatters module. Phase 2 created it (`generate_format_helpers`) and
+  `.agents/globalize-rules.md` carries its real import specifier. Its `useFormatters()` composable
+  delegates to vue-i18n's `n()` / `d()` internally, so it stays reactive to `locale.value` — but it also
+  carries this project's currency default and its date presets, which a bare `n(amount, 'currency')` at a
+  call site does not:
 
   ```vue
   <script setup lang="ts">
-  import { useI18n } from 'vue-i18n'
-  const { n } = useI18n({ useScope: 'global' })
+  import { useFormatters } from '<the specifier from .agents/globalize-rules.md>'
+  const f = useFormatters()
   defineProps<{ amount: number }>()
   </script>
 
   <template>
-    <span>{{ n(amount, 'currency') }}</span>
+    <span>{{ f.money(amount) }}</span>
   </template>
   ```
 
-  Requires `numberFormats.{locale}.currency` to be registered on the i18n instance (seeded in setup Step 3). If the format isn't registered yet, either (a) register it alongside the conversion edit, or (b) fall back to `n(amount, { style: 'currency', currency: 'USD' })` as an inline format. Do not reintroduce `new Intl.NumberFormat(locale.value, ...)` inside the component — `n()` and `d()` already delegate to those APIs, caching per-locale.
+  `useFormatters()` needs the same context `useI18n()` does — a component's `<script setup>` or a
+  composable called from one. **There is no `getFormatters()` counterpart on this library**; for genuinely
+  non-setup code the module also exports standalone `formatRelativeTime(locale, …)` and
+  `formatList(locale, …)`, which take a locale string. Do not reintroduce
+  `new Intl.NumberFormat(locale.value, …)` inside the component, and do not fall back to an inline
+  `n(amount, { style: 'currency', currency: 'USD' })` — an inline options object is exactly the drift the
+  module exists to prevent. If a needed format is missing, add it to the module and to the instance's
+  `numberFormats` / `datetimeFormats` registration together.
 
-  **After wrapping — remove the now-dead helpers.** Once all call-sites use `n()` / `d()` (or an ICU `plural` / `select` key in the catalog), the hand-rolled helpers that encoded the same logic — module-scope `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` constants, `pluralizeItems`, `replyLine`, any format-switch `if/else` bodies — become dead code. Delete them together with their imports. Leaving them gives the appearance of duplicate sources of truth; removing them confirms the migration is complete. Grep for the helper's name (or `new Intl.NumberFormat` / `new Intl.DateTimeFormat` at module scope) to verify no stragglers remain.
+  **After wrapping — remove the now-dead helpers.** Once all call-sites use the formatters module (or an ICU `plural` / `select` key in the catalog), the hand-rolled helpers that encoded the same logic — module-scope `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` constants, `pluralizeItems`, `replyLine`, any format-switch `if/else` bodies — become dead code. Delete them together with their imports. Leaving them gives the appearance of duplicate sources of truth; removing them confirms the migration is complete. Grep for the helper's name (or `new Intl.NumberFormat` / `new Intl.DateTimeFormat` at module scope) to verify no stragglers remain. The formatters module itself is the one file that legitimately constructs `Intl` — never "clean it up".
 
 ### Flag with judgment (medium confidence)
 
 Review these and wrap only if they appear in the UI:
 
-- **`toFixed()` and number formatting**: Raw `toFixed()` won't respect locale decimal separators. Use `n()` with a named format registered on the i18n instance.
-- **Currency symbols hardcoded near numbers**: `'$' + price` or `price + ' USD'` — use `n(price, 'currency')` with a `currency` format like `{ style: 'currency', currency: 'USD' }`. If no currency format is registered, warn the user — setup Step 3 seeds a baseline.
-- **Date formatting without locale**: `date.toLocaleDateString()` without a locale argument is runtime-dependent; explicit format strings (`'MM/DD/YYYY'`) are not locale-aware. Use `d(date, 'short' | 'long')`.
-- **`new Intl.NumberFormat(...)` inside components**: Prefer `n()` so locale changes are reactive.
+- **`toFixed()` and number formatting**: Raw `toFixed()` won't respect locale decimal separators. Use `f.money(price)` for a price, `f.number(value)` otherwise.
+- **Currency symbols hardcoded near numbers**: `'$' + price` or `price + ' USD'` — use `f.money(price)`. The module owns the currency code; do not restate it at the call site.
+- **Date formatting without locale**: `date.toLocaleDateString()` without a locale argument is runtime-dependent; explicit format strings (`'MM/DD/YYYY'`) are not locale-aware. Use `f.date(value)` (or `f.dateTime` / `f.time`).
+- **`new Intl.NumberFormat(...)` inside components**: use the formatters module so locale changes stay reactive and the options live in one place.
+
+  The full find-and-replace table (`toFixed`, `toLocaleString`, `dayjs().format()`, `join(', ')`, percentages, relative time), the list of values that must **never** be converted, and the rule that formatting is converted *after* the strings in the same file, are all in `references/languages/js-ts/convert.format-pass.md`.
 - **Toast / notification / error messages shown to users**: Strings in `toast()` / `notify()` / `$q.notify()` calls, or in `throw new Error(...)` that surfaces in the UI.
 
 ### Never flag (skip these)
