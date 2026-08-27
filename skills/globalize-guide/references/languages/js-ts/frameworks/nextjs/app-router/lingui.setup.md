@@ -6,6 +6,9 @@ This covers Next.js 13+ projects using the App Router with React Server Componen
 
 ## Packages
 
+> **Before installing — Node ≥ 22.19 and ESM-only.** Every `@lingui/*` v6 package except `@lingui/swc-plugin` declares `engines.node >= 22.19.0`, and all of them are `"type": "module"` with no `require` condition, so no CJS file can `require()` them. `setup.locale-module.md` (read first on this variant) carries the full check and the failure modes. Do not use `@lingui/swc-plugin` to test the Node floor — it declares no `engines` at all.
+
+
 In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@lingui/cli`), install:
 
 | Package | Type | Purpose |

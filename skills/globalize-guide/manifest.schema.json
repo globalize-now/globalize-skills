@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/globalize-now/globalize-skills/skills/globalize-guide/manifest.schema.json",
+  "title": "globalize-guide stack manifest",
+  "description": "Shape of skills/globalize-guide/manifest.json. Describes what is true today; new optional per-stack fields (Node floors, peer floors, host floors) should be added here in the same commit that introduces them.",
+  "type": "object",
+  "required": [
+    "version",
+    "stacks"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "stacks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/stack"
+      }
+    },
+    "incompatibleStacks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/incompatibleStack"
+      }
+    }
+  },
+  "$defs": {
+    "referencePath": {
+      "type": "string",
+      "pattern": "^references/.+\\.md$",
+      "description": "Repo-relative to skills/globalize-guide/. Resolution is checked by evals/verify-manifest.sh, not by this schema."
+    },
+    "referenceList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/referencePath"
+      }
+    },
+    "packageSpec": {
+      "type": "string",
+      "minLength": 1,
+      "description": "npm name plus a pin, e.g. \"next-intl@^4\"."
+    },
+    "gemSpec": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Gem name plus a Bundler pin, e.g. \"rails-i18n ~> 8.1\"."
+    },
+    "match": {
+      "type": "object",
+      "description": "Structural keys matched against detection.json. Every key here must also exist in the detection schema in SKILL.md.",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "enum": [
+            "js-ts",
+            "ruby",
+            "android",
+            "swift"
+          ]
+        },
+        "framework": {
+          "type": "string"
+        },
+        "router": {
+          "type": "string"
+        },
+        "compiler": {
+          "enum": [
+            "swc",
+            "babel",
+            null
+          ]
+        },
+        "library": {
+          "type": "string"
+        },
+        "react": {
+          "type": "boolean"
+        },
+        "vue": {
+          "type": "boolean"
+        },
+        "svelte": {
+          "type": "boolean"
+        },
+        "buildSystem": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "uiFramework": {
+          "type": "string"
+        }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "required": [
+        "variant",
+        "match",
+        "supportLevel",
+        "packages",
+        "references"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "variant": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Stable identifier; kebab-case. Uniqueness is enforced by evals/verify-manifest.sh."
+        },
+        "match": {
+          "$ref": "#/$defs/match"
+        },
+        "supportLevel": {
+          "enum": [
+            "stable",
+            "experimental"
+          ]
+        },
+        "appliesAlsoTo": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Human-readable scenarios this entry also covers. Prose, not matched against."
+        },
+        "packages": {
+          "type": "object",
+          "required": [
+            "runtime",
+            "dev"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "runtime": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/packageSpec"
+              }
+            },
+            "dev": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/packageSpec"
+              }
+            }
+          }
+        },
+        "gems": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "_comment": {
+              "type": "string"
+            },
+            "runtime": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/gemSpec"
+              }
+            },
+            "dev": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/gemSpec"
+              }
+            }
+          },
+          "description": "Informational only. Bundler installs these from the setup reference; the npm-shaped Phase-2 install does not read them."
+        },
+        "references": {
+          "type": "object",
+          "required": [
+            "setup",
+            "convert",
+            "rulesTemplate"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "setup": {
+              "$ref": "#/$defs/referenceList"
+            },
+            "convert": {
+              "$ref": "#/$defs/referenceList"
+            },
+            "rulesTemplate": {
+              "$ref": "#/$defs/referenceList"
+            },
+            "optional": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "$ref": "#/$defs/referenceList"
+              },
+              "propertyNames": {
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "incompatibleStack": {
+      "type": "object",
+      "required": [
+        "match",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/match"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

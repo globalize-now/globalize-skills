@@ -6,6 +6,7 @@
   ],
   "phase2StepsContain": [
     "build_verification",
+    "generate_format_helpers",
     "generate_coding_rules",
     "install_coding_rules"
   ],

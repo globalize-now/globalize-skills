@@ -81,23 +81,24 @@ A placeholder whose value is a list (`targetLocales`) renders comma-separated: `
 Performed by the core `generate_coding_rules` step after core setup, when the config files setup wrote are on disk and their real values can be read. That step always runs — it is not gated on a `SKILL.md §1.10` selection, because Phase 3's wrap subagents read the generated file as their authoring contract.
 
 1. Read `.globalize/manifest-snapshot.json` → `references.rulesTemplate`. **Every** stack entry carries one — there is no `references.code` and no generic-`code.md` track any more. If the key is missing, the installed skill is stale or damaged: stop and tell the user to reinstall rather than inventing a fallback.
-2. Resolve every key in `conditions`. Write them to `.globalize/rules-values.json`.
-3. Eliminate branches: delete every false branch, **and every marker line** — `<!-- if: -->`, `<!-- else -->`, `<!-- /if -->` all disappear whether their branch was kept or not.
-4. Resolve **only the values still referenced** in what survived, and add them to `.globalize/rules-values.json`.
+2. Read `.globalize/format-module.json`, written by the `generate_format_helpers` step that ran immediately before this one. It carries `{ specifier, path, surface, defaultCurrency, currencySource }`. `specifier` is the value of `<<formatModule>>`. If the file is absent, `generate_format_helpers` did not complete — **fail closed** (below) rather than guessing an import path; a rules file that tells the agent to import from a module that does not exist is worse than no rules file.
+3. Resolve every key in `conditions`. Write them to `.globalize/rules-values.json`.
+4. Eliminate branches: delete every false branch, **and every marker line** — `<!-- if: -->`, `<!-- else -->`, `<!-- /if -->` all disappear whether their branch was kept or not.
+5. Resolve **only the values still referenced** in what survived, and add them to `.globalize/rules-values.json`.
 
    Branch elimination comes first on purpose. `i18nNavigationPath` has no value on a project without prefix routing, and `getI18nInstance` has no path on a Vite project — those placeholders live inside branches that are already gone. Resolving up front would demand values that do not exist and trip the fail-closed rule on a perfectly healthy project.
-5. Finish the body:
+6. Finish the body:
    - Replace every surviving `<<name>>` with its resolved value.
    - Strip the frontmatter.
    - **Copy everything retained verbatim.** Do not rewrite, summarize, reflow, re-order, or improve the prose. The template is the reviewed artifact; the generated file is a mechanical projection of it. If a sentence reads badly in the output, fix the template and re-render — never fix it in the output.
-6. Prepend the header (below) and write to `.agents/globalize-rules.md`.
-7. Self-check the output. All of these must hold:
+7. Prepend the header (below) and write to `.agents/globalize-rules.md`.
+8. Self-check the output. All of these must hold:
    - zero occurrences of `<!-- if:`, `<!-- else -->`, `<!-- /if -->`
    - zero occurrences of `<<`
    - header present on line 1
    - line count ≤ the applicable `budget`
-8. Confirm the file is not ignored — `git check-ignore .agents/globalize-rules.md`. Some repos ignore whole dotfile directories, and a rules file no teammate receives is not doing its job. If it comes back ignored, say so; do not silently succeed.
-9. Migrate off the old path. Earlier versions of this skill wrote `.claude/globalize-rules.md`. **Only after step 6 succeeded**, delete that file if it exists and its line 1 carries the generated header. A file at that path *without* the header is not ours — leave it and warn. Never remove the `.claude/` directory itself; it holds settings and installed skills that are not ours.
+9. Confirm the file is not ignored — `git check-ignore .agents/globalize-rules.md`. Some repos ignore whole dotfile directories, and a rules file no teammate receives is not doing its job. If it comes back ignored, say so; do not silently succeed.
+10. Migrate off the old path. Earlier versions of this skill wrote `.claude/globalize-rules.md`. **Only after step 7 succeeded**, delete that file if it exists and its line 1 carries the generated header. A file at that path *without* the header is not ours — leave it and warn. Never remove the `.claude/` directory itself; it holds settings and installed skills that are not ours.
 
 Then hand off to `install_coding_rules` (core, always runs — see below).
 
@@ -108,9 +109,27 @@ Then hand off to `install_coding_rules` (core, always runs — see below).
 <!-- Generated file. Re-running globalize-guide overwrites it. Put your own project rules in CLAUDE.md or AGENTS.md. -->
 ```
 
-`v1` is the template's `templateVersion`. `variant` is the matched manifest variant. The header is what makes the file re-generatable and lets a later run recognise output from an older template — and it is what step 9 keys on when deciding whether an old `.claude/globalize-rules.md` is safe to delete.
+`v1` is the template's `templateVersion`. `variant` is the matched manifest variant. The header is what makes the file re-generatable and lets a later run recognise output from an older template — and it is what step 10 keys on when deciding whether an old `.claude/globalize-rules.md` is safe to delete.
 
 Bump `templateVersion` only when the **rendering contract** changes — the conditions, the values, or how the body is projected into the output. Moving where the rendered file is written is not a rendering-contract change: the bytes are identical, and a stale file is detected by path, not by version.
+
+### `.globalize/format-module.json`
+
+```json
+{ "specifier": "@/i18n/format",
+  "path": "src/i18n/format.ts",
+  "surface": ["money","number","percent","compact","unit","date","time","dateTime","relativeTime","list"],
+  "defaultCurrency": "EUR",
+  "currencySource": "grep:src/checkout/price.ts:12" }
+```
+
+`specifier` is what an import statement in the target project would name — the project's path alias (`@/`, `~/`) when `tsconfig.json` declares one in `compilerOptions.paths`, otherwise a relative specifier. On stacks with no import statement (Rails helpers, Swift same-module extensions) it is the human-readable location the rules file names instead. `path` is repo-relative and is what `evals/verify-format-helpers.sh --project` resolves.
+
+`surface` always has exactly ten entries, one per concept, **spelled as the module actually spells them** — `["money", …]` in TypeScript and Kotlin, `["format_money", …]` on Rails, the Swift style and function names on Apple targets. The verifier greps the module file for each entry, so the array is a claim the file must back. It is never pruned: a stack that cannot implement a concept emits a loudly-failing stub and still lists it.
+
+`currencySource` records *why* `defaultCurrency` was chosen — a `grep:<file>:<line>` hit, or `default` when nothing was findable and `USD` was assumed.
+
+**Where the format contract is enforced.** All of it lives in `evals/verify-format-helpers.sh`, not split across the two verifiers. `verify-rules-template.sh` keeps its existing job — grammar, self-containment, declared-vs-used in both directions — and the `formatModule` value it now sees is covered for free by its used-⊆-declared and declared-⊆-used checks.
 
 ### Wiring the rules in (`install_coding_rules`)
 
@@ -131,11 +150,11 @@ A core step, not an add-on, and not gated on any `SKILL.md §1.10` selection —
 
 Both edits follow the skill's usual guided/unguided rule: guided mode describes the change and waits for confirmation, unguided mode applies it directly.
 
-**If `generate_coding_rules` failed and there is no `.agents/globalize-rules.md` on disk, write neither bridge and create neither file.** A pointer or import aimed at a missing file opens every future session with a dangling reference. Because the step-9 deletion is gated on a successful write, a failed run also leaves any existing `.claude/globalize-rules.md` and its import untouched — the project keeps the working rules it already had.
+**If `generate_coding_rules` failed and there is no `.agents/globalize-rules.md` on disk, write neither bridge and create neither file.** A pointer or import aimed at a missing file opens every future session with a dangling reference. Because the step-10 deletion is gated on a successful write, a failed run also leaves any existing `.claude/globalize-rules.md` and its import untouched — the project keeps the working rules it already had.
 
 ### Fail closed
 
-If **any** surviving condition or value cannot be resolved, or the step-7 self-check fails: **never write a partial file.** Delete anything already written to `.agents/globalize-rules.md`, then:
+If **any** surviving condition or value cannot be resolved, or the step-8 self-check fails: **never write a partial file.** Delete anything already written to `.agents/globalize-rules.md`, then:
 
 - **Guided mode** — ask the user for the specific value. These are answerable questions ("Where do this project's catalogs live?", "Which locale is the source?"), and a one-line answer is a far better outcome than either a wrong rules file or none. Resolve, re-render, re-check. Only if the user can't answer, or the self-check still fails, stop the step and report which key or check failed.
 - **Unguided mode** — do not block the run. Skip the step entirely and record `⚠ coding rules not generated (<key> unresolved) — no rules file installed` in the end-of-run summary.

@@ -164,28 +164,40 @@ function SaveButton() {
 
 ## Numbers, currencies, and dates
 
-Use `i18n.number()` and `i18n.date()` for locale-aware formatting — they wrap `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale automatically. Pass the project's shared presets (`CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME`, exported from the locale module) rather than retyping an options object at each call site — the currency code in particular must not drift.
+**Call the project's formatters module.** Phase 2 created it (`generate_format_helpers`) and
+`.agents/globalize-rules.md` carries its real import specifier. Do **not** reach for `i18n.number()` /
+`i18n.date()` off the Lingui instance, and never construct `Intl` at a call site — both bypass the
+module's currency default, its date presets and its formatting-locale seam.
 
 ```tsx
-import { useLingui } from '@lingui/react/macro'
-import { CURRENCY, DATE_MEDIUM } from '<the project's locale module>'
+import { useFormatters } from '<the specifier from .agents/globalize-rules.md>'
 
 function PriceDisplay({ amount }: { amount: number }) {
-  const { i18n } = useLingui()
-  return <span>{i18n.number(amount, CURRENCY)}</span>
+  const f = useFormatters()
+  return <span>{f.money(amount)}</span>
 }
 
 function EventDate({ timestamp }: { timestamp: number }) {
-  const { i18n } = useLingui()
-  return <time>{i18n.date(new Date(timestamp), DATE_MEDIUM)}</time>
+  const f = useFormatters()
+  return <time>{f.date(timestamp)}</time>
 }
 ```
 
-The generated i18n rules file carries the real import path. If a format the project needs has no preset yet, add one to the locale module rather than inlining the options.
+In non-component code — loaders, route handlers, server code, tests — there is no React context, so use
+the non-hook form with an explicit locale:
 
-In non-component code where you have a locale string but no `i18n` instance, use `Intl.NumberFormat` / `Intl.DateTimeFormat` directly — still with the presets:
+```ts
+import { getFormatters } from '<the specifier from .agents/globalize-rules.md>'
 
-```tsx
-const formatted = new Intl.NumberFormat(locale, CURRENCY).format(amount)
-const date = new Intl.DateTimeFormat(locale, DATE_MEDIUM).format(new Date(timestamp))
+const f = getFormatters(locale)
+const formatted = f.money(amount)
+const date = f.date(timestamp)
 ```
+
+The ten helpers are `money`, `number`, `percent`, `compact`, `unit`, `date`, `time`, `dateTime`,
+`relativeTime`, `list`. If a value needs a shape none of them produce, add a preset to the module —
+do not inline an options object at the call site.
+
+For the full find-and-replace table (`'$' + price`, `toFixed(2)`, `toLocaleDateString()`, `dayjs().format()`,
+`join(', ')`, …), what must never be converted, and the ordering rule, follow
+`references/languages/js-ts/convert.format-pass.md`.

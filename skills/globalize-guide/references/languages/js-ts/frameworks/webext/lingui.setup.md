@@ -83,6 +83,9 @@ If the project is a Safari target (`safari-web-extension-converter` in scripts, 
 
 ## Step 2: Packages
 
+
+> **Before installing — Node ≥ 22.19 and ESM-only.** Every `@lingui/*` v6 package except `@lingui/swc-plugin` declares `engines.node >= 22.19.0`, and all of them are `"type": "module"` with no `require` condition, so no CJS file can `require()` them. `setup.locale-module.md` (read first on this variant) carries the full check and the failure modes. Do not use `@lingui/swc-plugin` to test the Node floor — it declares no `engines` at all.
+
 The orchestrator pre-installed the manifest's runtime and dev packages on its main thread (Phase 2.0) before dispatching you. **Treat them as already on disk — do not re-run `npm install` / `pnpm add` / `yarn add` for them.** The set is:
 
 | Package | Type | Purpose |

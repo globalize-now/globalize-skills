@@ -208,18 +208,33 @@ Only wrap fields that are rendered as **copy**. IDs, slugs, and raw API payloads
 
 ## Numbers, currencies, dates
 
-Paraglide has no formatting API of its own, so setup created `src/lib/format.ts` with the project's presets. **Call those helpers — never construct `Intl` at a call site.** They read the active locale themselves, so nothing needs `getLocale()`:
+Paraglide has no formatting API of its own, so Phase 2 created a formatters module
+(`generate_format_helpers`; `$lib/format` by default — `.agents/globalize-rules.md` carries the real
+specifier). **Call its helpers — never construct `Intl` at a call site.** They read the active locale
+themselves, so nothing needs `getLocale()`, and the module exports each function directly:
 
 ```ts
-import { formatCurrency, formatDate } from '$lib/format'
+import { money, date } from '<the specifier from .agents/globalize-rules.md>'
 
-formatCurrency(amount)     // not new Intl.NumberFormat(getLocale(), { style: 'currency', … })
-formatDate(timestamp)
+money(amount)     // not new Intl.NumberFormat(getLocale(), { style: 'currency', … })
+date(timestamp)
 ```
 
-If a value needs a format the module has no preset for, **add the preset to `src/lib/format.ts`** and call it — do not inline an options object. A currency code or date style written out at two call sites will drift.
+The ten are `money`, `number`, `percent`, `compact`, `unit`, `date`, `time`, `dateTime`, `relativeTime`,
+`list`. The module also still exports `formatCurrency` / `formatNumber` / `formatDate` / `formatDateTime`
+as `@deprecated` aliases so an existing project's call sites keep compiling across a re-run — **do not
+delete them, and do not write new code against them.** Convert toward the short names.
 
-When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), hardcoded date formats (`'MM/DD/YYYY'`), and any existing `new Intl.` construction outside the format module — a project that already hand-rolls `formatPrice()` should have that function rewritten to delegate to `formatCurrency()`, not have its call sites rewritten. Details in `paraglide/rules.template.md`. (ICU `number` skeletons inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup — prefer the format module for dates/times.)
+If a value needs a format the module has no preset for, **add the preset to the module** and call it — do
+not inline an options object. A currency code or date style written out at two call sites will drift.
+
+When converting, flag and replace `toFixed()`, concatenated currency symbols (`'$' + price`), hardcoded
+date formats (`'MM/DD/YYYY'`), and any existing `new Intl.` construction outside the format module — a
+project that already hand-rolls `formatPrice()` should have that function rewritten to delegate to
+`money()`, not have its call sites rewritten. The full find-and-replace table, the never-convert list,
+and the ordering rule are in `references/languages/js-ts/convert.format-pass.md`. (ICU `number` skeletons
+inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup —
+prefer the format module for dates/times.)
 
 ---
 

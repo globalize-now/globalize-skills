@@ -8,10 +8,10 @@ description: >-
   user-invocable. Ensures strings, plurals, interpolation, escaping, and
   do-not-translate runs are authored correctly as code is written.
 template: android-strings
-templateVersion: 2
+templateVersion: 3
 conditions: [uiToolkit, localeSwitcher]
-values: [resDir, sourceLocale, targetLocales]
-budget: { "default": 180 }
+values: [resDir, sourceLocale, targetLocales, formatModule]
+budget: { "default": 225 }
 ---
 
 # Android String-Resource Coding Rules
@@ -113,36 +113,81 @@ languages with more than two forms.
 ## Numbers, currencies, dates — format, never concatenate
 
 `"$" + amount` hardcodes both the symbol and its position — many locales put it after the number — and
-`String.format("%.2f", amount)` renders `1234.50` with the wrong separators. Format through the framework,
-using the locale the resources actually resolved to:
+`String.format("%.2f", amount)` renders `1234.50` with the wrong separators. Never construct `NumberFormat`,
+`DateTimeFormatter`, `Currency`, or `android.icu.*` directly at a call site — route every formatted value
+through `<<formatModule>>`, this project's one formatting surface:
 
 <!-- if: uiToolkit != "compose" -->
-- Views/Kotlin — `val locale = resources.configuration.locales[0]`
+- Views/Kotlin — `Formatters.of(context).money(amount)`. Pass an Activity (or a View's) context, never
+  `applicationContext`.
 <!-- /if -->
 <!-- if: uiToolkit != "views" -->
-- Compose — `val locale = LocalConfiguration.current.locales[0]`
+- Compose — `LocalFormatters.current.money(amount)`. `LocalFormatters` is provided once at the Compose root;
+  reading it above that provider throws immediately — a loud, debuggable crash, not a silently wrong value.
 <!-- /if -->
 
 ```kotlin
-NumberFormat.getCurrencyInstance(locale).apply { currency = Currency.getInstance("USD") }.format(amount)
-NumberFormat.getInstance(locale).format(count)
-NumberFormat.getPercentInstance(locale).format(ratio)
+import <<formatModule>>
 
-DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale).format(date)
-DateUtils.formatDateTime(context, millis, FORMAT_SHOW_DATE or FORMAT_SHOW_TIME)
+val f = Formatters.of(context) // or LocalFormatters.current in Compose
+
+f.money(amount)                                // '$42.50' — currency comes from the data, not the reader
+f.number(1234.5)                               // '1,234.5'
+f.percent(0.42)                                // '42%'
+f.compact(12_000)                              // '12K'
+f.unit(5, "km")                                // '5 km'
+f.date(value)                                  // 'Aug 21, 2026' — 'medium' is the default preset
+f.time(value)                                  // '4:05 PM'
+f.dateTime(value)                              // 'Aug 21, 2026, 4:05 PM'
+f.relativeTime(value)                          // '3 days ago'
+f.list(listOf("Alice", "Bob", "Carol"))        // 'Alice, Bob, and Carol'
 ```
 
-**The currency code is a property of the price, not of the reader.** Set it explicitly from your data
-(`Currency.getInstance("USD")`); never leave it defaulting to the device locale's currency, which would
-relabel a dollar price as euros for a German user. The locale decides *formatting*, the data decides *which
-currency*.
+**The currency code is a property of the price, not of the reader.** Pass it explicitly from your data —
+`Formatters.of(context).money(order.total, order.currency)` — never let it default to the device
+locale's currency, which would relabel a dollar price as euros for a German user. The locale decides
+*formatting*; the data decides *which currency*. Omitting the second argument formats `DEFAULT_CURRENCY`, this
+project's own default — never the reader's locale. Passing a code `money()` doesn't recognize as valid ISO 4217
+throws `IllegalArgumentException` rather than silently substituting `DEFAULT_CURRENCY` — validate currency codes
+where they enter this project's data, not inside the formatter.
+
+<!-- if: uiToolkit != "views" -->
+**Provide `LocalFormatters` once, at the Compose root:**
+
+```kotlin
+CompositionLocalProvider(
+    LocalFormatters provides Formatters(
+        Formatters.formatLocale(LocalConfiguration.current),
+        LocalContext.current,
+    )
+) { AppContent() }
+```
+
+Read `LocalConfiguration.current`, not just `LocalContext.current` — that is what makes the provider recompose
+on a locale change when the Activity is not recreated for it (`android:configChanges` includes `locale`).
+<!-- /if -->
+
+<!-- if: localeSwitcher == "true" -->
+**This project has an in-app language picker. Below API 33, never build a `Formatters` from
+`applicationContext`.** `AppCompatDelegate.setApplicationLocales` patches only `Activity` contexts below API 33
+— `applicationContext.resources.configuration` keeps returning the *system* locale there, silently, with no
+error. Always pass an Activity or Compose (`LocalContext.current`) context into `Formatters.of()`. A `Service`,
+a `WorkManager` `Worker`, or anything else with no Activity context must read
+`AppCompatDelegate.getApplicationLocales()` (AppCompat's own store, kept in sync everywhere, unlike
+`Configuration`) and build `Formatters` from that instead of a `Context`. On API 33+ the system `LocaleManager`
+applies the per-app locale at the process level, so `applicationContext` is safe there too — this workaround is
+only needed to also cover API 21–32.
+<!-- /if -->
 
 **Never hardcode a date pattern.** `SimpleDateFormat("MM/dd/yyyy")` forces American field order everywhere.
-Use `FormatStyle` with `DateTimeFormatter`, or `DateUtils.formatDateTime()` — the latter also honours the
-user's 12/24-hour system setting, which a pattern string cannot.
+`<<formatModule>>`'s `date`/`time`/`dateTime` already use `FormatStyle` presets under `DateTimeFormatter`, which
+honour both field order and the user's 12/24-hour system setting — a pattern string can do neither.
 
 Format the value first, then pass the **formatted string** into the resource as `%1$s` — not `%1$d` / `%1$f`,
 which format the raw number without going through the locale-aware formatter.
+
+**Needs a format `<<formatModule>>` has no preset for?** Add it to the module. A date style or currency code
+written out at two call sites will drift.
 
 **Flag for review:** `"$" + amount`, `String.format("%.2f", price)`, `SimpleDateFormat("…")`, and any raw
 number or date interpolated into a Kotlin template that reaches the UI.

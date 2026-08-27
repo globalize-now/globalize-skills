@@ -8,10 +8,10 @@ description: >-
   Not user-invocable. Ensures strings, plurals, interpolation, HTML-safe keys,
   and per-request locale scope are authored correctly as code is written.
 template: rails
-templateVersion: 1
+templateVersion: 2
 conditions: [urlLocaleRouting, railsI18nGem, modelContentGems]
-values: [catalogPath, sourceLocale, targetLocales]
-budget: { "default": 185 }
+values: [catalogPath, sourceLocale, targetLocales, formatModule]
+budget: { "default": 210 }
 ---
 
 # Rails I18n Coding Rules
@@ -173,19 +173,51 @@ t("profile.show.reply.#{user.gender}", default: t("profile.show.reply.other"))
 
 **Never reach for a CLDR plural group** (`one`/`other`) for non-count selection — plural categories are count-driven and will mis-select on a gender/category value. Gender and category selection is a separate concern, handled by explicit sub-keys as above.
 
-## Dates and times use `l()`; numbers use number helpers
+## Numbers, currencies, dates and times — route every call through `<<formatModule>>`
 
-**Dates and times** — format through `l` (localize), never a hardcoded format string. `I18n.l` / the `l` helper only localizes `Date`, `DateTime`, and `Time` objects; passing a numeric value raises `I18n::ArgumentError`.
-
-**Numbers and currency** — use the Action View number helpers, which read the active locale's `number.*` keys instead of hardcoding separators or currency symbols.
+Never hardcode a formatted number, a currency symbol, or a date/time format string, and never call `number_to_currency` / `number_with_delimiter` / `number_to_percentage` / `number_to_human` / `distance_of_time_in_words` / `I18n.l` directly at a call site — route through `<<formatModule>>`'s ten methods instead, so currency, precision, and presets stay defined in one place.
 
 ```ruby
-l(Time.current, format: :short)
-l(Date.today)
-number_to_currency(price)           # backed by number.currency.*
-number_with_delimiter(1_234_567)    # backed by number.format.*
-# also: number_with_precision, number_to_human
+# In any view or mailer — <<formatModule>> is mixed in automatically:
+format_money(amount)
+
+# Everywhere else — models, service objects, jobs, rake tasks, `rails runner` —
+# reach the same methods through Rails' own helper proxy:
+ActionController::Base.helpers.format_money(order.total, order.currency)
 ```
+
+All ten:
+
+```ruby
+format_money(amount)                              # '$42.50' — see below, currency comes from the data
+format_number(1234.5)                             # '1,234.5'
+format_percent(0.42)                              # '42.0%' — fixed one-decimal precision
+format_compact(12_000)                            # '12 Thousand' — word units, not 'K'/'M' abbreviations
+format_unit(5, 'km')                              # '5 km'
+format_date(value, :short)                        # 'medium' is the default if omitted — 'Aug 21' (rails-i18n's short has no year)
+format_date(value, :long)                         # 'August 21, 2026'
+format_time(value)                                # '4:05 PM'
+format_date_time(value)                           # 'Aug 21, 2026, 4:05 PM'
+format_relative_time(value)                       # '3 days ago'
+format_list(['Alice', 'Bob', 'Carol'])            # 'and' is the default — 'Alice, Bob, and Carol'
+format_list(['Alice', 'Bob'], :or)                # 'Alice or Bob'
+```
+
+**Currency comes from the data, not the reader.** `format_money(order.total, order.currency)` renders whatever currency the *order* carries; `format_money(amount)` with no second argument formats the project default and, only then, may the active locale's own configured symbol win. Never derive a currency code from the locale — that relabels a dollar price as euros for a German reader.
+
+**`I18n.l` raises on a numeric argument.** It localizes `Date`, `DateTime`, and `Time` only — a bare `Float` or `Integer` raises `I18n::ArgumentError`. `<<formatModule>>`'s `format_date` / `format_time` / `format_date_time` already coerce via `.to_date` / `.to_time`, so they accept `Date` / `Time` / `DateTime` / parseable `String` values directly; a raw Unix timestamp still needs `Time.at(...)` first.
+
+**`<<formatModule>>` needs Action View for six of its ten methods** (`format_money`, `format_number`, `format_percent`, `format_compact`, `format_unit`, `format_relative_time`) — a bare `include FormatHelper` on a model, job, or service object is not enough for those six. Use `ActionController::Base.helpers.format_money(...)` (works anywhere with no include), or `include ActionView::Helpers::NumberHelper` / `DateHelper` alongside `FormatHelper` on that class. `format_locale`, `format_date`, `format_time`, `format_date_time`, and `format_list` need neither — they run everywhere already.
+
+<!-- if: railsI18nGem == "true" -->
+**`rails-i18n` already ships `number.*`, `date.formats.{default,short,long}`, `time.formats.{default,short,long}`, and `support.array.{words_connector,two_words_connector,last_word_connector}`** for every locale it covers — never re-author those. `<<formatModule>>` adds seven keys neither Rails core nor `rails-i18n` ships under any locale: `date.formats.medium`, `time.formats.{time,date_time}`, `time.{ago,from_now}`, and `support.array.or.{two_words_connector,last_word_connector}`. Every new target locale needs its own translation of these seven — `rails-i18n` never fills them in, no matter how well it covers that locale otherwise.
+<!-- else -->
+**This project does not have `rails-i18n`.** `<<formatModule>>`'s number and date formatting only reads correctly-localized defaults once it is installed (see the plurals section above) — until then, `number.*` and `date.formats`/`time.formats` fall back to English regardless of the active locale. `<<formatModule>>` also adds seven keys neither Rails core nor `rails-i18n` ships under any locale: `date.formats.medium`, `time.formats.{time,date_time}`, `time.{ago,from_now}`, and `support.array.or.{two_words_connector,last_word_connector}` — author these directly, for every locale, regardless of whether `rails-i18n` is ever added.
+<!-- /if -->
+
+**Needs a format `<<formatModule>>` has no preset for?** Add it to the module. A date style or currency code written out at two call sites will drift.
+
+**Flag for review:** `strftime(`, `"$#{`, a bare `number_to_currency` with an inline `unit:`, and `round(2)` in a view.
 
 ## What NOT to wrap
 
@@ -196,7 +228,7 @@ Do not give these a `t()` call or a YAML catalog entry:
 <!-- /if -->
 - **`db/` directory** — migrations, schema, seeds are not user-facing UI text.
 <!-- if: railsI18nGem == "true" -->
-- **`rails-i18n`-provided defaults** — `activerecord.errors.messages.*`, `date.formats`, `number.*`, and similar keys that `rails-i18n` already ships for each locale. Only app-authored overrides of these belong in your connected catalog.
+- **`rails-i18n`-provided defaults** — `activerecord.errors.messages.*`, `date.formats.{default,short,long}`, `number.*`, and similar keys that `rails-i18n` already ships for each locale. Only app-authored overrides of these belong in your connected catalog. **Exception:** `date.formats.medium` (and the other six keys `<<formatModule>>` adds — see "Numbers, currencies, dates and times" above) is *not* one of `rails-i18n`'s defaults and must be authored for every locale — it only looks like the same bucket.
 <!-- /if -->
 - **Non-user-facing internal strings** — log messages, console output, internal codes, object keys, `data-testid` values, enum/constant names, URL paths, API route strings, `config/` file values, `raise`/`fail` messages that never surface in the UI.
 - **CSS class names** — `class="font-bold text-sm"`. When writing CSS, prefer logical properties (`margin-inline-start`, not `margin-left`); see the `css-i18n` skill.

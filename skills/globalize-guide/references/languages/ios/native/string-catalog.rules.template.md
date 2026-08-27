@@ -9,10 +9,10 @@ description: >-
   format specifiers and plurals are authored correctly, translator comments are
   attached, and non-UI strings are left alone as code is written.
 template: string-catalog
-templateVersion: 2
+templateVersion: 3
 conditions: [uiFramework, bundleScope]
-values: [catalogPath, sourceLocale, targetLocales]
-budget: { "uiFramework == \"swiftui\"": 195, "default": 165 }
+values: [catalogPath, sourceLocale, targetLocales, formatModule]
+budget: { "uiFramework == \"swiftui\"": 215, "default": 180 }
 ---
 
 # Apple String Catalog Coding Rules
@@ -180,29 +180,46 @@ Always include `other` — it is the required fallback every language uses, and 
 
 ## Numbers, currencies, dates — format, never interpolate raw
 
-A raw `\(value)` renders `1234.5` and `2026-03-04 15:30:00 +0000` in every language. Format through Foundation so separators, currency placement, and date field order follow the reader's locale:
+A raw `\(value)` renders `1234.5` and `2026-03-04 15:30:00 +0000` in every language. Never construct `NumberFormatter`, `DateFormatter`, or a bare `FormatStyle` at a call site — route every formatted value through `<<formatModule>>`, this project's one formatting surface, so separators, currency placement, and date field order follow the reader's locale and every call agrees on which locale that is:
 
 ```swift
-amount.formatted(.currency(code: "USD"))   // $1,234.50 · 1.234,50 $ · 1 234,50 $US
-count.formatted()                          // 1,234 · 1.234 · 1 234
-ratio.formatted(.percent)                  // 25.6% · 25,6 %
-date.formatted(date: .abbreviated, time: .omitted)
-date.formatted(date: .abbreviated, time: .shortened)
+amount.formatted(.money)                                 // '$1,234.50' — this project's default currency
+amount.formatted(.money(order.currency))                  // when the data carries its own currency
+rating.formatted(.plainNumber)                             // '4.5' — Double, Decimal and Int each have one
+ratio.formatted(.percentage)                               // '42%' — Double/Decimal take a ratio (0.42); Int takes 42
+value.formatted(.compactNumber)                            // '12K'
+<<formatModule>>.measurement(5.2, UnitLength.kilometers)   // '5.2 km' — unit is a typed Dimension, not a string
+date.formatted(.mediumDate)                                // 'August 21, 2026' — the default date preset
+date.formatted(.shortDate)                                 // 'Aug 21, 2026' — abbreviated month form
+date.formatted(.timeOnly)                                  // '4:05 PM'
+date.formatted(.dateAndTime)                               // 'Aug 21, 2026, 4:05 PM'
+<<formatModule>>.relativeTime(date)                         // '3 days ago' / 'yesterday'
+<<formatModule>>.list(["Alice", "Bob", "Carol"])            // 'Alice, Bob, and Carol'
 ```
 
-**The currency code is a property of the price, not of the reader.** Pass the currency your data actually carries (`"USD"`, `"EUR"`); never derive it from `Locale.current`, which would relabel a dollar price as euros for a German reader. The locale decides *formatting*; your data decides *which currency*.
+**The currency code is a property of the price, not of the reader.** Pass the currency your data actually carries — `amount.formatted(.money(order.currency))`; never derive it from `Locale.current`, which would relabel a dollar price as euros for a German reader. Omitting the argument formats `<<formatModule>>`'s own project default, never the reader's locale. The locale decides *formatting*; your data decides *which currency*.
+
+**`.money`, `.plainNumber`, `.percentage` and `.compactNumber` are each declared over all three numeric families — `Double`, `Decimal` and `Int`** — because `Decimal` does not conform to `BinaryFloatingPoint` and so does not satisfy the `Double` extension. Each is spelled the same way whichever family the value is stored in. (`measurement` is the exception, and not for this reason: Foundation's `Measurement.FormatStyle` takes a typed `Dimension`, so it is a `<<formatModule>>` function rather than a `FormatStyle` extension.) Use whichever matches how your data is actually typed; never convert a `Decimal` price to `Double` to satisfy a formatter — that reintroduces the binary floating-point rounding error `Decimal` exists to avoid.
+
+**Never reach for Foundation's own un-wrapped `.formatted(.number)` / `.formatted(.percent)` / `.formatted(.currency(code:))`.** They compile, and they are wrong here: they resolve their locale from Foundation's default and never consult `<<formatModule>>`'s `formatLocale`, so a value formatted that way silently ignores this project's formatting-locale seam. Always use the project's styles above.
+
+**`.percentage` scales differently per family, and that is Foundation's behaviour, not this project's.** `Double` and `Decimal` take a **ratio** — `0.4567` renders `45.67%`, and `Decimal(42)` renders `4,200%`. `Int` takes a **whole percentage** — `42` renders `42%`. Pass the shape the overload expects instead of converting between families.
 
 Interpolating an already-formatted value into a localized string is correct — it extracts as `%@`:
 
 ```swift
-String(localized: "Total: \(amount.formatted(.currency(code: "USD")))")
+String(localized: "Total: \(amount.formatted(.money))")
 ```
 
-**Never hardcode a date format string.** `DateFormatter().dateFormat = "MM/dd/yyyy"` forces American field order on every locale. Below the `.formatted()` availability floor (iOS 15 / macOS 12), set `dateStyle` / `timeStyle`, or use `setLocalizedDateFormatFromTemplate(_:)` for a specific field set — and **cache the formatter**, since constructing `DateFormatter` / `NumberFormatter` per call is a well-known performance trap.
+**Never hardcode a date format string.** `DateFormatter().dateFormat = "MM/dd/yyyy"` forces American field order on every locale. If this project's deployment target is below iOS 15, `<<formatModule>>` additionally exposes `…Compat` siblings (`moneyCompat`, `mediumDateCompat`, …) backed by a **cached** `NumberFormatter` / `DateFormatter` — check the header comment at the top of the generated file for which functions have one before assuming the bare style name above compiles unconditionally on this project; constructing `DateFormatter` / `NumberFormatter` per call instead of caching them is a well-known performance trap either way.
+
+**This module's formatting locale is `Formatters.formatLocale`, not the ambient SwiftUI environment.** Every style above chains `.locale(Formatters.formatLocale)` explicitly, so a `.environment(\.locale, …)` override (SwiftUI Previews, an in-app switcher) has **no effect** on anything routed through `<<formatModule>>` — the style already carries its own explicit locale. To preview or switch locales for values formatted through this module, assign `Formatters.formatLocale` itself — `Formatters.formatLocale = Locale(identifier: "fr_FR")` — from a Previews harness or an in-app locale switcher; `.environment(\.locale, …)` alone will not touch it. The property is a stored, `nonisolated(unsafe)` static var precisely so this assignment compiles under Swift 6 strict concurrency; treat writes as rare, deliberate, main-thread UI actions rather than something written from multiple threads/tasks concurrently.
 <!-- if: uiFramework == "swiftui" -->
 
-In SwiftUI prefer the `format:` initializer over formatting into a `String` — it re-formats automatically when the environment locale changes: `Text(amount, format: .currency(code: "USD"))`, `Text(date, format: .dateTime.day().month().year())`.
+Prefer the `format:` initializer over formatting into a `String`: `Text(amount, format: .money)` re-reads `Formatters.formatLocale` every time this view's body runs, so it never goes stale the way a `String` captured once via `.formatted()` and stored does. Same styles as above: `Text(amount, format: .money(order.currency))`, `Text(date, format: .mediumDate)`.
 <!-- /if -->
+
+**Needs a format `<<formatModule>>` has no preset for?** Add it to the module. A date style or currency default written out at two call sites will drift.
 
 **Flag for review:** `String(format: "%.2f", price)`, `"$\(amount)"`, `dateFormat = "…"`, and any raw number or `Date` interpolated straight into user-visible copy.
 
