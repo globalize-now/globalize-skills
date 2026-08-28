@@ -88,7 +88,7 @@ bundle exec rubocop --only I18n app/controllers/ app/mailers/ app/helpers/ app/m
 
 Review flagged literals. For autocorrect, add `--autocorrect` — but review all changes, as `rubocop-i18n` replaces literals with `I18n.t('...')` (bare `I18n.t`, not the `t` helper). Prefer the `t` helper in views and the `t` controller helper in controllers; update generated calls accordingly.
 
-> **Herb note:** Herb (`@herb-tools/linter`) is an actively-developed HTML+ERB parser and linter and is the intended replacement for `erb_lint`. As of June 2026, Herb's rule set covers a11y, ActionView, and ERB formatting — it does **not** yet ship a hardcoded-string/i18n rule. Use `erb_lint`'s `HardCodedString` cop for ERB discovery until a Herb i18n rule lands.
+> **Herb note:** Herb (`@herb-tools/linter`) is an actively-developed HTML+ERB parser and linter and is the intended replacement for `erb_lint`. As of `v0.10.3` (2026-08-01), Herb's rule set covers a11y, ActionView, and ERB formatting — it does **not** yet ship a hardcoded-string/i18n rule. Use `erb_lint`'s `HardCodedString` cop for ERB discovery until a Herb i18n rule lands.
 
 ---
 

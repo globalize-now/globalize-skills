@@ -205,7 +205,7 @@ I18n/GetText:
 
 **Herb (`herb-tools`) — the migration target for ERB linting, but NOT for i18n discovery:**
 
-Herb is an actively-developed, modern ERB parser/linter/formatter and is the intended replacement for `erb_lint` for general ERB linting. It has a growing rule set (accessibility, ActionView, ERB formatting). However, **as of June 2026, Herb does not ship a hardcoded-string or i18n rule**. It cannot detect unlocalized user-facing strings. Do not install Herb as a replacement for `erb_lint`'s `HardCodedString` for i18n discovery — there is no equivalent rule.
+Herb is an actively-developed, modern ERB parser/linter/formatter and is the intended replacement for `erb_lint` for general ERB linting. It has a growing rule set (accessibility, ActionView, ERB formatting). However, **Herb does not ship a hardcoded-string or i18n rule** — verified against the linter's rule directory at `v0.10.3` (2026-08-01), where 107 rule files contain no `i18n`, `hardcode`, `locale` or `translat` rule. It cannot detect unlocalized user-facing strings. Do not install Herb as a replacement for `erb_lint`'s `HardCodedString` for i18n discovery — there is no equivalent rule.
 
 Herb is a reasonable addition for general ERB linting and formatting (non-i18n rules). If the project wants it for that purpose, it can coexist with `erb_lint` running only `HardCodedString`. When Herb gains an i18n/hardcoded-string rule, it will become the preferred tool for ERB i18n linting — watch for that.
 
