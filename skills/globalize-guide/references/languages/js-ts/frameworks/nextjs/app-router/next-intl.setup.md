@@ -212,6 +212,41 @@ export default getRequestConfig(async ({requestLocale}) => {
 
 This file runs on every request and provides the locale and messages to all Server Components.
 
+> **On Next.js 16.3+, prefer `next/root-params`.** next-intl deprecated the `requestLocale` parameter in **4.13.6** ([#2380](https://github.com/amannn/next-intl/issues/2380)) and `setRequestLocale` in **4.13.5** ([#1632](https://github.com/amannn/next-intl/issues/1632)); the replacement is Next.js 16.3's [`next/root-params`](https://next-intl.dev/blog/nextjs-root-params). Detect the installed `next` major.minor before choosing:
+>
+> ```ts
+> import * as rootParams from 'next/root-params';
+> import {getRequestConfig} from 'next-intl/server';
+> import {hasLocale} from 'next-intl';
+> import {notFound} from 'next/navigation';
+> import {routing} from './routing';
+>
+> export default getRequestConfig(async () => {
+>   const paramValue = await rootParams.locale();
+>
+>   let locale;
+>   if (hasLocale(routing.locales, paramValue)) {
+>     locale = paramValue;
+>   } else {
+>     notFound();
+>   }
+>
+>   return {
+>     locale,
+>     messages: (await import(`../../messages/${locale}.json`)).default
+>   };
+> });
+> ```
+>
+> Note the validation failure mode differs: the `requestLocale` form falls back to `routing.defaultLocale`, the `rootParams` form calls `notFound()`. That is upstream's recommendation, not a transcription slip — an unknown locale segment is a 404, not the default locale.
+>
+> Adopting this path has three consequences elsewhere in the setup:
+> - **`setRequestLocale` calls become unnecessary** — locale is resolved from the root params, so there is nothing to hand to next-intl per page. See "`setRequestLocale` must be called in every static page" below, which applies to the `requestLocale` path only.
+> - **A pass-through `app/layout.tsx` above `app/[locale]/` must go.** With root params the topmost layout must be the locale layout; use `global-not-found` for root-level 404s instead of a pass-through root layout.
+> - **`generateStaticParams` is still required** for static rendering. (`dynamicParams = false` does not work with Cache Components.)
+>
+> **`next/root-params` does not work in Route Handlers or Server Actions** at any Next version. Those still need locale passed explicitly as a function argument. Below Next 16.3, the `requestLocale` form above remains the only mechanism — it is deprecated, not removed, and `next-intl@^4` supports both.
+
 **Custom path note:** The next-intl plugin expects this file at `./i18n/request.ts` by default (relative to the project root). If the file is at a different location (e.g., `./src/i18n/request.ts` in a project with a `src/` directory), you may need to pass the custom path to the plugin:
 
 ```ts
@@ -493,6 +528,8 @@ export function generateStaticParams() {
 This goes in `app/[locale]/layout.tsx` alongside the layout component. Without it, locale pages are only rendered on-demand.
 
 ### `setRequestLocale` must be called in every static page, not just the layout
+
+> **Applies to the `requestLocale` path only** (Next < 16.3, or any project not using `next/root-params`). On the `next/root-params` path there are no `setRequestLocale` calls to place — skip this whole section.
 
 `setRequestLocale(locale)` opts the current render into static rendering by telling next-intl's server APIs which locale to resolve. **Next.js does not propagate layout `setRequestLocale` calls into individual pages** — each page that accepts `params.locale` must call `setRequestLocale` itself at the top of the component body, or static generation silently bails out to on-demand rendering and `useTranslations` / `getTranslations` inside that page throws at request time.
 

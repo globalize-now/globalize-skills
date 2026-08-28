@@ -8,8 +8,8 @@ description: >-
   numbers, currencies, dates, and plurals are wrapped correctly as code is
   written, so nothing needs fixing after the fact.
 template: next-intl
-templateVersion: 2
-conditions: [router, localeNavigation, catalogFormat, paramsShape]
+templateVersion: 3
+conditions: [router, localeNavigation, catalogFormat, paramsShape, localeSource]
 values: [i18nRequestPath, i18nNavigationPath, importPrefix, localeSegment, catalogPath, sourceLocale, targetLocales, formatModule]
 budget: { "router == \"app\"": 300, "default": 260 }
 ---
@@ -168,7 +168,7 @@ Decide **server vs client** before choosing a pattern.
 **Server components** (no `'use client'`):
 - Use `getTranslations()` for strings — async, must be `await`ed.
 - For numbers, currencies, dates and lists: **an `async` component can't call a hook.** Almost every Server Component that renders translated text is `async` (it `await`s `getTranslations()`), so use `await getFormatters()` from `<<formatModule>>` in it — same await rule as `getTranslations()`. Only a Server Component with no `await` anywhere in its body may call `useFormatters()` instead, the same as a Client Component would.
-- Every page rendered under `generateStaticParams` (or any static segment) **must call `setRequestLocale(locale)` before any translation lookup** — in the page itself, not only in the layout. Without it the page silently drops back to dynamic rendering on every request, and the tests still pass.
+- The locale-resolution rule for statically rendered pages is below, under **Locale resolution (server)** — it differs by `localeSource` and must not be applied unconditionally.
 - Leave `<NextIntlClientProvider>` in `app/<<localeSegment>>/layout.tsx` without an explicit `messages` prop unless you need to filter; next-intl then serialises only what the client tree references. Passing every message ships the whole catalog to every page.
 
 **Client components** (`'use client'`):
@@ -206,7 +206,7 @@ Route `params` is a **Promise** on Next.js 15+ — `await` it before anything el
 ```tsx
 export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  setRequestLocale(locale);          // before any translation lookup
+  // then apply the locale-resolution rule below
 }
 ```
 
@@ -216,11 +216,31 @@ Route `params` is a **plain object** on Next.js 13–14 — destructure it direc
 
 ```tsx
 export default async function Page({ params: { locale } }: { params: { locale: string } }) {
-  setRequestLocale(locale);          // before any translation lookup
+  // `locale` is available synchronously; then apply the locale-resolution rule below
 }
 ```
 
 <!-- /if -->
+<!-- if: localeSource == "request-locale" -->
+## Locale resolution (server)
+
+Every page rendered under `generateStaticParams` (or any static segment) **must call `setRequestLocale(locale)` before any translation lookup** — in the page itself, not only in the layout. Next does not propagate the layout's call into pages. Without it the page silently drops back to dynamic rendering on every request, and the tests still pass.
+
+```tsx
+import {setRequestLocale} from 'next-intl/server';
+setRequestLocale(locale);            // first statement, before any getTranslations/useTranslations
+```
+
+Client components (`'use client'`) do not need it — static rendering applies to server components only.
+<!-- /if -->
+<!-- if: localeSource == "root-params" -->
+## Locale resolution (server)
+
+Locale is resolved once in `<<i18nRequestPath>>` via `await rootParams.locale()`. **Never call `setRequestLocale`** — it is deprecated and does nothing this project needs. Pages under `generateStaticParams` still need `generateStaticParams` itself for static rendering; nothing else per page.
+
+`next/root-params` does not work in **Route Handlers or Server Actions**. There, take the locale as an explicit function argument and pass it through: `getTranslations({locale})`.
+<!-- /if -->
+
 ## Plurals, select, and ICU MessageFormat
 
 Any time a string's wording depends on a number — singular/plural nouns, subject-verb agreement, anything count-sensitive — it is a plural string. Keep every form inside a single message; never branch in JS.
