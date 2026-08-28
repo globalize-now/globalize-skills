@@ -25,7 +25,13 @@ npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/detect-locale@^6'
 npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6' '@lingui/vite-plugin@^6'
 ```
 
-**Version pinning:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the build fails with an AST schema or plugin invocation error, look up the compatible version at https://plugins.swc.rs and pin it exactly — e.g. `npm install -D @lingui/swc-plugin@5.8.0`. See "SWC plugin version mismatch" in Common Gotchas.
+**Version compatibility for `@lingui/swc-plugin`.** SWC's Wasm plugin ABI has been backward-compatible since **`@swc/core` 1.15.0** ([announcement](https://blog.swc.rs/2025-11-4-wasm-backward-compatibility)), and `@lingui/swc-plugin` is built against a pinned `swc_core`: `6.2.0`-`6.6.0` against `swc_core@66.0.3`, and **`6.7.0`+ against `swc_core@77.1.1`** ([plugin table](https://github.com/lingui/swc-plugin/blob/6.7.0/packages/lingui-macro/README.md#compatibility)). `^6` resolves to `6.7.0` today, so the host must ship `swc_core` 77.x — that is `@swc/core` **1.16.x** (`1.16.1` → `swc_core@77.0.2`; `1.15.46` → `74.0.1`; `1.15.11` → `56.0.0`). So `^6` needs no pinning on a **current** host — but `@vitejs/plugin-react-swc >= 4.2.3` is no longer a sufficient floor: its dependency is `@swc/core@^1.15.11` (`4.3.3`: `^1.15.46`), and a caret range is not a resolved version. A lockfile holding `@swc/core` at `1.15.11` runs `swc_core@56.0.0`, well below the plugin's 77.x. Install `@vitejs/plugin-react-swc@^4` **and** let `@swc/core` resolve to `1.16.x`; do not pin the host's `@swc/core` backwards. **Do not pin the plugin backwards by default either.**
+
+If the build fails with an AST schema or plugin invocation error (`failed to invoke plugin: ...`, `swc_core version mismatch`), the host is older than that. In order:
+
+1. **Raise the host** — `npm install -D '@vitejs/plugin-react-swc@^4'`. The 3.x line pulls `@swc/core` ~1.11-1.12, from before the compatible ABI existed.
+2. If the project must stay on `@vitejs/plugin-react-swc@3.x`, the plugin has to match the host's `swc_core` exactly. Look up the host's range at <https://plugins.swc.rs> and pin a `@lingui/swc-plugin` version **whose `@lingui/core` peer admits the major this project installs**. For a v6 project that means `6.0.0`-`6.1.0` (`swc_core@50.2.3`) and nothing older: every `5.x` requires `@lingui/core@5` and every `4.x` requires `@lingui/macro@4`, so both fail `ERESOLVE` here.
+3. If no such pair exists, switch to the **Babel** variant of this stack rather than downgrading `@lingui/core`.
 
 ## Build Tool Integration
 
