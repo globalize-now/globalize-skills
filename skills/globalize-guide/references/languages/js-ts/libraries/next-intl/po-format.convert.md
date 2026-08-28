@@ -82,15 +82,14 @@ When wrapping a string during sequential processing (small projects with one wra
 | `msgstr` | yes | ICU body. Source locale → actual text. Other locales → placeholder (copy the source text; globalize.now or a human translator will replace it later). |
 | `#. description` | yes | One-line note about intent, audience, or tone. **The point of choosing PO. Do not skip it.** |
 | `#: reference` | yes | `src/path/to/File.tsx` pointing at the file that renders the string. Line number optional but helpful (`src/components/Header.tsx:42`). |
-| `msgctxt` | occasional | Only when two strings with identical source text need different translations (e.g. "Post" as verb vs. noun). Pair it with a distinguishing suffix in the `msgid`. |
+| `msgctxt` | avoid | **Not translator context in next-intl.** The codec builds the key as `msgctxt` + `.` + `msgid`, so a `msgctxt` line moves the entry to a different key and `t()` stops resolving it. To split two identical source strings, give them distinct `msgid` dot-paths (`ItemRow.deleteVerb` / `ItemRow.deleteNoun`) and explain the difference in `#.`. |
 
-Order inside an entry is comment lines first, then `msgctxt` (if any), then `msgid`, then `msgstr`. Example:
+Order inside an entry is comment lines first, then `msgid`, then `msgstr`. Example:
 
 ```
 #. Tooltip on the delete icon in the item list
 #: src/components/ItemRow.tsx:64
-msgctxt "icon-tooltip"
-msgid "ItemRow.delete"
+msgid "ItemRow.deleteTooltip"
 msgstr "Delete"
 ```
 
