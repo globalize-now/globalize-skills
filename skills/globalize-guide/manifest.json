@@ -16,7 +16,10 @@
           "references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/lingui.convert.md"],
+        "convert": [
+          "references/languages/js-ts/frameworks/nextjs/app-router/lingui.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -30,7 +33,10 @@
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md"],
-        "convert": ["references/languages/js-ts/frameworks/nextjs/app-router/next-intl.convert.md"],
+        "convert": [
+          "references/languages/js-ts/frameworks/nextjs/app-router/next-intl.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/next-intl/rules.template.md"],
         "optional": {
           "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
@@ -48,7 +54,10 @@
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md"],
-        "convert": ["references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.convert.md"],
+        "convert": [
+          "references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/next-intl/rules.template.md"],
         "optional": {
           "po-format-setup": ["references/languages/js-ts/libraries/next-intl/po-format.setup.md"],
@@ -80,7 +89,10 @@
           "references/languages/js-ts/frameworks/vite/react-swc/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -98,7 +110,10 @@
           "references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -116,7 +131,10 @@
           "references/languages/js-ts/frameworks/tanstack-start/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -137,7 +155,10 @@
           "references/languages/js-ts/frameworks/tanstack-start/swc/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -155,7 +176,10 @@
           "references/languages/js-ts/frameworks/remix/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -173,7 +197,10 @@
           "references/languages/js-ts/frameworks/remix/swc/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -194,7 +221,10 @@
           "references/languages/js-ts/frameworks/react-router-framework/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -212,7 +242,10 @@
           "references/languages/js-ts/frameworks/react-router-framework/swc/lingui.setup.md",
           "references/languages/js-ts/libraries/lingui/setup.navigation.md"
         ],
-        "convert": ["references/languages/js-ts/libraries/lingui/convert.standard-react.md"],
+        "convert": [
+          "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"]
       }
     },
@@ -231,7 +264,8 @@
         ],
         "convert": [
           "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
-          "references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md"
+          "references/languages/js-ts/frameworks/vite/vue/vue-i18n.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
         ],
         "rulesTemplate": ["references/languages/js-ts/libraries/vue-i18n/rules.template.md"],
         "optional": {
@@ -254,7 +288,8 @@
         ],
         "convert": [
           "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
-          "references/languages/js-ts/frameworks/nuxt/vue-i18n.convert.md"
+          "references/languages/js-ts/frameworks/nuxt/vue-i18n.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
         ],
         "rulesTemplate": ["references/languages/js-ts/libraries/vue-i18n/rules.template.md"],
         "optional": {
@@ -277,7 +312,8 @@
         ],
         "convert": [
           "references/languages/js-ts/libraries/vue-i18n/convert.shared.md",
-          "references/languages/js-ts/frameworks/quasar/vue-i18n.convert.md"
+          "references/languages/js-ts/frameworks/quasar/vue-i18n.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
         ],
         "rulesTemplate": ["references/languages/js-ts/libraries/vue-i18n/rules.template.md"],
         "optional": {
@@ -295,7 +331,10 @@
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md"],
-        "convert": ["references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md"],
+        "convert": [
+          "references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/libraries/paraglide/rules.template.md"],
         "optional": {
           "setup-add-ons": ["references/languages/js-ts/libraries/paraglide/setup.add-ons.md"],
@@ -319,7 +358,10 @@
       },
       "references": {
         "setup": ["references/languages/js-ts/frameworks/webext/webext-native.setup.md"],
-        "convert": ["references/languages/js-ts/frameworks/webext/webext-native.convert.md"],
+        "convert": [
+          "references/languages/js-ts/frameworks/webext/webext-native.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
         "rulesTemplate": ["references/languages/js-ts/frameworks/webext/webext-native.rules.template.md"],
         "optional": {
           "setup-add-ons": ["references/languages/js-ts/frameworks/webext/setup.add-ons.md"]
@@ -346,7 +388,8 @@
         ],
         "convert": [
           "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
-          "references/languages/js-ts/frameworks/webext/lingui.convert.md"
+          "references/languages/js-ts/frameworks/webext/lingui.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
         ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"],
         "optional": {
@@ -377,7 +420,8 @@
         ],
         "convert": [
           "references/languages/js-ts/libraries/lingui/convert.standard-react.md",
-          "references/languages/js-ts/frameworks/webext/lingui.convert.md"
+          "references/languages/js-ts/frameworks/webext/lingui.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
         ],
         "rulesTemplate": ["references/languages/js-ts/libraries/lingui/rules.template.md"],
         "optional": {

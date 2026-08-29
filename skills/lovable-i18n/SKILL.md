@@ -33,7 +33,7 @@ One thing the terminal limit does **not** block: connecting Globalize. Once the 
 |---|---|
 | 1.1 Detect | Identify the project stack (Vite SPA or TanStack Start) and any existing i18n |
 | 1.2 Ask | One chat message collecting source locale, target locales, URL routing, opt-ins |
-| 2A / 2B Setup | Add dependencies, build config, `i18n.ts`, provider, catalogs, language switcher |
+| 2A / 2B Setup | Add dependencies, build config, `i18n.ts`, provider, catalogs, formatters module, language switcher |
 | 3 Rules | Add Lingui coding rules to `AGENTS.md` so every future edit stays localized |
 | 4 Wrap | Wrap the app's existing hardcoded strings in Lingui macros |
 | 5 CI | Add a GitHub Action that runs `lingui extract` and keeps catalogs in sync |
@@ -140,7 +140,7 @@ Record the answers — `SOURCE_LOCALE`, the locale list, routing choice, opt-ins
 
 ## Phase 2A: Setup — Vite SPA
 
-Nine steps, A1–A9, in order. Then the optional URL-routing variant if the user opted in.
+Ten steps, A1–A10, in order. Then the optional URL-routing variant if the user opted in.
 
 ### A1. Dependencies
 
@@ -163,7 +163,7 @@ Dev dependencies:
 | `@lingui/vite-plugin` | `^6` | Compiles `.po` catalogs when the app imports them |
 | `@lingui/format-po` | `^6` | PO catalog formatter for `lingui.config.ts` |
 
-**Version pinning caveat:** `@lingui/swc-plugin` must match the `swc_core` version shipped by `@vitejs/plugin-react-swc`. If the preview build fails with an AST schema error or a plugin invocation error after this setup, look up the compatible version at https://plugins.swc.rs and pin `@lingui/swc-plugin` to that exact version (e.g. `5.8.0` — no caret). This exact pin overrides the `^6` default for this one package only.
+**Version compatibility caveat:** SWC's Wasm plugin ABI has been backward-compatible since `@swc/core` 1.15.0 ([announcement](https://blog.swc.rs/2025-11-4-wasm-backward-compatibility)), and `@lingui/swc-plugin` is built against a pinned `swc_core`: `6.2.0`-`6.6.0` against `swc_core@66.0.3`, and **`6.7.0`+ against `swc_core@77.1.1`**. `^6` resolves to `6.7.0` today, so `^6` needs no pin on a host whose `@swc/core` resolves to **1.16.x** (`swc_core@77.0.2`) — check the lockfile, not the `@vitejs/plugin-react-swc` range: `^4`'s dependency is only `@swc/core@^1.15.11`/`^1.15.46`, and `1.15.11` carries `swc_core@56.0.0`. If the preview build fails with an AST schema error or a plugin invocation error after this setup, the Lovable scaffold is on an older `@vitejs/plugin-react-swc` — raise it to `^4` first. If it cannot move, look the host range up at https://plugins.swc.rs and pin a `@lingui/swc-plugin` version **whose `@lingui/core` peer admits the major installed here** — for `^6` that is `6.0.0`-`6.1.0` and nothing older, since every `5.x` requires `@lingui/core@5` (a required peer, so `ERESOLVE` rather than a fix).
 
 ### A2. `vite.config.ts`
 
@@ -417,13 +417,145 @@ export function LanguageSwitcher() {
 
 Place the switcher where the user can see it — the app's existing header or navigation component if there is one, otherwise the top-level layout in `App.tsx`. Match the surrounding styling (Tailwind classes) rather than keeping the bare `w-[140px]`.
 
-### A9. Verify via the preview
+### A9. Create `src/i18n/format.ts`
+
+Ten locale-aware functions — money, numbers, percentages, dates, relative time, lists — behind one seam, `formatLocale()`. Wrapping strings (Phase 4) makes text translatable; this module is what makes a *value* — a price, a date, a count — render correctly per locale, and it's what the AGENTS.md rules (Phase 3) point at.
+
+Create the file exactly as below. It exports two ways to get at the ten functions: `useFormatters()`, a hook for components, and `getFormatters(locale)`, for everywhere else — see the "Numbers, currencies, dates" section of the Phase 3 rules for when to use which:
+
+```ts
+// src/i18n/format.ts
+import { useMemo } from 'react'
+import { useLingui } from '@lingui/react'
+
+export type DateInput = Date | number | string
+export type DatePreset = 'short' | 'medium' | 'long'
+
+/** The project's currency. Formatting follows the locale; the currency follows the data. */
+export const DEFAULT_CURRENCY = 'USD' // adjust to this project's currency
+
+/** Date presets. Trim to what this app actually formats. */
+export const DATE_PRESETS: Record<DatePreset, Intl.DateTimeFormatOptions> = {
+  short: { dateStyle: 'short' },
+  medium: { dateStyle: 'medium' },
+  long: { dateStyle: 'long' },
+}
+
+export type Formatters = {
+  money(amount: number, currency?: string): string
+  number(value: number, opts?: Intl.NumberFormatOptions): string
+  percent(value: number): string
+  compact(value: number): string
+  unit(value: number, unit: string): string
+  date(value: DateInput, preset?: DatePreset): string
+  time(value: DateInput): string
+  dateTime(value: DateInput): string
+  relativeTime(value: DateInput, now?: DateInput): string
+  list(items: string[], type?: 'and' | 'or'): string
+}
+
+/**
+ * THE SEAM. Formatting follows the UI locale today. To give this project a
+ * separate regional preference — an English UI that still renders 1.234,56 € —
+ * change this one function. Every formatter reads its locale from here.
+ */
+export function formatLocale(uiLocale: string): string {
+  return uiLocale
+}
+
+/** Intl instances keyed by locale + kind. Holds no request state, so it is safe under SSR. */
+const memo = new Map<string, unknown>()
+function cached<T>(key: string, make: () => T): T {
+  let f = memo.get(key) as T | undefined
+  if (f === undefined) memo.set(key, (f = make()))
+  return f
+}
+
+const toDate = (v: DateInput): Date => (v instanceof Date ? v : new Date(v))
+
+const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ['second', 1000],
+  ['minute', 60_000],
+  ['hour', 3_600_000],
+  ['day', 86_400_000],
+  ['week', 604_800_000],
+  ['month', 2_629_746_000],
+  ['year', 31_556_952_000],
+]
+
+/** Largest unit whose magnitude is at least 1; falls back to seconds. */
+export function pickRelativeUnit(deltaMs: number): [Intl.RelativeTimeFormatUnit, number] {
+  const abs = Math.abs(deltaMs)
+  for (let i = UNITS.length - 1; i >= 0; i--) {
+    const [unit, ms] = UNITS[i]
+    if (abs >= ms || i === 0) return [unit, Math.round(deltaMs / ms)]
+  }
+  return ['second', 0]
+}
+
+export function createFormatters(uiLocale: string): Formatters {
+  const locale = formatLocale(uiLocale)
+  const nf = (key: string, opts: Intl.NumberFormatOptions) =>
+    cached(`n:${locale}:${key}`, () => new Intl.NumberFormat(locale, opts))
+  const df = (key: string, opts: Intl.DateTimeFormatOptions) =>
+    cached(`d:${locale}:${key}`, () => new Intl.DateTimeFormat(locale, opts))
+
+  return {
+    money: (amount, currency = DEFAULT_CURRENCY) =>
+      nf(`cur:${currency}`, { style: 'currency', currency }).format(amount),
+    number: (value, opts) =>
+      opts
+        ? new Intl.NumberFormat(locale, opts).format(value)
+        : nf('dec', { style: 'decimal' }).format(value),
+    percent: (value) => nf('pct', { style: 'percent' }).format(value),
+    compact: (value) => nf('cmp', { notation: 'compact' }).format(value),
+    unit: (value, unit) => nf(`unit:${unit}`, { style: 'unit', unit }).format(value),
+    date: (value, preset = 'medium') =>
+      df(`p:${preset}`, DATE_PRESETS[preset]).format(toDate(value)),
+    time: (value) => df('t', { timeStyle: 'short' }).format(toDate(value)),
+    dateTime: (value) =>
+      df('dt', { dateStyle: 'medium', timeStyle: 'short' }).format(toDate(value)),
+    relativeTime: (value, now) => {
+      const from = now === undefined ? Date.now() : toDate(now).getTime()
+      const [unit, amount] = pickRelativeUnit(toDate(value).getTime() - from)
+      return cached(`r:${locale}`, () =>
+        new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
+      ).format(amount, unit)
+    },
+    list: (items, type = 'and') =>
+      cached(`l:${locale}:${type}`, () =>
+        new Intl.ListFormat(locale, {
+          style: 'long',
+          type: type === 'or' ? 'disjunction' : 'conjunction',
+        }),
+      ).format(items),
+  }
+}
+
+/** In components. Reads the locale from context, so it re-renders on locale change. */
+export function useFormatters(): Formatters {
+  const { i18n } = useLingui()
+  return useMemo(() => createFormatters(i18n.locale), [i18n.locale])
+}
+
+/** In loaders, server code, route handlers and tests — anywhere there is no React context. */
+export const getFormatters = createFormatters
+```
+
+Notes:
+
+- **Set `DEFAULT_CURRENCY` to the project's currency.** There's no terminal to grep with, so look through the codebase yourself: an existing `currency:` option, an `Intl.NumberFormat` / `toLocaleString` call, or a hardcoded symbol. If nothing turns up, leave `'USD'` and keep the `// adjust to this project's currency` comment — a wrong currency that looks deliberate is worse than one that flags itself.
+- **The TypeScript `lib` gate.** `Intl.ListFormat` needs `es2021.intl`; `Intl.RelativeTimeFormat`, `notation: 'compact'`, and `style: 'unit'` need `es2020.intl`. Open `tsconfig.json` (Lovable's TanStack Start template sometimes splits this into `tsconfig.app.json` via `references` — check both) and read `compilerOptions.lib`. If it resolves below `ES2021`, don't silently ship a module that fails to build: tell the user in one chat message and ask whether to raise `lib` to `ES2021` (recommended), or omit `list()` and `relativeTime()` — replacing their bodies with `throw new Error(...)` stubs so the ten-entry surface stays intact and a missed call fails loudly instead of silently.
+- **If `src/i18n/format.ts` already exists** (a re-run, or project code with that name), don't overwrite it — add any exports it's missing instead.
+
+### A10. Verify via the preview
 
 You can't run a build, but you can read the preview:
 
 1. **The preview builds with no errors.** If it fails mentioning the SWC plugin, an AST schema, or plugin invocation — that's the version-pinning caveat from A1; pin `@lingui/swc-plugin` exactly.
 2. **Switching languages works.** Pick a locale in the switcher; `document.documentElement.lang` updates (visible in the element inspector, or log it), and the choice survives a reload (localStorage).
 3. **Strings still show source text.** Expected — the catalogs are empty until strings are wrapped (Phase 4) and translations arrive (Phase 6). No console errors about failed catalog imports should appear.
+4. **The formatters module has no type errors.** If the preview's type-check surfaces an error on `Intl.ListFormat` or `Intl.RelativeTimeFormat`, that's the `lib` gate from A9 — resolve it there, don't suppress the error.
 
 Tell the user what to expect at this point: the plumbing is live, the visible text doesn't change yet.
 
@@ -558,7 +690,7 @@ Verify in the preview: `/` redirects to `/<locale>`, deep links re-prefix, switc
 
 ## Phase 2B: Setup — TanStack Start (SSR)
 
-Eight steps, B1–B8, in order. The defining constraint of this path: the app renders on the server (Cloudflare Workers), so **i18n state must be per-request**. A module-level i18n singleton activated per request would leak locales across concurrent users — request 2 activating `fr` mid-render of request 1 sends French HTML to an English visitor. Every server-side snippet below creates a fresh `setupI18n()` instance per request instead.
+Nine steps, B1–B9, in order. The defining constraint of this path: the app renders on the server (Cloudflare Workers), so **i18n state must be per-request**. A module-level i18n singleton activated per request would leak locales across concurrent users — request 2 activating `fr` mid-render of request 1 sends French HTML to an English visitor. Every server-side snippet below creates a fresh `setupI18n()` instance per request instead.
 
 Locale selection on this path is **cookie-based**: a `locale` cookie carries the visitor's choice, the `accept-language` header is the fallback, and the server picks the locale before rendering — so the first paint is already in the right language, with no client-side flash.
 
@@ -892,12 +1024,24 @@ export function LanguageSwitcher() {
 
 Place it in the app's existing header or navigation, matching the surrounding styling.
 
-### B8. Verify via the preview
+### B8. Create the formatters module
+
+Same file, same content as Phase 2A step **A9** — create `src/i18n/format.ts` exactly as there. The module doesn't know or care whether the app is SSR; `useFormatters()` reads the locale from `useLingui()`'s context the same way on both paths, and `Intl` is fully supported in the Cloudflare Workers runtime (the language switcher already relies on `Intl.DisplayNames` there — see B7).
+
+One Path B-specific addition. `useFormatters()` is a hook — it only works inside a component. Outside one — `lingui-middleware.ts`, `locale-fn.ts`, or any other server-function handler — use `getFormatters(locale)` instead, passing the same `locale` that `getLocaleFromRequest(request)` already resolved in B4's `i18n.server.ts`. Don't re-derive it; thread it through `context` the same way `i18n` itself is threaded.
+
+**Two hydration hazards worth knowing about now** — they're written into AGENTS.md in Phase 3 (Path B section only) so they stay in force for every future edit, not just this setup:
+
+- **Time zone.** `Intl.DateTimeFormat` uses the runtime's zone, so the Cloudflare Workers server renders in its deploy region's zone while the browser renders in the reader's — a hydration mismatch that never shows up in local dev. Render time-of-day in a client-only component, or pin an explicit `timeZone` in `DATE_PRESETS`.
+- **`relativeTime` needs a shared `now`.** The server and the client evaluate `Date.now()` at different instants and can land on opposite sides of a threshold (`an hour ago` on the server, `2 hours ago` after hydration). Resolve one reference instant per request — alongside the locale, in `lingui-middleware.ts` — and pass it explicitly: `f.relativeTime(postedAt, requestNow)`.
+
+### B9. Verify via the preview
 
 1. **The preview builds with no errors.** A build break right after adding a server function almost always means macros and `createServerFn` ended up in the same file — re-check the B7 file split.
 2. **First paint is already localized.** With a non-source `accept-language` (or the cookie set), the page arrives in that language with no flash of source-language content.
 3. **Switching locale round-trips.** Pick a language in the switcher: the `locale` cookie is set, the page reloads, and the new locale renders.
 4. **`<html lang>` is correct in view-source.** The server-rendered HTML (not just the live DOM) carries the right `lang` and `dir` — that's the SSR proof.
+5. **The formatters module has no type errors.** Same `lib` gate as A9 — resolve it there if it fires.
 
 Tell the user what to expect: the plumbing is live, but visible text doesn't change until strings are wrapped (Phase 4) and translations arrive (Phase 6).
 
@@ -913,6 +1057,7 @@ Mechanics:
 - If it exists, append the block at the end.
 - The block is wrapped in `<!-- lovable-i18n:rules:start -->` / `<!-- lovable-i18n:rules:end -->` markers. If those markers already exist in the file, **replace** everything between them and keep the marker lines themselves — this makes re-running the skill safe.
 - Substitute the real source locale for `en` in the catalog-upkeep section if it differs.
+- The block below already carries the "Time zone" and "`relativeTime` needs a shared `now`" paragraphs at the end of the "Numbers, currencies, dates" section, written for TanStack Start. **On a Path A (Vite SPA) project, delete both paragraphs before writing the file** — Path A has no server rendering, so neither hazard can occur, and a hydration note that can never fire is dead weight in every future edit's context. **On a Path B (TanStack Start) project, keep them as-is** — do not duplicate them.
 
 Write this block (everything between and including the markers):
 
@@ -976,7 +1121,8 @@ Interpolation: only a bare variable (`${name}`) auto-names its placeholder. Any 
 
 ```tsx
 import { ph } from '@lingui/core/macro'
-t`Total: ${ph({ total: i18n.number(amount) })}`   // → "Total: {total}", not "{0}"
+// f = useFormatters(), see "Numbers, currencies, dates" below
+t`Total: ${ph({ total: f.money(amount) })}`   // → "Total: {total}", not "{0}"
 ```
 
 ## Plurals
@@ -992,9 +1138,48 @@ t`Total: ${ph({ total: i18n.number(amount) })}`   // → "Total: {total}", not "
 - Never build plurals with a ternary between two separate strings — that bakes English plural rules into the code.
 - `value` must be a number.
 
-## Numbers and dates
+## Numbers, currencies, dates
 
-Use `i18n.number()` and `i18n.date()` (from `useLingui()`) — never hand-rolled formatting. Flag for review any `toFixed()`, `"$" + price` concatenation, or hardcoded date patterns like `"MM/DD/YYYY"`.
+Never hardcode a formatted number, currency symbol, or date string, and never construct `Intl` directly at a call site — that's exactly what `src/i18n/format.ts` exists to replace. Import the project's formatters from there:
+
+```tsx
+import { useFormatters } from '@/i18n/format'
+const f = useFormatters()
+f.money(amount)            // in components — reads the locale from Lingui context
+```
+
+```ts
+import { getFormatters } from '@/i18n/format'
+const f = getFormatters(locale)   // outside components: a plain .ts utility, a store,
+                                   // or, on TanStack Start, a server function / middleware
+```
+
+`useFormatters()` is a React hook — it only works inside a component. Reaching for it in a plain `.ts` file, a store, or (on TanStack Start) a server-function handler throws "Invalid hook call." Use `getFormatters(locale)` there instead. On TanStack Start, `locale` is the value `getLocaleFromRequest(request)` already resolves in `src/modules/lingui/i18n.server.ts` — thread it through rather than re-deriving it. In a Vite SPA with no server rendering, a non-component helper can read the locale off the imported `i18n` singleton from `@/i18n` (`i18n.locale`).
+
+The ten functions, one example each:
+
+| Function | Example |
+|---|---|
+| `f.money(amount, currency?)` | `f.money(19.99)` → `$19.99`. Pass currency only when a record carries its own: `f.money(order.total, order.currency)` |
+| `f.number(value, opts?)` | `f.number(1234.5)` → `1,234.5` |
+| `f.percent(value)` | `f.percent(0.42)` → `42%` — takes a **ratio**, not a percentage; `f.percent(42)` renders `4,200%` |
+| `f.compact(value)` | `f.compact(1500)` → `1.5K` |
+| `f.unit(value, unit)` | `f.unit(5, 'kilometer')` → `5 km` |
+| `f.date(value, preset?)` | `'short' \| 'medium' \| 'long'`, default `'medium'` |
+| `f.time(value)` | `f.time(d)` → `2:30 PM` |
+| `f.dateTime(value)` | date + time together |
+| `f.relativeTime(value, now?)` | `f.relativeTime(Date.now() - 86_400_000)` → `yesterday` |
+| `f.list(items, type?)` | `f.list(['a','b','c'])` → `a, b, and c`; `f.list(items, 'or')` for a disjunction |
+
+**Currency comes from the data, not the reader.** Never derive a currency code from the UI locale — that relabels a dollar price as euros for a German reader. Use the project default (`f.money(amount)`) unless the record itself carries a currency.
+
+**Needs a shape none of the ten produce?** Add it to `src/i18n/format.ts` — never inline an options object or construct `Intl` at the call site.
+
+**Flag for review, don't hand-fix:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date-format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and any `new Intl.` construction outside `src/i18n/format.ts`.
+
+**Time zone.** `Intl.DateTimeFormat` uses the runtime's zone, so the Cloudflare Workers server renders in its deploy region's zone while the browser renders in the reader's — a hydration mismatch that never shows up in local dev. Render time-of-day in a client-only component, or pin an explicit `timeZone` in `DATE_PRESETS`.
+
+**`relativeTime` needs a shared `now` under SSR.** The server and the client evaluate `Date.now()` at different instants and can land on opposite sides of a threshold (`an hour ago` on the server, `2 hours ago` after hydration). Resolve one reference instant per request — alongside the locale, in `src/modules/lingui/lingui-middleware.ts` — and pass it explicitly: `f.relativeTime(postedAt, requestNow)`.
 
 ## What not to wrap
 
@@ -1112,13 +1297,31 @@ async function handleSave() {
 }
 ```
 
-**Hand-rolled formatting.** Replace `"$" + price`, `toFixed()`, and date-string concatenation with the locale-aware helpers:
+**Hand-rolled formatting.** A wrapped string that still prints `$1,234.50` or `03/14/2026` by hand is only half-localized — the sentence translates, the value doesn't. Route every formatted value through `src/i18n/format.ts` (created in Phase 2, step A9/B8) instead of formatting it inline:
 
 ```tsx
-const { i18n } = useLingui()
-<span>{i18n.number(amount, { style: 'currency', currency: 'USD' })}</span>
-<time>{i18n.date(new Date(timestamp), { dateStyle: 'medium' })}</time>
+const f = useFormatters()
+<span>{f.money(amount)}</span>
+<time>{f.date(new Date(timestamp))}</time>
 ```
+
+The rewrite table:
+
+| Found | Replace with |
+|---|---|
+| `'$' + price`, `` `$${price}` ``, `"$" + amount` | `f.money(price)` |
+| `price.toFixed(2)` in user-visible copy | `f.money(price)` when it's a price; `f.number(value, { maximumFractionDigits: 2 })` otherwise |
+| `value.toLocaleString()` / `.toLocaleDateString()` / `.toLocaleTimeString()` with no explicit locale | `f.number` / `f.date` / `f.time` |
+| `new Intl.NumberFormat(...)` / `new Intl.DateTimeFormat(...)` at a call site | the matching helper |
+| `(a / b * 100).toFixed(0) + '%'` | `f.percent(a / b)` — the helper takes a **ratio**, not an already-multiplied percentage |
+| `dayjs(d).format('MM/DD/YYYY')`, `format(d, 'MM/dd/yyyy')` (date-fns) | `f.date(d)` |
+| `items.join(', ')` in user-visible copy | `f.list(items)` |
+| a hand-built `"3 days ago"` | `f.relativeTime(d)` |
+| `(n / 1000).toFixed(1) + 'K'` | `f.compact(n)` |
+
+**What NOT to convert:** log lines and `console.*`, IDs/slugs/filenames/cache keys, `data-*` attributes, CSV/JSON/API payloads, anything compared against a literal or parsed back later, test fixtures, any date going into an ISO-8601 field (`toISOString()` stays as-is), and `src/i18n/format.ts` itself — it constructs `Intl` on purpose. When in doubt whether a value is user-visible, leave it and flag it in your summary to the user; a locale-formatted number in a JSON payload silently breaks the consumer, and that's a worse outcome than an unconverted call site.
+
+Convert formatting **after** wrapping the strings in the same file — a formatted value usually lands as a placeholder inside a wrapped message (`Total: {total}`, not a separately-formatted node), so the `ph()` naming rule from Phase 3 applies to it.
 
 **Count-dependent strings.** Anything like `` `${items.length} results` `` is a plural, even when the English happens to look fine — convert to `<Plural>` / ICU per the Phase 3 rules, and put the **full ICU expression** in the catalog msgid.
 
@@ -1330,9 +1533,11 @@ npx @globalize-now/cli-client repositories create \
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Preview build error mentioning "AST schema mismatch" or "failed to invoke plugin" (Path A) | `@lingui/swc-plugin` compiled against a different `swc_core` than `@vitejs/plugin-react-swc` ships | Look up the compatible version at https://plugins.swc.rs and pin `@lingui/swc-plugin` to that **exact** version (no caret) — see the A1 caveat |
+| Preview build error mentioning "AST schema mismatch" or "failed to invoke plugin" (Path A) | The host's resolved `@swc/core` carries an older `swc_core` than the plugin was built against (`6.7.0`+ → `swc_core@77.1.1`) | Raise the host to `@vitejs/plugin-react-swc@^4` **and** let `@swc/core` resolve to `1.16.x` (check the lockfile); only if it cannot move, pin `@lingui/swc-plugin` to a build matching the host's `swc_core` via https://plugins.swc.rs — see the A1 caveat |
 | Build fails resolving `@lingui/vite-plugin`, or ESM/`ERR_REQUIRE_ESM`-style errors from Lingui packages | The build image's Node is too old for Lingui 6 (ESM-only, needs Node ≥ 22.19) | Pin **all** `@lingui/*` packages to `@^5` instead. Keep `lingui.config.ts` as-is — the `formatter(...)` form from `@lingui/format-po` works in v5 too |
 | TS error `Cannot find module './locales/en/messages.po'` | Missing the `*.po` module declaration | Add the declaration from A4 (`src/vite-env.d.ts` or `src/po-modules.d.ts`) |
+| `Invalid hook call` after adding a formatter call in a store, plain `.ts` file, or (Path B) a server function | `useFormatters()` is a React hook, called outside a component | Use `getFormatters(locale)` instead — see A9's notes and, on Path B, the B8 addendum |
+| TS error on `Intl.ListFormat` or `Intl.RelativeTimeFormat` types in `format.ts` | `tsconfig.json` `compilerOptions.lib` resolves below `ES2021` | Raise `lib` to `ES2021`, or omit `list()` / `relativeTime()` — ask the user which (A9) |
 | Strings render as raw ICU (`{count, plural, ...}`) or stay in the source language after switching | Catalog not loaded for that locale (typo in the dynamic import path, missing `.po` file) or the entry is missing from that locale's catalog | Check the `src/locales/<locale>/messages.po` file exists with a valid header (A7) and contains the entry (PO protocol) |
 | `<Trans>` renders as literal macro output, but the build succeeds (Path A) | SWC plugin registered as a bare string instead of the `['@lingui/swc-plugin', {}]` tuple | Use the tuple shape in `vite.config.ts` (A2) |
 | (Path B) Build breaks right after adding a server function | Lingui macros and `createServerFn` in the same file | Split them: server functions in their own macro-free file; use ``i18n._(msg`...`)`` inside handlers (B7) |

@@ -88,7 +88,7 @@ bundle exec rubocop --only I18n app/controllers/ app/mailers/ app/helpers/ app/m
 
 Review flagged literals. For autocorrect, add `--autocorrect` — but review all changes, as `rubocop-i18n` replaces literals with `I18n.t('...')` (bare `I18n.t`, not the `t` helper). Prefer the `t` helper in views and the `t` controller helper in controllers; update generated calls accordingly.
 
-> **Herb note:** Herb (`@herb-tools/linter`) is an actively-developed HTML+ERB parser and linter and is the intended replacement for `erb_lint`. As of June 2026, Herb's rule set covers a11y, ActionView, and ERB formatting — it does **not** yet ship a hardcoded-string/i18n rule. Use `erb_lint`'s `HardCodedString` cop for ERB discovery until a Herb i18n rule lands.
+> **Herb note:** Herb (`@herb-tools/linter`) is an actively-developed HTML+ERB parser and linter and is the intended replacement for `erb_lint`. As of `v0.10.3` (2026-08-01), Herb's rule set covers a11y, ActionView, and ERB formatting — it does **not** yet ship a hardcoded-string/i18n rule. Use `erb_lint`'s `HardCodedString` cop for ERB discovery until a Herb i18n rule lands.
 
 ---
 
@@ -255,8 +255,78 @@ All rules for `%{name}` interpolation, `_html` key naming, and localized formatt
 
 - **Interpolation:** `t('key', name: user.name)` against `"Hello, %{name}!"` — never build sentences by Ruby string concatenation or `#{}` interpolation of a raw string.
 - **HTML markup:** key ending in `_html` (e.g. `terms_html`) — Rails marks the result `html_safe`; interpolated variables are still HTML-escaped by Rails, so you do not escape them manually. When the value contains **double-quoted** HTML attributes (`href="/privacy"`), author it as a **single-quoted** YAML scalar so the inner `"` need no escaping (see the coding rules → "HTML-safe keys").
-- **Dates and times:** `l(article.published_at, format: :short)` — `l()` localizes `Date`, `DateTime`, and `Time` objects only. Passing a number to `l()` raises `I18n::ArgumentError`.
-- **Numbers and currency:** use Action View helpers — `number_to_currency(price)`, `number_with_delimiter(count)`, `number_with_precision(rate)`. These are backed by `rails-i18n`'s `number.*` YAML keys. Do **not** pass numeric values to `l()`.
+- **Dates and times:** `format_date(article.published_at, :short)` from `FormatHelper` — not a bare `l()`. `l()` localizes `Date`, `DateTime`, and `Time` objects only; passing a number to it raises `I18n::ArgumentError`.
+- **Numbers and currency:** `format_money(price)`, `format_number(count)`, `format_percent(rate)` from `FormatHelper` — not bare `number_to_currency` / `number_with_delimiter` / `number_with_precision`. The module wraps those Action View helpers (and their `rails-i18n` `number.*` YAML keys) behind one name each, with the project's currency and its ISO 4217 minor-unit handling already resolved. Do **not** pass numeric values to `l()`.
+
+The module name is whatever `.agents/globalize-rules.md` states — `FormatHelper` is the default. See "Convert hand-rolled formatting" below for the full rewrite table.
+
+---
+
+## Convert hand-rolled formatting
+
+Wrapping a string makes it **translatable**; it does not make a number, a price or a date **render
+correctly**. `$1,234.50` stays `$1,234.50` for a German reader who expects `1.234,50 $`, however good
+the surrounding translation is. This pass routes hand-rolled formatting through `FormatHelper`, the
+module Phase 2 created (`generate_format_helpers`) — it already exists, so you are rewriting call
+sites, not authoring a module.
+
+Methods are `format_`-prefixed and snake_case because the module is mixed into every view, where a bare
+`number` or `list` would collide with Action View or a local. The ten: `format_money`, `format_number`,
+`format_percent`, `format_compact`, `format_unit`, `format_date`, `format_time`, `format_date_time`,
+`format_relative_time`, `format_list`.
+
+| Found | Replace with |
+|---|---|
+| `"$#{amount}"`, `"$" + amount.to_s`, `"#{price} USD"` | `format_money(price)` |
+| `number_to_currency(price)` with an inline `unit:` / `precision:` at the call site | `format_money(price)` — the module owns the unit and the minor-unit rules |
+| `price.round(2)` / `"%.2f" % price` inside an ERB output tag or any user-visible string | `format_money(price)` when it is a price, `format_number(value)` otherwise |
+| `value.strftime("%m/%d/%Y")`, `Time.current.strftime(...)` in a view, helper, mailer or serializer that feeds the UI | `format_date(value)` — or `format_date_time` / `format_time` when the pattern carried a time |
+| `time_ago_in_words(t)`, a hand-built `"3 days ago"` | `format_relative_time(t)` |
+| `(a.to_f / b * 100).round + "%"` | `format_percent(a.to_f / b)` — the helper takes a **ratio**, not an already-multiplied percentage |
+| `items.join(", ")` in user-visible copy | `format_list(items)` (`format_list(items, :or)` for a disjunction) |
+| `number_with_delimiter` / `number_with_precision` at a call site | `format_number(value)` |
+| `"#{n / 1000.0.round(1)}K"` | `format_compact(n)` |
+
+**Rewrite the helper, not its call sites.** A project with its own `formatted_price(amount)` used in
+thirty views should have *that method* delegate to `format_money` — a thirty-file diff for the same
+result is worse.
+
+**`FormatHelper` is a helper module**, so its methods are available in views without an import. In a
+model, job, mailer body, or service object, `include FormatHelper` (or call
+`ApplicationController.helpers.format_money(…)`) — the rules file states which form this project uses.
+
+### What NOT to convert
+
+Locale formatting in machine-readable output is a **bug**, not a fix. Leave alone: log lines and
+`Rails.logger` output; IDs, slugs, filenames, cache keys, `data-*` attributes; CSV/JSON/XML payloads
+and every API serializer (Jbuilder, ActiveModel::Serializers, `to_json`); anything compared against a
+literal or parsed back; test fixtures and factories; **any date going into an ISO-8601 field**
+(`iso8601`, `to_s(:db)` — both must stay); `<input type="number">` / `type="date"` values and any form
+value that round-trips; and `app/helpers/format_helper.rb` itself, which constructs formatters on
+purpose. When in doubt whether a value is user-visible, leave it and record it — a flagged
+non-conversion costs a review comment, a wrong one costs a production bug.
+
+### Ordering
+
+Convert formatting **after** wrapping the strings in the same file. A formatted value usually ends up
+as a `%{…}` placeholder inside a wrapped message, and the placeholder-naming rule in the coding rules
+applies to it. Format the value, then interpolate the result — never interpolate a raw number and
+expect the YAML to format it. And never split a sentence to isolate a number: `t('cart.total', total:
+format_money(x))` is one message; `"Total: " + format_money(x)` is a fragment no translator can
+reorder.
+
+### What this pass does not remove
+
+Leave date/time libraries in place. Convert their **display formatting** only; leave parsing,
+arithmetic (`+ 1.day`, `beginning_of_month`), and timezone conversion (`in_time_zone`) exactly as
+written. Do not edit the `Gemfile`. Record what you left, with file and line.
+
+### Progress reporting
+
+Same atomic-write protocol as the wrap pass. Under each file's entry record `formatSitesConverted`
+(how many call sites, to which method) and `formatSitesFlagged` (each site left, with a one-line
+reason). A file in scope for `formatting` that needed no change still gets a zero-conversion entry —
+"scanned and clean" must not look like "never opened".
 
 ---
 

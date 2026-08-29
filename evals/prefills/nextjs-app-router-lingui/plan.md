@@ -40,6 +40,7 @@ Subagent steps:
 - [ ] scaffold_catalogs
 - [ ] gitignore_artifacts
 - [ ] extract_compile
+- [ ] generate_format_helpers
 - [ ] generate_coding_rules
 - [ ] install_coding_rules
 - [ ] build_verification

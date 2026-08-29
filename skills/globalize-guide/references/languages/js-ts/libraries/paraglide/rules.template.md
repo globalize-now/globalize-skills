@@ -8,10 +8,10 @@ description: >-
   strings, numbers, currencies, dates, plurals, and translator comments are
   authored correctly as code is written.
 template: paraglide
-templateVersion: 2
+templateVersion: 3
 conditions: [catalogFormat, ssr]
 values: [catalogPath, sourceCatalog, sourceLocale, targetLocales, paraglideImportBase, hooksServerPath, formatModule]
-budget: { "default": 200 }
+budget: { "default": 230 }
 ---
 
 # Paraglide JS Coding Rules
@@ -234,17 +234,50 @@ const locale = getLocale()
 
 ## Numbers, currencies, dates
 
-Paraglide has no formatting API. `<<formatModule>>` holds this project's presets and reads the active locale itself — never construct `Intl` at a call site:
+Paraglide has no formatting API. `<<formatModule>>` holds this project's presets and reads the active locale itself via `getLocale()` — never construct `Intl` directly at a call site. Import the functions you need as plain module-level imports — there is no hook and no factory to call first:
 
 ```ts
-import { formatCurrency, formatDate } from '<<formatModule>>'
-formatCurrency(amount)   // not new Intl.NumberFormat(getLocale(), { style: 'currency', … })
-formatDate(timestamp)
+import { money, date, relativeTime } from '<<formatModule>>'
+
+money(amount)              // '$42.50' — see below, currency comes from the data
+date(value, 'short')       // 'medium' is the default if omitted — '8/21/26'
+relativeTime(value)        // '3 days ago'
 ```
 
-Need a format it has no preset for? Add one to `<<formatModule>>` — a currency code or date style written out at two call sites will drift.
+All ten:
 
-**Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`'$' + price`), hardcoded date formats like `'MM/DD/YYYY'`, any `new Intl.` outside `<<formatModule>>`.
+```ts
+money(amount)                        // '$42.50'
+number(1234.5)                       // '1,234.5'
+percent(0.42)                        // '42%'
+compact(12000)                       // '12K'
+unit(5, 'kilometer')                 // '5 km'
+date(value, 'short')                 // '8/21/26'
+date(value, 'long')                  // 'August 21, 2026'
+time(value)                          // '4:05 PM'
+dateTime(value)                      // 'Aug 21, 2026, 4:05 PM'
+relativeTime(value)                  // '3 days ago'
+list(['Alice', 'Bob', 'Carol'])      // 'and' is the default — 'Alice, Bob, and Carol'
+list(['Alice', 'Bob'], 'or')         // 'Alice or Bob'
+```
+
+**Currency comes from the data, not the reader.** `money(amount)` uses the project default; when a record carries its own currency, pass it: `money(order.total, order.currency)`. Never derive a currency code from the locale — that relabels a dollar price as euros for a German reader.
+
+**Needs a format the module has no preset for?** Add it to `<<formatModule>>`. A date style or currency code written out at two call sites will drift.
+
+**Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), hardcoded date formats like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, any `new Intl.` outside `<<formatModule>>`.
+<!-- if: ssr == "true" -->
+
+**Time zone.** `Intl.DateTimeFormat` uses the *runtime's* zone, so the server renders in the deploy region's zone and the browser in the reader's — a hydration mismatch that never appears in development. Render time-of-day behind a client-only guard (e.g. `browser` from `$app/environment`), or pin an explicit `timeZone` in `<<formatModule>>`'s date presets.
+<!-- /if -->
+<!-- if: ssr == "true" -->
+
+**`relativeTime` needs an explicit `now` under SSR.** Server and client evaluate `Date.now()` at different instants and can land on different sides of a threshold, producing a hydration mismatch. Pass a shared reference instant — `relativeTime(postedAt, pageRenderedAt)` — or render it client-side only.
+<!-- /if -->
+<!-- if: ssr == "true" -->
+
+**`getLocale()` only observes the request's locale inside `paraglideMiddleware`'s context** (wired in `<<hooksServerPath>>`), which stores it in request-scoped `AsyncLocalStorage`. Every `<<formatModule>>` function reads through that same call, via the `formatLocale()` seam — so this applies to all ten, not just to `getLocale()` calls you write yourself. Outside that context — a module-scope initializer that runs at import time, a build or prerender script, or server code that runs outside a request the middleware wraps — `getLocale()` silently falls back to the base locale instead of throwing. If code there genuinely needs the request's real locale, do not call `<<formatModule>>` — accept the locale, or an already-formatted string, as a parameter from a caller that does have it.
+<!-- /if -->
 <!-- if: catalogFormat == "po" -->
 
 ## ICU-mode caveats (footguns)

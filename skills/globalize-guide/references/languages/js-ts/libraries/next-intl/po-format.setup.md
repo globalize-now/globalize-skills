@@ -72,6 +72,8 @@ export default getRequestConfig(async ({requestLocale}) => {
 
 Adjust the `../../messages/` path for your project depth. Do not wrap the `import()` in `JSON.parse` — the loader already returns a plain JS object.
 
+> **Next.js 16.3+.** next-intl 4.13.6 deprecated the `requestLocale` parameter shown above in favour of [`next/root-params`](https://next-intl.dev/blog/nextjs-root-params). If the project is on Next 16.3+, resolve the locale with `await rootParams.locale()` (full form in `next-intl.setup.md` → Request Configuration) and keep the `messages` line exactly as written here — the PO loader matches on the literal `.po` extension and is unaffected by how the locale is resolved.
+
 ---
 
 ## § Pages Router `getStaticProps`

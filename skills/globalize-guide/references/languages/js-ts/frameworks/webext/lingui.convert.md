@@ -2,7 +2,9 @@
 
 **Read `references/languages/js-ts/libraries/lingui/convert.standard-react.md` first.** It carries
 every wrapping pattern this variant uses — `<Trans>`, `useLingui()`, module-scope `msg` resolved with
-`t(descriptor)`, validation messages, toasts, `i18n.number()` / `i18n.date()`.
+`t(descriptor)`, validation messages, toasts, and the formatters-module call forms for numbers, prices
+and dates. **Also read `references/languages/js-ts/convert.format-pass.md`** — the format pass applies to
+an extension unchanged, with `**/*.html` popup and options markup included in scope.
 
 **This file is an overlay.** It states only what a browser extension changes or adds and never
 restates a shared rule. **Where the two disagree, this file wins.**

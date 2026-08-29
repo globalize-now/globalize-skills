@@ -8,10 +8,10 @@ description: >-
   numbers, currencies, dates, and plurals are wrapped correctly as code is
   written, so nothing needs fixing after the fact.
 template: next-intl
-templateVersion: 1
-conditions: [router, localeNavigation, catalogFormat, paramsShape]
-values: [i18nRequestPath, i18nNavigationPath, importPrefix, localeSegment, catalogPath, sourceLocale, targetLocales]
-budget: { "router == \"app\"": 240, "default": 200 }
+templateVersion: 3
+conditions: [router, localeNavigation, catalogFormat, paramsShape, localeSource]
+values: [i18nRequestPath, i18nNavigationPath, importPrefix, localeSegment, catalogPath, sourceLocale, targetLocales, formatModule]
+budget: { "router == \"app\"": 300, "default": 260 }
 ---
 
 # next-intl Coding Rules
@@ -43,8 +43,12 @@ Server Component (the file has no 'use client' directive)?
 Client Component ('use client'), or a custom hook used by one?
   YES → const t = useTranslations('Namespace')          // 'next-intl'
 
-Need a number, date, currency, or relative time?
-  YES → useFormatter() (client) / await getFormatter() (server)
+Need a number, date, currency, or relative time — from <<formatModule>>?
+  Async Server Component, or non-component async code (generateMetadata,
+  route handlers, server actions)?
+    YES → const f = await getFormatters()
+  Client Component, or a Server Component with no `await` in its body?
+    YES → const f = useFormatters()
 ```
 <!-- else -->
 
@@ -57,7 +61,7 @@ Loading a page's messages?
   YES → getStaticProps/getServerSideProps → props.messages → <NextIntlClientProvider>
 
 Need a number, date, currency, or relative time?
-  YES → useFormatter()
+  YES → useFormatters() — from <<formatModule>>
 ```
 <!-- /if -->
 
@@ -74,9 +78,15 @@ Check the plural question first. Two separate keys ("oneItem" / "manyItems") plu
 <!-- if: localeNavigation == "create-navigation" -->
 | `Link`, `redirect`, `useRouter`, `usePathname`, `getPathname` | `<<i18nNavigationPath>>` (locale-aware wrappers from `createNavigation`) |
 <!-- /if -->
+
 <!-- if: router == "app" -->
 
-Server async APIs (`getTranslations`, `getFormatter`, `getMessages`, …) **must be `await`ed**. They throw at runtime if used unawaited.
+`useFormatter` / `getFormatter` above are what `<<formatModule>>` wraps internally. Call `useFormatters()` / `getFormatters()` from that module at the call site instead of importing `useFormatter` / `getFormatter` directly — see "Numbers, currencies, dates, relative time" below.
+
+Server async APIs (`getTranslations`, `getFormatter`, `getMessages`, …) **must be `await`ed**. They throw at runtime if used unawaited — the same rule applies to this project's `getFormatters()`.
+<!-- else -->
+
+`useFormatter` above is what `<<formatModule>>` wraps internally. Call `useFormatters()` from that module at the call site instead of importing `useFormatter` directly — see "Numbers, currencies, dates, relative time" below. There is no `getFormatter` row above and no `getFormatters()` in `<<formatModule>>` on the Pages Router.
 <!-- /if -->
 
 ## Common patterns
@@ -156,24 +166,26 @@ Keep keys statically analysable: a string literal, or a member of an `as const` 
 Decide **server vs client** before choosing a pattern.
 
 **Server components** (no `'use client'`):
-- Use `getTranslations()` and `getFormatter()` — both async, both must be `await`ed.
-- Every page rendered under `generateStaticParams` (or any static segment) **must call `setRequestLocale(locale)` before any translation lookup** — in the page itself, not only in the layout. Without it the page silently drops back to dynamic rendering on every request, and the tests still pass.
+- Use `getTranslations()` for strings — async, must be `await`ed.
+- For numbers, currencies, dates and lists: **an `async` component can't call a hook.** Almost every Server Component that renders translated text is `async` (it `await`s `getTranslations()`), so use `await getFormatters()` from `<<formatModule>>` in it — same await rule as `getTranslations()`. Only a Server Component with no `await` anywhere in its body may call `useFormatters()` instead, the same as a Client Component would.
+- The locale-resolution rule for statically rendered pages is below, under **Locale resolution (server)** — it differs by `localeSource` and must not be applied unconditionally.
 - Leave `<NextIntlClientProvider>` in `app/<<localeSegment>>/layout.tsx` without an explicit `messages` prop unless you need to filter; next-intl then serialises only what the client tree references. Passing every message ships the whole catalog to every page.
 
 **Client components** (`'use client'`):
-- Use `useTranslations()` and `useFormatter()` (synchronous hooks), inside the `<NextIntlClientProvider>` tree.
+- Use `useTranslations()` for strings and `useFormatters()` from `<<formatModule>>` for numbers, currencies, dates and lists (both synchronous), inside the `<NextIntlClientProvider>` tree.
 - Take `Link`, `useRouter`, `usePathname` and `redirect` from `<<i18nNavigationPath>>`, never from `next/link` or `next/navigation`.
 
 ```tsx
 'use client';
+import { useFormatters } from '<<formatModule>>'
 const t = useTranslations('Cart');
-const format = useFormatter();
-return <span>{t('total', { amount: format.number(amount, { style: 'currency', currency: 'USD' }) })}</span>;
+const f = useFormatters();
+return <span>{t('total', { amount: f.money(amount) })}</span>;
 ```
 <!-- else -->
 ## Pages Router rules
 
-`useTranslations` and `useFormatter` are the canonical APIs in every page and nested component — there is no `getTranslations` equivalent on the Pages Router request lifecycle. Load `messages` in `getStaticProps` (or `getServerSideProps`) and feed them to a top-level `<NextIntlClientProvider>` in `_app.tsx`:
+`useTranslations` (strings) and `useFormatters()` from `<<formatModule>>` (numbers, currencies, dates, lists) are the canonical APIs in every page and nested component — there is no `getTranslations` equivalent on the Pages Router request lifecycle. Load `messages` in `getStaticProps` (or `getServerSideProps`) and feed them to a top-level `<NextIntlClientProvider>` in `_app.tsx`:
 
 ```tsx
 // pages/_app.tsx — wraps the whole tree once
@@ -194,7 +206,7 @@ Route `params` is a **Promise** on Next.js 15+ — `await` it before anything el
 ```tsx
 export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  setRequestLocale(locale);          // before any translation lookup
+  // then apply the locale-resolution rule below
 }
 ```
 
@@ -204,11 +216,31 @@ Route `params` is a **plain object** on Next.js 13–14 — destructure it direc
 
 ```tsx
 export default async function Page({ params: { locale } }: { params: { locale: string } }) {
-  setRequestLocale(locale);          // before any translation lookup
+  // `locale` is available synchronously; then apply the locale-resolution rule below
 }
 ```
 
 <!-- /if -->
+<!-- if: localeSource == "request-locale" -->
+## Locale resolution (server)
+
+Every page rendered under `generateStaticParams` (or any static segment) **must call `setRequestLocale(locale)` before any translation lookup** — in the page itself, not only in the layout. Next does not propagate the layout's call into pages. Without it the page silently drops back to dynamic rendering on every request, and the tests still pass.
+
+```tsx
+import {setRequestLocale} from 'next-intl/server';
+setRequestLocale(locale);            // first statement, before any getTranslations/useTranslations
+```
+
+Client components (`'use client'`) do not need it — static rendering applies to server components only.
+<!-- /if -->
+<!-- if: localeSource == "root-params" -->
+## Locale resolution (server)
+
+Locale is resolved once in `<<i18nRequestPath>>` via `await rootParams.locale()`. **Never call `setRequestLocale`** — it is deprecated and does nothing this project needs. Pages under `generateStaticParams` still need `generateStaticParams` itself for static rendering; nothing else per page.
+
+`next/root-params` does not work in **Route Handlers or Server Actions**. There, take the locale as an explicit function argument and pass it through: `getTranslations({locale})`.
+<!-- /if -->
+
 ## Plurals, select, and ICU MessageFormat
 
 Any time a string's wording depends on a number — singular/plural nouns, subject-verb agreement, anything count-sensitive — it is a plural string. Keep every form inside a single message; never branch in JS.
@@ -263,34 +295,91 @@ t.rich('votes', { count, strong: (chunks) => <strong>{chunks}</strong> })   // p
 
 ## Numbers, currencies, dates, relative time
 
-Never hardcode formatted numbers, currency symbols, or date strings. Use the formatter — it wraps `Intl.NumberFormat` / `Intl.DateTimeFormat` with the active locale.
+Never hardcode a formatted number, a currency symbol, or a date string. Never call `useFormatter()` / `getFormatter()` directly at a call site — import this project's formatters from `<<formatModule>>` instead, so every call carries the request's `timeZone` and `now`.
 
 ```tsx
-const format = useFormatter();                 // client — 'next-intl'
-format.number(amount, { style: 'currency', currency: 'USD' })
-format.relativeTime(postedAt)
+import { useFormatters } from '<<formatModule>>'
+const f = useFormatters()
+f.money(amount)
 ```
+
+`useFormatters()` is a hook: call it from Client Components, and from any Server Component that has no `await` in its body.
 <!-- if: router == "app" -->
+An `async` Server Component can't call a hook — almost every Server Component that renders translated text is `async` (it `await`s `getTranslations()`), so in practice most Server Components reach for the awaitable form instead:
+
+```ts
+import { getFormatters } from '<<formatModule>>'
+const f = await getFormatters()   // async Server Components, generateMetadata, route handlers, server actions — must be awaited
+```
+<!-- else -->
+There is no `getFormatters()` on the Pages Router, and `<<formatModule>>` does not export one here — `next-intl/server` (where the underlying `getFormatter` lives) is App Router only. `useFormatters()` is the only form; there is no Server/Client Component split on the Pages Router for it to disagree with.
+<!-- /if -->
+
+All ten:
 
 ```tsx
-const format = await getFormatter();           // server — 'next-intl/server'
-format.dateTime(publishedAt, { dateStyle: 'medium' })
+f.money(amount)                        // '$42.50' — see below, currency comes from the data
+f.number(1234.5)                       // '1,234.5'
+f.percent(0.42)                        // '42%'
+f.compact(12000)                       // '12K'
+f.unit(5, 'kilometer')                 // '5 km'
+f.date(value, 'short')                 // 'medium' is the default if omitted — '8/21/26'
+f.date(value, 'long')                  // 'August 21, 2026'
+f.time(value)                          // '4:05 PM'
+f.dateTime(value)                      // 'Aug 21, 2026, 4:05 PM'
+f.relativeTime(value)                  // '3 days ago'
+f.list(['Alice', 'Bob', 'Carol'])      // 'and' is the default — 'Alice, Bob, and Carol'
+f.list(['Alice', 'Bob'], 'or')         // 'Alice or Bob'
 ```
 
-**Named formats** — define reusable presets in `<<i18nRequestPath>>` (part of the object `getRequestConfig` returns), then use them by name: `format.dateTime(date, 'short')`, `format.number(value, 'precise')`.
-<!-- else -->
+**Currency comes from the data, not the reader.** `f.money(amount)` uses the project default; when a record carries its own currency, pass it: `f.money(order.total, order.currency)`. Never derive a currency code from the locale — that relabels a dollar price as euros for a German reader. Keep currency codes in code, not in messages — a catalog entry that spells out `'$'` or `'USD'` can't adapt when a record's currency differs, and duplicates work `f.money` already does.
 
-**Named formats** — define reusable presets as the `formats` prop of `<NextIntlClientProvider>` in `_app.tsx`, then use them by name: `format.dateTime(date, 'short')`, `format.number(value, 'precise')`.
+**`date`, `time`, `dateTime` and `list` above pass preset names, not options** — `'short'`, `'medium'`, `'time'`, `'and'`.
+<!-- if: router == "app" -->
+They only resolve if the preset is registered in the `formats` object that setup added to `<<i18nRequestPath>>`'s `getRequestConfig`:
+<!-- else -->
+They only resolve if the preset is registered in the `formats` prop of `<NextIntlClientProvider>` in `_app.tsx`:
 <!-- /if -->
 
 ```ts
-formats: { dateTime: { short: { day: 'numeric', month: 'short', year: 'numeric' } },
-           number: { precise: { maximumFractionDigits: 5 } } }
+formats: {
+  dateTime: {
+    short: { dateStyle: 'short' },
+    medium: { dateStyle: 'medium' },
+    long: { dateStyle: 'long' },
+    time: { timeStyle: 'short' },
+    dateTime: { dateStyle: 'medium', timeStyle: 'short' },
+  },
+  list: { and: { style: 'long', type: 'conjunction' },
+          or:  { style: 'long', type: 'disjunction' } },
+}
 ```
 
-**Currency requires a `currency` option** — `Intl` throws without it. Keep currency codes in code, not in messages.
+An unregistered name does not throw — it silently falls back to next-intl's defaults, so a missing registration is a silent failure, not a build error. **Needs a format with no matching preset? Register it there, not at the call site** — a preset written out at two call sites will drift.
 
-**Flag for review:** `toFixed()`, currency symbols concatenated with numbers (`"$" + price`), date format strings like `"MM/DD/YYYY"`, locale-naive `new Date().toLocaleDateString()` calls without an explicit locale.
+**`<<formatModule>>` exports a `formatLocale()` seam, and on this stack nothing calls it.** All ten functions delegate to next-intl, which resolves the locale itself — so unlike other stacks, editing `formatLocale()` changes nothing. Do not "fix" a formatting-locale problem there. To format against something other than the UI locale,
+<!-- if: router == "app" -->
+set `locale` in what `getRequestConfig` returns in `<<i18nRequestPath>>`
+<!-- else -->
+set `locale` on `<NextIntlClientProvider>` in `_app.tsx`
+<!-- /if -->
+— that moves every formatter and every message lookup together. Anything narrower means rebuilding the ten on raw `Intl`, which also gives up the request-scoped `timeZone` and `now` below.
+
+**Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and any `useFormatter()` / `getFormatter()` call outside `<<formatModule>>`.
+
+**Time zone.** `Intl.DateTimeFormat` uses the *runtime's* zone unless told otherwise, so the server renders in the deploy region's zone and the browser in the reader's — a hydration mismatch that never appears in development.
+<!-- if: router == "app" -->
+Fix it at the source: set `timeZone` in `<<i18nRequestPath>>`'s `getRequestConfig`, never a local constant.
+<!-- else -->
+Fix it at the source: set `timeZone` in `_app.tsx`'s `NextIntlClientProvider` props, never a local constant.
+<!-- /if -->
+
+**`relativeTime` needs one reference instant, shared by server and client.** Evaluating `Date.now()` independently on each side eventually lands them on different sides of a threshold. `f.relativeTime(value)` — called with no second argument — already uses the request config's `now` for exactly this reason; pass an explicit second argument only when this particular call needs a different reference instant than the rest of the page.
+<!-- if: router == "app" -->
+That `now` comes from `<<i18nRequestPath>>`'s `getRequestConfig` — set once per request, on the server, before anything renders.
+<!-- else -->
+On the Pages Router, `now` must be produced once in `getStaticProps` / `getServerSideProps`, serialized into `props`, and passed through to `<NextIntlClientProvider now={...}>` in `_app.tsx`. **Never** write `now={new Date()}` directly in `_app.tsx`'s render body — that expression re-evaluates on every render, server and client independently, which is the exact failure this rule exists to avoid.
+<!-- /if -->
 <!-- if: localeNavigation == "create-navigation" -->
 
 ## Locale-aware navigation
