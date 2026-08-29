@@ -6,6 +6,16 @@ PO support is **experimental** in next-intl ≥ 4.5 and is enabled via the `expe
 
 **next-intl 4.14.0 replaced the built-in PO codec** with [`@eloqnt/format-po`](https://cli.eloqnt.dev/docs/formats/po) ([#2393](https://github.com/amannn/next-intl/pull/2393), 2026-08-27). Catalogs authored the way this reference describes keep working unchanged; catalogs *written by next-intl's own extractor* on 4.5–4.13 do not. Run the pre-flight check below before touching an existing project.
 
+> **Do not install exactly `4.14.0`.** That release is superseded by [4.14.1](https://github.com/amannn/next-intl/releases/tag/v4.14.1) (2026-08-28), which fixes a build-breaking regression on this exact path: 4.14.0 always passed `sourceLocale` into the catalog loader's options, `undefined` included, and Next.js rejects loader options that do not survive a JSON round-trip ([#2394](https://github.com/amannn/next-intl/issues/2394)). Any project that configures `experimental.messages` **without** an explicit `sourceLocale` fails to build under Turbopack with:
+>
+> ```
+> Error: loader next-intl/extractor/catalogLoader for match "*.po" does not have serializable options. Ensure that options passed are plain JavaScript objects and values.
+> ```
+>
+> (The glob is whatever `getFormatExtension(messages.format)` returns, so a PO project sees `"*.po"`; the upstream report was filed from a JSON project and quotes `"*.json"`. Same defect, same fix.)
+>
+> The scaffold in this reference does not set `sourceLocale`, so it hits this on 4.14.0. Catalog loading already requires Next.js 16 or higher, and on Next 16 next-intl configures the Turbopack rules whether or not `--turbopack` is passed (`shouldConfigureTurbo = useTurbo || isNextJs16OrHigher()`), so dropping the flag is **not** a way around it. **Install `next-intl@^4.14.1` (or any `4.5`–`4.13.x`); if a lockfile already pins `4.14.0`, upgrade it before running setup.** `^4` on a fresh install resolves to 4.14.1 or later and is fine.
+
 ---
 
 ## § Pre-flight: bundler & module system
@@ -156,7 +166,7 @@ Option notes:
 - `path: './messages'` — directory containing the `.po` files, relative to project root.
 - `locales: 'infer'` — auto-detects locales from filenames (`en.po`, `de.po`, …). Alternatively pass an explicit array, e.g. `['en', 'de', 'fr']`.
 - `precompile: true` — compiles message bodies at build time rather than request time. Recommended. Same flag as the JSON precompile path (`next-intl >= 4.8`); originally introduced for PO in 4.5. See `SKILL.md` § Common Gotchas → **`t.raw` + precompile** for the one known limitation.
-- `sourceLocale` — **new in 4.14.0**, optional. Names the locale whose catalog holds the source strings. Set it to the project's default locale when the project is on 4.14+: with it, an entry whose `msgstr` is empty in the source catalog falls back to the entry's `msgid` instead of rendering as an empty string. Older versions ignore the key, so it is safe to include on 4.5–4.13 as well.
+- `sourceLocale` — **new in 4.14.0**, optional on 4.14.1+. Names the locale whose catalog holds the source strings; with it, an entry whose `msgstr` is empty in the source catalog falls back to the entry's `msgid` instead of rendering as an empty string. Worth setting to the project's default locale on 4.14+ for that reason alone. Versions 4.5–4.13 ignore the key, so it is harmless there. **On 4.14.0 specifically it is not optional** — omitting it breaks the Turbopack build outright (see the release note at the top of this file). Prefer fixing that by upgrading to 4.14.1 rather than by adding this key, so the scaffold stays the same across the whole supported range.
 
 ### Pages Router (CJS)
 
