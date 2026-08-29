@@ -58,7 +58,7 @@ next-intl 4.14.0 moved the built-in PO codec to `@eloqnt/format-po`, which picks
 
 | Header in the `msgid ""` block | Layout | Key comes from | Effect on 4.14+ |
 |---|---|---|---|
-| `X-Crowdin-SourceKey: msgstr` | previous next-intl layout | `msgid` | **Hard build error** with a migration link |
+| `X-Crowdin-SourceKey: msgstr` | previous next-intl layout | `msgid` | **Hard build error** with a migration link — see the note under the check |
 | `X-Message-Key: msgctxt` | current extractor layout | `msgctxt` | Reads normally |
 | neither (plain gettext) | gettext | `msgctxt` + `.` + `msgid`, or `msgid` alone | Reads normally — **this is what the scaffold in this reference produces** |
 
@@ -73,6 +73,10 @@ grep -l "X-Crowdin-SourceKey" messages/*.po
 
   1. **Migrate the catalogs** (recommended, and what upstream recommends). For every entry: move the key from `msgid` into `msgctxt`, put the source text in `msgid` (look it up by key in the source-locale catalog's `msgstr`), leave `msgstr` alone. In each header block, drop `X-Crowdin-SourceKey: msgstr` and add `X-Message-Key: msgctxt`. Preserve entry order, `#.`, `#:` and flags. Verify by building: extraction must not modify the converted files further. Full instructions: [next-intl#2393](https://github.com/amannn/next-intl/pull/2393).
   2. **Keep the previous layout** by configuring [`POCodecLegacy`](https://github.com/amannn/next-intl/blob/main/packages/next-intl/src/extractor/format/codecs/fixtures/POCodecLegacy.tsx) as a custom codec — `format: {codec: './POCodecLegacy.tsx', extension: '.po'}`. No catalog edits, but the project stays off the built-in path.
+
+> **Where the error comes from, and the one case it misses.** The throw is not in `@eloqnt/format-po`. next-intl wraps that codec in [`BuiltInPoCodec`](https://github.com/amannn/next-intl/blob/main/packages/next-intl/src/extractor/format/codecs/BuiltInPoCodec.tsx), whose `assertMigrated` does a **literal substring test on the raw file text** for `X-Crowdin-SourceKey: msgstr` — that exact spelling, one space — before handing the content to `decode`. A catalog written with different spacing (`X-Crowdin-SourceKey:msgstr`) slips past the guard and is then decoded by the **gettext** branch, which reads the key from `msgctxt` + `.` + `msgid`. On a previous-layout catalog that yields wrong keys and `MISSING_MESSAGE` at render, with no build error at all. The `grep` above is deliberately looser than the guard so it catches those too: treat any hit as "migrate", not as "the build will tell me".
+>
+> The same wrapper comment records that **a custom codec referencing `@eloqnt/format-po` directly opts out of the guard**, which is what makes option 2 above work.
 
 **You MUST wait for the user to choose before proceeding.**
 
