@@ -2,7 +2,7 @@
 
 > This is one of three setup references for this stack — read them in the order `references.setup` lists. `setup.locale-module.md` runs first and owns `src/i18n/locales.ts`; `setup.navigation.md` runs last and owns `src/i18n/navigation.ts` plus the language switcher. **This file imports those modules and never defines them.**
 
-This covers Next.js 13+ projects using the App Router with React Server Components (RSC). The setup is more involved than standard React because RSC can't use React context — LinguiJS provides a server-side `setI18n` API alongside a client-side provider.
+This covers Next.js 13+ projects using the App Router with React Server Components (RSC). **The SWC-plugin path below needs Next.js ≥ 16.1.0** — on 13-16.0.x the Lingui macro has to go through Babel instead; see "Version compatibility" for the boundary and the fallback. The setup is more involved than standard React because RSC can't use React context — LinguiJS provides a server-side `setI18n` API alongside a client-side provider.
 
 ## Packages
 
@@ -21,12 +21,47 @@ If the project has a `.babelrc`, use `@lingui/babel-plugin-lingui-macro` instead
 
 ```bash
 npm install '@lingui/core@^6' '@lingui/react@^6'
-npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@^6'
+npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@~6.6.0'
 ```
 
-**Version compatibility:** on this stack the plugin runs inside **Next.js's own bundled SWC**, whose `swc_core` version is not readable from npm metadata — so unlike the Vite stacks, `plugins.swc.rs` (select "next" + the project's Next.js version) remains the right lookup when something breaks. Start with `^6` regardless: SWC's Wasm plugin ABI has been backward-compatible since `@swc/core` 1.15.0 ([announcement](https://blog.swc.rs/2025-11-4-wasm-backward-compatibility)), `@lingui/swc-plugin` is built against a pinned `swc_core`: `6.2.0`-`6.6.0` against `swc_core@66.0.3`, and **`6.7.0`+ against `swc_core@77.1.1`** ([plugin table](https://github.com/lingui/swc-plugin/blob/6.7.0/packages/lingui-macro/README.md#compatibility)). `^6` resolves to `6.7.0` today, so a Next release whose bundled SWC is at `swc_core` 77.x needs no pin at all — and one below it may. Because Next's bundled `swc_core` is not readable from npm metadata, `plugins.swc.rs` stays the lookup here.
+**Version compatibility — verified by build on this stack.** Here the plugin runs inside **Next.js's own bundled SWC**, which you do not choose and cannot read from npm metadata. That makes the rule the *opposite shape* to the Vite stacks: a **ceiling on the plugin** and a **floor on Next.js**, not a floor on a host you install.
 
-If the build fails with an AST schema or plugin invocation error, the project's Next.js is older than that. Look the host range up at `plugins.swc.rs`, then pin a `@lingui/swc-plugin` version **whose `@lingui/core` peer admits the major this project installs** — for a v6 project that is `6.0.0`-`6.1.0` (`swc_core@50.2.3`) and nothing older. Do **not** pin into the `5.x` or `4.x` lines here: every `5.x` requires `@lingui/core@5`, and `4.0.8` requires `@lingui/macro@4`, a package this stack does not install in any version. Both are required peers, so both are an `ERESOLVE` failure on npm and pnpm rather than a fix. If no compatible pair exists, upgrade Next.js or use `@lingui/babel-plugin-lingui-macro` with a `.babelrc` instead.
+- **`@lingui/swc-plugin@6.7.0` does not run on any Next.js release.** It fails on 16.1.7, 16.2.12 and 16.3.4 alike — its pinned `swc_core@77.1.1` is newer than every plugin runner Next has shipped (observed `swc_plugin_runner` **23.0.0** on 16.1.7, **24.0.0** on 16.2.12, **30.0.1** on 16.3.4). `^6` resolves to `6.7.0` today, so **`@lingui/swc-plugin@^6` is a hard build break on current Next.js** — that is why the install line above pins `~6.6.0`.
+- **`6.0.0`, `6.2.0` and `6.6.0` all transform correctly on Next.js ≥ 16.1.0.**
+- **Below Next.js 16.1.0 no `6.x` plugin works at all.** 16.0.0, 16.0.11, 15.5.25 and 14.2.35 reject `6.0.0`, `6.1.0`, `6.2.0`, `6.6.0` and `6.7.0` alike. Pinning the plugin backwards is **not** a remedy on those hosts — see the Babel fallback below.
+
+The same failure prints three different ways, so match on the cause, not the wording:
+
+| Host | Plugin | What you see |
+|---|---|---|
+| Next 14/15 (webpack) | any `6.x` | `failed to invoke plugin on 'Some("<file>")'` |
+| Next 16 (Turbopack) | too new (`6.7.0`) | `Failed to execute SWC plugin` → `failed to run Wasm plugin transform` → `Failed to deserialize program received from host` |
+| Next 16.0.x (Turbopack) | too old for that runner | a Turbopack **panic** (`TurbopackInternalError`); the real cause is only in the panic log: `Plugin's AST schema version is not compatible with host's. Host: 1, Plugin: <n>` |
+
+**Do not compare `swc_core` or `swc_ecma_ast` numbers** between the plugin and the host — they never match and do not predict the outcome. `plugins.swc.rs` (select "next" + the project's Next.js version) is still the lookup for a Next release not listed above, but the two boundaries above were established by building, not by reading a table.
+
+If the build fails with any of the three errors above, **read the project's Next.js version first** — it decides which of the two remedies applies.
+
+**Next.js ≥ 16.1.0** — the plugin is too new for the runner. Install `@lingui/swc-plugin@~6.6.0` (the install line above already does); confirm with `npm ls @lingui/swc-plugin`. Nothing else changes.
+
+**Next.js < 16.1.0** — no `6.x` plugin this project can install will load. Do **not** pin into the `5.x` or `4.x` lines: every `5.x` requires `@lingui/core@5` and `4.0.8` requires `@lingui/macro@4`, both required peers, so both are an `ERESOLVE` failure rather than a fix (verified: `@lingui/core@^6` + `@lingui/swc-plugin@5.11.0` → `npm error code ERESOLVE`). Either **upgrade Next.js to ≥ 16.1.0**, or switch this project to the Babel macro:
+
+```bash
+npm install -D '@lingui/babel-plugin-lingui-macro@^6' babel-plugin-macros @babel/types
+```
+
+```json
+// .babelrc
+{ "presets": ["next/babel"], "plugins": ["macros"] }
+```
+
+Remove the `experimental.swcPlugins` entry from `next.config.js` when you do this. Three things this needs that the SWC plugin does not, each of which is a build failure on its own:
+
+1. **`@babel/types` is not optional.** Next bundles its own Babel and does not expose it to plugins, so without an explicit install the build fails with `Cannot find package '@babel/types' imported from .../@lingui/babel-plugin-lingui-macro/...`. `@babel/core` is *not* needed.
+2. **A Lingui config file must exist** (`lingui.config.ts` / `.js`). The macro reads it at compile time and fails with `@lingui/core/macro: No Lingui config found`; the SWC plugin does not read it, which is why this only bites on the Babel path.
+3. **A `.babelrc` disables SWC for the whole project** — Next prints `Disabled SWC as replacement for Babel because of custom Babel configuration ".babelrc"`, and `compiler` options in `next.config.js` are ignored from then on. That is a real cost, so prefer the Next.js upgrade where it is available.
+
+Verified end to end on Next.js 15.5.25 + `@lingui/babel-plugin-lingui-macro@6.6.0`: builds clean and the macro is expanded.
 
 Note: No `@lingui/vite-plugin` — Next.js has its own build pipeline.
 

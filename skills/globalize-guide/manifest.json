@@ -8,7 +8,7 @@
       "supportLevel": "stable",
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6"]
+        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@~6.6.0"]
       },
       "references": {
         "setup": [
