@@ -110,6 +110,7 @@ const withNextIntl = createNextIntlPlugin({
       format: 'po',
       path: './messages',
       locales: 'infer',
+      sourceLocale: 'en',
       precompile: true
     }
   }
@@ -127,6 +128,7 @@ Option notes:
 - `format: 'po'` — activates the PO loader. Without this, next-intl defaults to JSON.
 - `path: './messages'` — directory containing the `.po` files, relative to project root.
 - `locales: 'infer'` — auto-detects locales from filenames (`en.po`, `de.po`, …). Alternatively pass an explicit array, e.g. `['en', 'de', 'fr']`.
+- `sourceLocale: 'en'` — **set this, always.** Use the project's default locale (the `defaultLocale` in `routing.ts`). It is not optional on current next-intl: from `4.14.2` the PO codec **throws at build** on any entry whose `msgstr` is empty unless a source locale is known, and an untranslated entry in a non-default locale is the normal state of a project mid-translation. Omitting it also trips a separate build failure on exactly `4.14.0`. Both failure modes and the version range this key is safe on are covered in § Pre-flight: `sourceLocale` below.
 - `precompile: true` — compiles message bodies at build time rather than request time. Recommended. Same flag as the JSON precompile path (`next-intl >= 4.8`); originally introduced for PO in 4.5. See `SKILL.md` § Common Gotchas → **`t.raw` + precompile** for the one known limitation.
 
 ### Pages Router (CJS)
@@ -142,6 +144,7 @@ const withNextIntl = createNextIntlPlugin({
       format: 'po',
       path: './messages',
       locales: 'infer',
+      sourceLocale: 'en',  // required — see option notes; set to the project's default locale
       precompile: false    // Pages Router: precompile: true is broken upstream (webpack alias scoping)
     }
   }
@@ -185,10 +188,46 @@ If `i18n/request.ts` is not at one of the default locations (`./i18n/request.ts`
 ```ts
 const withNextIntl = createNextIntlPlugin({
   experimental: {
-    messages: {format: 'po', path: './messages', locales: 'infer', precompile: true}
+    messages: {format: 'po', path: './messages', locales: 'infer', sourceLocale: 'en', precompile: true}
   }
 }, './custom/path/request.ts');
 ```
+
+---
+
+## § Pre-flight: `sourceLocale`
+
+`experimental.messages.sourceLocale` names the locale the source strings are written in. Set it to the project's `defaultLocale`. It looks optional and is not: leaving it out is a **build failure** on two different next-intl versions, for two different reasons.
+
+### 1. `4.14.2` and later — empty `msgstr` throws
+
+`4.14.2` (2026-09-01) moved its PO codec dependency from `@eloqnt/format-po@^0.0.3` to `^0.1.0`. At `0.0.x` a caret range is an exact pin, so every `4.14.0`/`4.14.1` install resolved `0.0.3`; `^0.1.0` now resolves `0.1.0`, which carries the `0.0.5` change *"throw a clear error when a PO file contains an empty `msgstr` but no source locale is known"*. On `0.0.3` an empty `msgstr` in a non-source locale decoded to an empty message and rendered as an empty element. On `0.1.0` it aborts the build:
+
+```
+Error: Found an empty msgstr in the "de" messages file, but no source locale is known.
+An empty msgstr can mean that the translation is missing, or that it matches the source
+text, and only the source locale tells the two apart. Set `sourceLocale` in your config
+to the locale your source messages are written in.
+```
+
+The trigger is any entry with `msgstr ""` in any catalog — the normal state of a project between extraction and translation. Nothing in the project has to change for this to start failing: `next-intl@^4` resolves to `4.14.2` on a fresh install or a `npm update`.
+
+With `sourceLocale` set, an empty `msgstr` **in the source catalog** falls back to that entry's `msgid`. Because this reference authors `msgid` as a dot-path key, that fallback renders the key itself (`common.subtitle`), not English text — so an empty `msgstr` in the source catalog is still a bug to fix, it just no longer stops the build. An empty `msgstr` in a *non-source* catalog still resolves to an empty message, exactly as it did on `0.0.3`.
+
+### 2. Exactly `4.14.0` — non-serializable loader options
+
+`4.14.0` always passes `sourceLocale` into the catalog loader's options, `undefined` included, and Next.js rejects loader options that do not survive a JSON round-trip ([#2394](https://github.com/amannn/next-intl/issues/2394)):
+
+```
+Error: loader next-intl/extractor/catalogLoader for match "*.po" does not have
+serializable options. Ensure that options passed are plain JavaScript objects and values.
+```
+
+Setting `sourceLocale` to a real string is sufficient to clear this — the key is no longer `undefined`. Upgrading to `4.14.1` or later also clears it.
+
+### Version safety
+
+`sourceLocale` is accepted and harmless across the whole range this reference supports — verified by build on `4.13.7` (pre-codec-swap), `4.14.1` and `4.14.2`, all on `next@16.3.4`. Set it unconditionally; there is no version check to write.
 
 ---
 
