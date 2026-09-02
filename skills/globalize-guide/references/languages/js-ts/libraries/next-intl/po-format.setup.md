@@ -4,6 +4,18 @@ PO-specific variants for `next-intl` setup. Each section below corresponds to a 
 
 PO support is **experimental** in next-intl ≥ 4.5 and is enabled via the `experimental.messages` option on `createNextIntlPlugin`. A Turbopack/Webpack loader compiles `.po` into a plain JS object at build time — no `po2json` or pre-build step is required.
 
+**next-intl 4.14.0 replaced the built-in PO codec** with [`@eloqnt/format-po`](https://cli.eloqnt.dev/docs/formats/po) ([#2393](https://github.com/amannn/next-intl/pull/2393), 2026-08-27). Catalogs authored the way this reference describes keep working unchanged; catalogs *written by next-intl's own extractor* on 4.5–4.13 do not. Run the pre-flight check below before touching an existing project.
+
+> **Do not install exactly `4.14.0`.** That release is superseded by [4.14.1](https://github.com/amannn/next-intl/releases/tag/v4.14.1) (2026-08-28), which fixes a build-breaking regression on this exact path: 4.14.0 always passed `sourceLocale` into the catalog loader's options, `undefined` included, and Next.js rejects loader options that do not survive a JSON round-trip ([#2394](https://github.com/amannn/next-intl/issues/2394)). Any project that configures `experimental.messages` **without** an explicit `sourceLocale` fails to build under Turbopack with:
+>
+> ```
+> Error: loader next-intl/extractor/catalogLoader for match "*.po" does not have serializable options. Ensure that options passed are plain JavaScript objects and values.
+> ```
+>
+> (The glob is whatever `getFormatExtension(messages.format)` returns, so a PO project sees `"*.po"`; the upstream report was filed from a JSON project and quotes `"*.json"`. Same defect, same fix.)
+>
+> Catalog loading already requires Next.js 16 or higher, and on Next 16 next-intl configures the Turbopack rules whether or not `--turbopack` is passed (`shouldConfigureTurbo = useTurbo || isNextJs16OrHigher()`), so dropping the flag is **not** a way around it. Two things clear it, and this reference does both: the scaffold sets an explicit `sourceLocale` (which is separately required from 4.14.2 — see the option notes), and `^4` on a fresh install resolves well past 4.14.0 anyway. **If a lockfile already pins exactly `4.14.0`, upgrade it before running setup.**
+
 ---
 
 ## § Pre-flight: bundler & module system
@@ -30,7 +42,7 @@ PO support is **experimental** in next-intl ≥ 4.5 and is enabled via the `expe
 >
 > 1. **Drop `--turbopack`** — remove the flag from `package.json` scripts. Webpack handles the PO loader reliably. Lowest-friction option; matches what most next-intl PO users run today.
 > 2. **Convert config to ESM** — rename `next.config.js` to `next.config.mjs` and change `module.exports = ...` to `export default ...`. Keeps Turbopack but is a wider edit.
-> 3. **Switch catalog format to JSON** — skip the experimental PO loader entirely. Simpler, but loses PO's translator metadata (`#.` descriptions, `#:` source refs, `msgctxt`).
+> 3. **Switch catalog format to JSON** — skip the experimental PO loader entirely. Simpler, but loses PO's translator metadata (`#.` descriptions, `#:` source refs).
 
 **You MUST wait for the user to choose before proceeding.** Do not silently default.
 
@@ -38,11 +50,43 @@ PO support is **experimental** in next-intl ≥ 4.5 and is enabled via the `expe
 
 ---
 
+## § Pre-flight: existing catalogs on next-intl ≥ 4.14
+
+**Skip this on a greenfield project** — there are no catalogs yet. Run it whenever `.po` files already exist and next-intl resolves to 4.14.0 or later.
+
+next-intl 4.14.0 moved the built-in PO codec to `@eloqnt/format-po`, which picks its layout from a header in the catalog itself:
+
+| Header in the `msgid ""` block | Layout | Key comes from | Effect on 4.14+ |
+|---|---|---|---|
+| `X-Crowdin-SourceKey: msgstr` | previous next-intl layout | `msgid` | **Hard build error** with a migration link — see the note under the check |
+| `X-Message-Key: msgctxt` | current extractor layout | `msgctxt` | Reads normally |
+| neither (plain gettext) | gettext | `msgctxt` + `.` + `msgid`, or `msgid` alone | Reads normally — **this is what the scaffold in this reference produces** |
+
+**Check:**
+
+```bash
+grep -l "X-Crowdin-SourceKey" messages/*.po
+```
+
+- **No output** → nothing to do. Hand-authored catalogs carry only `Content-Type` and `Language`, so they read as plain gettext, and gettext decoding is byte-for-byte the behaviour of the 4.13 codec (`id = msgctxt ? msgctxt + "." + msgid : msgid`, `message = msgstr`).
+- **Any file listed** → those catalogs were written by next-intl's own extractor (`useExtracted`) or round-tripped through a TMS that preserved the header, and the build will fail on them. The message key lives in `msgid` and the text in `msgstr` — the reverse of what 4.14 expects. Present the user a choice; do not migrate silently:
+
+  1. **Migrate the catalogs** (recommended, and what upstream recommends). For every entry: move the key from `msgid` into `msgctxt`, put the source text in `msgid` (look it up by key in the source-locale catalog's `msgstr`), leave `msgstr` alone. In each header block, drop `X-Crowdin-SourceKey: msgstr` and add `X-Message-Key: msgctxt`. Preserve entry order, `#.`, `#:` and flags. Verify by building: extraction must not modify the converted files further. Full instructions: [next-intl#2393](https://github.com/amannn/next-intl/pull/2393).
+  2. **Keep the previous layout** by configuring [`POCodecLegacy`](https://github.com/amannn/next-intl/blob/main/packages/next-intl/src/extractor/format/codecs/fixtures/POCodecLegacy.tsx) as a custom codec — `format: {codec: './POCodecLegacy.tsx', extension: '.po'}`. No catalog edits, but the project stays off the built-in path.
+
+> **Where the error comes from, and the one case it misses.** The throw is not in `@eloqnt/format-po`. next-intl wraps that codec in [`BuiltInPoCodec`](https://github.com/amannn/next-intl/blob/main/packages/next-intl/src/extractor/format/codecs/BuiltInPoCodec.tsx), whose `assertMigrated` does a **literal substring test on the raw file text** for `X-Crowdin-SourceKey: msgstr` — that exact spelling, one space — before handing the content to `decode`. A catalog written with different spacing (`X-Crowdin-SourceKey:msgstr`) slips past the guard and is then decoded by the **gettext** branch, which reads the key from `msgctxt` + `.` + `msgid`. On a previous-layout catalog that yields wrong keys and `MISSING_MESSAGE` at render, with no build error at all. The `grep` above is deliberately looser than the guard so it catches those too: treat any hit as "migrate", not as "the build will tell me".
+>
+> The same wrapper comment records that **a custom codec referencing `@eloqnt/format-po` directly opts out of the guard**, which is what makes option 2 above work.
+
+**You MUST wait for the user to choose before proceeding.**
+
+---
+
 PO carries translator-facing metadata that JSON cannot:
 
 - `#.` — description comments (intent of the message, audience, tone notes)
 - `#:` — source-file references (which component/page the string came from)
-- `msgctxt` — disambiguating context for otherwise-identical strings
+- `msgctxt` — **part of the key, not translator context.** next-intl's PO codec reads an entry's key as `msgctxt` + `.` + `msgid`. See § Authoring conventions before using it.
 
 Authoring convention: **`msgid` is a dot-path** matching the namespace hierarchy that `useTranslations` / `getTranslations` use. For example, `useTranslations('HomePage')` + `t('greeting')` resolves to `msgid "HomePage.greeting"`. `msgstr` holds the translated text and may contain ICU syntax (`{name}`, `{count, plural, ...}`, `<link>...</link>`).
 
@@ -128,6 +172,7 @@ Option notes:
 - `path: './messages'` — directory containing the `.po` files, relative to project root.
 - `locales: 'infer'` — auto-detects locales from filenames (`en.po`, `de.po`, …). Alternatively pass an explicit array, e.g. `['en', 'de', 'fr']`.
 - `precompile: true` — compiles message bodies at build time rather than request time. Recommended. Same flag as the JSON precompile path (`next-intl >= 4.8`); originally introduced for PO in 4.5. See `SKILL.md` § Common Gotchas → **`t.raw` + precompile** for the one known limitation.
+- `sourceLocale` — **new in 4.14.0, and required from 4.14.2.** Names the locale whose catalog holds the source strings. It is set unconditionally in the snippets above; see **§ Pre-flight: `sourceLocale`** for both build failures it prevents and the versions each applies to.
 
 ### Pages Router (CJS)
 
@@ -292,6 +337,6 @@ When writing or editing `.po` messages going forward:
 - **`msgstr` is the translation.** ICU syntax is supported inside `msgstr` — interpolation (`{name}`), plurals (`{count, plural, one {...} other {...}}`), select (`{gender, select, ...}`), and rich-text tags (`<link>...</link>`).
 - **Always keep `#.` descriptions.** One-line intent note for translators. "Button on checkout form", "Error shown when payment fails", "Tooltip on delete icon". These are the single biggest quality lever for AI-assisted translation.
 - **Always keep `#:` source references.** Point to the file + line where the message is consumed. Tools like Poedit will let a translator jump straight to the call site. Keep these up to date — stale references are worse than missing ones.
-- **Use `msgctxt` for disambiguation.** Two identical source strings with different meanings (e.g. "Post" as a verb vs. "Post" as a noun) need different `msgctxt` values so translators can render them differently per locale.
+- **Do not use `msgctxt` as translator context.** In gettext generally `msgctxt` disambiguates two identical source strings, but next-intl does not read it that way: its PO codec builds the message key as `msgctxt` + `.` + `msgid`. Adding `msgctxt "icon-tooltip"` to `msgid "ItemRow.delete"` produces the key `icon-tooltip.ItemRow.delete`, so `useTranslations('ItemRow')` + `t('delete')` never finds the entry. This does **not** fail the build: next-intl reports `MISSING_MESSAGE` through its error handler and falls back to rendering the key, so a production build succeeds and ships the literal string `ItemRow.delete` to the page (observed on `next-intl@4.14.2` / `next@16.3.4`). Disambiguate with distinct `msgid` dot-paths instead — `ItemRow.deleteVerb` and `ItemRow.deleteNoun` — and put the human explanation in `#.`. `msgctxt` is only correct as a deliberate namespace prefix: `msgctxt "Cart"` + `msgid "items"` is another spelling of `msgid "Cart.items"`, which is what the codec writes back when it re-encodes a catalog.
 - **Keep entries sorted or grouped by namespace.** The loader doesn't care, but humans reviewing diffs and translators importing into a TMS do.
 - **Do not hand-edit the `msgstr ""` header block** beyond `Content-Type` and `Language`. Headers like `Plural-Forms` are gettext-native; next-intl relies on ICU plurals in `msgstr`, so the gettext `Plural-Forms` header is informational only.
