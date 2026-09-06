@@ -160,16 +160,16 @@ Detect the package manager from the lockfile (`package-lock.json` → npm, `pnpm
 
 ```bash
 # npm
-npm install --save-dev 'eslint-plugin-lingui@^0.14'
+npm install --save-dev 'eslint-plugin-lingui@^0.15'
 # pnpm
-pnpm add -D 'eslint-plugin-lingui@^0.14'
+pnpm add -D 'eslint-plugin-lingui@^0.15'
 # yarn
-yarn add -D 'eslint-plugin-lingui@^0.14'
+yarn add -D 'eslint-plugin-lingui@^0.15'
 # bun
-bun add -D 'eslint-plugin-lingui@^0.14'
+bun add -D 'eslint-plugin-lingui@^0.15'
 ```
 
-(If the published current major has advanced past `0.14`, bump the pin accordingly — confirm via `npm view eslint-plugin-lingui version` if uncertain.)
+(The plugin is pre-1.0, so `^0.15` admits `0.15.x` and **not** `0.16`. If the published minor has advanced past `0.15`, bump the pin accordingly — confirm via `npm view eslint-plugin-lingui version` if uncertain.)
 
 ### Configure
 
@@ -206,6 +206,25 @@ The recommended preset enables (subject to plugin version):
 | `lingui/no-expression-in-message` | Template-string expressions inside `t\`…\`` that the macro can't statically extract |
 
 Read the plugin README for the exact rule list at the installed version — rules and severities shift between minor releases.
+
+### `no-unnamed-tag-placeholders` — enable it explicitly
+
+`0.15.0` (2026-09-04) added `lingui/no-unnamed-tag-placeholders`, which flags an inline JSX tag inside `<Trans>` that has no placeholder name. **It is not in the recommended preset** — at both `0.14.0` and `0.15.0` `flat/recommended` enables the same five rules — so installing `0.15` changes nothing on its own. Turn it on, and give it the same attribute name the project's `lingui.config.ts` declares:
+
+```js
+{
+  rules: {
+    'lingui/no-unnamed-tag-placeholders': ['error', { jsxPlaceholderAttribute: '_t' }],
+  },
+}
+```
+
+This is the lint counterpart of the *Naming tag placeholders* section in the generated coding rules: unnamed tags extract as positional `<0>` / `<1>`, so adding a wrapper element renumbers the rest and obsoletes that message's finished translations. The rule reports one error per unnamed tag and names the tag it means.
+
+Two things to keep straight before turning it on:
+
+- **The rule's other option, `jsxPlaceholderDefaults`, mirrors a `lingui.config.ts` setting of the same name** — a tag-name → placeholder-name map (`{ a: 'link', strong: 'strong' }`) that names tags without touching the JSX. It is tempting and it has a sharp edge: two elements with the *same* tag in one message then resolve to the same placeholder name, and `lingui extract` fails with `Multiple distinct JSX elements with the same placeholder name` (exit 1) rather than warning. Any message with two links breaks the build. Prefer per-element `_t`; reach for defaults only for tags that never repeat inside one message.
+- **Pinning to `^0.14` cannot reach this rule**, and enabling it against `0.14.x` is a hard ESLint failure (`Could not find "no-unnamed-tag-placeholders" in plugin "lingui"`, exit 2), not a skipped rule. Bump the pin and the rule together, or neither.
 
 ### `no-unlocalized-strings` configuration
 

@@ -224,6 +224,10 @@ export default defineConfig({
   ],
   format: formatter({ lineNumbers: false }),
   compileNamespace: 'ts',
+  macro: {
+    // Lets `<a _t="tos">` inside <Trans> extract as <tos>…</tos> instead of <0>…</0>.
+    jsxPlaceholderAttribute: '_t',
+  },
 })
 ```
 
