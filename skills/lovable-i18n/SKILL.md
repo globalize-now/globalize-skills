@@ -1349,7 +1349,18 @@ Until the CI workflow (Phase 5) takes over, you maintain the `.po` files by hand
 
 ### Entry shape
 
-This is exactly what `lingui extract` writes with this project's config (`lineNumbers: false` in A3 keeps `#:` references to file paths only — no line numbers); match it:
+This is exactly what `lingui extract` writes with this project's config (`lineNumbers: false` in A3 keeps `#:` references to file paths only — no line numbers); match it. **Only the `msgstr` differs between the source locale and the targets** — every other line is identical across all catalog files.
+
+In the source locale (`src/locales/<sourceLocale>/messages.po`) the extractor repeats the msgid:
+
+```po
+#. A translator comment from the comment= prop
+#: src/components/Header.tsx
+msgid "Welcome back, {name}!"
+msgstr "Welcome back, {name}!"
+```
+
+In every target locale it is empty:
 
 ```po
 #. A translator comment from the comment= prop
@@ -1361,21 +1372,22 @@ msgstr ""
 - `#.` line: only when the code has a `comment=` for this string.
 - `#:` line: the source file path where the string lives.
 - `msgid`: the **exact** source text — including placeholder names (`{name}`) exactly as the macro produces them.
-- `msgstr`: empty (see below).
+- `msgstr`: the msgid repeated verbatim in the source locale; empty in every target locale (see below).
 - One blank line between entries.
 - When the code uses `context=`, add `msgctxt "the context value"` on its own line directly above `msgid`.
 
-Plural and other ICU strings put the **full ICU expression** in the msgid:
+Plural and other ICU strings put the **full ICU expression** in the msgid, and the same source/target split applies — the source locale repeats the whole ICU body into its `msgstr`, the targets leave it empty:
 
 ```po
 #: src/components/CartBadge.tsx
 msgid "{count, plural, one {# item} other {# items}}"
-msgstr ""
+msgstr "{count, plural, one {# item} other {# items}}"
 ```
 
 ### Rules
 
-- **Every locale gets the entry — including the source locale.** All with `msgstr ""`. Lingui falls back to the source text (the msgid) at runtime for any missing message, so empty msgstr renders correctly in the source locale and signals "untranslated" to the translation platform for the targets. Never copy the msgid into msgstr.
+- **Every locale gets the entry — including the source locale.** The source locale's `msgstr` repeats the msgid; every target locale's is empty. Never copy the msgid into a *target* `msgstr`: an empty one is what signals "untranslated" to the translation platform, and Lingui compiles a message with no translation down to its msgid anyway, so the target still renders the source text until a real translation arrives.
+- **A blank source-locale `msgstr` does not heal itself.** `lingui extract` preserves existing `msgstr` values, empty ones included, and its statistics table never counts the source locale as missing — so a source catalog hand-written with `msgstr ""` stays that way through every later extraction, with no diagnostic anywhere. It still *renders* correctly, because compile falls back to the msgid. But it permanently diverges from what the extractor writes, which is the one thing this protocol exists to guarantee.
 - **Append-only.** Add new entries at the end of each file. Never reorder existing entries, never rewrite `#.` / `#:` lines on entries you didn't author, never reformat the file.
 - **Formatting is CI-owned after the first CI run.** Extraction regenerates `#:` references and `#.` comments from code, adds missing entries, removes entries whose source strings are gone (`--clean`), and normalizes ordering — while **preserving existing `msgstr` translations**. Any hand-decoration you add beyond the shape above will be erased; any translation in msgstr survives.
 
