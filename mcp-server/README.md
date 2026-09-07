@@ -1,6 +1,6 @@
 # @globalize-now/mcp-server
 
-MCP server for the [Globalize](https://globalize.now) translation platform. Connects AI coding agents to the Globalize API so they can manage translation projects, languages, glossaries, style guides, and more.
+MCP server for the [Globalize](https://globalize.now/en/developers/) translation platform. Connects AI coding agents to the Globalize API so they can manage translation projects, languages, glossaries, style guides, and more. To run it from Claude Code, see [Claude Code i18n](https://globalize.now/en/integrations/claude-code/).
 
 ## Installation
 
