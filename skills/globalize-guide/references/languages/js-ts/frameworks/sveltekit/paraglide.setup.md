@@ -366,6 +366,16 @@ The Paraglide compiler also emits a `.gitignore` of its own inside `outdir` by d
 ## Verify
 
 1. Compile: `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`. It should complete and emit `messages.js` / `runtime.js` under `src/lib/paraglide/`. (The Vite plugin also recompiles on dev/build; this is a standalone sanity run.)
+
+   **Exit 0 and those two files are not the check — count the compiled messages.** Paraglide compiles whatever the inlang model holds, and a settings file that hydrates *zero* messages is not an error to it: it prints `✔ Successfully compiled inlang project`, exits **0**, and still writes `messages.js`, `runtime.js`, `registry.js` and `server.js`. Only the per-message modules are missing. So assert the count, not the files:
+
+   ```bash
+   # compiled message modules (excluding the barrel) vs. msgids in the source catalog
+   ls src/lib/paraglide/messages/*.js | grep -v '_index.js' | wc -l
+   grep -c '^msgid "[^"]' messages/en.po      # <baseLocale>.po; the header msgid "" is excluded by the [^"]
+   ```
+
+   The two numbers must match, and the first must be **> 0**. Zero means the catalog plugin imported nothing — the `.po` files are untouched on disk and look fine, so nothing else in the tree hints at it. Two settings mistakes produce exactly this, both verified: the `plugin.globalizeNow.po` key missing or misspelled (most likely halfway through the ICU-JSON → PO migration below, where the module URL is swapped but the old `plugin.inlang.icu-messageformat-1` key is left behind), and a `pathPattern` that matches no file. In both cases every `m.*()` call is then `undefined` at runtime.
 2. Start the dev server (`npm run dev` or the detected manager's equivalent). It should boot without errors and the page should render the sample message. Switch locale via the switcher — the visible text changes and (with `url` in the strategy) the URL gains the locale prefix; reloading that URL keeps the chosen locale (cookie + URL persistence working under SSR).
 3. **Render a plural and confirm it selects the correct form.** Call `m.likes({ count: 1 })` and `m.likes({ count: 5 })` somewhere on a page and confirm the output is `1 like` and `5 likes` — **not** the raw `{count, plural, …}` source and not an empty string. Raw-source output means `messageFormat: "icu"` is missing (or the plugin URL is below `0.1.2`); fix that before continuing. This check is non-negotiable — it is the only signal that ICU is actually being evaluated (a malformed or unparsed ICU body is imported as literal text with no build error).
 4. Run the production build (`npm run build`) and confirm it completes — a missing or misconfigured `project.inlang/settings.json` surfaces here.
