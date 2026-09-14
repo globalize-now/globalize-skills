@@ -28,6 +28,7 @@ npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@~6.6.0'
 
 - **`@lingui/swc-plugin@6.7.0` does not run on any Next.js release.** It fails on 16.1.7, 16.2.12 and 16.3.4 alike — its pinned `swc_core@77.1.1` is newer than every plugin runner Next has shipped (observed `swc_plugin_runner` **23.0.0** on 16.1.7, **24.0.0** on 16.2.12, **30.0.1** on 16.3.4). `^6` resolves to `6.7.0` today, so **`@lingui/swc-plugin@^6` is a hard build break on current Next.js** — that is why the install line above pins `~6.6.0`.
 - **`6.0.0`, `6.2.0` and `6.6.0` all transform correctly on Next.js ≥ 16.1.0.**
+- **The pin is a split pin, and that is fine.** `@lingui/swc-plugin@~6.6.0` alongside `@lingui/core`/`@lingui/react`/`@lingui/cli` at `^6` means `npm ls` shows the plugin one minor behind the rest of the family. Verified by build on Next.js 16.3.4 with plugin `6.6.0` + core/react/cli/format-po `6.7.0`: `next build` succeeds with the macro transformed, and `lingui extract` then `lingui compile` both exit 0. Do **not** pin the rest of the family back to `6.6.0` to "match" the plugin — the plugin's own peer range is `@lingui/core@5 || 6`, so the mismatch is not one.
 - **Below Next.js 16.1.0 no `6.x` plugin works at all.** 16.0.0, 16.0.11, 15.5.25 and 14.2.35 reject `6.0.0`, `6.1.0`, `6.2.0`, `6.6.0` and `6.7.0` alike. Pinning the plugin backwards is **not** a remedy on those hosts — see the Babel fallback below.
 
 The same failure prints three different ways, so match on the cause, not the wording:
