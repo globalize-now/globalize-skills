@@ -35,7 +35,7 @@ Lingui 6 has two hard install-time preconditions. Neither is advisory, both are 
 
 **If the project is below the Node floor, or is locked to CJS config files it cannot convert, stop and tell the user** rather than installing a runtime they cannot run. This mirrors the orchestrator-level check in `SKILL.md` §2.0; the check is repeated here because this file is the first reference read on every Lingui variant, and the orchestrator installs packages before dispatching the setup subagent.
 
-*Verified against the `@lingui/*` 6.6.0 packuments.*
+*Verified against the `@lingui/*` 6.7.0 packuments — the version `^6` installs today. Both preconditions are unchanged from 6.6.0: the seven packages named above still declare `engines: { "node": ">=22.19.0" }`, `@lingui/swc-plugin` still declares none, and all eight are still `"type": "module"` with no `require` condition in `exports`. One detail worth having if you automate this check: `@lingui/swc-plugin` is also the one package that **does** carry a `main` field (`"./lingui_macro.wasm"`), so a check written as "no `main` field" misclassifies it. Test the `require` condition, not `main`.*
 
 ---
 
