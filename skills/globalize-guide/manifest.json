@@ -76,7 +76,12 @@
       ],
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/detect-locale@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6"]
+        "dev": [
+          "@lingui/cli@^6",
+          "@lingui/swc-plugin@^6",
+          "@lingui/vite-plugin@^6",
+          "@vitejs/plugin-react-swc@^4"
+        ]
       },
       "references": {
         "setup": [
