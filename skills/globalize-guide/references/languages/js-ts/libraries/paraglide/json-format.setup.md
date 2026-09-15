@@ -64,7 +64,23 @@ The compile command is also unchanged: `npx '@inlang/paraglide-js@^2' compile --
 
 1. Start the dev server (`npm run dev` or the detected manager's equivalent). It should boot without errors and the page should render the sample message.
 2. Switch locale via the switcher — the visible text changes and (with `url` in the strategy) the URL gains the locale prefix; reloading that URL keeps the chosen locale (cookie + URL persistence working under SSR).
-3. Run the production build (`npm run build`) and confirm it completes — a missing or misconfigured `project.inlang/settings.json`, or a malformed ICU string (the ICU1 plugin **does** fail the build on malformed ICU, unlike the PO plugin's silent literal import), surfaces here.
+3. Run the production build (`npm run build`). **Exit 0 is not the check — read the warnings.** Three outcomes, all verified against `@inlang/plugin-icu1@1.1.0` on Paraglide 2.25.2:
+
+   - A **malformed ICU string** *does* fail the build, exit 1 — this is the one place ICU-JSON is stricter than PO, whose plugin imports an unparsed body as literal text with no build error:
+
+     ```
+      ERROR  [paraglide-js] Failed to compile project: Unexpected message end at line 1 col 45
+     ✗ Build failed
+     ```
+
+   - A **missing** `project.inlang/settings.json` also fails the build, exit 1 (`ENOENT … project.inlang/settings.json`).
+   - A **misconfigured** one does **not**. A wrong or misspelled `plugin.inlang.icu-messageformat-1` key, or a `pathPattern` that matches no file, hydrates zero messages; the build exits **0** and the only signal is a Rollup warning per call site:
+
+     ```
+     src/routes/+page.svelte (4:7): "hello_world" is not exported by "src/lib/paraglide/messages.js", imported by "src/routes/+page.svelte".
+     ```
+
+     **Treat any `is not exported by "…/paraglide/messages.js"` warning as a build failure.** Shipping past it produces a server that returns **500 on every page** — the missing named import bundles as `undefined`, so the first `m.*()` call throws `TypeError: (void 0) is not a function` during SSR. Step 1 above is what catches it cheaply: a page that renders the sample message cannot have an empty catalog.
 
 ## Translator comments
 

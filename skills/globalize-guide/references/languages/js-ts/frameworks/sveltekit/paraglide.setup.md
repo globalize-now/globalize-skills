@@ -378,7 +378,22 @@ The Paraglide compiler also emits a `.gitignore` of its own inside `outdir` by d
    The two numbers must match, and the first must be **> 0**. Zero means the catalog plugin imported nothing — the `.po` files are untouched on disk and look fine, so nothing else in the tree hints at it. Two settings mistakes produce exactly this, both verified: the `plugin.globalizeNow.po` key missing or misspelled (most likely halfway through the ICU-JSON → PO migration below, where the module URL is swapped but the old `plugin.inlang.icu-messageformat-1` key is left behind), and a `pathPattern` that matches no file. In both cases every `m.*()` call is then `undefined` at runtime.
 2. Start the dev server (`npm run dev` or the detected manager's equivalent). It should boot without errors and the page should render the sample message. Switch locale via the switcher — the visible text changes and (with `url` in the strategy) the URL gains the locale prefix; reloading that URL keeps the chosen locale (cookie + URL persistence working under SSR).
 3. **Render a plural and confirm it selects the correct form.** Call `m.likes({ count: 1 })` and `m.likes({ count: 5 })` somewhere on a page and confirm the output is `1 like` and `5 likes` — **not** the raw `{count, plural, …}` source and not an empty string. Raw-source output means `messageFormat: "icu"` is missing (or the plugin URL is below `0.1.2`); fix that before continuing. This check is non-negotiable — it is the only signal that ICU is actually being evaluated (a malformed or unparsed ICU body is imported as literal text with no build error).
-4. Run the production build (`npm run build`) and confirm it completes — a missing or misconfigured `project.inlang/settings.json` surfaces here.
+4. Run the production build (`npm run build`). **Exit 0 is not the check here either — read the warnings.**
+
+   A **missing** `project.inlang/settings.json` does fail the build:
+
+   ```
+    ERROR  [paraglide-js] Failed to compile project: ENOENT: no such file or directory, open '.../project.inlang/settings.json'
+   ✗ Build failed
+   ```
+
+   A **misconfigured** one does not. The two settings mistakes from step 1 (the `plugin.globalizeNow.po` key missing or misspelled, or a `pathPattern` that matches no file) compile to zero messages, and the production build exits **0**. The only signal is a Rollup warning, one per call site, printed twice (Vite builds the client and the server pass):
+
+   ```
+   src/routes/+page.svelte (4:7): "hello_world" is not exported by "src/lib/paraglide/messages.js", imported by "src/routes/+page.svelte".
+   ```
+
+   **Treat any `is not exported by "…/paraglide/messages.js"` warning as a build failure.** Shipping past it produces a server that returns **500 on every page** — the missing named import is bundled as `undefined`, so the first `m.*()` call throws `TypeError: (void 0) is not a function` during SSR. Step 1's message count is what catches this cheaply; this step cannot replace it.
 5. **Render `list(['a', 'b', 'c'])` and `relativeTime(Date.now() - 86_400_000)`** on a page and confirm they read as `a, b, and c` and `yesterday` — **not** `[object Object]` and **not** `1 day ago`. `numeric: 'auto'` on the `Intl.RelativeTimeFormat` constructor is what produces `yesterday`; losing it (omitting the option, or passing `numeric: 'always'`) is a silent quality regression — the output stays grammatically valid, just worse.
 
 ## Coding rules + optional add-ons
