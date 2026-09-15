@@ -65,6 +65,11 @@ import type { Plugin } from 'vite'
  *
  * msgctxt + msgid pairs are encoded via a "__ctx_<context>" suffix on the final key
  * segment, so call sites reach them with t('HomePage.title__ctx_direction').
+ *
+ * An entry whose msgstr is empty is SKIPPED, not defaulted. In this scheme the
+ * msgid is the key, not the source text — emitting it as the value would render
+ * "HomePage.title" to the page. Leaving the key absent hands the miss to
+ * vue-i18n's fallbackLocale, which is configured to the source locale.
  */
 export function poLoader(): Plugin {
   return {
@@ -77,9 +82,10 @@ export function poLoader(): Plugin {
       for (const ctx of Object.keys(parsed.translations)) {
         for (const [msgid, entry] of Object.entries(parsed.translations[ctx])) {
           if (!msgid) continue  // empty msgid = PO header
+          const translated = entry.msgstr[0]
+          if (!translated) continue  // untranslated — let fallbackLocale supply it
           const fullKey = ctx ? `${msgid}__ctx_${ctx}` : msgid
-          const value = entry.msgstr[0] || msgid   // fall back to source text if msgstr empty
-          setByPath(tree, fullKey, value)
+          setByPath(tree, fullKey, translated)
         }
       }
       return { code: `export default ${JSON.stringify(tree)}`, map: null }
@@ -122,6 +128,8 @@ export default defineConfig({
 ```
 
 The `enforce: 'pre'` on `poLoader()` makes the ordering explicit even if a user rearranges the array.
+
+**Why an empty `msgstr` is skipped rather than defaulted.** In this catalog scheme the `msgid` is the *call-site key* (`HomePage.title`), not the source text — the source text lives in the source locale's `msgstr`. So a loader that defaults an empty `msgstr` to its `msgid` puts the key string into the target locale's message tree, vue-i18n finds it, and the page renders the literal `HomePage.title` with no warning at any layer. Worse, it renders the *unmangled* msgid for a `msgctxt` entry (`Common.right`, not `Common.right__ctx_direction`). Skipping the entry instead leaves the key absent, so the `fallbackLocale: sourceLocale` set in the provider step does its job: the string renders in the source language and vue-i18n logs `[intlify] Fall back to translate '<key>' key with '<sourceLocale>' locale` in development. A fully untranslated catalog therefore transforms to `{}`, which is fine — `setLocaleMessage(locale, {})` still registers the locale in `availableLocales`, so the lazy-load guard in `setLocale()` does not re-fetch it.
 
 **Source-map caveat:** `.po → JS` transforms don't emit source maps. `.po` parse errors surface through `gettext-parser`'s thrown exception with a line reference; runtime errors will point at the compiled JS, not the source `.po` file. In practice this is fine — the loader output is mechanical, and TMS-level validation catches real catalog issues.
 
