@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/globalize-now/globalize-skills/skills/globalize-guide/manifest.schema.json",
   "title": "globalize-guide stack manifest",
-  "description": "Shape of skills/globalize-guide/manifest.json. Describes what is true today; new optional per-stack fields (Node floors, peer floors, host floors) should be added here in the same commit that introduces them.",
+  "description": "Shape of skills/globalize-guide/manifest.json. Describes what is true today; new optional per-stack fields should be added here in the same commit that introduces them - Node and Vite floors now live in the per-stack \"requires\" array.",
   "type": "object",
   "required": [
     "version",
@@ -52,6 +52,53 @@
       "type": "string",
       "minLength": 1,
       "description": "Gem name plus a Bundler pin, e.g. \"rails-i18n ~> 8.1\"."
+    },
+    "requirement": {
+      "type": "object",
+      "description": "One install-time host constraint, derived from a package this stack installs. Read by the SKILL.md 1.5a gate. Add a row here rather than writing the range into a reference file - prose cannot track an upstream floor change and cannot express a disjoint range.",
+      "required": [
+        "tool",
+        "range",
+        "setBy",
+        "enforcement"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "enum": [
+            "node",
+            "vite"
+          ],
+          "description": "What is being constrained on the user's machine or in their project."
+        },
+        "range": {
+          "type": "string",
+          "minLength": 1,
+          "description": "SemVer range, copied verbatim from the declaring package's engines/peerDependencies. May be disjoint (e.g. \"^20.19.0 || >=22.12.0\")."
+        },
+        "setBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The package spec this range came from. Must appear in this stack's packages, or name a transitive path from one (\"a@^1 -> b@^2\"); checked by evals/verify-manifest.sh."
+        },
+        "enforcement": {
+          "enum": [
+            "warn",
+            "stop"
+          ],
+          "description": "\"warn\" = engines.node, which npm reports and then installs anyway. \"stop\" = an unsatisfiable required peer, which is an ERESOLVE hard failure on npm >= 7 and pnpm."
+        },
+        "fallback": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A real alternative to offer alongside the upgrade, e.g. an older major of the constraining package that still supports the user's version."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why the range is what it is, where that is not obvious from setBy alone (e.g. a transitive floor stricter than the direct dependency's own declaration)."
+        }
+      }
     },
     "match": {
       "type": "object",
@@ -156,6 +203,14 @@
               }
             }
           }
+        },
+        "requires": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/requirement"
+          },
+          "description": "Optional. Install-time host constraints for this stack, strictest-per-tool. Absent means this stack constrains nothing."
         },
         "gems": {
           "type": "object",

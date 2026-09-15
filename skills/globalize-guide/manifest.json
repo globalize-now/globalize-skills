@@ -10,6 +10,9 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@~6.6.0"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -78,6 +81,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/detect-locale@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -99,6 +106,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/detect-locale@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -120,6 +131,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -144,6 +159,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@vitejs/plugin-react-swc@^4"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -165,6 +184,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -186,6 +209,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6", "@vitejs/plugin-react-swc@^4"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -210,6 +237,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6", "@vitejs/plugin-react@^5"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -231,6 +262,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6", "@vitejs/plugin-react-swc@^4"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -252,6 +287,9 @@
         "runtime": ["vue-i18n@^11", "intl-messageformat@^11"],
         "dev": ["@intlify/unplugin-vue-i18n@^11"]
       },
+      "requires": [
+        { "tool": "node", "range": ">= 22.13", "setBy": "@intlify/unplugin-vue-i18n@^11", "enforcement": "warn" }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/vue-i18n/setup.shared.md",
@@ -276,6 +314,9 @@
         "runtime": ["@nuxtjs/i18n@^10", "intl-messageformat@^11"],
         "dev": []
       },
+      "requires": [
+        { "tool": "node", "range": ">= 22", "setBy": "@nuxtjs/i18n@^10 -> vue-i18n@^11.4.8", "enforcement": "warn", "note": "@nuxtjs/i18n declares >=20.11.1, but depends on vue-i18n@^11.4.8 and every vue-i18n >= 11.4.3 declares >= 22, so the real floor is transitive." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/vue-i18n/setup.shared.md",
@@ -300,6 +341,9 @@
         "runtime": ["vue-i18n@^11", "intl-messageformat@^11"],
         "dev": ["@intlify/unplugin-vue-i18n@^11"]
       },
+      "requires": [
+        { "tool": "node", "range": ">= 22.13", "setBy": "@intlify/unplugin-vue-i18n@^11", "enforcement": "warn" }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/vue-i18n/setup.shared.md",
@@ -376,6 +420,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/format-po@^6", "@lingui/vite-plugin@^6", "babel-plugin-macros@^3"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",
@@ -408,6 +456,10 @@
         "runtime": ["@lingui/core@^6", "@lingui/react@^6"],
         "dev": ["@lingui/cli@^6", "@lingui/format-po@^6", "@lingui/vite-plugin@^6", "@lingui/swc-plugin@^6", "@vitejs/plugin-react-swc@^4"]
       },
+      "requires": [
+        { "tool": "node", "range": ">=22.19.0", "setBy": "@lingui/core@^6", "enforcement": "warn" },
+        { "tool": "vite", "range": "^6.3.0 || ^7 || ^8", "setBy": "@lingui/vite-plugin@^6", "enforcement": "stop", "fallback": "@lingui/vite-plugin@^5 accepts Vite 3 through 8 and is maintained (5.9.5, 2026-04-06) - pinning it is the alternative to upgrading Vite." }
+      ],
       "references": {
         "setup": [
           "references/languages/js-ts/libraries/lingui/setup.locale-module.md",

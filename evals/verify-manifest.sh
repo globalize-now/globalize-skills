@@ -74,10 +74,13 @@ a = copy.deepcopy(m); a["stacks"][0]["supportLevel"] = "mostly-stable"; cases.ap
 b = copy.deepcopy(m); b["stacks"][0]["referenves"] = b["stacks"][0].pop("references"); cases.append(b)
 c = copy.deepcopy(m); del c["stacks"][0]["references"]["rulesTemplate"]; cases.append(c)
 e = copy.deepcopy(m); e["stacks"][0]["references"]["setup"] = ["setup.md"]; cases.append(e)
+f = copy.deepcopy(m); f["stacks"][0]["requires"] = [{"tool": "node", "range": ">=22", "setBy": "x@^1"}]; cases.append(f)
+g = copy.deepcopy(m); g["stacks"][0]["requires"] = [{"tool": "pnpm", "range": ">=9", "setBy": "x@^1", "enforcement": "warn"}]; cases.append(g)
+h = copy.deepcopy(m); h["stacks"][0]["requires"] = [{"tool": "node", "range": ">=22", "setBy": "x@^1", "enforcement": "shrug"}]; cases.append(h)
 sys.exit(0 if all(not v.is_valid(x) for x in cases) else 1)
 PY
   then
-    pass "schema rejects a bad supportLevel, a typo'd key, a missing rulesTemplate, and an unrooted path"
+    pass "schema rejects a bad supportLevel, a typo'd key, a missing rulesTemplate, an unrooted path, and three malformed requires[] rows"
   else
     fail "schema accepts at least one manifest it should reject - it is not constraining what it claims to"
   fi
@@ -146,6 +149,27 @@ print("NSTACKS %d" % len(stacks))
 decl = m.get("$schema")
 print("SCHEMAKEY %s" % (decl or "-"))
 print("SCHEMARESOLVES %s" % ("yes" if decl and (d / decl).exists() else "no"))
+
+# Every requires[].setBy must trace back to a package this stack actually installs.
+# "a@^1 -> b@^2" declares a transitive floor; only the root (a@^1) has to be present.
+bad, nreq, tools = [], 0, 0
+for s in stacks:
+    installed = set(s.get("packages", {}).get("runtime", [])) | set(s.get("packages", {}).get("dev", []))
+    reqs = s.get("requires", [])
+    if reqs:
+        nreq += 1
+        tools += len(reqs)
+    seen = set()
+    for r in reqs:
+        root = r["setBy"].split("->")[0].strip()
+        if root not in installed:
+            bad.append("%s:%s(%s)" % (s["variant"], r["tool"], root))
+        if r["tool"] in seen:
+            bad.append("%s:%s(duplicate-tool)" % (s["variant"], r["tool"]))
+        seen.add(r["tool"])
+print("REQBAD " + (",".join(bad) if bad else "-"))
+print("NREQ %d" % nreq)
+print("NREQTOOLS %d" % tools)
 PY
 )
 DUPES=$(echo "$OUT" | awk '/^DUPES/{print $2}')
@@ -153,9 +177,20 @@ NOTMPL=$(echo "$OUT" | awk '/^NOTMPL/{print $2}')
 NSTACKS=$(echo "$OUT" | awk '/^NSTACKS/{print $2}')
 SCHEMAKEY=$(echo "$OUT" | awk '/^SCHEMAKEY/{print $2}')
 SCHEMARESOLVES=$(echo "$OUT" | awk '/^SCHEMARESOLVES/{print $2}')
+REQBAD=$(echo "$OUT" | awk '/^REQBAD/{print $2}')
+NREQ=$(echo "$OUT" | awk '/^NREQ /{print $2}')
+NREQTOOLS=$(echo "$OUT" | awk '/^NREQTOOLS /{print $2}')
 
 [ "$DUPES" = "-" ] && pass "all $NSTACKS stack variants are unique" || fail "duplicate variant id(s): $DUPES"
 [ "$NOTMPL" = "-" ] && pass "$NSTACKS/$NSTACKS stacks declare a rulesTemplate" || fail "stack(s) with no rulesTemplate: $NOTMPL"
+
+if [ "$NREQ" = "0" ]; then
+  warn "no stack declares a requires[] block"
+elif [ "$REQBAD" = "-" ]; then
+  pass "$NREQTOOLS requires[] rows across $NREQ stacks each trace to an installed package, one row per tool"
+else
+  fail "requires[].setBy names a package the stack does not install (or a duplicate tool): $REQBAD"
+fi
 
 if [ "$SCHEMAKEY" = "-" ]; then
   warn "manifest.json declares no \$schema"
