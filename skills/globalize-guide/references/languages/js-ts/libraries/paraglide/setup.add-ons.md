@@ -185,7 +185,7 @@ There is no generic "no hardcoded JSX/markup strings" ESLint rule that works rel
 Paraglide is **compiler-based with no extract step** — messages are hand-authored into `messages/{locale}.po` (default format) and the compiler turns them into the runtime `m` object. So the Lingui-style "extract → diff" flow does not apply. The CI integration here has two parts:
 
 1. **Compile** — regenerate the runtime output so the build consumes up-to-date message functions.
-2. **Catalog consistency (drift) check** — fail the build if a non-base locale file is missing keys present in the base locale (someone added a key to `messages/en.po` but didn't add it to the others), so untranslated keys surface in review instead of rendering as fallbacks in production.
+2. **Catalog consistency (drift) check** — fail the build when a locale catalog would not produce the messages the base locale does: a key missing from a non-base file (someone added a key to `messages/en.po` but didn't add it to the others), **or an entry that is present but has an empty `msgstr`**. Both silently render the base-locale text in production, so both have to fail in review. Key parity alone is not enough — see § *What the PO plugin actually imports* below.
 
 ### Compile command
 
@@ -199,7 +199,23 @@ npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/
 
 ### Drift check
 
-The drift check is a small custom script — there is **no Paraglide subcommand for it**. It compares the key set of every locale catalog against the base locale and exits non-zero on any mismatch. On the default **PO** format the keys are `msgid` values; the skill authors PO entries one-key-per-`msgid` on a single line, so a dependency-free line scan is enough. Create `scripts/check-i18n-catalogs.mjs`:
+#### What the PO plugin actually imports
+
+Before the script, the behaviour it has to mirror. `@globalize-now/paraglidejs-po-format` **skips any entry whose `msgstr` is empty** — for a plural entry, any empty `msgstr[n]` drops the whole entry. The skipped entry produces no message for that locale, and Paraglide's compiler then aliases that locale to the base one. `paraglide compile` prints `Successfully compiled inlang project.` either way; there is no warning.
+
+Three consequences, all silent, all observed on `@inlang/paraglide-js@2.25.0` + `@globalize-now/paraglidejs-po-format@0.1.2`:
+
+| Catalog state | What compiles | What renders |
+|---|---|---|
+| `msgstr ""` in a **target** locale | `const fr_hello_world = en_hello_world` | the **English** string, to French users |
+| `msgstr ""` in the **base** locale | `const en_blank = () => 'blank'` | the **key itself**, as visible UI text |
+| one empty `msgstr[n]` in a **plural** entry | entry dropped for that locale — the form that *was* translated is discarded too | the base-locale plural, for every count |
+
+A key-parity scan cannot see any of these: the `msgid` is present in every file. That is why the script below tracks whether each entry is **translated**, not merely whether its key exists.
+
+#### The script
+
+The drift check is a small custom script — there is **no Paraglide subcommand for it**. It compares the *translated* key set of every locale catalog against the base locale and exits non-zero on any mismatch. On the default **PO** format the keys are `msgid` values; the skill authors PO entries one-key-per-`msgid` on a single line, so a dependency-free line scan is enough (`msgstr` values may be wrapped across lines — the scan joins them). Create `scripts/check-i18n-catalogs.mjs`:
 
 ```js
 // scripts/check-i18n-catalogs.mjs  (PO — default)
@@ -209,69 +225,109 @@ import { join } from 'node:path'
 const MESSAGES_DIR = 'messages'
 const BASE_LOCALE = 'en' // set to the project's baseLocale from project.inlang/settings.json
 
-const keysOf = (locale) => {
+// Map<key, translated>. `translated` mirrors what the PO plugin imports: an entry
+// is imported only when every msgstr form is non-empty. An entry with an empty
+// msgstr is skipped by the plugin and silently falls back to the base locale.
+const entriesOf = (locale) => {
   const raw = readFileSync(join(MESSAGES_DIR, `${locale}.po`), 'utf8')
-  const keys = new Set()
+  const entries = new Map()
   let ctx = null
-  for (const line of raw.split('\n')) {
-    const c = line.match(/^msgctxt\s+"(.*)"\s*$/)
-    if (c) { ctx = c[1]; continue }
-    const m = line.match(/^msgid\s+"(.*)"\s*$/)
-    if (m) {
-      if (m[1] !== '') keys.add(ctx ? `${ctx}::${m[1]}` : m[1]) // skip the empty header msgid; fold msgctxt like the plugin does
-      ctx = null
-    }
+  let key = null
+  let forms = []
+  let slot = null
+  const flush = () => {
+    // fold msgctxt into the key exactly as the plugin does: "<msgctxt>::<msgid>"
+    if (key) entries.set(ctx ? `${ctx}::${key}` : key, forms.length > 0 && forms.every((f) => f !== ''))
+    ctx = null
+    key = null
+    forms = []
+    slot = null
   }
-  return keys
+  for (const line of raw.split('\n')) {
+    const t = line.trim()
+    if (t === '') { flush(); continue }          // blank line ends an entry
+    if (t.startsWith('#')) continue              // comments carry no key material
+    let m
+    if ((m = t.match(/^msgctxt\s+"(.*)"$/))) { flush(); ctx = m[1]; continue }
+    if ((m = t.match(/^msgid\s+"(.*)"$/))) {
+      if (key) { const keep = ctx; flush(); ctx = keep } // entry without a blank line before it
+      key = m[1]
+      continue
+    }
+    if (/^msgid_plural\s+"/.test(t)) { slot = null; continue }
+    if ((m = t.match(/^msgstr(?:\[\d+])?\s+"(.*)"$/))) { forms.push(m[1]); slot = forms.length - 1; continue }
+    if ((m = t.match(/^"(.*)"$/)) && slot !== null) { forms[slot] += m[1] } // wrapped msgstr continuation
+  }
+  flush()
+  entries.delete('') // the header block's empty msgid
+  return entries
 }
 
-const baseKeys = keysOf(BASE_LOCALE)
+const base = entriesOf(BASE_LOCALE)
+const baseKeys = new Set(base.keys())
 const locales = readdirSync(MESSAGES_DIR)
   .filter((f) => f.endsWith('.po'))
   .map((f) => f.replace(/\.po$/, ''))
 
 let failed = false
+
+// The base locale has to be complete too: an empty msgstr there ships the key as UI text.
+const baseUntranslated = [...base].filter(([, ok]) => !ok).map(([k]) => k)
+if (baseUntranslated.length) {
+  failed = true
+  console.error(`✗ messages/${BASE_LOCALE}.po has entries with an empty msgstr — these render the key itself`)
+  console.error(`  untranslated: ${baseUntranslated.join(', ')}`)
+}
+
 for (const locale of locales) {
   if (locale === BASE_LOCALE) continue
-  const keys = keysOf(locale)
-  const missing = [...baseKeys].filter((k) => !keys.has(k))
-  const extra = [...keys].filter((k) => !baseKeys.has(k))
-  if (missing.length || extra.length) {
+  const entries = entriesOf(locale)
+  const missing = [...baseKeys].filter((k) => !entries.has(k))
+  const extra = [...entries.keys()].filter((k) => !baseKeys.has(k))
+  const untranslated = [...entries].filter(([k, ok]) => !ok && baseKeys.has(k)).map(([k]) => k)
+  if (missing.length || extra.length || untranslated.length) {
     failed = true
     console.error(`✗ messages/${locale}.po out of sync with ${BASE_LOCALE}`)
-    if (missing.length) console.error(`  missing keys: ${missing.join(', ')}`)
-    if (extra.length) console.error(`  extra keys:   ${extra.join(', ')}`)
+    if (missing.length) console.error(`  missing keys:      ${missing.join(', ')}`)
+    if (extra.length) console.error(`  extra keys:        ${extra.join(', ')}`)
+    if (untranslated.length) console.error(`  empty msgstr:      ${untranslated.join(', ')}  (falls back to ${BASE_LOCALE} at runtime)`)
   }
 }
 
 if (failed) {
-  console.error('\nCatalog drift detected. Add the missing keys (the translation platform fills the values).')
+  console.error('\nCatalog drift detected. Add the missing keys and fill every msgstr (the translation platform fills the values).')
   process.exit(1)
 }
-console.log('✓ all locale catalogs are in sync with the base locale')
+console.log('✓ every locale catalog matches the base locale and has no empty msgstr')
 ```
 
 Set `BASE_LOCALE` to the project's actual `baseLocale` from `project.inlang/settings.json`. The line scan assumes the skill's authoring style (single-line `msgid` keys); if a TMS has reformatted the `.po` (wrapped lines, reordered entries), parse with `gettext-parser` instead — but that adds a devDependency, so only reach for it if the line scan proves insufficient.
 
-**Critical — compile does NOT validate ICU under PO.** Unlike the ICU-JSON plugin, the PO plugin in `icu` mode imports a malformed ICU `msgstr` **verbatim as literal text with no error**, so `paraglide compile` succeeds and the broken string ships. There is no build-time guard for ICU validity. Keep a render-level check in CI (or at minimum in the convert/verify step) — assert a known plural renders its selected form, not the raw `{count, plural, …}` source. The drift script above only enforces key parity.
+**Critical — compile does NOT validate ICU under PO.** Unlike the ICU-JSON plugin, the PO plugin in `icu` mode imports a malformed ICU `msgstr` **verbatim as literal text with no error**, so `paraglide compile` succeeds and the broken string ships. There is no build-time guard for ICU validity. Keep a render-level check in CI (or at minimum in the convert/verify step) — assert a known plural renders its selected form, not the raw `{count, plural, …}` source. The drift script above enforces key parity **and** that every `msgstr` is filled; it does not parse the ICU inside them.
 
 #### ICU-JSON catalog format (`catalogFormat === "json"`)
 
-If the project uses the ICU-JSON format, the catalogs are `messages/{locale}.json`, so the drift script compares JSON keys. Replace `keysOf` and the locale glob:
+If the project uses the ICU-JSON format, the catalogs are `messages/{locale}.json`. **The empty-value failure is different here and still needs checking.** `@inlang/plugin-icu1` does *not* skip an empty value the way the PO plugin does — it imports it as a message with an empty pattern, so an empty string renders as an **empty string** rather than falling back to the base locale. Blank UI instead of English UI: still wrong, still silent, but a different symptom, so the check reports it separately. Replace `entriesOf` and the locale glob:
 
 ```js
-const keysOf = (locale) => {
+const entriesOf = (locale) => {
   const raw = JSON.parse(readFileSync(join(MESSAGES_DIR, `${locale}.json`), 'utf8'))
-  return new Set(Object.keys(raw).filter((k) => k !== '$schema'))
+  return new Map(
+    Object.entries(raw)
+      .filter(([k]) => k !== '$schema')
+      .map(([k, v]) => [k, typeof v === 'string' && v !== '']),
+  )
 }
 
 const locales = readdirSync(MESSAGES_DIR)
   .filter((f) => f.endsWith('.json'))
   .map((f) => f.replace(/\.json$/, ''))
-// …rest of the script (baseKeys, the per-locale comparison, exit codes) is unchanged, swapping `.po` → `.json` in the error message.
+// …rest of the script (baseKeys, the per-locale comparison, exit codes) is unchanged, swapping
+// `.po` → `.json` in the error messages and "empty msgstr" → "empty value". On ICU-JSON an empty
+// value renders as an empty string rather than the base-locale text, so adjust that parenthetical.
 ```
 
-**On ICU-JSON, compile covers ICU validity:** the ICU1 plugin parses every catalog at compile time, so running the compile command above in CI already fails on malformed ICU (no separate ICU parser or render check needed — the drift script only enforces key parity). This is the one safety net the PO format lacks.
+**On ICU-JSON, compile covers ICU validity:** the ICU1 plugin parses every catalog at compile time, so running the compile command above in CI already fails on malformed ICU (no separate ICU parser or render check needed — the drift script covers key parity and empty values, not ICU syntax). This is the one safety net the PO format lacks.
 
 ### `package.json` scripts
 
