@@ -16,7 +16,7 @@ excluding tests, stories, configs, and `.d.ts`.
 
 - **Lingui — authoritative lint.** Ensure `eslint-plugin-lingui` is installed and
   configured per **Add-on 2** (`references/languages/js-ts/libraries/lingui/setup.add-ons.md`)
-  — the single source of truth for the install (`'eslint-plugin-lingui@^0.14'`)
+  — the single source of truth for the install (`'eslint-plugin-lingui@^0.15'`)
   and the tuned `no-unlocalized-strings` config (`ignoreNames`,
   `ignoreFunctions`, `ignore`). Consent rule: **guided** mode → describe and confirm before
   installing; **unguided** mode → install directly. If the user declines in

@@ -220,6 +220,10 @@ const config: LinguiConfig = {
     },
   ],
   format: formatter({ lineNumbers: false }),
+  macro: {
+    // Lets `<a _t="tos">` inside <Trans> extract as <tos>…</tos> instead of <0>…</0>.
+    jsxPlaceholderAttribute: '_t',
+  },
 }
 
 export default config
@@ -1124,6 +1128,15 @@ import { ph } from '@lingui/core/macro'
 // f = useFormatters(), see "Numbers, currencies, dates" below
 t`Total: ${ph({ total: f.money(amount) })}`   // → "Total: {total}", not "{0}"
 ```
+
+Tags inside `<Trans>` have the same problem and no `ph()`: every inline element extracts as a positional `<0>`, `<1>`. Adding a wrapper renumbers the rest, changes the msgid, and drops that message’s finished translations; and two different elements with the same text (`<a>Upgrade</a>` vs `<button>Upgrade</button>`) collapse into one catalog entry. Name each tag with `_t`:
+
+```tsx
+<Trans>Read the <a _t="tos" href="/tos">terms</a> and the <a _t="privacy" href="/privacy">policy</a>.</Trans>
+// → "Read the <tos>terms</tos> and the <privacy>policy</privacy>."
+```
+
+`_t` is consumed by the macro and never reaches the DOM — as long as `lingui.config.ts` carries `macro: { jsxPlaceholderAttribute: '_t' }` (A3). Without it the attribute is silently ignored and rendered onto the element instead.
 
 ## Plurals
 

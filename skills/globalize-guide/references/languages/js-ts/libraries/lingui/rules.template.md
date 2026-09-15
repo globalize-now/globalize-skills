@@ -11,7 +11,7 @@ template: lingui
 templateVersion: 5
 conditions: [router, perPageCatalogs, localeNavigation, appTarget, ssr]
 values: [catalogPath, sourceLocale, targetLocales, localesModule, formatModule, navModule, navHooksModule, manifestStringsModule, localesBridgeScript]
-budget: { "router == \"app\"": 285, "appTarget == \"browser-extension\"": 265, "default": 275 }
+budget: { "router == \"app\"": 308, "appTarget == \"browser-extension\"": 288, "default": 298 }
 # Never add a value named `locale`: the typed-links block contains `params={{ locale }}`
 # inside a fence, which the template linter would then flag as a `{{ }}` placeholder.
 ---
@@ -105,6 +105,29 @@ t`Total: ${f.money(amount)}`                        // ❌ "Total: {0}"
 t`Total: ${ph({ total: f.money(amount) })}`         // ✅ "Total: {total}"
 <Trans>Welcome back, {ph({ username: getUser().name })}!</Trans>   // ph() also works in <Plural>, <Select>, <SelectOrdinal>
 ```
+
+### Naming tag placeholders
+
+The same problem applies to **JSX elements inside `<Trans>`**, and it is easy to miss because the numbering looks deliberate. Every inline tag extracts as a positional `<0>`, `<1>` in source order:
+
+```tsx
+<Trans>Read the <a href="/tos">terms</a> and the <a href="/privacy">policy</a>.</Trans>
+// → msgid "Read the <0>terms</0> and the <1>policy</1>."
+```
+
+Two consequences, both silent:
+
+- **A presentational change discards finished translations.** Wrapping the first link in a `<span>` renumbers everything after it — `<1>` becomes `<2>`, the msgid changes, and `lingui extract` marks the completed target-locale entry obsolete (`#~`). No copy changed; the translation is gone.
+- **Two different elements collapse into one catalog entry.** `<Trans><a href="/upgrade">Upgrade</a></Trans>` and `<Trans><button>Upgrade</button></Trans>` both extract as `<0>Upgrade</0>` — one message, one translation, rendered into a link in one place and a button in another.
+
+Name the tag with the `_t` attribute, which this project's `lingui.config.ts` declares as `macro.jsxPlaceholderAttribute`:
+
+```tsx
+<Trans>Read the <a _t="tos" href="/tos">terms</a> and the <a _t="privacy" href="/privacy">policy</a>.</Trans>
+// → msgid "Read the <tos>terms</tos> and the <privacy>policy</privacy>."
+```
+
+`_t` is consumed by the macro and never reaches the DOM. **Without the `macro.jsxPlaceholderAttribute` setting in `lingui.config.ts` the attribute is ignored silently and rendered onto the element as an invalid `_t="..."` attribute** — if a `_t` shows up in the browser, that setting is missing, not the placeholder.
 
 ### Strings outside components
 

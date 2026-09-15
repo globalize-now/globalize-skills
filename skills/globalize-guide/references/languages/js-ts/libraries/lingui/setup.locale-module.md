@@ -309,10 +309,25 @@ The framework reference imports from this module rather than declaring its own c
 | Framework file needs | Import |
 |---|---|
 | `lingui.config.ts` locale list | `import { sourceLocale, locales } from './<i18nDir>/locales'` (relative to the repo root) |
+| `lingui.config.ts` tag-placeholder naming | `macro: { jsxPlaceholderAttribute: '_t' }` — see below. Not an import; a setting the config must carry. |
 | `<html dir>` in the root document | `import { getDirection } from '<specifier>/locales'` |
 | Locale validation in a loader, middleware, or route param | `import { resolveLocale } from '<specifier>/locales'` |
 
 Use the project's path alias (`~/`, `@/`) when `tsconfig.json` declares one in `compilerOptions.paths`; otherwise use a relative specifier. Do not assume `@/` — check.
+
+### `macro.jsxPlaceholderAttribute` is required, on every variant
+
+Whatever else the framework file puts in `lingui.config.ts`, it must also carry:
+
+```ts
+  macro: {
+    jsxPlaceholderAttribute: '_t',
+  },
+```
+
+Without it, an inline tag inside `<Trans>` extracts as a positional `<0>` / `<1>`: adding a wrapper element renumbers every tag after it and obsoletes the finished translations for that message, and two structurally different call sites with the same text collapse into a single catalog entry. The generated coding rules teach `<a _t="tos">` as the fix, and **the macro ignores `_t` silently when this setting is absent** — the attribute is then passed straight through to the DOM. A `_t="..."` visible in the browser means this setting is missing.
+
+The four references that ship a `lingui.config.ts` block (`remix/`, `remix/swc/`, `webext/`, `webext/swc/`) already include it. The other variants build the config in `create_config` with no block to copy — add the `macro` key there.
 
 **On React Router v7 and Remix**, `getDirection` previously lived in `locale.server.ts`, which Vite strips from the client bundle. Moving it here makes it reachable from client components for the first time; leave `localeCookie`, `readLocaleFromRequest`, and `pickFromAcceptLanguage` in `locale.server.ts` where they belong — they touch `Request` and cookies.
 
