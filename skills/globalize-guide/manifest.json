@@ -249,7 +249,7 @@
       "match": { "framework": "vite", "library": "vue-i18n" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["vue-i18n@^11", "intl-messageformat@^11"],
+        "runtime": ["vue-i18n@^11", "intl-messageformat@^12"],
         "dev": ["@intlify/unplugin-vue-i18n@^11"]
       },
       "references": {
@@ -273,7 +273,7 @@
       "match": { "framework": "nuxt", "library": "vue-i18n" },
       "supportLevel": "stable",
       "packages": {
-        "runtime": ["@nuxtjs/i18n@^10", "intl-messageformat@^11"],
+        "runtime": ["@nuxtjs/i18n@^10", "intl-messageformat@^12"],
         "dev": []
       },
       "references": {
@@ -297,7 +297,7 @@
       "match": { "framework": "quasar", "library": "vue-i18n" },
       "supportLevel": "experimental",
       "packages": {
-        "runtime": ["vue-i18n@^11", "intl-messageformat@^11"],
+        "runtime": ["vue-i18n@^11", "intl-messageformat@^12"],
         "dev": ["@intlify/unplugin-vue-i18n@^11"]
       },
       "references": {

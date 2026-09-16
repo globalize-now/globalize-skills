@@ -15,7 +15,7 @@ Install:
 | `@intlify/unplugin-vue-i18n` | dev | Pre-compiles resources and enables `<i18n>` SFC blocks |
 
 ```bash
-npm install 'vue-i18n@^11' 'intl-messageformat@^11'
+npm install 'vue-i18n@^11' 'intl-messageformat@^12'
 npm install -D '@intlify/unplugin-vue-i18n@^11'
 ```
 
