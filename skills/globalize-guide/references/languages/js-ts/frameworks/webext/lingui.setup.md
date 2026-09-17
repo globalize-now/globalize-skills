@@ -6,7 +6,7 @@
 
 This covers MV3 browser extensions (Chrome, Edge, Firefox) built with Vite and React, using `@vitejs/plugin-react` (the Babel-based plugin, without the `-swc` suffix) for the React transform and `babel-plugin-macros` to expand the Lingui macros. It applies to WXT, CRXJS and plain-Vite extension projects alike; Step 3 branches on `extensionFramework`. **This is the default on WXT**, whose `@wxt-dev/module-react` wraps `@vitejs/plugin-react`.
 
-> **Version gate — `@vitejs/plugin-react` v6+.** `@vitejs/plugin-react@6.0.0` dropped the `babel` option from its public `Options` type; only `include`, `exclude`, `jsxImportSource`, `jsxRuntime` and `reactRefreshHost` remain. The `babel: { plugins: ['macros'] }` form below is **silently ignored** on v6+ — macros never expand, `tsc` errors with TS2353 on the `babel` property, and every `<Trans>` renders its message id at runtime.
+> **Version gate — `@vitejs/plugin-react` v6+.** `@vitejs/plugin-react@6.0.0` dropped the `babel` option from its public `Options` type; only `include`, `exclude`, `jsxImportSource`, `jsxRuntime` and `reactRefreshHost` remain. The `babel: { plugins: ['macros'] }` form below is **silently ignored** on v6+ — macros never expand and `tsc` errors with TS2353 on the `babel` property. At runtime the macro module throws *"…executed outside the context of compilation"* on load; it does **not** render the message id.
 >
 > **Read the installed `@vitejs/plugin-react` version before applying this file** (`package.json`, then the lockfile). On WXT the peer range of `@wxt-dev/module-react` is `^4 || ^5 || ^6`, so v6 is entirely possible. If the major is 6 or higher, write `status: "needs_decision"` with
 >
@@ -887,9 +887,12 @@ lingui compile
 node scripts/build-locales.mjs
 npx tsc --noEmit
 npm run build
+! grep -rl --exclude-dir=node_modules --exclude-dir=.git \
+    "outside the context of compilation" .
 ```
 
-- **`lingui extract --clean`** reads `src/` (and `entrypoints/` on WXT) and writes `src/locales/<locale>/messages.po`. Confirm the source catalog holds the four `manifest.*` ids with their `#.` comments — if not, the macro transform is not running, or `manifest-strings.ts` is outside the config's `include`.
+- **The `grep` step** is the only one above that can fail on a project where every other step passed. `@lingui/core/macro` and `@lingui/react/macro` ship a module whose top-level code throws *"The macro you imported from `@lingui/…/macro` is being executed outside the context of compilation"*. When the transform runs, the macro import is rewritten and that module never reaches the bundle; when it does not run, the module is bundled verbatim and the app throws on load — while `lingui extract`, `lingui compile`, `tsc --noEmit` and `npm run build` **all still exit 0**. `grep` exits 1 when it matches nothing, so the leading `!` makes a clean tree the passing case, and a match prints the offending build artefact. Nothing outside `node_modules` carries that string unless the bundler put it there, so the check needs no knowledge of your output directory.
+- **`lingui extract --clean`** reads `src/` (and `entrypoints/` on WXT) and writes `src/locales/<locale>/messages.po`. Confirm the source catalog holds the four `manifest.*` ids with their `#.` comments — if not, `manifest-strings.ts` is outside the config's `include`. This step does **not** tell you whether the *build* transform is running: `lingui extract` parses the source itself and produces byte-identical catalogs whether or not the Babel/SWC plugin is wired into the bundler. The `grep` step is what answers that question.
 - **`lingui compile`** turns the `.po` files into `src/locales/<locale>/messages.ts`. If it emits `.js` with `module.exports`, `compileNamespace: 'ts'` is missing from `lingui.config.ts`.
 - **`node scripts/build-locales.mjs`** writes `public/_locales/<code>/messages.json`. Open the source-locale file and confirm it holds `ext_name`, `ext_short_name`, `ext_description`, `ext_action_title`, each with a `description`.
 - **`tsc --noEmit`** catches a locale in `lingui.config.ts` missing from the `Locale` union or from the `catalogs` map in `src/i18n/index.ts`.
@@ -914,7 +917,7 @@ If any step fails, capture the error to `result.verificationResult` in your prog
 - **A listener registered after `await` in the service worker.** The worker can wake for an event with no listener attached and drop it. Register synchronously; await inside.
 - **Store listing collapsed to one language.** Caused by hardcoding `name` / `description` in the manifest — see Step 8.
 - **`webextension-polyfill`.** Archived 2026-07-30. Never add it; the shim in Step 5 covers everything used here.
-- **Macros not expanding.** `<Trans>` rendering its raw message id, or the runtime error *"The macro you imported from `@lingui/react/macro` is being executed outside the context of compilation"*, means `'macros'` never reached Babel. On `@vitejs/plugin-react@6` the `babel` option does not exist and is dropped silently — see the version gate at the top of this file. On WXT, check that the macro sits under the `react: { vite: { babel: … } }` key and not under the top-level `vite`, where `@vitejs/plugin-react`'s options cannot reach it.
+- **Macros not expanding.** The runtime error *"The macro you imported from `@lingui/react/macro` is being executed outside the context of compilation"* on load means `'macros'` never reached Babel. The build exits 0 in this case, so the `grep` step in Verification is what catches it before you ever load the extension. On `@vitejs/plugin-react@6` the `babel` option does not exist and is dropped silently — see the version gate at the top of this file. On WXT, check that the macro sits under the `react: { vite: { babel: … } }` key and not under the top-level `vite`, where `@vitejs/plugin-react`'s options cannot reach it.
 - **Safari.** `browser.i18n.getMessage()` has open reports of returning empty strings after `safari-web-extension-converter`. Warn; do not claim it works.
 
 ---

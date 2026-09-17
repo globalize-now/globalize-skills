@@ -837,7 +837,12 @@ npx tsc --noEmit
 
 # 4. Production build
 npm run build
+# 5. Assert the macro transform actually ran (see note below)
+! grep -rl --exclude-dir=node_modules --exclude-dir=.git \
+    "outside the context of compilation" .
 ```
+
+- **The `grep` step** is the only one above that can fail on a project where every other step passed. `@lingui/core/macro` and `@lingui/react/macro` ship a module whose top-level code throws *"The macro you imported from `@lingui/…/macro` is being executed outside the context of compilation"*. When the transform runs, the macro import is rewritten and that module never reaches the bundle; when it does not run, the module is bundled verbatim and the app throws on load — while `lingui extract`, `lingui compile`, `tsc --noEmit` and `npm run build` **all still exit 0**. `grep` exits 1 when it matches nothing, so the leading `!` makes a clean tree the passing case, and a match prints the offending build artefact. Nothing outside `node_modules` carries that string unless the bundler put it there, so the check needs no knowledge of your output directory.
 
 The compile step comes **before** `tsc --noEmit` on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet and type-checking would fail to resolve the route files' catalog imports. The prefixed `build` / `typecheck` scripts do exactly this ordering for you.
 
@@ -845,7 +850,7 @@ If `tsc --noEmit` fails with "Cannot find name 'Route'" or similar, re-run `npx 
 
 If `lingui extract` fails with `Could not resolve import(...)`, revisit Section 8 — there's an unstubbed catalog import in one of the loader files.
 
-If `npm run build` fails with `Trans is not defined` or similar, the macro transform isn't running. Verify:
+If the `grep` step fires — or `npm run build` fails with `Trans is not defined` — the macro transform isn't running. Dropping the Babel plugin does not fail the build; it exits 0 and the app throws on load, which is why the `grep` step exists. Verify:
 - `@vitejs/plugin-react@^5` is installed (Section 1 — pre-installed by the orchestrator).
 - `vite.config.ts` has the exact plugin order from Section 2: `reactRouter()`, then `react({ babel: { plugins: ['@lingui/babel-plugin-lingui-macro'] } })`, then `lingui()`.
 - The macro import is `import { Trans } from '@lingui/react/macro'` (not the deprecated `@lingui/macro`; non-React macros like `t` come from `@lingui/core/macro`).
