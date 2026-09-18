@@ -627,9 +627,10 @@ On any other platform, skip this add-on and say so.
 
 ## Add-on 6: ESLint (native variant only)
 
-Skip on the Lingui variants: `eslint-plugin-lingui`'s `no-unlocalized-strings` covers them, wired by
-Add-on 2 of `references/languages/js-ts/libraries/lingui/setup.add-ons.md`, and the convert verify phase
-installs it regardless.
+Skip on the Lingui variants: `eslint-plugin-lingui`'s `no-unlocalized-strings` covers them — but only
+once it is enabled explicitly, which Add-on 2 of `references/languages/js-ts/libraries/lingui/setup.add-ons.md`
+does in its own rule block; the recommended preset alone does **not** include it. The convert verify phase
+enables and runs it regardless.
 
 **Be honest about the ceiling here. There is no `eslint-plugin-chrome-i18n`** — the name is not on npm
 (a `npm view` returns 404). Do not install, configure, or mention one. The only realistic option is
