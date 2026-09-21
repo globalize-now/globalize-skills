@@ -16,7 +16,7 @@ excluding tests, stories, configs, and `.d.ts`.
 
 - **Lingui — authoritative lint.** Ensure `eslint-plugin-lingui` is installed and
   configured per **Add-on 2** (`references/languages/js-ts/libraries/lingui/setup.add-ons.md`)
-  — the single source of truth for the install (`'eslint-plugin-lingui@^0.15'`)
+  — the single source of truth for the install (`'eslint-plugin-lingui@^0.16'`)
   and the tuned `no-unlocalized-strings` config (`ignoreNames`,
   `ignoreFunctions`, `ignore`). Consent rule: **guided** mode → describe and confirm before
   installing; **unguided** mode → install directly. If the user declines in
@@ -29,7 +29,18 @@ excluding tests, stories, configs, and `.d.ts`.
   npx eslint 'src/**/*.{ts,tsx,js,jsx}' --format json
   ```
   Parse the JSON, keep only messages whose `ruleId === "lingui/no-unlocalized-strings"`
-  (ignore other rules' messages), into `{ file, line, text }` violations. Because verify installs
+  (ignore other rules' messages), into `{ file, line, text }` violations.
+  **Gate on the rule having run, not on the scan being empty.** `no-unlocalized-strings` is
+  *not* in `eslint-plugin-lingui`'s recommended preset at any published version, so a project
+  that extended `flat/recommended` and skipped the explicit rule block produces zero matching
+  messages and exit 0 — identical output to a fully wrapped codebase. Before accepting an empty
+  list, confirm the rule is enabled:
+  ```bash
+  npx eslint --print-config src/<any-source-file> | grep -q '"lingui/no-unlocalized-strings"'
+  ```
+  If that check fails, the recall scan **did not run**: do not set `succeeded` on an empty
+  `recallViolations`. Apply the Add-on 2 rule block (installing the plugin if needed, under the
+  same consent rule) and re-run, or fall back to the grep scan below for this run and say so. Because verify installs
   the plugin, the project keeps it as a **permanent guardrail** — the intended
   bonus.
 - **next-intl / Paraglide — no reliable rule → tuned grep scan.** There is no
@@ -47,7 +58,10 @@ excluding tests, stories, configs, and `.d.ts`.
   (consent as for Lingui), else the grep scan above adapted to `.vue` templates.
 
 Write the violations to `progress/verify.json` as `result.recallViolations`. If
-the list is empty, the recall gate passes — set status `succeeded` as usual. If
+the list is empty **and the scan is known to have run** (Lingui: the `--print-config`
+check above passed; other libraries: the grep scan executed over a non-empty file set),
+the recall gate passes — set status `succeeded` as usual. An empty list from a scan that
+never ran is not a pass. If
 non-empty, set status `needs_cleanup` and stop (the orchestrator drives the loop).
 
 ## Cleanup loop (orchestrator-driven)

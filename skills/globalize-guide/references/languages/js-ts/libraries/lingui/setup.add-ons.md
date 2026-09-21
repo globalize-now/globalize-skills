@@ -152,7 +152,9 @@ Verify: in a fresh session, ask Claude "how should I wrap a plural string in thi
 
 ## Add-on 2: ESLint plugin
 
-Lingui ships an officially maintained ESLint plugin: [`eslint-plugin-lingui`](https://github.com/lingui/eslint-plugin-lingui). It catches the most common authoring mistakes — hardcoded JSX strings outside macros, missing translator comments, malformed `<Plural>` props — and is the right default for any lingui project.
+Lingui ships an officially maintained ESLint plugin: [`eslint-plugin-lingui`](https://github.com/lingui/eslint-plugin-lingui). At `0.16.0` it carries **fourteen** rules covering hardcoded strings, malformed `<Trans>` / `<Plural>` nesting, message ids, and translator comments — and is the right default for any lingui project.
+
+**Its recommended preset is a thin slice of that, and none of the rules this skill most depends on are in it.** `flat/recommended` enables five rules; `lingui/no-unlocalized-strings` — the hardcoded-string rule, the reason this add-on exists — is **not** one of them at any published version. Installing the plugin and extending the preset therefore produces a project with *no* hardcoded-string detection and a clean lint run. The sections below enable the rules explicitly; do not treat the preset as sufficient.
 
 ### Install
 
@@ -160,16 +162,16 @@ Detect the package manager from the lockfile (`package-lock.json` → npm, `pnpm
 
 ```bash
 # npm
-npm install --save-dev 'eslint-plugin-lingui@^0.15'
+npm install --save-dev 'eslint-plugin-lingui@^0.16'
 # pnpm
-pnpm add -D 'eslint-plugin-lingui@^0.15'
+pnpm add -D 'eslint-plugin-lingui@^0.16'
 # yarn
-yarn add -D 'eslint-plugin-lingui@^0.15'
+yarn add -D 'eslint-plugin-lingui@^0.16'
 # bun
-bun add -D 'eslint-plugin-lingui@^0.15'
+bun add -D 'eslint-plugin-lingui@^0.16'
 ```
 
-(The plugin is pre-1.0, so `^0.15` admits `0.15.x` and **not** `0.16`. If the published minor has advanced past `0.15`, bump the pin accordingly — confirm via `npm view eslint-plugin-lingui version` if uncertain.)
+(The plugin is pre-1.0, so `^0.16` admits `0.16.x` and **not** `0.17`. If the published minor has advanced past `0.16`, bump the pin accordingly — confirm via `npm view eslint-plugin-lingui version` if uncertain.)
 
 ### Configure
 
@@ -195,21 +197,23 @@ export default [
 }
 ```
 
-The recommended preset enables (subject to plugin version):
+The recommended preset enables **exactly these five rules**, identically at `0.14.0`, `0.15.0` and `0.16.0` — verify with `npx eslint --print-config <a source file>` rather than trusting this table:
 
-| Rule | What it catches |
-|---|---|
-| `lingui/no-unlocalized-strings` | Plain string literals in JSX or component props (the most common gap) |
-| `lingui/t-call-in-function` | `t\`…\`` outside a component / hook / `msg` context — would resolve at the wrong locale |
-| `lingui/no-single-tag-to-translate` | `<Trans>{x}</Trans>` with only an interpolation — extracts to `{x}`, useless to translators |
-| `lingui/no-trans-inside-trans` | Nested `<Trans>`, which produces broken catalog entries |
-| `lingui/no-expression-in-message` | Template-string expressions inside `t\`…\`` that the macro can't statically extract |
+| Rule | Severity in the preset | What it catches |
+|---|---|---|
+| `lingui/t-call-in-function` | `error` | `t\`…\`` outside a component / hook / `msg` context — would resolve at the wrong locale |
+| `lingui/no-single-tag-to-translate` | `warn` | `<Trans>{x}</Trans>` with only an interpolation — extracts to `{x}`, useless to translators |
+| `lingui/no-single-variables-to-translate` | `warn` | A `<Trans>` holding a variable and no text — nothing for a translator to act on |
+| `lingui/no-trans-inside-trans` | `warn` | Nested `<Trans>`, which produces broken catalog entries |
+| `lingui/no-expression-in-message` | `warn` | Template-string expressions inside `t\`…\`` that the macro can't statically extract |
 
-Read the plugin README for the exact rule list at the installed version — rules and severities shift between minor releases.
+**Four of the five are `warn`, so ESLint exits 0 on them.** A file with three genuine preset violations reports `0 errors, 3 warnings` and passes any gate that reads the exit code or counts errors. If the project gates CI on this plugin, run it with `--max-warnings 0`.
+
+`lingui/no-unlocalized-strings` is **not** in the preset — nor are `no-unnamed-tag-placeholders`, `require-comment`, `require-directive-reset`, `consistent-plural-format`, `no-plural-inside-trans`, `require-explicit-id`, `require-implicit-id` or `text-restrictions`. Enable what the project needs — the sections below cover the ones this skill's guidance depends on.
 
 ### `no-unnamed-tag-placeholders` — enable it explicitly
 
-`0.15.0` (2026-09-04) added `lingui/no-unnamed-tag-placeholders`, which flags an inline JSX tag inside `<Trans>` that has no placeholder name. **It is not in the recommended preset** — at both `0.14.0` and `0.15.0` `flat/recommended` enables the same five rules — so installing `0.15` changes nothing on its own. Turn it on, and give it the same attribute name the project's `lingui.config.ts` declares:
+`0.15.0` (2026-09-04) added `lingui/no-unnamed-tag-placeholders`, which flags an inline JSX tag inside `<Trans>` that has no placeholder name. **It is not in the recommended preset** — `flat/recommended` enables the same five rules at `0.14.0`, `0.15.0` and `0.16.0` — so installing a newer minor changes nothing on its own. Turn it on, and give it the same attribute name the project's `lingui.config.ts` declares:
 
 ```js
 {
@@ -224,11 +228,41 @@ This is the lint counterpart of the *Naming tag placeholders* section in the gen
 Two things to keep straight before turning it on:
 
 - **The rule's other option, `jsxPlaceholderDefaults`, mirrors a `lingui.config.ts` setting of the same name** — a tag-name → placeholder-name map (`{ a: 'link', strong: 'strong' }`) that names tags without touching the JSX. It is tempting and it has a sharp edge: two elements with the *same* tag in one message then resolve to the same placeholder name, and `lingui extract` fails with `Multiple distinct JSX elements with the same placeholder name` (exit 1) rather than warning. Any message with two links breaks the build. Prefer per-element `_t`; reach for defaults only for tags that never repeat inside one message.
-- **Pinning to `^0.14` cannot reach this rule**, and enabling it against `0.14.x` is a hard ESLint failure (`Could not find "no-unnamed-tag-placeholders" in plugin "lingui"`, exit 2), not a skipped rule. Bump the pin and the rule together, or neither.
+- **Enabling a rule the installed version does not have is a hard ESLint failure**, not a skipped rule: against `0.14.x` this one aborts with `Could not find "no-unnamed-tag-placeholders" in plugin "lingui"`, exit 2. The pin above (`^0.16`) reaches every rule named in this add-on; if a project is held back on an older minor, bump the pin and the rules together, or neither.
 
-### `no-unlocalized-strings` configuration
+### `0.16.0`'s two new rules — named, not wired
 
-This rule is the noisiest by default because it flags every string literal in JSX. Tune the rule's `ignoreNames` (attribute, property, and variable names — e.g. `data-testid`, `id`, `slug`), `ignoreFunctions` (functions whose string arguments to skip), and `ignore` (regex patterns for literal values to skip) to match the codebase before running across the full repo, otherwise the first lint pass produces hundreds of false positives in tests, fixtures, and `data-testid` attributes. A reasonable starting point:
+`0.16.0` (2026-09-17) added `lingui/require-comment` and `lingui/require-directive-reset`. Neither is in the preset, and this skill does **not** turn either on by default:
+
+- **`lingui/require-comment`** demands a `comment` on every macro and component. That is the lint counterpart of the *Translator comments* guidance in `convert.standard-react.md`, and it is the right rule for a team that wants translator context enforced — but switched on mid-conversion it reports one error per unannotated message across the whole catalog, which is a policy decision and not a setup default. Its `allowContext: true` option accepts a `context` value in place of a comment. Note the diagnostic it gives for `` t`…` ``: the tagged-template form cannot carry a comment at all, so the object form (`` t({ message: `…`, comment: '…' }) ``) is the only way to satisfy it — which is what the coding rules already teach.
+- **`lingui/require-directive-reset`** flags a `// lingui-set context="…"` comment directive left open at end of file. Comment directives are a macro feature this skill neither writes nor documents, so the rule has nothing to act on in a project converted by these references. Worth enabling only in a codebase that already uses them.
+
+### `no-unlocalized-strings` — enable it explicitly
+
+**This rule is not in the recommended preset**, so extending the preset leaves it off and the first lint pass comes back clean on a project full of hardcoded strings. Add it to the flat config yourself:
+
+```js
+// eslint.config.mjs
+export default [
+  // existing config...
+  lingui.configs['flat/recommended'],
+  {
+    files: ['src/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'lingui/no-unlocalized-strings': ['error', { /* options below */ }],
+    },
+  },
+];
+```
+
+Confirm it took effect before trusting a clean run:
+
+```bash
+npx eslint --print-config src/<any-source-file> | grep -q '"lingui/no-unlocalized-strings"' \
+  || echo 'no-unlocalized-strings is NOT enabled — the clean lint run means nothing'
+```
+
+Once on, the rule is the noisiest in the plugin because it flags every string literal in JSX. Tune its `ignoreNames` (attribute, property, and variable names — e.g. `data-testid`, `id`, `slug`), `ignoreFunctions` (functions whose string arguments to skip), and `ignore` (regex patterns for literal values to skip) to match the codebase before running across the full repo, otherwise the first lint pass produces hundreds of false positives in tests, fixtures, and `data-testid` attributes. A reasonable starting point:
 
 ```js
 {
@@ -248,9 +282,11 @@ Apply this only inside `src/` (or the project's source root), not test files or 
 
 ### After install
 
-Run the project's lint command once and report the count of new errors to the user. If the count is large (>50), suggest running `lingui extract` first so any missed wraps surface as proper catalog entries before the lint-driven cleanup pass.
+**First confirm the rules are actually on.** `npx eslint --print-config <a source file>` prints the resolved config; check that `lingui/no-unlocalized-strings` appears in its `rules` map, and that it carries the tuned options rather than a bare severity. A clean lint run on a config that never enabled the rule is indistinguishable from a clean codebase, and this is the only step that tells them apart.
 
-> **Note:** the convert **verify** phase now installs and runs `lingui/no-unlocalized-strings` as a recall self-check regardless of this add-on (see `references/languages/js-ts/convert.recall-self-check.md`), so a converted project keeps this guardrail even if the add-on wasn't selected. Selecting this add-on additionally wires the full recommended preset and (with Add-on 3) the CI drift check.
+Then run the project's lint command once and report the count of new problems — **errors *and* warnings**. Four of the five preset rules report at `warn`, and ESLint exits 0 when only warnings are present, so a report built from the exit code or from `errorCount` alone will read clean on a file that has real violations. If the count is large (>50), suggest running `lingui extract` first so any missed wraps surface as proper catalog entries before the lint-driven cleanup pass.
+
+> **Note:** the convert **verify** phase now installs and runs `lingui/no-unlocalized-strings` as a recall self-check regardless of this add-on (see `references/languages/js-ts/convert.recall-self-check.md`), so a converted project keeps this guardrail even if the add-on wasn't selected. Selecting this add-on additionally wires the preset's five rules, the explicitly-enabled rules above, and (with Add-on 3) the CI drift check.
 
 ---
 
