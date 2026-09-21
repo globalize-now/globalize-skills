@@ -103,7 +103,7 @@ The reasoning behind the pins: Lingui 6 is the current major, paired with React 
 
 No `@lingui/detect-locale`. It reads `window.location`, `document.cookie` and `localStorage`, none of which exist in the MV3 service worker, and none of which are where an extension's locale preference belongs. The locale comes from `browser.storage.sync` with `browser.i18n.getUILanguage()` as the first-run default — see Step 5.
 
-> **`pofile` is not required.** An earlier revision of this variant's manifest entry listed `pofile@^1` as a dev dependency for parsing `.po` in `scripts/build-locales.mjs`. It is unnecessary: `@lingui/format-po@^6` exports `formatter()`, and the object it returns has a public `parse(content, ctx)` method that returns Lingui's own catalog shape — including the `#.` extracted comments and the msgstr, with the internal `js-lingui-explicit-id` marker already stripped. Step 7's script uses that. If `pofile` is in `devDependencies` and nothing else imports it, it can be removed.
+> **`pofile` is not required.** An earlier revision of this variant's manifest entry listed `pofile@^1` as a dev dependency for parsing `.po` in `scripts/build-locales.mjs`. It is unnecessary: `@lingui/format-po@^6` exports `formatter()`, and the object it returns has a public `parse(content, ctx)` method that returns Lingui's own catalog shape — including the `#.` extracted comments and the msgstr, with the internal `js-lingui-explicit-id` marker already stripped from them. Step 7's script uses that. What the marker's presence *does* change is the catalog's **keys** — see Step 4 on `explicitIdAsDefault`, and `manifestIdOf()` in Step 7, which handles both. If `pofile` is in `devDependencies` and nothing else imports it, it can be removed.
 
 ---
 
@@ -241,6 +241,8 @@ Four things matter here:
 - **`locales: [...locales]`** spreads because the shared module declares its array `as const` (readonly); `defineConfig` wants a mutable `string[]`.
 
 If a `lingui.config.*` already exists, reconcile rather than overwrite: keep the project's `catalogs[].path` if it differs, and carry the differing path through Steps 5, 7 and 11 instead of relocating catalogs the project already has.
+
+**One formatter option is load-bearing for Step 7: `explicitIdAsDefault`.** It is a legitimate `@lingui/format-po` option that this skill does not set, and a project that already uses explicit ids may well carry it. It changes how the PO is written — with it, the msgid *is* the explicit id and Lingui's `js-lingui-explicit-id` marker is absent; without it, the marker is present. That in turn changes how `formatter().parse()` keys the catalog, which is what the Step 7 bridge filters on. The script in Step 7 reads **both** spellings, so either config works — do not "simplify" its id resolution back to a single one. Verified by running both configurations end to end; see the comment on `manifestIdOf()`.
 
 ---
 
@@ -418,6 +420,8 @@ Fill `message:` from the project's **current** manifest values, not invented one
 
 This is the bridge from PO to the native format. It is plain Node ESM — no TypeScript import, so it runs identically under npm, pnpm, yarn and bun with no loader flags.
 
+It **fails closed**: if the source catalog holds no `manifest.*` ids, it throws and exits non-zero rather than writing empty `messages.json` files, and it throws *before* deleting the previous `_locales/` output. That matters because nothing downstream can see the empty case. `web-ext lint` reports no i18n finding on an extension whose manifest says `"name": "__MSG_extName__"` and whose default-locale catalog is `{}` — verified against `web-ext@10.6.0`, whose output on that package is byte-identical to its output on a healthy one. The convert phase's verify step (`SKILL.md` §3.5, webext checks 2–3) does catch it, but it runs once, while this script runs on every `dev`, `build` and `zip`.
+
 ```js
 // scripts/build-locales.mjs
 //
@@ -479,14 +483,36 @@ function toMessageName(id) {
   return name
 }
 
-/** Parse one PO file into Lingui's catalog shape, keyed by message id. */
-async function readCatalog(locale) {
+/**
+ * A parsed PO entry is keyed by its message id only when the catalog carries
+ * Lingui's `js-lingui-explicit-id` marker — which is what Step 4's formatter
+ * options produce. If the project's `lingui.config.ts` passes
+ * `explicitIdAsDefault` to `formatter()` (a legitimate option this skill does
+ * not set, but one a reconciled config may already carry), the marker is absent,
+ * the key is a generated hash, and the explicit id lands in the entry's
+ * `message` instead. Read both spellings rather than silently filtering to
+ * nothing.
+ */
+function manifestIdOf(key, entry) {
+  if (key.startsWith(ID_PREFIX)) return key
+  const message = entry?.message
+  return typeof message === 'string' && message.startsWith(ID_PREFIX) ? message : null
+}
+
+/** Parse one PO file and re-index it by `manifest.*` id. */
+async function readManifestEntries(locale) {
   const file = path.join(PO_DIR, locale, 'messages.po')
-  return formatter({}).parse(await readFile(file, 'utf8'), {
+  const catalog = formatter({}).parse(await readFile(file, 'utf8'), {
     locale,
     sourceLocale: SOURCE_LOCALE,
     filename: file,
   })
+  const byId = {}
+  for (const [key, entry] of Object.entries(catalog)) {
+    const id = manifestIdOf(key, entry)
+    if (id) byId[id] = entry
+  }
+  return byId
 }
 
 async function main() {
@@ -505,12 +531,19 @@ async function main() {
     throw new Error(`No catalog for the source locale "${SOURCE_LOCALE}" under ${PO_DIR}/.`)
   }
 
-  const source = await readCatalog(SOURCE_LOCALE)
-  const manifestIds = Object.keys(source).filter((id) => id.startsWith(ID_PREFIX))
+  const source = await readManifestEntries(SOURCE_LOCALE)
+  const manifestIds = Object.keys(source)
+  // Fail closed, and before OUT_DIR is removed below. The manifest reaches these
+  // strings through `__MSG_…__`; emitting an empty catalog ships an extension
+  // whose name, description and toolbar tooltip are blank in every locale, and
+  // nothing downstream sees it — `web-ext lint` passes on an unresolvable
+  // `__MSG_…__`, and the store rejects the upload much later.
   if (manifestIds.length === 0) {
-    console.warn(
-      `[build-locales] No "${ID_PREFIX}*" messages in ${PO_DIR}/${SOURCE_LOCALE}/messages.po. ` +
-        'Run `lingui extract` after editing src/i18n/manifest-strings.ts.',
+    throw new Error(
+      `No "${ID_PREFIX}*" messages found in ${PO_DIR}/${SOURCE_LOCALE}/messages.po. ` +
+        'Either `lingui extract` has not run since src/i18n/manifest-strings.ts was ' +
+        `written, or the ids in that file do not carry the "${ID_PREFIX}" prefix ` +
+        'this script filters on.',
     )
   }
 
@@ -531,7 +564,7 @@ async function main() {
       continue
     }
 
-    const catalog = locale === SOURCE_LOCALE ? source : await readCatalog(locale)
+    const catalog = locale === SOURCE_LOCALE ? source : await readManifestEntries(locale)
     const messages = {}
     for (const id of manifestIds) {
       const entry = catalog[id]
