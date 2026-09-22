@@ -562,10 +562,10 @@ export default function About() {
 
 ## 8. Catalog Bootstrapping
 
-Before the first `npx lingui extract`, the locale directories don't exist yet. Two things break without bootstrap stubs:
+Before the first `npx lingui compile`, no compiled catalog exists yet. What breaks without bootstrap stubs depends on the layout:
 
-1. The root loader's `await import(\`./locales/${locale}/messages.ts\`)` (Section 4) will fail with `Cannot find module` the first time the dev server starts.
-2. The extractor scans source files (including the dynamic `import('./locales/...')` specifier in `root.tsx`), and if it can't resolve them it fails with `Could not resolve import(...)` and exits without writing anything.
+1. **Both layouts — silently.** The root loader's `await import(\`./locales/${locale}/messages.ts\`)` (Section 4) is a template-literal specifier, which Vite turns into a map of the files that exist when it builds or serves the module. With none on disk, `npm run build` **exits 0**, the dev server starts, and `tsc --noEmit` passes (TypeScript does not resolve template-literal specifiers) — then the loader throws `Unknown variable dynamic import: ./locales/en/messages.ts` on the first request.
+2. **Per-route layout only.** `lingui extract-experimental` bundles each route to find its messages, and an unresolvable `import(...)` fails with `Could not resolve import(...)` without writing anything. Plain `lingui extract` — the single-catalog default — parses each file on its own and never resolves the import, so it runs fine without stubs.
 
 **For the single-catalog layout (Section 3 default):** seed an empty `messages.ts` stub for every locale before the first dev start.
 
@@ -599,7 +599,7 @@ The script is a convenience — the load-bearing step is verifying that every `i
 
 `lingui extract --clean` followed by `lingui compile` will overwrite these stubs with real catalogs on the first successful run.
 
-> **These stubs are local-only scaffolding.** They are written to the paths you just gitignored, so they are never committed — and they do not need to be. They exist for exactly one situation: the **very first** `lingui extract` on a project that has no `.po` files yet, where the extractor must resolve the route files' dynamic catalog imports before any catalog exists.
+> **These stubs are local-only scaffolding.** They are written to the paths you just gitignored, so they are never committed — and they do not need to be. They exist for a build, dev server or type-check that runs before the **very first** `lingui compile` on a project that has no `.po` files yet — and, in the per-route layout, for the first `lingui extract-experimental`, which resolves the routes' catalog imports. Plain `lingui extract` does not need them.
 >
 > **On a fresh clone, do not re-seed stubs — run `lingui compile`.** The `.po` sources are committed, so `lingui compile` regenerates the real compiled catalogs. Seeding is only correct when there is no `.po` file at all.
 >
@@ -832,6 +832,14 @@ npx react-router typegen
 npx lingui extract --clean
 npx lingui compile
 
+# 2b. Every locale has a source catalog and a compiled module (single-catalog layout;
+#     same locale list as Section 8). Neither tsc nor the build can see a missing one.
+( for loc in en de fr; do
+    for f in "app/locales/$loc/messages.po" "app/locales/$loc/messages.ts"; do
+      [ -f "$f" ] || { echo "missing catalog: $f" >&2; exit 1; }
+    done
+  done )
+
 # 3. TypeScript check
 npx tsc --noEmit
 
@@ -839,11 +847,11 @@ npx tsc --noEmit
 npm run build
 ```
 
-The compile step comes **before** `tsc --noEmit` on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet and type-checking would fail to resolve the route files' catalog imports. The prefixed `build` / `typecheck` scripts do exactly this ordering for you.
+The compile step comes **before** `tsc --noEmit` and the build on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet. Neither later step reports that — `tsc` does not resolve the loaders' template-literal import, and the build exits 0 with an empty import map that throws `Unknown variable dynamic import` on the first request. The prefixed `build` / `typecheck` scripts do exactly this ordering for you; step 2b is what proves it happened. `.po` proves the locale is in `lingui.config.ts` (`lingui extract` only writes catalogs for configured locales, so a locale missing from the config keeps its Section 8 stub and has no `.po`); `.ts` proves `lingui compile` wrote a module for it.
 
 If `tsc --noEmit` fails with "Cannot find name 'Route'" or similar, re-run `npx react-router typegen` — the type generator is normally invoked by the dev server, but it doesn't run on a fresh clone until `npm run dev` (or `react-router dev`) has been invoked at least once.
 
-If `lingui extract` fails with `Could not resolve import(...)`, revisit Section 8 — there's an unstubbed catalog import in one of the loader files.
+If `lingui extract-experimental` (per-route layout) fails with `Could not resolve import(...)`, revisit Section 8 — there's an unstubbed catalog import in one of the loader files.
 
 If `npm run build` fails with `Trans is not defined` or similar, the macro transform isn't running. Verify:
 - `@vitejs/plugin-react@^5` is installed (Section 1 — pre-installed by the orchestrator).

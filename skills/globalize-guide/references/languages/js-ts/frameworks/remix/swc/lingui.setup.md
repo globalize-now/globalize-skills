@@ -456,7 +456,7 @@ Routes that don't render any translatable text don't need the loader — only ro
 
 ## Catalog Bootstrapping
 
-**Bootstrap before the first `npx lingui extract --clean` run.** The dynamic imports above resolve `../locales/<locale>/messages.ts` at build time. On a fresh project that file doesn't exist yet, so the first build fails with `Cannot find module ../locales/en/messages.ts`. Seed an empty stub per locale before the first extract:
+**Bootstrap before the first `npx lingui extract --clean` run.** The route loaders import `../locales/<locale>/messages.ts` through a template-literal specifier, and Vite resolves that specifier by globbing at build time. On a fresh project no compiled catalog exists yet — and **nothing fails loudly when it is missing**: Vite bakes an empty import map into the server bundle, `npm run build` exits 0, and every loader then throws `Unknown variable dynamic import: ../locales/en/messages.ts` at request time. `tsc --noEmit` does not catch it either (TypeScript does not resolve template-literal import specifiers). Seed an empty stub per locale before the first extract, so that any build or dev server that runs before the first `lingui compile` produces a working, untranslated bundle instead of a green build that 500s:
 
 ```sh
 for loc in en de fr; do
@@ -469,7 +469,7 @@ Replace the `en de fr` list with the project's actual locales from `decisions.md
 
 The same step is documented in the TanStack Start setup (§5a). The Remix-specific shape is simpler because catalogs are per-locale rather than per-route, so you only seed one stub per locale rather than per route.
 
-> **These stubs are local-only scaffolding.** They are written to the paths you just gitignored, so they are never committed — and they do not need to be. They exist for exactly one situation: the **very first** `lingui extract` on a project that has no `.po` files yet, where the extractor must resolve the route files' dynamic catalog imports before any catalog exists.
+> **These stubs are local-only scaffolding.** They are written to the paths you just gitignored, so they are never committed — and they do not need to be. They exist for exactly one situation: a build, dev server or type-check that runs before the **very first** `lingui compile` on a project that has no `.po` files yet. `lingui extract` itself does not need them — it parses each source file and never resolves the catalog import.
 >
 > **On a fresh clone, do not re-seed stubs — run `lingui compile`.** The `.po` sources are committed, so `lingui compile` regenerates the real compiled catalogs. Seeding is only correct when there is no `.po` file at all.
 >
@@ -680,16 +680,22 @@ Run, in order:
 
 ```bash
 npx lingui extract --clean && npx lingui compile
+( for loc in en de fr; do
+    for f in "app/locales/$loc/messages.po" "app/locales/$loc/messages.ts"; do
+      [ -f "$f" ] || { echo "missing catalog: $f" >&2; exit 1; }
+    done
+  done )
 npx tsc --noEmit
 npm run build
 ```
 
-- **`lingui extract --clean`** reads every file under `app/` and produces `app/locales/<locale>/messages.po`. `--clean` drops obsolete entries. The first run will produce zero messages (nothing's wrapped yet) — that's expected; the catalog stubs from "Catalog Bootstrapping" keep the build green.
+- **`lingui extract --clean`** reads every file under `app/` and produces `app/locales/<locale>/messages.po`. `--clean` drops obsolete entries. The first run will produce zero messages (nothing's wrapped yet) — that's expected; the build is green either way, and the catalog stubs from "Catalog Bootstrapping" are what keep the *built bundle* working until the first compile.
 - **`lingui compile`** turns the `.po` files into the `.ts` runtime modules each route imports. This must succeed before `npm run build`.
+- **The catalog loop** (use the same locale list as "Catalog Bootstrapping", from `decisions.md`) is the only step here that can see a missing catalog. `.po` proves the locale is in `lingui.config.ts` — `lingui extract` only writes catalogs for configured locales, so a locale missing from the config has a stub `.ts` and no `.po`. `.ts` proves `lingui compile` wrote a module for it. Neither `tsc` nor the build fails without them.
 - **`tsc --noEmit`** catches mismatched types — the most common failure here is the `Locale` union not containing a locale you listed in `lingui.config.ts`, or a route loader importing the wrong path.
 - **`npm run build`** is Remix's Vite-driven production build. Failures here usually indicate the plugin-order issue from "Build Tool Integration" — verify `remix()` comes first, `react()` (from `@vitejs/plugin-react-swc`) with the Lingui SWC plugin comes second, and `lingui()` comes last. If macros render as raw JSX at runtime (`<Trans>` showing the message ID), the SWC plugin isn't being picked up — re-check the `plugins` tuple syntax (`['@lingui/swc-plugin', {}]`) and that no leftover `@vitejs/plugin-react` is shadowing the SWC variant.
 
-The compile step comes **before** `tsc --noEmit` on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet and type-checking would fail to resolve the route files' catalog imports. The prefixed `build` / `typecheck` scripts do exactly this ordering for you.
+The compile step comes **before** `tsc --noEmit` and the build on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet. Neither later step reports that — `tsc` does not resolve the loaders' template-literal import, and the build exits 0 with an empty import map that throws `Unknown variable dynamic import` on the first request. The prefixed `build` / `typecheck` scripts do exactly this ordering for you; the catalog loop is what proves it happened.
 
 If any step fails, capture the error to `result.verificationResult` in your progress file and exit with `status: "failed"` per `SKILL.md §2.2`. Do not advance to Phase 3 with a broken build.
 
