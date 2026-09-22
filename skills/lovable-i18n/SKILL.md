@@ -198,7 +198,7 @@ export default defineConfig(({ mode }) => ({
 }))
 ```
 
-The SWC plugin entry **must** be the tuple shape `['@lingui/swc-plugin', {}]` — a string + options object. Passing the plugin name as a bare string silently disables the macro transform: the build succeeds, but `<Trans>` never resolves and raw macro output leaks into the UI.
+The SWC plugin entry **must** be the tuple shape `['@lingui/swc-plugin', {}]` — a string + options object. A bare string is not silent: `@vitejs/plugin-react-swc@4` types the entry as `[string, Record<string, any>]`, so `tsc` reports TS2322 and `vite build` aborts while loading the config with `Cannot find module '@'`. The failure that *is* silent is the plugin being **absent** or shadowed by a leftover `@vitejs/plugin-react` — then the build exits 0 and the app throws *"…executed outside the context of compilation"* on load. After a production build, `! grep -rl --exclude-dir=node_modules "outside the context of compilation" .` is the check that catches it.
 
 ### A3. `lingui.config.ts`
 
