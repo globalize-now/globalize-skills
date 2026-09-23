@@ -98,10 +98,32 @@ function setByPath(tree: Record<string, unknown>, dotPath: string, value: string
   let node = tree as Record<string, unknown>
   for (let i = 0; i < parts.length - 1; i++) {
     const p = parts[i]
+    if (typeof node[p] === 'string') {
+      const prefix = parts.slice(0, i + 1).join('.')
+      throw new Error(
+        `key collision: "${dotPath}" needs "${prefix}" to be a group, ` +
+          `but "${prefix}" is already a message in this catalog. Keeping both is impossible — ` +
+          `rename one (e.g. "${prefix}.label").`,
+      )
+    }
     if (typeof node[p] !== 'object' || node[p] === null) node[p] = {}
     node = node[p] as Record<string, unknown>
   }
-  node[parts[parts.length - 1]] = value
+  const last = parts[parts.length - 1]
+  if (typeof node[last] === 'object' && node[last] !== null) {
+    throw new Error(
+      `key collision: "${dotPath}" is a message, but other entries ` +
+        `nest under it (e.g. "${dotPath}.${Object.keys(node[last] as object)[0]}"). ` +
+        `Keeping both is impossible — rename one (e.g. "${dotPath}.label").`,
+    )
+  }
+  if (last in node) {
+    throw new Error(
+      `duplicate key "${dotPath}" — two PO entries mangle to the same ` +
+        `key. Check for a literal msgid that collides with a "__ctx_" mangled one.`,
+    )
+  }
+  node[last] = value
 }
 ```
 
@@ -128,6 +150,8 @@ export default defineConfig({
 ```
 
 The `enforce: 'pre'` on `poLoader()` makes the ordering explicit even if a user rearranges the array.
+
+**Why `setByPath` throws.** A PO file is a flat list of `msgid`s; the loader rehydrates them into the nested object vue-i18n resolves against. Two entries whose dot-paths overlap — `Cart.items` and `Cart.items.empty`, or the seeded `messages` alongside a later `messages.inbox` — cannot both exist in that object. The original loader resolved the overlap by overwriting, so **whichever entry came second in the file won and the other vanished with `rc 0`**: no build error, no type error, and the catalog-parity check in Step 9 still passed because both entries are present in every `.po`. The page then rendered the raw key. The throws above turn that into a build failure that names both keys. A `.po` whose entries do not overlap is unaffected; sorting the file (`msgcat --sort-by-msgid`, or a TMS round-trip) can no longer silently change which string survives.
 
 **Why an empty `msgstr` is skipped rather than defaulted.** In this catalog scheme the `msgid` is the *call-site key* (`HomePage.title`), not the source text — the source text lives in the source locale's `msgstr`. So a loader that defaults an empty `msgstr` to its `msgid` puts the key string into the target locale's message tree, vue-i18n finds it, and the page renders the literal `HomePage.title` with no warning at any layer. Worse, it renders the *unmangled* msgid for a `msgctxt` entry (`Common.right`, not `Common.right__ctx_direction`). Skipping the entry instead leaves the key absent, so the `fallbackLocale: sourceLocale` set in the provider step does its job: the string renders in the source language and vue-i18n logs `[intlify] Fall back to translate '<key>' key with '<sourceLocale>' locale` in development. A fully untranslated catalog therefore transforms to `{}`, which is fine — `setLocaleMessage(locale, {})` still registers the locale in `availableLocales`, so the lazy-load guard in `setLocale()` does not re-fetch it.
 
