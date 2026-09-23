@@ -658,6 +658,8 @@ msgid "messages"
 msgstr "{count, plural, one {One new message} other {# new messages}}"
 ```
 
+**Keys must not overlap as dot-paths.** The `poLoader` rehydrates each `msgid` into a nested object, so a catalog cannot hold both `Cart.items` and `Cart.items.empty` — one of the two would have to become a group and the other a message. The loader raises a build error naming both keys, and the Step 9 check below catches it in CI. Note that `messages` and `welcome` are seeded here as flat keys: a later namespace of the same name (`messages.inbox`) collides with the seed.
+
 Substitute `"Language: {locale}\n"` for each locale file. For target-locale files, copy the source `msgstr` values as placeholders — they're replaced by actual translations later. Keep the `#.` descriptions identical across locales; they're authoritative metadata shared among translators.
 
 ### Commit and ignore rules (both formats)
@@ -874,23 +876,56 @@ function entryKey(msgid, ctx) {
   return ctx ? `${ctx}${msgid}` : msgid
 }
 
+// The key the poLoader will actually build for this entry.
+function loaderKey(msgid, ctx) {
+  return ctx ? `${msgid}__ctx_${ctx}` : msgid
+}
+
+// The loader rehydrates dot-paths into a nested object. An entry whose key is a
+// dot-prefix of another cannot survive that: one of the two would be dropped.
+// The entry-set comparison below cannot see this — both entries are present in
+// every file — so check it here.
+function collisions(keys) {
+  const found = []
+  const seen = new Set()
+  for (const k of keys) {
+    if (seen.has(k)) found.push(`duplicate key "${k}"`)
+    seen.add(k)
+  }
+  const sorted = [...seen].sort()
+  for (let i = 0; i < sorted.length - 1; i++) {
+    for (let j = i + 1; j < sorted.length && sorted[j].startsWith(sorted[i] + '.'); j++) {
+      found.push(`"${sorted[i]}" is a message, but "${sorted[j]}" nests under it`)
+    }
+  }
+  return found
+}
+
 const catalogs = Object.fromEntries(files.map((f) => {
   const parsed = gettextParser.po.parse(fs.readFileSync(path.join(LOCALES_DIR, f)))
   const keys = new Set()
+  const loaderKeys = []
   for (const ctx of Object.keys(parsed.translations)) {
     for (const msgid of Object.keys(parsed.translations[ctx])) {
-      if (msgid) keys.add(entryKey(msgid, ctx))
+      if (msgid) {
+        keys.add(entryKey(msgid, ctx))
+        loaderKeys.push(loaderKey(msgid, ctx))
+      }
     }
   }
-  return [f.replace(/\.po$/, ''), keys]
+  return [f.replace(/\.po$/, ''), { keys, loaderKeys }]
 }))
 
-const source = catalogs.en ?? Object.values(catalogs)[0]
+const source = (catalogs.en ?? Object.values(catalogs)[0]).keys
 let hadIssue = false
-for (const [locale, keys] of Object.entries(catalogs)) {
+for (const [locale, { keys, loaderKeys }] of Object.entries(catalogs)) {
   const missing = [...source].filter((k) => !keys.has(k))
   if (missing.length > 0) {
     console.error(`[i18n] ${locale} missing ${missing.length} entry/entries: ${missing.slice(0, 5).map((k) => k.replace('', ' / ')).join(', ')}${missing.length > 5 ? '…' : ''}`)
+    hadIssue = true
+  }
+  for (const c of collisions(loaderKeys)) {
+    console.error(`[i18n] ${locale} key collision: ${c} — the PO loader would drop one of them`)
     hadIssue = true
   }
 }

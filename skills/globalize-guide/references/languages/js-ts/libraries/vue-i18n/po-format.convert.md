@@ -93,10 +93,12 @@ msgid "Auth.login.submit"
 msgstr "Log in"
 ```
 
-The `poLoader` re-hydrates these into:
+The `poLoader` rehydrates these into:
 ```js
 { Auth: { login: { title: 'Sign in', submit: 'Log in' } } }
 ```
+
+**A segment is either a group or a message, never both.** Because `Auth.login` is a group here, `msgid "Auth.login"` cannot also exist in the same catalog — the nested object has one slot for `login`. PO will happily hold both entries, and every PO-level check will pass, but the loader can only keep one, so it raises a build error naming both keys instead. If a message key later needs children, rename the message (`Auth.login` → `Auth.login.label`) across every locale file and at its call sites.
 
 ---
 
@@ -329,6 +331,7 @@ Replaces the JSON deep-merge step in "After all subagents complete — merge cat
    - Every new `(msgid, msgctxt)` pair exists in every locale file.
    - `#.`, `#:`, and `msgctxt` lines are identical across locales for each new entry.
    - Every locale file still parses via `gettext-parser` without errors.
+   - **No loader key is a dot-prefix of another.** Build each entry's loader key (`msgid`, or `` `${msgid}__ctx_${msgctxt}` ``), sort them, and reject the merge if any key is followed by one that starts with it plus a dot. The three checks above cannot catch this — the colliding entries are present, and identical, in every file — but the `poLoader` keeps only one of them and the other disappears from the build with no error. If a new entry collides with an existing one, rename the *new* key (`Cart.items.empty` under an existing `Cart.items` → `Cart.itemsEmpty`, or rename the existing leaf to `Cart.items.label` in every locale and at its call sites) rather than dropping it.
 
 ---
 

@@ -410,7 +410,8 @@ Catalogs are organized by **namespace**. Shared rules apply to both JSON and PO;
 - **Max 2 levels of nesting.** `Auth.login.title` is fine; `Auth.pages.login.fields.email.label` is not.
 - **Shared strings live under `Common`.** Buttons, labels, and status text reused across pages belong in `Common.save`, `Common.cancel`, etc.
 - **Semantic keys, not copy-literal keys.** `HomePage.title` / `HomePage.subtitle` / `HomePage.cta` — not `HomePage.welcomeBack`. Translators edit values; keys should not need renaming when copy changes.
-- **Access via dot-path.** `t('HomePage.title')` works in both formats — vue-i18n's default resolver walks nested objects, and the PO loader re-hydrates dot-paths into the same nested shape.
+- **Access via dot-path.** `t('HomePage.title')` works in both formats — vue-i18n's default resolver walks nested objects, and the PO loader rehydrates dot-paths into the same nested shape.
+- **No key may be a dot-prefix of another.** `Cart.items` and `Cart.items.empty` cannot coexist: one has to be a message and the other a group, and the nested object the resolver walks has room for only one of them. JSON makes this impossible to write. **PO does not** — both are valid, distinct `(msgid, msgctxt)` entries, and the loader used to resolve the overlap by overwriting, silently. It now fails the build instead. When a key needs to grow children, rename the leaf (`Cart.items` → `Cart.items.label`) in every locale file and at the call site. This also applies to the `__ctx_` mangled form: `msgctxt "a"` and `msgctxt "a.b"` on the same `msgid` collide.
 
 ### Choosing a namespace for new strings
 
@@ -742,6 +743,7 @@ Follow the merge algorithm in `references/languages/js-ts/libraries/vue-i18n/po-
    - Otherwise, append new entries to every locale file. Source locale gets real `msgstr`; other locales get source text as placeholder. `#.` and `#:` are identical across locales.
 4. Preserve the `msgid ""` header block untouched in every file.
 5. Verify every locale file has the same `(msgid, msgctxt)` set.
+6. Verify no entry's loader key (`msgid`, or `msgid__ctx_msgctxt`) is a dot-prefix of another's. Step 4 and step 5 cannot see this — the colliding entries are present, and identical, in every file — but the `poLoader` can keep only one of them. The Step 9 CI check in `setup.shared.md` runs this check; a wrap subagent that introduces `Cart.items.empty` beside an existing `Cart.items` must rename one.
 
 #### Verification after parallel wrapping
 
