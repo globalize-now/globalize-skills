@@ -246,7 +246,7 @@ Locale is resolved once in `<<i18nRequestPath>>` via `await rootParams.locale()`
 Any time a string's wording depends on a number — singular/plural nouns, subject-verb agreement, anything count-sensitive — it is a plural string. Keep every form inside a single message; never branch in JS.
 
 <!-- if: catalogFormat == "po" -->
-`msgid` is the full namespace dot-path: `useTranslations('Cart')` + `t('items')` → `msgid "Cart.items"`. ICU goes inside `msgstr`. Never use gettext `msgid_plural` / `msgstr[0]` / `msgstr[1]` — next-intl evaluates ICU in a single `msgstr`, and the gettext `Plural-Forms` header is informational only. Give every entry a `#.` description and a `#:` source reference (elided in the examples below for brevity — never elide them in a real catalog), and use `msgctxt` to disambiguate identical source strings.
+`msgid` is the full namespace dot-path: `useTranslations('Cart')` + `t('items')` → `msgid "Cart.items"`. ICU goes inside `msgstr`. Never use gettext `msgid_plural` / `msgstr[0]` / `msgstr[1]` — next-intl evaluates ICU in a single `msgstr`, and the gettext `Plural-Forms` header is informational only. Give every entry a `#.` description and a `#:` source reference (elided in the examples below for brevity — never elide them in a real catalog). Do **not** add `msgctxt` as translator context: next-intl's PO codec reads an entry's key as `msgctxt` + `.` + `msgid`, so a `msgctxt` line silently moves the message to a different key and `t()` stops finding it. Disambiguate with distinct `msgid` dot-paths instead.
 
 ```po
 msgid "Cart.items"
