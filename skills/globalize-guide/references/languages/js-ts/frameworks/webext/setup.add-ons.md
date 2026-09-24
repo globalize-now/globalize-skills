@@ -341,7 +341,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'          # web-ext@10 requires Node >= 20
+          node-version: '22'          # @lingui/* v6 require Node >= 22.19.0; web-ext@10 requires >= 20
       - run: npm ci
       - name: Build the extension        # Lingui variant only — _locales is generated
         run: npm run build
@@ -370,21 +370,26 @@ them**; add only what is missing, which is normally just the bridge and the drif
 {
   "scripts": {
     "i18n:locales": "node scripts/build-locales.mjs",
-    "i18n:check": "lingui compile && lingui extract --clean && git diff --exit-code -- src/locales"
+    "i18n:check": "lingui check sync && lingui check missing"
   }
 }
 ```
 
-Replace `src/locales` with the project's real `catalogs[].path` root from `lingui.config.ts`. **Do not
-add `--typescript`** on this variant — setup sets `compileNamespace: 'ts'` in `lingui.config.ts`, which
-already emits the `.ts` catalogs the static imports resolve against.
+**Requires `@lingui/cli` ≥ 6.8.0**, which added `lingui check`. Read `npx lingui --version` first; on an
+older 6.x the command exits with `unknown command`, and the fallback is the git-diff form documented in
+Add-on 3 of `references/languages/js-ts/libraries/lingui/setup.add-ons.md` — with the pathspec derived
+from `catalogs[].path`, never left as a literal `src/locales`. **Do not add `--typescript`** on this
+variant — setup sets `compileNamespace: 'ts'` in `lingui.config.ts`, which already emits the `.ts`
+catalogs the static imports resolve against.
 
-- **Why `i18n:check` compiles first.** Compiled catalogs are gitignored, so a clean CI checkout has the
-  `.po` sources but none of the compiled output; anything that resolves a catalog import fails until
-  something generates them.
-- **The drift check only ever sees `.po` changes.** `public/_locales/**` is gitignored build output, so
-  `git diff --exit-code` cannot flag it. That is the intended contract — the gate is about catalog
-  *sources*.
+- **`lingui check` takes no path argument.** It reads the catalog paths from `lingui.config.ts`, so
+  there is nothing to keep in sync by hand — which is the point: the previous form hardcoded
+  `src/locales`, and `git diff --exit-code` on a pathspec that matches nothing exits 0.
+- **`i18n:check` no longer compiles first.** `check sync` and `check missing` do not resolve the
+  extension's catalog imports, so the gitignored compiled catalogs being absent does not affect them.
+  Keep a separate compile step in CI — it is what proves the catalogs compile.
+- **The gate is about catalog *sources*.** `public/_locales/**` is gitignored build output and neither
+  check looks at it; the bridge step below is what covers it.
 - **Run the bridge as its own CI step anyway.** It is the step that fails on a PO the bridge cannot map:
   an id that maps to an illegal Chrome message name, or a malformed entry. Its skip-and-warn lines for
   locales outside Chrome's ~55-entry supported table are informational, not failures — surface them in
@@ -404,7 +409,7 @@ lint step if you prefer one job):
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'          # @lingui/* v6 require Node >= 22.19.0
       - run: npm ci
       - name: Compile catalogs
         run: npm run lingui:compile
@@ -414,9 +419,10 @@ lint step if you prefer one job):
         run: npm run i18n:locales
 ```
 
-Without the drift check, a contributor can wrap a string, forget to run `lingui extract`, and merge a PR
+Without the sync check, a contributor can wrap a string, forget to run `lingui extract`, and merge a PR
 whose catalog is silently stale — the string then renders as its source text in every locale until
-someone notices.
+someone notices. Without the missing check, a catalog that is in sync but entirely untranslated passes
+too: `lingui compile` exits 0 and falls every message back to the source string.
 
 ---
 
