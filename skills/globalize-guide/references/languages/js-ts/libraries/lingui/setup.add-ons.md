@@ -294,9 +294,27 @@ Then run the project's lint command once and report the count of new problems �
 
 Lingui has a real extract/compile build step. The canonical CI integration runs:
 
-1. **Extract** — `lingui extract --clean` regenerates the source-locale catalog from the wrapped strings. The `--clean` flag drops obsolete entries.
-2. **Drift check** — fail the build if extraction produced uncommitted changes (someone wrapped a string but forgot to commit the catalog update).
+1. **Sync check** — fail the build if the committed catalogs are not what extraction would produce (someone wrapped a string but forgot to commit the catalog update).
+2. **Missing check** — fail the build if a target locale still has untranslated messages after `fallbackLocales` are applied.
 3. **Compile** — `lingui compile` produces the optimized `*.ts` / `*.js` runtime catalogs that the build consumes.
+
+**Requires `@lingui/cli` ≥ 6.8.0**, which added the `lingui check sync` and `lingui check missing` subcommands. The manifest pins `@lingui/cli@^6`, so a fresh install resolves to a version that has them; a project installed earlier may be on 6.7.x, where `lingui check` exits with `unknown command`. Read the installed version (`npx lingui --version`) before writing these scripts, and upgrade or fall back to the git-diff form below if it is older.
+
+**The sync check replaces a `git diff` after `lingui extract`, and is not the same thing.** The older form of this add-on shipped `lingui extract --clean && git diff --exit-code -- src/locales`. It is blind in three ways, all measured on `@lingui/cli@6.8.0`, Node 22.23.2:
+
+| hole | measured |
+|---|---|
+| The pathspec is hardcoded to `src/locales`. Remix and React Router put catalogs under `app/locales`. | `git diff --exit-code -- src/locales` returns **rc 0** with real drift present at `app/locales`. `git diff` does not error on a pathspec that matches nothing. |
+| `git diff` cannot see untracked or gitignored files. | On the PR that *introduces* i18n — catalogs not yet added to the index — `git diff --exit-code -- app/locales` returns **rc 0** with real drift. |
+| It runs `lingui extract --clean` first, which **rewrites the catalogs in the CI working tree** before the diff. | That is what makes the two holes above silent: the tree is mutated, then compared against an index that never sees it. |
+
+`lingui check sync` reads `lingui.config.*` for the catalog paths, compares in memory, writes nothing, and names the offending file:
+
+```
+FAIL sync: Found 2 out-of-sync catalog file(s).
+app/locales/en/messages.po: Catalog is out of sync with extract output
+app/locales/lv/messages.po: Catalog is out of sync with extract output
+```
 
 Detect from `package.json` and `lingui.config.{ts,js}`:
 - The package manager (npm / pnpm / yarn / bun).
@@ -305,25 +323,64 @@ Detect from `package.json` and `lingui.config.{ts,js}`:
 
 ### `package.json` scripts
 
-**Script-name reconciliation — read `package.json` before adding anything.** The framework setup references (`nextjs/app-router/lingui.setup.md`, the Vite files, the TanStack Start files) create a `lingui:extract` / `lingui:compile` pair as part of core setup. This add-on was written around an `i18n:extract` / `i18n:compile` pair. They run the same commands. If the `lingui:*` pair already exists, **reuse it** and add only what is missing — in practice just the drift check, `i18n:check` — rather than creating a second, near-duplicate pair. Point the GitHub Actions workflow below at whichever names the project actually has.
+**Script-name reconciliation — read `package.json` before adding anything.** The framework setup references (`nextjs/app-router/lingui.setup.md`, the Vite files, the TanStack Start files) create a `lingui:extract` / `lingui:compile` pair as part of core setup. This add-on was written around an `i18n:extract` / `i18n:compile` pair. They run the same commands. If the `lingui:*` pair already exists, **reuse it** and add only what is missing — in practice just the validation script, `i18n:check` — rather than creating a second, near-duplicate pair. Point the GitHub Actions workflow below at whichever names the project actually has.
 
 Add (or merge with existing):
+
+**Which `i18n:check` to write depends on the catalog layout, and the two are not interchangeable.** Read `lingui.config.*` first:
+
+- **Single-catalog layout** — the config has `catalogs: [{ path: … }]` and the extract script is plain `lingui extract`. This is Remix, React Router (single-catalog shape), the web-extension variants, and the Vite declarative-SPA shape.
+- **Per-page layout** — the config has `experimental.extractor.entries` and the extract script is `lingui extract-experimental`. This is Next.js App Router, TanStack Start, and the per-route Vite shapes.
+
+### Single-catalog layout
 
 ```json
 {
   "scripts": {
     "i18n:extract": "lingui extract --clean",
     "i18n:compile": "lingui compile --typescript",
-    "i18n:check": "lingui compile && lingui extract --clean && git diff --exit-code -- src/locales"
+    "i18n:check": "lingui check sync && lingui check missing"
   }
 }
 ```
 
-Replace `src/locales` in `i18n:check` with the project's actual catalog path. Drop `--typescript` if the project is plain JavaScript.
+Drop `--typescript` if the project is plain JavaScript. `lingui check` takes no path argument — it reads the catalog paths from the config, so there is nothing to keep in sync by hand.
 
-**Why `i18n:check` compiles first.** Compiled catalogs are gitignored (see the `` `.gitignore` `` section of the stack's setup reference), so a clean CI checkout has the `.po` sources but none of the compiled output. That breaks extraction on the per-route stacks: the per-page extractor resolves each route file's dynamic-import target with esbuild **before writing anything**, and fails with `Could not resolve import(...)` when those targets are absent — see `frameworks/tanstack-start/lingui.setup.md:423`. Running `lingui compile` first materialises them so the extract can proceed. Without the leading compile, the old form of this script fails on every clean CI checkout for those stacks.
+`i18n:check` no longer needs a leading `lingui compile`: `check sync` and `check missing` do not resolve the app's dynamic catalog imports, so the gitignored compiled catalogs being absent on a clean CI checkout does not affect them.
 
-A side effect: `git diff --exit-code` can now only ever report `.po` changes, because the compiled catalogs it would otherwise have flagged are untracked. That is the intended contract — the drift check is about catalog *sources*, not build artifacts.
+### Per-page layout (`extract-experimental`)
+
+**Do not use `lingui check sync` here.** `check sync` mirrors plain `lingui extract`, and on a per-page project plain `lingui extract` marks the whole catalog obsolete. Measured on `@lingui/cli@6.8.0` against a project extracted cleanly with `lingui extract-experimental` seconds earlier:
+
+```
+FAIL sync: Found 2 out-of-sync catalog file(s).
+src/pages/locales/one/en.po: Catalog is out of sync with extract output
+src/pages/locales/one/lv.po: Catalog is out of sync with extract output
+```
+
+That is a **false positive** — the catalogs were in sync. Wiring it in would make the check permanently red, and "fixing" it by running `lingui extract` rewrites every entry as `#~ msgid` and discards the catalog. `lingui check missing` **is** correct here: it reads the per-page catalogs through the same `experimental.extractor` config the extractor uses, and it reported both untranslated `lv` entries in the same fixture.
+
+```json
+{
+  "scripts": {
+    "i18n:extract": "lingui extract-experimental",
+    "i18n:compile": "lingui compile --typescript",
+    "i18n:check": "lingui compile && lingui extract-experimental && git diff --exit-code -- <catalog-dir> && lingui check missing"
+  }
+}
+```
+
+Derive `<catalog-dir>` from `experimental.extractor.output` in `lingui.config.*` — the directory that actually holds the `.po` files. Do **not** leave a literal `src/locales`: if the pathspec matches nothing, `git diff` exits 0 and the check can never fail.
+
+**Why the per-page form still compiles first.** Compiled catalogs are gitignored (see the `` `.gitignore` `` section of the stack's setup reference), so a clean CI checkout has the `.po` sources but none of the compiled output. The per-page extractor resolves each route file's dynamic-import target with esbuild **before writing anything**, and fails with `Could not resolve import(...)` when those targets are absent — see `frameworks/tanstack-start/lingui.setup.md:423`. Running `lingui compile` first materialises them so the extract can proceed.
+
+A side effect: `git diff --exit-code` can only ever report `.po` changes, because the compiled catalogs it would otherwise have flagged are untracked. That is the intended contract — the drift check is about catalog *sources*, not build artifacts.
+
+### `lingui check missing` passes when there are no catalogs at all
+
+Measured: on a project whose catalog files do not exist, `lingui check missing` prints `PASS missing: No missing translations found` and exits **0**. It iterates the messages it can read, and an absent catalog contributes none. It is a completeness gate, not an existence gate — never let it stand alone as proof that catalogs were produced. On the single-catalog layout `check sync` covers that case (it reports `Catalog is missing and would be created by extract`); on the per-page layout the `git diff` above does, provided the pathspec is right.
+
+`lingui check missing` defaults to `--mode resolved`, matching `lingui compile --strict`: a message is missing only if it is still missing after `fallbackLocales` are applied. Use `--mode catalog` when the contract is that each target catalog must be independently complete — with a `fallbackLocales` chain configured, `resolved` mode will pass a target locale that has no translations of its own.
 
 **Build wiring — check before you write.** Core setup now prepends `lingui compile` to the `build` and `dev` scripts itself (see the "Catalog scripts" section of the stack's setup reference). Read `package.json`: if the `build` script already starts with `lingui compile`, leave it alone — do **not** add a second compile invocation. Only wire it in here when it is absent, which means an older setup that predates that change, or a hand-built project that never went through the setup reference:
 
@@ -347,8 +404,8 @@ name: i18n
 on:
   pull_request:
     paths:
-      - 'src/**'
-      - 'src/locales/**'
+      - '<source-dir>/**'
+      - '<catalog-dir>/**'
       - 'lingui.config.*'
       - '.github/workflows/i18n.yml'
 
@@ -363,17 +420,23 @@ jobs:
       - run: npm ci
       - name: Compile catalogs
         run: npm run i18n:compile
-      - name: Verify catalogs are in sync
+      - name: Verify catalogs are in sync and complete
         run: npm run i18n:check
 ```
 
-**Compile before anything that type-checks or builds.** The compile step comes first on purpose. Compiled catalogs are gitignored, so a CI checkout starts without them and the route files' catalog imports cannot resolve until something generates them. Any job that runs `tsc --noEmit`, `next build`, `vite build`, or the project's `build` script on a clean checkout must run `i18n:compile` first (or invoke a `build` script that already prepends `lingui compile`). Keep this ordering if you add typecheck or build steps to this workflow, and apply it to any other workflow that touches the app.
+**Fill in `<source-dir>` and `<catalog-dir>` from the project.** `<source-dir>` is the `include` root from `lingui.config.*` (`src`, `app`, …); `<catalog-dir>` is the directory holding the `.po` files, from `catalogs[].path` or `experimental.extractor.output`. A `paths:` filter that names a directory the project does not have means the workflow never runs on the PRs it exists to guard — a silent pass, not a failure.
 
-Adjust `paths`, source directory, and the install command to match the project. If the project does not have `.github/workflows/`, skip the workflow scaffold and just install the npm scripts. Tell the user how to wire `i18n:check` into their CI of choice.
+**Compile before anything that type-checks or builds.** Compiled catalogs are gitignored, so a CI checkout starts without them and the route files' catalog imports cannot resolve until something generates them. Any job that runs `tsc --noEmit`, `next build`, `vite build`, or the project's `build` script on a clean checkout must run `i18n:compile` first (or invoke a `build` script that already prepends `lingui compile`). Keep this ordering if you add typecheck or build steps to this workflow, and apply it to any other workflow that touches the app. On the single-catalog layout `i18n:check` itself no longer needs it, but the step above is kept because it also proves the catalogs compile.
 
-### Why drift check matters
+Adjust the install command to match the project. If the project does not have `.github/workflows/`, skip the workflow scaffold and just install the npm scripts. Tell the user how to wire `i18n:check` into their CI of choice.
 
-Without `git diff --exit-code` after extract, a contributor can wrap a string in code, forget to run `lingui extract`, and merge a PR where the catalog is silently out of date. The string then renders as its key (or fallback) for every non-source locale until someone notices. The drift check makes the catalog state part of the PR contract.
+### Why these checks matter
+
+Without a sync check, a contributor can wrap a string in code, forget to run `lingui extract`, and merge a PR where the catalog is silently out of date. The string then renders as its key (or fallback) for every non-source locale until someone notices.
+
+Without a missing check, the failure is quieter still. `lingui compile` without `--strict` exits **0** with every `msgstr` in a target catalog empty — measured — and falls each message back to the source string. The build is green, the bundle is well-formed, and the "localized" site renders in the source language. Nothing in the setup Verification sequence (`extract → compile → tsc → build`) can see it. `lingui check missing` is the only step in this add-on that can.
+
+Together they make catalog state part of the PR contract: `sync` says the catalogs match the code, `missing` says the translations are actually there.
 
 ---
 
