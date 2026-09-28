@@ -676,12 +676,15 @@ Run, in order:
 npx lingui extract --clean && npx lingui compile
 npx tsc --noEmit
 npm run build
+! grep -rl --exclude-dir=node_modules --exclude-dir=.git \
+    "outside the context of compilation" .
 ```
 
+- **The `grep` step** is the only one above that can fail on a project where every other step passed. `@lingui/core/macro` and `@lingui/react/macro` ship a module whose top-level code throws *"The macro you imported from `@lingui/…/macro` is being executed outside the context of compilation"*. When the transform runs, the macro import is rewritten and that module never reaches the bundle; when it does not run, the module is bundled verbatim and the app throws on load — while `lingui extract`, `lingui compile`, `tsc --noEmit` and `npm run build` **all still exit 0**. `grep` exits 1 when it matches nothing, so the leading `!` makes a clean tree the passing case, and a match prints the offending build artefact. Nothing outside `node_modules` carries that string unless the bundler put it there, so the check needs no knowledge of your output directory.
 - **`lingui extract --clean`** reads every file under `app/` and produces `app/locales/<locale>/messages.po`. `--clean` drops obsolete entries. The first run will produce zero messages (nothing's wrapped yet) — that's expected; the catalog stubs from "Catalog Bootstrapping" keep the build green.
 - **`lingui compile`** turns the `.po` files into the `.ts` runtime modules each route imports. This must succeed before `npm run build`.
 - **`tsc --noEmit`** catches mismatched types — the most common failure here is the `Locale` union not containing a locale you listed in `lingui.config.ts`, or a route loader importing the wrong path.
-- **`npm run build`** is Remix's Vite-driven production build. Failures here usually indicate the plugin-order issue from "Build Tool Integration" — verify `remix()` comes first, `react()` with the Lingui Babel plugin comes second, and `lingui()` comes last.
+- **`npm run build`** is Remix's Vite-driven production build. Failures here usually indicate the plugin-order issue from "Build Tool Integration" — verify `remix()` comes first, `react()` with the Lingui Babel plugin comes second, and `lingui()` comes last. A *missing* Babel plugin is the case this step cannot see: the build exits 0 and the app throws on load, which is what the `grep` step above catches.
 
 The compile step comes **before** `tsc --noEmit` on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet and type-checking would fail to resolve the route files' catalog imports. The prefixed `build` / `typecheck` scripts do exactly this ordering for you.
 

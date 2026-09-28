@@ -841,7 +841,12 @@ npx tsc --noEmit
 
 # 4. Production build
 npm run build
+# 5. Assert the macro transform actually ran (see note below)
+! grep -rl --exclude-dir=node_modules --exclude-dir=.git \
+    "outside the context of compilation" .
 ```
+
+- **The `grep` step** is the only one above that can fail on a project where every other step passed. `@lingui/core/macro` and `@lingui/react/macro` ship a module whose top-level code throws *"The macro you imported from `@lingui/…/macro` is being executed outside the context of compilation"*. When the transform runs, the macro import is rewritten and that module never reaches the bundle; when it does not run, the module is bundled verbatim and the app throws on load — while `lingui extract`, `lingui compile`, `tsc --noEmit` and `npm run build` **all still exit 0**. `grep` exits 1 when it matches nothing, so the leading `!` makes a clean tree the passing case, and a match prints the offending build artefact. Nothing outside `node_modules` carries that string unless the bundler put it there, so the check needs no knowledge of your output directory.
 
 The compile step comes **before** `tsc --noEmit` on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet and type-checking would fail to resolve the route files' catalog imports. The prefixed `build` / `typecheck` scripts do exactly this ordering for you.
 
@@ -849,10 +854,10 @@ If `tsc --noEmit` fails with "Cannot find name 'Route'" or similar, re-run `npx 
 
 If `lingui extract` fails with `Could not resolve import(...)`, revisit Section 8 — there's an unstubbed catalog import in one of the loader files.
 
-If `npm run build` fails with `Trans is not defined` or `<Trans>` renders as raw JSX at runtime, the SWC macro transform isn't running. Verify:
+If the `grep` step fires — or `npm run build` fails with `Trans is not defined` — the SWC macro transform isn't running. A missing plugin does not fail the build and does not render the message ID; the app throws on load, which is why the `grep` step exists. Verify:
 - `@vitejs/plugin-react-swc` is installed (Section 1) and `@vitejs/plugin-react` is **not** also installed (uninstall it if both are present — Vite may resolve the wrong one).
 - `vite.config.ts` has the exact plugin order from Section 2: `reactRouter()`, then `react({ plugins: [['@lingui/swc-plugin', {}]] })`, then `lingui()`.
-- The SWC plugin is passed as a tuple `['@lingui/swc-plugin', {}]` (string + options object), not a bare string — bare strings are silently ignored.
+- The SWC plugin is passed as a tuple `['@lingui/swc-plugin', {}]` (string + options object), not a bare string. A bare string is **not** silently ignored: `@vitejs/plugin-react-swc@4` types the entry as `[string, Record<string, any>]`, so `tsc --noEmit` reports TS2322 and `vite build` aborts while loading the config with `Cannot find module '@'`.
 - the SWC host resolves `@swc/core` to **1.16.x** (`swc_core` 77.x) — check the lockfile, not the `@vitejs/plugin-react-swc` range, since `^4`'s dependency is only `@swc/core@^1.15.11`/`^1.15.46`. `@lingui/swc-plugin@^6` (= `6.7.0`, `swc_core@77.1.1`) needs no pin on such a host — see the version-compatibility note in Section 1.
 - The macro import is `import { Trans } from '@lingui/react/macro'` (not the deprecated `@lingui/macro`; non-React macros like `t` come from `@lingui/core/macro`).
 
