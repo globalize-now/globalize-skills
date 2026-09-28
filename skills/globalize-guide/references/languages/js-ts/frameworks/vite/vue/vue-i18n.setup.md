@@ -117,7 +117,7 @@ function setByPath(tree: Record<string, unknown>, dotPath: string, value: string
         `Keeping both is impossible — rename one (e.g. "${dotPath}.label").`,
     )
   }
-  if (last in node) {
+  if (Object.hasOwn(node, last)) {
     throw new Error(
       `duplicate key "${dotPath}" — two PO entries mangle to the same ` +
         `key. Check for a literal msgid that collides with a "__ctx_" mangled one.`,
