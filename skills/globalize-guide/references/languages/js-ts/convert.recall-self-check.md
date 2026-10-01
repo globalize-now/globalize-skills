@@ -56,6 +56,16 @@ excluding tests, stories, configs, and `.d.ts`.
   subagent supplies precision.
 - **vue-i18n:** `@intlify/eslint-plugin-vue-i18n` `no-raw-text` if installed
   (consent as for Lingui), else the grep scan above adapted to `.vue` templates.
+- **Angular (`@angular/localize`) — tuned grep scan.** No maintained lint rule flags
+  unmarked Angular template text, so scan `src/**/*.html` (excluding `src/index.html`) for
+  text nodes `>[^<{]*[A-Za-z][^<]*<` on lines whose element carries no `i18n` attribute, and
+  for `placeholder=|title=|aria-label=|alt=|label=|text=|header=|message=|cancel-text=|ok-text=`
+  with a literal value and no matching `i18n-<attr>` on the same element. Scan `src/**/*.ts`
+  for string literals passed as `header:`, `subHeader:`, `message:` or `text:` inside an
+  `AlertController` / `ToastController` / `ActionSheetController` / `LoadingController`
+  `.create({` call without a `$localize` tag. Recall only — an ancestor's `i18n` makes some
+  hits false positives; the cleanup subagent supplies precision. The cleanup subagent's
+  catalog step is `npm run i18n:extract`.
 
 Write the violations to `progress/verify.json` as `result.recallViolations`. If
 the list is empty **and the scan is known to have run** (Lingui: the `--print-config`
@@ -89,7 +99,7 @@ The orchestrator, on `needs_cleanup`, loops up to **`maxCleanupRounds` (default
 3. **Re-catalog + re-scan (inside the same subagent).** After wrapping, re-run the
    library's catalog step so newly-wrapped strings extract (Lingui:
    `npx lingui extract --clean` + `npx lingui compile`; Paraglide:
-   `npx '@inlang/paraglide-js@^2' compile …`; next-intl/vue-i18n: none — runtime
+   `npx '@inlang/paraglide-js@^2' compile …`; Angular: `npm run i18n:extract`; next-intl/vue-i18n: none — runtime
    catalogs), then re-run the recall scan and write the residual
    `result.recallViolations` and `result.stringsWrappedInCleanup` (count wrapped
    this round).
