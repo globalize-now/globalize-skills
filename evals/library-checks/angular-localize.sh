@@ -51,9 +51,11 @@ bad = [u.get("id") for u in units
                   for n in u.findall("x:notes/x:note", ns))]
 print(f"{len(units)} {' '.join(bad)}")
 PY
-)
+) || MISSING=""
   TOTAL=${MISSING%% *}; BAD=${MISSING#* }; [ "$BAD" = "$TOTAL" ] && BAD=""
-  if [ "$TOTAL" = "0" ]; then warn "source catalog has no units"
+  # An empty result means python3 is missing or the XLIFF did not parse — never a pass.
+  if ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then fail "could not read units from $CATALOG (python3 missing or invalid XML)"
+  elif [ "$TOTAL" = "0" ]; then warn "source catalog has no units"
   elif [ -z "$BAD" ]; then pass "all $TOTAL units carry a description"
   else fail "units without a description: $BAD"; fi
 fi
@@ -74,7 +76,8 @@ done
 if npm run --silent build >/dev/null 2>&1; then pass "npm run build exited 0"; else fail "npm run build failed"; fi
 
 # 6. main.ts: translations loaded, app imported dynamically, never statically.
-if grep -nE "^[[:space:]]*import[[:space:]].*['\"]\./app/" src/main.ts >/dev/null 2>&1; then
+# Keyed on `from './app/…'` so a multi-line static import is caught; import('./app/…') never uses `from`.
+if grep -nE "from[[:space:]]*['\"]\./app/|^[[:space:]]*import[[:space:]]*['\"]\./app/" src/main.ts >/dev/null 2>&1; then
   fail "src/main.ts statically imports from ./app/ — that code evaluates \$localize before translations load"
 else pass "src/main.ts has no static ./app/ import"; fi
 grep -q 'loadTranslations(' src/main.ts && pass "src/main.ts calls loadTranslations()" || fail "src/main.ts never calls loadTranslations()"

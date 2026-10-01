@@ -58,7 +58,10 @@ excluding tests, stories, configs, and `.d.ts`.
   (consent as for Lingui), else the grep scan above adapted to `.vue` templates.
 - **Angular (`@angular/localize`) — tuned grep scan.** No maintained lint rule flags
   unmarked Angular template text, so scan `src/**/*.html` (excluding `src/index.html`) for
-  text nodes `>[^<{]*[A-Za-z][^<]*<` on lines whose element carries no `i18n` attribute, and
+  text nodes on lines whose element carries no `i18n` attribute — delete every `{{ … }}`
+  interpolation from the line first, then match `>[^<]*[A-Za-z][^<]*<` (so
+  `<p>{{ count }} items</p>` is caught), and also flag a line holding only text (no `<`, `>`
+  or `{{`) between tags, which is how Prettier lays out long text nodes — and
   for `placeholder=|title=|aria-label=|alt=|label=|text=|header=|message=|cancel-text=|ok-text=`
   with a literal value and no matching `i18n-<attr>` on the same element. Scan `src/**/*.ts`
   for string literals passed as `header:`, `subHeader:`, `message:` or `text:` inside an

@@ -24,7 +24,7 @@ The same steps cover Ionic Angular (standalone or NgModule), Angular + Capacitor
 | Step | Risk | Notes |
 |------|------|-------|
 | 1. Detect | Read-only | |
-| 2. `ng add @angular/localize` (`ng_add_localize`) | **Modifies existing files** | `package.json`, lockfile, `angular.json` polyfills, `tsconfig*.json` types |
+| 2. `ng add @angular/localize` (`ng_add_localize`) | **Modifies existing files** | `package.json`, lockfile, `angular.json` polyfills, `tsconfig*.json` types. Run by the orchestrator on the main thread (`SKILL.md §2.0`); the subagent verifies |
 | 3. `angular.json` i18n + extract options (`create_config`) | **Modifies existing file** | |
 | 4. Converter script + package scripts (`build_tool_integration`) | Additive + **modifies `package.json`** | |
 | 5. `main.ts` boot (`provider_wiring`) | **Modifies existing file** | Rewrites static `./app/` imports to `import()` |
@@ -100,7 +100,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 
 Read the project. Every check below states its outcome; a STOP halts the setup with the quoted message.
 
-- **Application project.** Read `angular.json` and list the projects with `"projectType": "application"`. **If there is more than one, write `status: "needs_decision"`** with:
+- **Application project.** `decisions.setup.angularProject` set (`SKILL.md §1.7` records it, and §2.0 already ran `ng add` against it) → use it. Otherwise read `angular.json` and list the projects with `"projectType": "application"`. **If there is more than one, write `status: "needs_decision"`** with:
 
   ```json
   { "step": "angular_project",
@@ -122,13 +122,13 @@ Read the project. Every check below states its outcome; a STOP halts the setup w
       "options": ["switch_to_runtime", "stop"] }
     ```
     On `switch_to_runtime`: remove every `"localize"` build option and the `i18n.locales` map (keep `i18n.sourceLocale`); the target files it pointed at are reused as-is if they sit in `src/locale/` as `messages.<locale>.xlf`, otherwise move them there. On `stop`: stop.
-  - **Unguided:** stop this step with that explanation. Do not switch build models without a human decision.
+  - **Unguided:** **STOP** — halt the setup with that explanation and do not go on to Step 2; every later step would layer runtime loading on top of the per-locale build. Switching build models needs a human decision.
 
 - **Bootstrap style.** `src/main.ts` calls `bootstrapApplication(` → `standalone`; `bootstrapModule(` → `ngmodule`. Record it — it is the `bootstrap` condition in Step 10 and selects the Step 5 branch. Note whether the project has `src/app/app.config.ts` and which names the original `main.ts` imports from `./app/…`.
 
-- **Ionic.** `ionic.config.json` exists, or detection `ionic === true`. Selects the Ionic switcher (Step 6) and the Ionic CLI hooks (Step 4). Note the Ionic major: Ionic 9 exports standalone components from `@ionic/angular`; Ionic 8 from `@ionic/angular/standalone`.
+- **Ionic.** `@ionic/angular` is in `package.json`. Selects the Ionic switcher (Step 6) and the `ionic` rules condition (Step 10). The Ionic CLI hooks (Step 4) are added when this holds **or** `ionic.config.json` exists. Never key the switcher on any `@ionic/*` package — `@ionic/pwa-elements` ships in plain Capacitor apps, and the Ionic switcher imports `@ionic/angular`. Note the Ionic major: Ionic 9 exports standalone components from `@ionic/angular`; Ionic 8 from `@ionic/angular/standalone`.
 
-- **Capacitor.** `capacitor.config.{ts,json}` exists → read `webDir` and confirm it equals the build output (`outputPath` when it is a string; `outputPath.base` joined with `outputPath.browser` when it is an object — the Ionic starter uses `{ "base": "www", "browser": "" }`). A mismatch is a **warning to surface**, not a fix to make: Capacitor would copy a stale or empty directory.
+- **Capacitor.** `capacitor.config.{ts,json}` exists → read `webDir` and confirm it equals the build output (`<outputPath>/browser` when it is a string — the application builder writes browser files to a `browser/` subfolder unless told otherwise; `outputPath.base` joined with `outputPath.browser` when it is an object, with `browser` defaulting to `browser` when absent — the Ionic starter uses `{ "base": "www", "browser": "" }`). A mismatch is a **warning to surface**, not a fix to make: Capacitor would copy a stale or empty directory.
 
 - **Static-assets dir.** Read `<project>.architect.build.options.assets`:
   - an entry with `"input": "public"` (the Angular 17+ default) → `<assetsDir>` = `public`, `<fetchPrefix>` = `i18n/` — the runtime JSON is written to `public/i18n/` and served at `i18n/<locale>.json`;
@@ -148,10 +148,12 @@ If no blockers were found, proceed to the **Setup Mode** prompt before continuin
 ## Step 2: Install `@angular/localize` (`ng_add_localize`)
 
 ```bash
-npx ng add '@angular/localize@^<angular-major>' --skip-confirmation --use-at-runtime
+npx ng add '@angular/localize@^<angular-major>' --skip-confirmation --use-at-runtime --project <project>
 ```
 
-`<angular-major>` is the major of detection `version` (`22.2` → `^22`). With pnpm, Yarn or Bun, run the same command through `pnpm exec`, `yarn` or `bunx`.
+**Under `globalize-guide` the orchestrator has already run this on the main thread** (`SKILL.md §2.0`), so the install and its lockfile change stay outside the subagent. The subagent does not re-run it: it confirms the edits below and adds whichever are missing. Run the command only when this reference is followed on its own, with no orchestrator.
+
+`<angular-major>` is the major of detection `version` (`22.2` → `^22`); `<project>` is the Step 1 project. With pnpm, Yarn or Bun, run the same command through `pnpm exec`, `yarn` or `bunx`.
 
 - `--use-at-runtime` puts the package in `dependencies` instead of `devDependencies`. Runtime `loadTranslations()` imports it in the browser bundle, so it must be a runtime dependency.
 - `ng add` adds `@angular/localize/init` to the build (and test) target's `polyfills` in `angular.json`, `@angular/localize` to `compilerOptions.types` in `tsconfig.app.json` (and `tsconfig.spec.json`), and a `/// <reference types="@angular/localize" />` line at the top of `src/main.ts`. **Confirm the polyfill and the types entry after it runs and add them if missing** — `$localize` is a global declared by those types; without them every component using it fails to typecheck.
@@ -406,7 +408,7 @@ How to apply it to the project's own `main.ts`:
 - **Convert every static `./app/…` import** the original `main.ts` had into the destructured `Promise.all([import(…)])`, keeping the original names — `AppComponent` from `./app/app.component` on Ionic and older projects, `App` from `./app/app` on Angular 20+ `ng new`; `routes` from `./app/app.routes` when the providers are inline. A static import evaluates every module-level `$localize` in that module graph **before** `loadTranslations()` runs, and that text stays in the source language with no error. Imports from packages (`@ionic/angular`, `@angular/router`, `@angular/common/http`) stay static.
 - **Inline providers** (the Ionic starter's shape — `bootstrapApplication(AppComponent, { providers: [...] })` with no `app.config.ts`): keep them inline and append `{ provide: LOCALE_ID, useValue: locale }` to that array. Only when the project has `app.config.ts` spread `appConfig` as shown.
 - **A failed fetch** (target file not translated yet, offline dev server) falls back to the source locale rather than blocking boot. `$localize.locale` is set to the locale actually loaded, which is what `currentLanguage()` and `formatLocale()` read.
-- **Already applied:** `loadTranslations(` is present in `src/main.ts` and it has no static `./app/` import → skip.
+- **Already applied:** `loadTranslations(` is present in `src/main.ts` and it has no static `./app/` import → skip the rewrite, but **reconcile the locale list**: add every locale in `decisions.md` that is missing from `LOCALES` in `src/locale-config.ts`, and give each new non-`en` locale its `@angular/common/locales/…` import and `LOCALE_DATA` entry in `main.ts`. A re-run that adds a target locale otherwise never makes it selectable.
 
 ### NgModule branch (`bootstrapModule`)
 
@@ -417,12 +419,12 @@ Same top half (imports, `LOCALE_DATA`, `storedLocale`, `loadLocale`, and the fir
     import('@angular/platform-browser'),
     import('./app/app.module'),
   ])
-  await platformBrowser().bootstrapModule(AppModule, {
-    providers: [{ provide: LOCALE_ID, useValue: locale }],
-  })
+  await platformBrowser([{ provide: LOCALE_ID, useValue: locale }]).bootstrapModule(AppModule)
 ```
 
-Keep the module path and the platform function the project already uses: Angular 20+ `ng new --no-standalone` names the file `app-module.ts`, so the import is `import('./app/app-module')`; older projects use `./app/app.module` and `platformBrowserDynamic` from `@angular/platform-browser-dynamic`. `bootstrapModule`'s options object takes `providers`, which is how `LOCALE_ID` reaches an NgModule app.
+Keep the module path and the platform function the project already uses: Angular 20+ `ng new --no-standalone` names the file `app-module.ts`, so the import is `import('./app/app-module')`; older projects use `./app/app.module` and `platformBrowserDynamic` from `@angular/platform-browser-dynamic` (it takes the same providers array).
+
+**`LOCALE_ID` goes to the platform, not to `bootstrapModule`.** `bootstrapModule`'s second argument is compiler options, and its `providers` are compiler providers: an AOT build skips that compile step, so a `LOCALE_ID` passed there never reaches the app. Root `LOCALE_ID` resolves from the parent (platform) injector first, then falls back to `$localize.locale` — so the platform provider and the `$localize.locale` line above set the same value. **A module that provides `LOCALE_ID` itself overrides both:** grep `src/app/` for `provide: LOCALE_ID`. A hardcoded one whose value is the source locale is removed (guided mode confirms the edit first). Any other value → write `status: "needs_decision"` — `{ "step": "angular_hardcoded_locale_id", "question": "<file> hardcodes LOCALE_ID to '<value>'. Remove it so the locale follows the loaded language?", "options": ["remove", "stop"] }` — in both modes, because the app may rely on that locale for formatting today.
 
 ---
 
@@ -447,13 +449,14 @@ export const availableLanguages: ReadonlyArray<{ code: AppLocale; name: string }
 
 /** $localize is evaluated once per page load, so a language change is a reload. */
 export function setLanguage(code: AppLocale): void {
-  if (code === currentLanguage()) return
+  // Store even when the page already shows `code`: after a failed load the page shows the source
+  // locale while storage still holds the failed one, and choosing the source must replace it.
   try {
     localStorage.setItem(LOCALE_STORAGE_KEY, code)
   } catch {
     return // storage blocked: a reload would come back in the same language
   }
-  location.reload()
+  if (code !== currentLanguage()) location.reload()
 }
 ```
 
@@ -488,7 +491,7 @@ export class LanguageSwitcherComponent {
 }
 ```
 
-Ionic 9 exports standalone components from `@ionic/angular`; the `@ionic/angular/standalone` path is Ionic 8's and does not resolve on 9. On Ionic 8, import `IonSelect` / `IonSelectOption` from `@ionic/angular/standalone`.
+Ionic 9 exports standalone components from `@ionic/angular`; the `@ionic/angular/standalone` path is Ionic 8's and does not resolve on 9. On Ionic 8, import `IonSelect` / `IonSelectOption` from `@ionic/angular/standalone` — **unless the app is NgModule-based on `IonicModule.forRoot()`**: Ionic does not support mixing the module and standalone builds, so there set `imports: [IonicModule]` (from `@ionic/angular`) instead.
 
 **Plain Angular switcher** (no Ionic): the same class and `standalone: true`, with this template and `imports: []`:
 
@@ -726,7 +729,7 @@ Resolve every key listed in the template frontmatter's `conditions` and write th
 
 | Condition | Where to read it |
 |---|---|
-| `ionic` | `"true"` when `ionic.config.json` exists or any `@ionic/*` package is in `package.json`; else `"false"`. |
+| `ionic` | `"true"` when `@ionic/angular` is in `package.json`; else `"false"` (the same predicate as Step 1 — not any `@ionic/*` package). |
 | `bootstrap` | `"standalone"` when `src/main.ts` calls `bootstrapApplication(`; `"ngmodule"` when it calls `bootstrapModule(`. Read the file Step 5 wrote. |
 
 ### 3. Eliminate branches, then resolve the surviving `values`
@@ -836,6 +839,8 @@ jobs:
       - run: git diff --exit-code src/locale/messages.<sourceLocale>.xlf
 ```
 
+The snippet is for npm. On pnpm, Yarn or Bun, swap the cache key and the install line for that manager (`pnpm/action-setup` + `pnpm install --frozen-lockfile`, `yarn install --immutable`, `oven-sh/setup-bun` + `bun install --frozen-lockfile`) and run the script through it — `npm ci` fails outright without a `package-lock.json`.
+
 ---
 
 ## Verification
@@ -846,10 +851,10 @@ What `build_verification` (Phase 2) runs, and what the Phase 3 verify worker re-
 npm run i18n:extract     # exit 0; no line containing "duplicate" (case-insensitive)
 npm run i18n:compile     # exit 0
 npm run build            # exit 0 — runs the compile first, then ng build (typecheck included)
-grep -nE "^\s*import\s.*['\"]\./app/" src/main.ts   # must print nothing
+grep -nE "from[[:space:]]*['\"]\./app/|^[[:space:]]*import[[:space:]]*['\"]\./app/" src/main.ts   # must print nothing
 ```
 
-A hit from the last command means some module that evaluates `$localize` loads before `loadTranslations()`; its text silently stays in the source language. Fix it by moving that import into the `Promise.all([import(…)])` inside `main()`.
+The pattern keys on `from './app/…'` rather than on the `import` keyword, so a static import Prettier wrapped over several lines (`} from './app/app.component'` on the last line) is still caught; `import('./app/…')` never uses `from`, so the dynamic imports pass. A hit means some module that evaluates `$localize` loads before `loadTranslations()`; its text silently stays in the source language. Fix it by moving that import into the `Promise.all([import(…)])` inside `main()`.
 
 ---
 
