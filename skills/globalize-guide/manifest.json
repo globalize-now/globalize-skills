@@ -519,8 +519,8 @@
       "reason": "Create React App is no longer supported by this skill. Migrate to Vite or Next.js."
     },
     {
-      "match": { "language": "js-ts", "react": false, "vue": false, "svelte": false },
-      "reason": "These skills currently target React-based, Vue-based, and Svelte-based projects only."
+      "match": { "language": "js-ts", "react": false, "vue": false, "svelte": false, "angular": false },
+      "reason": "These skills currently target React-based, Vue-based, Svelte-based, and Angular-based projects only."
     }
   ]
 }

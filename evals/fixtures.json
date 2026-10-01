@@ -85,6 +85,15 @@
     "expectedDetection": "evals/expectations/detection/webext-mv2.json",
     "expectedHardStop": "evals/expectations/hard-stop/webext-mv2.json"
   },
+  "angular-ssr": {
+    "category": "hard-stop",
+    "type": "local",
+    "path": "fixtures/hard-stop/angular-ssr",
+    "library": null,
+    "variant": null,
+    "expectedDetection": "evals/expectations/detection/angular-ssr.json",
+    "expectedHardStop": "evals/expectations/hard-stop/angular-ssr.json"
+  },
   "shadcn-admin": {
     "category": "positive",
     "type": "git",

@@ -91,6 +91,9 @@
         "svelte": {
           "type": "boolean"
         },
+        "angular": {
+          "type": "boolean"
+        },
         "buildSystem": {
           "type": "string"
         },

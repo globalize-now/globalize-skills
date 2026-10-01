@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "projects": {
+    "news-portal": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist/news-portal",
+            "index": "src/index.html",
+            "browser": "src/main.ts",
+            "server": "src/main.server.ts",
+            "ssr": { "entry": "src/server.ts" },
+            "outputMode": "server",
+            "tsConfig": "tsconfig.json"
+          }
+        }
+      }
+    }
+  }
+}
