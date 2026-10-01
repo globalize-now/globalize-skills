@@ -152,7 +152,7 @@ npx ng add '@angular/localize@^<angular-major>' --skip-confirmation --use-at-run
 `<angular-major>` is the major of detection `version` (`22.2` → `^22`). With pnpm, Yarn or Bun, run the same command through `pnpm exec`, `yarn` or `bunx`.
 
 - `--use-at-runtime` puts the package in `dependencies` instead of `devDependencies`. Runtime `loadTranslations()` imports it in the browser bundle, so it must be a runtime dependency.
-- `ng add` adds `@angular/localize/init` to the build (and test) target's `polyfills` in `angular.json`, and `@angular/localize` to `compilerOptions.types` in `tsconfig.app.json` (and `tsconfig.spec.json`). **Confirm both after it runs and add them if missing** — `$localize` is a global declared by those types; without them every component using it fails to typecheck.
+- `ng add` adds `@angular/localize/init` to the build (and test) target's `polyfills` in `angular.json`, `@angular/localize` to `compilerOptions.types` in `tsconfig.app.json` (and `tsconfig.spec.json`), and a `/// <reference types="@angular/localize" />` line at the top of `src/main.ts`. **Confirm the polyfill and the types entry after it runs and add them if missing** — `$localize` is a global declared by those types; without them every component using it fails to typecheck.
 - **Already applied:** `@angular/localize` is in `dependencies` at the same major as `@angular/core`, and the polyfill is present → skip.
 
 **Troubleshooting — the computed pin.** This repo pins every install to a fixed SemVer major. This one is computed from the project instead, because `@angular/localize`'s major must equal `@angular/core`'s: Angular's packages are released in lockstep, and `@angular/localize/tools` (used by the Step 4 converter) is not semver-guaranteed across majors. It is still a caret range. If `@angular/localize` already sits in `devDependencies` at the wrong major, `ng add` at the right major replaces it. Keep it on the same major whenever `ng update` moves `@angular/core`.
@@ -178,7 +178,7 @@ In `angular.json`, on `projects.<project>` (a sibling of `architect`), and on th
 }
 ```
 
-Keep the existing `builder` value (`@angular/build:extract-i18n` or `@angular-devkit/build-angular:extract-i18n`); only set `options`. If the project has no `extract-i18n` target, add one with the builder that matches the build target's package.
+Keep the existing `builder` value (`@angular/build:extract-i18n` or `@angular-devkit/build-angular:extract-i18n`); only set `options`. If the project has no `extract-i18n` target, add one with the builder that matches the build target's package (`@angular/build:extract-i18n` next to `@angular/build:application`) — Angular 20+ `ng new` projects have none.
 
 - **Do not add `i18n.locales` and do not set `"localize"`** — either one switches the build to one output per locale (Step 1 explains why that breaks Capacitor). Target locales are listed in `src/locale-config.ts` (Step 5), not in `angular.json`.
 - **Why `xlf2`:** XLIFF 2.0 carries each message's description as `<note category="description">`, which reaches the translator as the comment. Angular's `json` extraction format drops descriptions.
@@ -399,6 +399,7 @@ main().catch((err) => console.error(err))
 
 How to apply it to the project's own `main.ts`:
 
+- **Keep the `/// <reference types="@angular/localize" />` line** that `ng add` put at the top of the file (Step 2); it stays line 1, above the imports.
 - **`<fetchPrefix>`** is `i18n/` or `assets/i18n/` from Step 1. It is relative on purpose, so it resolves under Capacitor's `https://localhost` / `capacitor://localhost` origin and under any `<base href>`.
 - **Convert every static `./app/…` import** the original `main.ts` had into the destructured `Promise.all([import(…)])`, keeping the original names — `AppComponent` from `./app/app.component` on Ionic and older projects, `App` from `./app/app` on Angular 20+ `ng new`; `routes` from `./app/app.routes` when the providers are inline. A static import evaluates every module-level `$localize` in that module graph **before** `loadTranslations()` runs, and that text stays in the source language with no error. Imports from packages (`@ionic/angular`, `@angular/router`, `@angular/common/http`) stay static.
 - **Inline providers** (the Ionic starter's shape — `bootstrapApplication(AppComponent, { providers: [...] })` with no `app.config.ts`): keep them inline and append `{ provide: LOCALE_ID, useValue: locale }` to that array. Only when the project has `app.config.ts` spread `appConfig` as shown.
@@ -419,7 +420,7 @@ Same top half (imports, `LOCALE_DATA`, `storedLocale`, `loadLocale`, and the fir
   })
 ```
 
-Keep whichever platform function the project already uses (`platformBrowserDynamic` from `@angular/platform-browser-dynamic` on older projects). `bootstrapModule`'s options object takes `providers`, which is how `LOCALE_ID` reaches an NgModule app.
+Keep the module path and the platform function the project already uses: Angular 20+ `ng new --no-standalone` names the file `app-module.ts`, so the import is `import('./app/app-module')`; older projects use `./app/app.module` and `platformBrowserDynamic` from `@angular/platform-browser-dynamic`. `bootstrapModule`'s options object takes `providers`, which is how `LOCALE_ID` reaches an NgModule app.
 
 ---
 
