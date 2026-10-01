@@ -1,0 +1,8 @@
+{
+  "variant": "vite-vue-i18n",
+  "library": "vue-i18n",
+  "phasesIncluded": ["setup"],
+  "phase2StepsContain": ["generate_format_helpers", "generate_coding_rules", "install_coding_rules"],
+  "phase2StepsAbsent": ["extract_compile"],
+  "decisionsSections": { "Routing strategy": "^None" }
+}

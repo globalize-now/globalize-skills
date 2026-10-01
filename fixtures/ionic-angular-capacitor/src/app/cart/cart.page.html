@@ -1,0 +1,19 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-back-button defaultHref="/"></ion-back-button></ion-buttons>
+    <ion-title>Your cart</ion-title>
+  </ion-toolbar>
+</ion-header>
+<ion-content>
+  <p>{{ itemCount }} items</p>
+  <ion-list>
+    @for (line of lines; track line.name) {
+      <ion-item>
+        <ion-label>{{ line.name }} — {{ formatPrice(line.price) }}</ion-label>
+        <ion-button fill="clear" (click)="remove(line)">Remove</ion-button>
+      </ion-item>
+    }
+  </ion-list>
+  <p>Total: {{ formatPrice(total) }}</p>
+  <ion-button expand="block">Check out</ion-button>
+</ion-content>

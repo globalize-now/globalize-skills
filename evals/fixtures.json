@@ -85,6 +85,24 @@
     "expectedDetection": "evals/expectations/detection/webext-mv2.json",
     "expectedHardStop": "evals/expectations/hard-stop/webext-mv2.json"
   },
+  "ionic-angular-capacitor": {
+    "category": "positive", "type": "local", "path": "fixtures/ionic-angular-capacitor",
+    "library": "angular-localize", "variant": "angular-localize",
+    "expectedDetection": "evals/expectations/detection/ionic-angular-capacitor.json",
+    "expectedPlan": "evals/expectations/plan/ionic-angular-capacitor.json"
+  },
+  "ionic-react-capacitor": {
+    "category": "positive", "type": "local", "path": "fixtures/ionic-react-capacitor",
+    "library": "lingui", "variant": "vite-babel-lingui",
+    "expectedDetection": "evals/expectations/detection/ionic-react-capacitor.json",
+    "expectedPlan": "evals/expectations/plan/ionic-react-capacitor.json"
+  },
+  "ionic-vue-capacitor": {
+    "category": "positive", "type": "local", "path": "fixtures/ionic-vue-capacitor",
+    "library": "vue-i18n", "variant": "vite-vue-i18n",
+    "expectedDetection": "evals/expectations/detection/ionic-vue-capacitor.json",
+    "expectedPlan": "evals/expectations/plan/ionic-vue-capacitor.json"
+  },
   "angular-ssr": {
     "category": "hard-stop",
     "type": "local",

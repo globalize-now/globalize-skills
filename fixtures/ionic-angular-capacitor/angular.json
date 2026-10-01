@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "projects": {
+    "app": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": { "base": "www", "browser": "" },
+            "index": "src/index.html",
+            "browser": "src/main.ts",
+            "polyfills": [],
+            "tsConfig": "tsconfig.app.json",
+            "assets": [{ "glob": "**/*", "input": "public" }]
+          }
+        },
+        "serve": { "builder": "@angular/build:dev-server", "options": { "buildTarget": "app:build" } },
+        "extract-i18n": { "builder": "@angular/build:extract-i18n" }
+      }
+    }
+  }
+}

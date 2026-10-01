@@ -176,6 +176,27 @@ else
       fi
     done <<< "$ABSENT_STEPS"
 
+    # decisionsSections: heading -> ERE that the section's first non-empty line
+    # must match. Routing has no plan step id, so "no URL-prefix routing" is
+    # asserted against decisions.md instead.
+    DECISIONS_MD="$WORKDIR/.globalize/decisions.md"
+    SECTIONS=$(jq -r '.decisionsSections // {} | to_entries[] | "\(.key)\t\(.value)"' "$EXPECTED_PLAN_FILE")
+    while IFS=$'\t' read -r HEADING PATTERN; do
+      [ -z "$HEADING" ] && continue
+      if [ ! -f "$DECISIONS_MD" ]; then
+        fail "decisions.md missing — cannot check section '$HEADING'"
+        continue
+      fi
+      BODY=$(awk -v h="## $HEADING" '$0 == h {f = 1; next} f && /^## / {exit} f && NF {print; exit}' "$DECISIONS_MD")
+      if [ -z "$BODY" ]; then
+        fail "decisions.md has no '## $HEADING' section (or it is empty)"
+      elif printf '%s\n' "$BODY" | grep -qE "$PATTERN"; then
+        pass "decisions.md '$HEADING' = '$BODY' matches /$PATTERN/"
+      else
+        fail "decisions.md '$HEADING' = '$BODY' does not match /$PATTERN/"
+      fi
+    done <<< "$SECTIONS"
+
     # Informational: phasesIncluded — light check that "Phase 2" or "setup" appears
     PHASES=$(jq -r '.phasesIncluded // [] | .[]' "$EXPECTED_PLAN_FILE")
     while IFS= read -r PHASE; do
