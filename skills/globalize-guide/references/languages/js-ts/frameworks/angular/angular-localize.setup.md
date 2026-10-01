@@ -110,6 +110,8 @@ Read the project. Every check below states its outcome; a STOP halts the setup w
 
   This applies in guided and unguided mode alike — there is no safe default, and editing the first project would localize the wrong app. Exactly one → use it. It is called `<project>` below.
 
+  **`<project>` must be the workspace-root application** (`"root": ""`, `"sourceRoot": "src"`). Every path in this file — `src/main.ts`, `src/locale/`, `src/app/i18n/`, `public/` — and Phase 1's candidate-file scan assume it. If the chosen project lives elsewhere (`projects/admin/src`), STOP: "This setup currently localizes the application at the workspace root (`src/`). `{project}` lives in `{sourceRoot}`, which isn't supported yet."
+
 - **Defensive §1.2 re-check.** `<project>.architect.build.builder` must be `@angular/build:application` or `@angular-devkit/build-angular:application`; `@angular/ssr` must be absent; no `@analogjs/*` package; `@angular/core` major ≥ 18 (detection `version`). Any failure → STOP with the matching `SKILL.md §1.2` message.
 
 - **Existing compile-time i18n.** If `<project>.i18n.locales` is set, or any build option or configuration under `<project>.architect.build` sets `"localize"` (to `true` or to an array), the project already builds one output per locale. **Do not layer runtime loading on top** — that build writes `www/<locale>/index.html`, which Capacitor cannot load, and the two models fight over the same `$localize` global.
@@ -276,13 +278,13 @@ What it does on each input:
 
 `@angular/localize/tools` imports `@angular/compiler-cli`, which every Angular CLI project already has as a devDependency.
 
-Then the package scripts. Add `i18n:extract` and `i18n:compile`, and **chain the compile into the existing `start` and `build` commands** — keep whatever those commands already were and prefix them:
+Then the package scripts. Add `i18n:extract` (naming `<project>`, so extraction is unambiguous in a workspace with several projects) and `i18n:compile`, and **chain the compile into the existing `start` and `build` commands** — keep whatever those commands already were and prefix them:
 
 ```json
 "scripts": {
   "start": "node scripts/xliff-to-json.mjs && ng serve",
   "build": "node scripts/xliff-to-json.mjs && ng build",
-  "i18n:extract": "ng extract-i18n",
+  "i18n:extract": "ng extract-i18n <project>",
   "i18n:compile": "node scripts/xliff-to-json.mjs",
   "ionic:serve:before": "node scripts/xliff-to-json.mjs",
   "ionic:build:before": "node scripts/xliff-to-json.mjs"
@@ -465,6 +467,7 @@ import { availableLanguages, currentLanguage, setLanguage } from './locale'
 
 @Component({
   selector: 'app-language-switcher',
+  standalone: true, // the default only from Angular 19; required on 18
   imports: [IonSelect, IonSelectOption],
   template: `
     <ion-select
@@ -487,7 +490,7 @@ export class LanguageSwitcherComponent {
 
 Ionic 9 exports standalone components from `@ionic/angular`; the `@ionic/angular/standalone` path is Ionic 8's and does not resolve on 9. On Ionic 8, import `IonSelect` / `IonSelectOption` from `@ionic/angular/standalone`.
 
-**Plain Angular switcher** (no Ionic): the same class, with this template and `imports: []`:
+**Plain Angular switcher** (no Ionic): the same class and `standalone: true`, with this template and `imports: []`:
 
 ```html
 <label i18n="Label of the language picker@@settings.language.label" for="language">Language</label>

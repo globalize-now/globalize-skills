@@ -114,6 +114,7 @@ Format every user-visible value through `<<formatModule>>`. Never use `toFixed`,
 - Add `FmtPipe` from `<<formatModule>>` to the `imports` of the NgModule that declares the component (it is a standalone pipe), or to the component's own `imports` if the component is standalone.
 <!-- /if -->
 - TypeScript imports `money`, `number`, `percent`, `compact`, `unit`, `date`, `time`, `dateTime`, `relativeTime`, `list` from `<<formatModule>>`.
+- `<<formatModule>>` is the module's location. Unless it starts with a path alias (`@/`, `~/`), import it with a path relative to the importing file — `src/app/cart/cart.page.ts` imports `../i18n/format`. A bare `src/...` import does not resolve.
 - `percent()` takes a ratio: `percent(0.42)` renders 42 %.
 - Format the value, then interpolate: `` $localize`:Order total line@@checkout.total.label:Total: ${money(total)}:total:` ``. Never split a sentence to isolate a number.
 - A shape the ten functions lack becomes a new preset inside `<<formatModule>>`, never an inline options object.
