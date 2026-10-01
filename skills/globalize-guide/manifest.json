@@ -317,6 +317,28 @@
       }
     },
     {
+      "variant": "angular-localize",
+      "match": { "framework": "angular", "library": "angular-localize" },
+      "supportLevel": "experimental",
+      "appliesAlsoTo": [
+        "Ionic Angular (standalone or NgModule)",
+        "Angular + Capacitor or Cordova",
+        "Plain Angular CLI application (client-only)"
+      ],
+      "packages": {
+        "runtime": [],
+        "dev": []
+      },
+      "references": {
+        "setup": ["references/languages/js-ts/frameworks/angular/angular-localize.setup.md"],
+        "convert": [
+          "references/languages/js-ts/frameworks/angular/angular-localize.convert.md",
+          "references/languages/js-ts/convert.format-pass.md"
+        ],
+        "rulesTemplate": ["references/languages/js-ts/libraries/angular-localize/rules.template.md"]
+      }
+    },
+    {
       "variant": "sveltekit-paraglide",
       "match": { "framework": "sveltekit", "library": "paraglide" },
       "supportLevel": "stable",
