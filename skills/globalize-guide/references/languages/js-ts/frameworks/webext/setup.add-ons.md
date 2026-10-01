@@ -332,6 +332,9 @@ on:
       - 'public/_locales/**'
       - '_locales/**'
       - 'scripts/**'
+      - 'lingui.config.*'
+      - 'package.json'
+      - '<lockfile>'
       - '.github/workflows/i18n.yml'
 
 jobs:
@@ -350,6 +353,10 @@ jobs:
 ```
 
 Drop the build step on a build-less native extension and point the script at `.` instead of `dist`.
+Replace `<lockfile>` with the one the project commits (`package-lock.json`, `pnpm-lock.yaml`,
+`yarn.lock`, `bun.lock` / `bun.lockb`). `package.json` and the lockfile hold the check scripts and the
+`@lingui/*` / `web-ext` versions, so a PR that changes only those still runs the workflow. Drop
+`lingui.config.*` on `webext-native-messages`.
 
 ---
 
