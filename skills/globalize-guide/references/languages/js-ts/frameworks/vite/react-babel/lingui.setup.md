@@ -102,6 +102,8 @@ A project with `@react-router/dev` is React Router **framework mode** and does n
 
 ### Locale Routing Strategy
 
+**Capacitor apps skip this question.** When `.globalize/detection.json` has `hybrid === "capacitor"` (or `.globalize/decisions.md` records `Routing strategy: None`), do not present the choice — a Capacitor app runs in a WebView with no URL bar, so a locale in the path is invisible and unshareable. Use **Option 3** (the single-catalog setup in *Single catalog (plain SPA without a router)*): the locale is a stored preference (`localStorage`) defaulting to the device language (`navigator.language`). The route tree — including Ionic's `IonReactRouter` — is left untouched.
+
 **Unless the project has no router at all, STOP and present this to the user:**
 
 > Choose a locale routing strategy:

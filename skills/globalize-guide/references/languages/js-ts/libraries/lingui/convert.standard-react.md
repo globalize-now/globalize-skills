@@ -162,6 +162,30 @@ function SaveButton() {
 
 ---
 
+## Ionic components (Ionic React)
+
+Ionic text props take plain strings, so use `t` from `useLingui()`, not `<Trans>`:
+
+```tsx
+const { t } = useLingui()
+<IonInput label={t`Email`} placeholder={t`you@example.com`} />
+<IonBackButton text={t`Back`} defaultHref="/" />
+```
+
+Overlay hooks and controllers take option objects — wrap every user-visible field:
+
+```tsx
+const [presentAlert] = useIonAlert()
+const [presentToast] = useIonToast()
+presentAlert({
+  header: t`Remove item?`,
+  buttons: [{ text: t`Cancel`, role: 'cancel' }, { text: t`Remove`, role: 'destructive' }],
+})
+presentToast({ message: t`Item removed`, duration: 1500 })
+```
+
+Never set `backButtonText` in `setupIonicReact({...})` — it is one untranslated string.
+
 ## Numbers, currencies, and dates
 
 **Call the project's formatters module.** Phase 2 created it (`generate_format_helpers`) and
