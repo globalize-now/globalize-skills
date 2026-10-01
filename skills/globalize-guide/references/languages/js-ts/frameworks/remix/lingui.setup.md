@@ -450,7 +450,7 @@ Routes that don't render any translatable text don't need the loader — only ro
 
 ## Catalog Bootstrapping
 
-**Bootstrap before the first `npx lingui extract --clean` run.** The route loaders import `../locales/<locale>/messages.ts` through a template-literal specifier, and Vite resolves that specifier by globbing at build time. On a fresh project no compiled catalog exists yet — and **nothing fails loudly when it is missing**: Vite bakes an empty import map into the server bundle, `npm run build` exits 0, and every loader then throws `Unknown variable dynamic import: ../locales/en/messages.ts` at request time. `tsc --noEmit` does not catch it either (TypeScript does not resolve template-literal import specifiers). Seed an empty stub per locale before the first extract, so that any build or dev server that runs before the first `lingui compile` produces a working, untranslated bundle instead of a green build that 500s:
+**Bootstrap before the first `npx lingui compile` run.** The route loaders import `../locales/<locale>/messages.ts` through a template-literal specifier, and Vite resolves that specifier by globbing at build time. On a fresh project no compiled catalog exists yet — and **nothing fails loudly when it is missing**: Vite bakes an empty import map into the server bundle, `npm run build` exits 0, and every loader then throws `Unknown variable dynamic import: ../locales/en/messages.ts` at request time. `tsc --noEmit` does not catch it either (TypeScript does not resolve template-literal import specifiers). Seed an empty stub per locale before the first compile, so that any build or dev server that runs before the first `lingui compile` produces a working, untranslated bundle instead of a green build that 500s:
 
 ```sh
 for loc in en de fr; do
@@ -459,7 +459,7 @@ for loc in en de fr; do
 done
 ```
 
-Replace the `en de fr` list with the project's actual locales from `decisions.md`. After the first `npx lingui extract --clean && npx lingui compile`, these stubs get overwritten with real compiled catalogs — but the file needs to exist beforehand so the route `loader`'s dynamic import resolves during the build.
+Replace the `en de fr` list with the project's actual locales from `decisions.md`. After the first `npx lingui extract --clean && npx lingui compile`, these stubs get overwritten with real compiled catalogs — but the file needs to exist beforehand so Vite's import map for the route `loader`'s dynamic import has an entry for every locale.
 
 The same step is documented in the TanStack Start setup (§5a). The Remix-specific shape is simpler because catalogs are per-locale rather than per-route, so you only seed one stub per locale rather than per route.
 
