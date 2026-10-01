@@ -678,6 +678,9 @@ npx lingui extract --clean && npx lingui compile
     for f in "app/locales/$loc/messages.po" "app/locales/$loc/messages.ts"; do
       [ -f "$f" ] || { echo "missing catalog: $f" >&2; exit 1; }
     done
+    if grep -qx 'export const messages = {}' "app/locales/$loc/messages.ts"; then
+      echo "uncompiled bootstrap stub: app/locales/$loc/messages.ts" >&2; exit 1
+    fi
   done )
 npx tsc --noEmit
 npm run build
@@ -688,7 +691,7 @@ npm run build
 - **The `grep` step** catches a macro transform that never ran, which every other step above passes. `@lingui/core/macro` and `@lingui/react/macro` ship a module whose top-level code throws *"The macro you imported from `@lingui/…/macro` is being executed outside the context of compilation"*. When the transform runs, the macro import is rewritten and that module never reaches the bundle; when it does not run, the module is bundled verbatim and the app throws on load — while `lingui extract`, `lingui compile`, `tsc --noEmit` and `npm run build` **all still exit 0**. `grep` exits 1 when it matches nothing, so the leading `!` makes a clean tree the passing case, and a match prints the offending build artefact. Nothing outside `node_modules` carries that string unless the bundler put it there, so the check needs no knowledge of your output directory.
 - **`lingui extract --clean`** reads every file under `app/` and produces `app/locales/<locale>/messages.po`. `--clean` drops obsolete entries. The first run will produce zero messages (nothing's wrapped yet) — that's expected; the build is green either way, and the catalog stubs from "Catalog Bootstrapping" are what keep the *built bundle* working until the first compile.
 - **`lingui compile`** turns the `.po` files into the `.ts` runtime modules each route imports. This must succeed before `npm run build`.
-- **The catalog loop** (use the same locale list as "Catalog Bootstrapping", from `decisions.md`) is the only step here that can see a missing catalog. `.po` proves the locale is in `lingui.config.ts` — `lingui extract` only writes catalogs for configured locales, so a locale missing from the config has a stub `.ts` and no `.po`. `.ts` proves `lingui compile` wrote a module for it. Neither `tsc` nor the build fails without them.
+- **The catalog loop** (use the same locale list as "Catalog Bootstrapping", from `decisions.md`) is the only step here that can see a missing catalog. `.po` proves the locale is in `lingui.config.ts` — `lingui extract` only writes catalogs for configured locales, so a locale missing from the config has a stub `.ts` and no `.po`. `.ts` that is no longer the one-line stub from "Catalog Bootstrapping" proves `lingui compile` wrote a module for it — the stub alone would pass a presence check, and compiled output never matches it. Neither `tsc` nor the build fails without them.
 - **`tsc --noEmit`** catches mismatched types — the most common failure here is the `Locale` union not containing a locale you listed in `lingui.config.ts`, or a route loader importing the wrong path.
 - **`npm run build`** is Remix's Vite-driven production build. Failures here usually indicate the plugin-order issue from "Build Tool Integration" — verify `remix()` comes first, `react()` with the Lingui Babel plugin comes second, and `lingui()` comes last. A *missing* Babel plugin is the case this step cannot see: the build exits 0 and the app throws on load, which is what the `grep` step above catches.
 

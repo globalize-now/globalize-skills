@@ -842,6 +842,9 @@ npx lingui compile
     for f in "app/locales/$loc/messages.po" "app/locales/$loc/messages.ts"; do
       [ -f "$f" ] || { echo "missing catalog: $f" >&2; exit 1; }
     done
+    if grep -qx 'export const messages = {}' "app/locales/$loc/messages.ts"; then
+      echo "uncompiled bootstrap stub: app/locales/$loc/messages.ts" >&2; exit 1
+    fi
   done )
 
 # 3. TypeScript check
@@ -856,7 +859,7 @@ npm run build
 
 - **The `grep` step** catches a macro transform that never ran, which every other step above passes. `@lingui/core/macro` and `@lingui/react/macro` ship a module whose top-level code throws *"The macro you imported from `@lingui/…/macro` is being executed outside the context of compilation"*. When the transform runs, the macro import is rewritten and that module never reaches the bundle; when it does not run, the module is bundled verbatim and the app throws on load — while `lingui extract`, `lingui compile`, `tsc --noEmit` and `npm run build` **all still exit 0**. `grep` exits 1 when it matches nothing, so the leading `!` makes a clean tree the passing case, and a match prints the offending build artefact. Nothing outside `node_modules` carries that string unless the bundler put it there, so the check needs no knowledge of your output directory.
 
-The compile step comes **before** `tsc --noEmit` and the build on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet. Neither later step reports that — `tsc` does not resolve the loaders' template-literal import, and the build exits 0 with an empty import map that throws `Unknown variable dynamic import` on the first request. The prefixed `build` / `typecheck` scripts do exactly this ordering for you; step 2b is what proves it happened. `.po` proves the locale is in `lingui.config.ts` (`lingui extract` only writes catalogs for configured locales, so a locale missing from the config keeps its Section 8 stub and has no `.po`); `.ts` proves `lingui compile` wrote a module for it.
+The compile step comes **before** `tsc --noEmit` and the build on purpose: the compiled catalogs are gitignored, so on a fresh clone they do not exist yet. Neither later step reports that — `tsc` does not resolve the loaders' template-literal import, and the build exits 0 with an empty import map that throws `Unknown variable dynamic import` on the first request. The prefixed `build` / `typecheck` scripts do exactly this ordering for you; step 2b is what proves it happened. `.po` proves the locale is in `lingui.config.ts` (`lingui extract` only writes catalogs for configured locales, so a locale missing from the config keeps its Section 8 stub and has no `.po`); `.ts` that is no longer the one-line Section 8 stub proves `lingui compile` wrote a module for it — the stub alone would pass a presence check, and compiled output never matches it.
 
 If `tsc --noEmit` fails with "Cannot find name 'Route'" or similar, re-run `npx react-router typegen` — the type generator is normally invoked by the dev server, but it doesn't run on a fresh clone until `npm run dev` (or `react-router dev`) has been invoked at least once.
 
