@@ -881,10 +881,11 @@ function loaderKey(msgid, ctx) {
   return ctx ? `${msgid}__ctx_${ctx}` : msgid
 }
 
-// The loader rehydrates dot-paths into a nested object. An entry whose key is a
-// dot-prefix of another cannot survive that: one of the two would be dropped.
-// The entry-set comparison below cannot see this — both entries are present in
-// every file — so check it here.
+// The loader rehydrates dot-paths into a nested object. Two entries with the same
+// loader key, or one whose key is a dot-prefix of another, cannot both survive
+// that, so the loader throws and the build fails. The entry-set comparison below
+// cannot see this — both entries are present in every file — so check it here,
+// before the build does.
 function collisions(keys) {
   const found = []
   const seen = new Set()
@@ -925,7 +926,7 @@ for (const [locale, { keys, loaderKeys }] of Object.entries(catalogs)) {
     hadIssue = true
   }
   for (const c of collisions(loaderKeys)) {
-    console.error(`[i18n] ${locale} key collision: ${c} — the PO loader would drop one of them`)
+    console.error(`[i18n] ${locale} key collision: ${c} — the PO loader will fail the build`)
     hadIssue = true
   }
 }

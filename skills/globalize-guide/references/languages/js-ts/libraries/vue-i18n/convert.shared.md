@@ -743,7 +743,7 @@ Follow the merge algorithm in `references/languages/js-ts/libraries/vue-i18n/po-
    - Otherwise, append new entries to every locale file. Source locale gets real `msgstr`; other locales get source text as placeholder. `#.` and `#:` are identical across locales.
 4. Preserve the `msgid ""` header block untouched in every file.
 5. Verify every locale file has the same `(msgid, msgctxt)` set.
-6. Verify no entry's loader key (`msgid`, or `msgid__ctx_msgctxt`) is a dot-prefix of another's. Step 4 and step 5 cannot see this — the colliding entries are present, and identical, in every file — but the `poLoader` can keep only one of them. The Step 9 CI check in `setup.shared.md` runs this check; a wrap subagent that introduces `Cart.items.empty` beside an existing `Cart.items` must rename one.
+6. Verify no two entries share a loader key (`msgid`, or `msgid__ctx_msgctxt`) and no loader key is a dot-prefix of another's. Step 4 and step 5 cannot see this — the colliding entries are present, and identical, in every file, and distinct `(msgid, msgctxt)` pairs can still mangle to the same loader key — but the `poLoader` rejects both cases and fails the build. The Step 9 CI check in `setup.shared.md` runs this check; a wrap subagent that introduces `Cart.items.empty` beside an existing `Cart.items` must rename one.
 
 #### Verification after parallel wrapping
 
