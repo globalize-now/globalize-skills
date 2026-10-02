@@ -1,0 +1,9 @@
+{
+  "match": {
+    "language": "js-ts",
+    "framework": "angular",
+    "angular": true,
+    "react": false, "vue": false, "svelte": false
+  },
+  "ignore": ["candidateFiles", "formatCandidateFiles", "routeEntries", "git", "localeSignals", "version", "sourceDir", "packageManager", "platform", "buildSystem", "uiFramework", "existing", "compiler", "router", "hybrid", "ionic"]
+}

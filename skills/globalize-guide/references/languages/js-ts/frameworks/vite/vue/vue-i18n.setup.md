@@ -161,6 +161,8 @@ The `enforce: 'pre'` on `poLoader()` makes the ordering explicit even if a user 
 
 ### Locale Routing Strategy
 
+**Capacitor apps skip this question.** When `.globalize/detection.json` has `hybrid === "capacitor"` (or `.globalize/decisions.md` records `Routing strategy: None`), do not present the choice — a Capacitor app runs in a WebView with no URL bar, so a locale in the path is invisible and unshareable. Use **Strategy 3 / plain SPA: No URL routing**: the locale is a stored preference (`localStorage`) defaulting to the device language (`navigator.language`). The route tree — including Ionic's `@ionic/vue-router` — is left untouched.
+
 **If the project uses `vue-router`, STOP and present this to the user:**
 
 > Choose a locale routing strategy:

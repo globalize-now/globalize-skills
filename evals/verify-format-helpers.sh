@@ -4,7 +4,7 @@ set -uo pipefail
 # Usage: verify-format-helpers.sh                    # static mode (default)
 #        verify-format-helpers.sh --project <path>   # post-render mode
 #
-# Static mode asserts the format-helper contract across all eight
+# Static mode asserts the format-helper contract across all nine
 # (rules template, setup reference) pairs: the template declares and uses
 # <<formatModule>>, and the setup reference owns a generate_format_helpers
 # step that writes .globalize/format-module.json and names the full surface.
@@ -27,7 +27,7 @@ info() { echo "  INFO: $1"; }
 
 usage() {
   echo "Usage: verify-format-helpers.sh [--project <path>]"
-  echo "  (no args)          lint the 8 (rules template, setup reference) pairs"
+  echo "  (no args)          lint the 9 (rules template, setup reference) pairs"
   echo "  --project <path>   lint a generated format module in <path>"
 }
 
@@ -55,7 +55,7 @@ SEAM_RE='formatLocale|format_locale|formatlocale'
 
 # tag|rules template|setup reference (creates the module)|resolution host
 # (owns the "Resolve the template's conditions/values" table). All paths are
-# relative to REFS. The third and fourth columns differ on five of the eight
+# relative to REFS. The third and fourth columns differ on five of the nine
 # libraries — the file that writes the module is often not the file that
 # teaches the renderer how to resolve <<formatModule>>.
 PAIRS=$(cat <<'ROWS'
@@ -67,6 +67,7 @@ webext-native|languages/js-ts/frameworks/webext/webext-native.rules.template.md|
 rails|languages/ruby/frameworks/rails/rails.rules.template.md|languages/ruby/frameworks/rails/rails.setup.md|languages/ruby/frameworks/rails/setup.add-ons.md
 android-strings|languages/android/native/android-strings.rules.template.md|languages/android/native/android-strings.setup.md|languages/android/native/setup.add-ons.md
 string-catalog|languages/ios/native/string-catalog.rules.template.md|languages/ios/native/string-catalog.setup.md|languages/ios/native/string-catalog.setup.md
+angular-localize|languages/js-ts/libraries/angular-localize/rules.template.md|languages/js-ts/frameworks/angular/angular-localize.setup.md|languages/js-ts/frameworks/angular/angular-localize.setup.md
 ROWS
 )
 

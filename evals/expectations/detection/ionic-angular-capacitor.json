@@ -1,0 +1,9 @@
+{
+  "match": {
+    "language": "js-ts", "framework": "angular", "angular": true, "ionic": true, "hybrid": "capacitor",
+    "react": false, "vue": false, "svelte": false, "typescript": true, "packageManager": "npm",
+    "existing": { "library": "none", "configured": false, "providerWired": false, "catalogsScaffolded": false, "stringsWrapped": "no" }
+  },
+  "ignore": ["candidateFiles", "formatCandidateFiles", "routeEntries", "git", "localeSignals", "version", "sourceDir", "compiler", "router", "platform", "buildSystem", "uiFramework", "extensionFramework", "manifestVersion"],
+  "softAssert": { "candidateFilesMinCount": 2, "candidateFilesMustContain": ["src/app/cart/cart.page.html", "src/app/cart/cart.page.ts"] }
+}

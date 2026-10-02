@@ -1,0 +1,7 @@
+{
+  "variant": "vite-babel-lingui",
+  "library": "lingui",
+  "phasesIncluded": ["setup"],
+  "phase2StepsContain": ["create_config", "build_tool_integration", "provider_wiring", "scaffold_catalogs", "gitignore_artifacts", "extract_compile", "generate_format_helpers", "generate_coding_rules", "install_coding_rules"],
+  "decisionsSections": { "Routing strategy": "^None" }
+}

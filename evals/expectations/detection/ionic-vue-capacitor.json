@@ -1,0 +1,9 @@
+{
+  "match": {
+    "language": "js-ts", "framework": "vite", "router": "vue-router",
+    "angular": false, "ionic": true, "hybrid": "capacitor",
+    "react": false, "vue": true, "svelte": false, "typescript": true, "packageManager": "npm"
+  },
+  "ignore": ["candidateFiles", "formatCandidateFiles", "routeEntries", "git", "localeSignals", "version", "sourceDir", "compiler", "platform", "buildSystem", "uiFramework", "extensionFramework", "manifestVersion", "existing"],
+  "softAssert": { "candidateFilesMinCount": 1, "candidateFilesMustContain": ["src/views/CartPage.vue"] }
+}

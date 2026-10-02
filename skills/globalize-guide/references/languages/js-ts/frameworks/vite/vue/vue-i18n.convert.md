@@ -55,6 +55,29 @@ When reporting the follow-up list at the end of the conversion, include a one-li
 >
 > Alternatively, keep them on Options API and use `this.$t('Namespace.key')` plus entries in the catalog — but note that the Legacy API is scheduled for removal in vue-i18n v12.
 
+## Ionic components (Ionic Vue)
+
+Bind Ionic text props to `t()`:
+
+```vue
+<ion-input :label="t('Login.emailLabel')" :placeholder="t('Login.emailPlaceholder')" />
+<ion-back-button :text="t('Common.back')" default-href="/" />
+```
+
+Controllers take option objects — wrap every user-visible field (`header`, `subHeader`, `message`, button `text`):
+
+```ts
+import { alertController, toastController } from '@ionic/vue'
+const { t } = useI18n()
+const alert = await alertController.create({
+  header: t('Cart.removeTitle'),
+  buttons: [{ text: t('Common.cancel'), role: 'cancel' }, { text: t('Cart.remove'), role: 'destructive' }],
+})
+const toast = await toastController.create({ message: t('Cart.removed'), duration: 1500 })
+```
+
+Never set `backButtonText` in `app.use(IonicVue, {...})` — it is one untranslated string.
+
 ## Number and date formats
 
 Vite-SPA apps typically register number/date formats inside `createI18n({ ... })` in `src/i18n/index.ts`. When wrapping `toFixed()` / currency concatenations / date format strings, first check `src/i18n/index.ts` for registered `numberFormats` and `datetimeFormats`:

@@ -147,10 +147,11 @@ Scan for known i18n config files to auto-detect source and target languages. Use
 | **Paraglide** | `project.inlang/settings.json` exists (and/or `@inlang/paraglide-js` in `package.json` deps) | `baseLocale` → source language, `locales` array → all languages |
 | **i18next** | `i18next` in `package.json` deps + config file (`i18n.ts`, `i18n.js`, `i18next.config.*`) | `lng` or `fallbackLng` → source language, `supportedLngs` → all languages |
 | **react-intl** | `react-intl` or `@formatjs/intl` in `package.json` deps | Check for `defaultLocale` in config; scan `lang/` or `translations/` directories |
+| **Angular** (`@angular/localize`) | `angular.json` has `projects.<p>.i18n.sourceLocale` and `@angular/localize` is in `package.json` | `i18n.sourceLocale` → source language; target languages from `src/locale/messages.<code>.xlf` file names (or `extract-i18n.options.outputPath`) minus the source |
 | **Locale directories** | Directories named `locales/`, `messages/`, `translations/`, `lang/` | Subdirectory names or JSON file names (e.g., `en.json`, `fr.json`) indicate available locales |
 | **Rails** | `config/locales/` directory exists with locale-named `.yml` files (e.g. `en.yml`, `pt-BR.yml`). Optionally, parse `config/application.rb` for `config.i18n.default_locale`. | `config.i18n.default_locale` (or `en` if absent) → source language; all other locale codes in `config/locales/*.yml` filenames → target languages. Locale codes may be hyphenated (`pt-BR`, `zh-TW`) — pass through verbatim. |
 | **Android** | `res/values/strings.xml` exists (the locale-less default, typically under `app/src/main/res`), with per-locale `res/values-<qualifier>/strings.xml` overlays. | `res/values/strings.xml` → source language (the app default; report as `en` unless otherwise known). Each `res/values-<qualifier>/` dir → a target language: parse the qualifier and normalize **both** the legacy form (`values-pt-rBR` → `pt-BR`, `values-es` → `es`) and the BCP47 `b+` form (`values-b+sr+Latn` → `sr-Latn`) to BCP47. |
-| **Locale files** | `*.po`, `*.pot`, `*.xliff`, `*.json` files in locale-like paths | File/directory names map to locale codes |
+| **Locale files** | `*.po`, `*.pot`, `*.xliff`, `*.xlf`, `*.json` files in locale-like paths | File/directory names map to locale codes |
 
 **Detection priority**: Config files (explicit locale lists) take precedence over directory/file scanning (inferred locales).
 
@@ -179,6 +180,7 @@ During detection, also determine the **locale file path pattern** — a path tem
 | **Android** | **No `{locale}` segment** — the locale lives in the directory qualifier (`res/values-<qualifier>/strings.xml`), so point the pattern at the source file `**/res/values/strings.xml` (or the module-specific `app/src/main/res/values/strings.xml`). The `android-strings` handler discovers the target `res/values-*/strings.xml` overlays and normalizes their qualifiers ⇄ BCP47 on its own. If the active CLI form cannot express a directory-qualifier (no-`{locale}`) source, fall back to Step 4 server-side detection (`github detect` / `gitlab detect`) for the pattern rather than forcing a `{locale}` token. |
 | **Browser extension** (`_locales`) | `_locales/{locale}/messages.json`. The `{locale}` segment **is** used, but Chrome spells locale directories with an **underscore** (`pt_BR`, `zh_CN`, `es_419`) while the platform's languages are BCP-47 (`pt-BR`). Set a **path-locale override** per affected language — see "Path-locale overrides" below. `fileFormat: chrome-messages`. |
 | **WXT** (`@wxt-dev/i18n`) | The authoring source, not the generated `_locales` output: `<srcDir>/locales/{locale}.yml` (also `.json`/`.json5`/`.toml`). `fileFormat: wxt-i18n`. Never point a pattern at the `_locales/` build output as well — it would re-import generated files as source. |
+| **Angular** | `<outputPath>/messages.{locale}.xlf` from `angular.json` `extract-i18n.options` — `src/locale/messages.{locale}.xlf` in a globalize-guide setup. The source file matches the same pattern **only when `outFile` is `messages.<sourceLocale>.xlf`** (what globalize-guide sets). With no `outFile`, Angular writes the source as `messages.xlf`, which `messages.{locale}.xlf` does not match — set `outFile: "messages.<sourceLocale>.xlf"` and re-run `ng extract-i18n` before connecting, or the source catalog is never imported. |
 | **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
 
 If no pattern can be determined locally, record as absent — Step 4 will attempt server-side detection.
@@ -194,8 +196,9 @@ When a locale path pattern is determined, also determine the **file format**. Th
 | **Paraglide** | `po` if `messages/*.po` are present (the globalize-guide default — PO format via `@globalize-now/paraglidejs-po-format`, carries `#.` translator comments). `json-flat` for `messages/*.json` (ICU-JSON; flat key → ICU string, no translator comments) |
 | **i18next** | `json-nested` by default. If `keySeparator: false` in config, use `json-flat`. |
 | **react-intl** | Inspect file content (see JSON detection below) |
+| **Angular** | `xliff-2` when `extract-i18n.options.format` is `xlf2`/`xliff2`; `xliff-1` when it is `xlf`/`xlif`/`xliff`/absent |
 | **`.po` / `.pot` files** | `po` |
-| **`.xliff` files** | `xliff-1` — if you can inspect the file, check the `version` attribute: `2.0` → `xliff-2`, `1.x` → `xliff-1` |
+| **`.xliff` / `.xlf` files** | `xliff-1` — if you can inspect the file, check the `version` attribute: `2.0` → `xliff-2`, `1.x` → `xliff-1` |
 | **`.yaml` / `.yml` files** | `yaml-rails` (Rails-style locale-rooted YAML) |
 | **`.arb` files** | `arb` (Flutter Application Resource Bundle) |
 | **`.xcstrings` files** | `xcstrings` (Apple String Catalog) |

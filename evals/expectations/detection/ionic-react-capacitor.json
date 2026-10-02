@@ -1,0 +1,9 @@
+{
+  "match": {
+    "language": "js-ts", "framework": "vite", "compiler": "babel", "router": "react-router",
+    "angular": false, "ionic": true, "hybrid": "capacitor",
+    "react": true, "vue": false, "svelte": false, "typescript": true, "packageManager": "npm"
+  },
+  "ignore": ["candidateFiles", "formatCandidateFiles", "routeEntries", "git", "localeSignals", "version", "sourceDir", "platform", "buildSystem", "uiFramework", "extensionFramework", "manifestVersion", "existing"],
+  "softAssert": { "candidateFilesMinCount": 1, "candidateFilesMustContain": ["src/pages/Cart.tsx"] }
+}

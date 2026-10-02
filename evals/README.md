@@ -99,6 +99,11 @@ extensions all carry `vite` in devDependencies. Whenever that ordering is touche
 `vite-swc`, `vite-babel`, `vite-swc-data-module` and `shadcn-admin` and confirm none of them reclassify
 to `webext`.
 
+The `ionic-angular-capacitor`, `ionic-react-capacitor` and `ionic-vue-capacitor` fixtures guard two more:
+the Capacitor/Cordova/Ionic stop in §1.2 now applies only to an `android` detection (each fixture ships an
+`android/` folder and must reach a plan), and Angular is checked before the `vite` fallback (Ionic React and
+Ionic Vue must still detect as `vite`, never `angular`).
+
 ### `fixtures.json` schema
 
 ```jsonc
@@ -175,6 +180,13 @@ Structural assertions parsed from `.globalize/plan.md`. Each checklist line look
 - `phase2StepsContain` — exact step ids (prefix match) that must each appear.
 - `phase2StepsContainPattern` — regexes where at least one checklist step must match. Use this when the exact id varies run-to-run but the *family* is what matters.
 - `phase2StepsAbsent` — step ids that must NOT appear.
+- `decisionsSections` — optional map of `decisions.md` heading → ERE. The first non-empty line under `## <heading>` must match. Use it for decisions that have no plan step id to anchor on — e.g. the `ionic-*-capacitor` fixtures assert there is no URL-prefix locale routing:
+
+  ```jsonc
+  "decisionsSections": { "Routing strategy": "^None" }
+  ```
+
+Never put `null` in a detection golden's `match`: the verifier prints `<missing>` for an actual null and `null` for the expected one, so the two never compare equal. List null-valued fields under `ignore` instead.
 
 **Collapse fixtures** assert the *behavior* rather than a literal step list: a `verify_` step is present (config is verified, not recreated), `build_verification` runs, and the from-scratch `create_config` step is absent. This is deliberately tolerant — when a project is already configured, the skill generates a library-appropriate verify-and-complete plan (e.g. next-intl drops `extract_compile` because it has no compile step), so hardcoding SKILL.md's generic collapse list would be brittle.
 
@@ -202,7 +214,7 @@ Refresh prefills when the manifest's package pins or plan step ids change.
 
 ## Layer B Verification
 
-`verify-setup.sh` reads the fixture's `library` and dispatches to `library-checks/<library>.sh`. Currently `lingui.sh` is implemented (locales in an imported module, per-page catalogs, optional ESLint add-on, `app/` source dir, Next 16 `proxy.ts` / `[locale]` routing). `next-intl.sh` and `vue-i18n.sh` are added as those variants come online.
+`verify-setup.sh` reads the fixture's `library` and dispatches to `library-checks/<library>.sh`. Currently `lingui.sh` is implemented (locales in an imported module, per-page catalogs, optional ESLint add-on, `app/` source dir, Next 16 `proxy.ts` / `[locale]` routing). `next-intl.sh` and `vue-i18n.sh` are added as those variants come online. `angular-localize.sh` runs SKILL.md §3.5's Angular checks: `i18n:extract` with no duplicate IDs, a description on every unit of the source XLIFF, one runtime JSON per target XLIFF from `i18n:compile`, a passing build, and no static `./app/` import in `src/main.ts`.
 
 Each library checker runs three layers:
 
