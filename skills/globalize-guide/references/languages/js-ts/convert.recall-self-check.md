@@ -61,7 +61,10 @@ excluding tests, stories, configs, and `.d.ts`.
   text nodes on lines whose element carries no `i18n` attribute — delete every `{{ … }}`
   interpolation from the line first, then match `>[^<]*[A-Za-z][^<]*<` (so
   `<p>{{ count }} items</p>` is caught), and also flag a line holding only text (no `<`, `>`
-  or `{{`) between tags, which is how Prettier lays out long text nodes — and
+  or `{{`) between tags, which is how Prettier lays out long text nodes, plus both ends of a
+  text node that wraps mid-sentence (`<p>First line` / `  second line</p>`): a line whose text
+  runs from a `>` to the line end (`>[^<]*[A-Za-z][^<]*$`) and a line whose text runs from
+  the line start to a `<` (`^[^<>]*[A-Za-z][^<>]*<`) — one end is enough to flag the node — and
   for `placeholder=|title=|aria-label=|alt=|label=|text=|header=|message=|cancel-text=|ok-text=`
   with a literal value and no matching `i18n-<attr>` on the same element. Scan `src/**/*.ts`
   for string literals passed as `header:`, `subHeader:`, `message:` or `text:` inside an
