@@ -146,6 +146,11 @@ import type { MessageCompiler, MessageContext, CompileError } from 'vue-i18n'
 
 const messageCompiler: MessageCompiler = (message, { locale, key, onError }) => {
   if (typeof message !== 'string') {
+    // A non-string message is a pre-compiled AST. `onError` does not return —
+    // `@intlify/core-base` re-throws it in production as well as development —
+    // so `t()` throws rather than falling back to the key. A pre-compiled
+    // message *function* is not caught here at all; see the shared setup
+    // reference for why. The `return` runs only on a host with no `onError`.
     onError?.(new Error(`[i18n] ICU compiler requires string messages (key: ${key})`) as CompileError)
     return () => key
   }
