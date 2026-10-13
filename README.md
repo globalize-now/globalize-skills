@@ -1,6 +1,6 @@
 # globalization-skills
 
-Agent skills for localizing software projects. Each skill is a self-contained set of instructions that an AI coding agent can follow to set up or modify i18n in a target project.
+Agent skills for localizing software projects. Each skill is a self-contained set of instructions that an AI coding agent can follow to set up or modify i18n in a target project. Built by [globalize.now](https://globalize.now/en/developers/); the [Claude Code i18n](https://globalize.now/en/integrations/claude-code/) guide shows the full workflow end-to-end.
 
 The repo follows the [Agent Skills](https://github.com/vercel-labs/skills) open standard, so every skill is a flat top-level directory under `skills/` and installable via the standard tooling.
 
@@ -55,7 +55,7 @@ The production MCP server is built into the Globalize app as a remote Streamable
 https://api.globalize.now/mcp
 ```
 
-Authenticate with OAuth (your MCP client will prompt) or an API key from the [dashboard](https://app.globalize.now). Published on the official MCP registry as `io.github.globalize-now/globalize`. Works with Claude Code (`claude mcp add --transport http globalize https://api.globalize.now/mcp`), Claude custom connectors, Cursor, and any other MCP client.
+Authenticate with OAuth (your MCP client will prompt) or an API key from the [dashboard](https://app.globalize.now). Published on the official MCP registry as `io.github.globalize-now/globalize`. Works with Claude Code (`claude mcp add --transport http globalize https://api.globalize.now/mcp`), Claude custom connectors, [Cursor](https://globalize.now/en/integrations/cursor/), and any other MCP client.
 
 ### Local package (this repo)
 
