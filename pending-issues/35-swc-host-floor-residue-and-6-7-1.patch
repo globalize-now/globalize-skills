@@ -1,0 +1,26 @@
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md
+index d4f500d..d149d80 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/lingui.setup.md
+@@ -26,7 +26,7 @@ npm install -D '@lingui/cli@^6' '@lingui/swc-plugin@~6.6.0'
+ 
+ **Version compatibility — verified by build on this stack.** Here the plugin runs inside **Next.js's own bundled SWC**, which you do not choose and cannot read from npm metadata. That makes the rule the *opposite shape* to the Vite stacks: a **ceiling on the plugin** and a **floor on Next.js**, not a floor on a host you install.
+ 
+-- **`@lingui/swc-plugin@6.7.0` does not run on any Next.js release.** It fails on 16.1.7, 16.2.12 and 16.3.4 alike — its pinned `swc_core@77.1.1` is newer than every plugin runner Next has shipped (observed `swc_plugin_runner` **23.0.0** on 16.1.7, **24.0.0** on 16.2.12, **30.0.1** on 16.3.4). `^6` resolves to `6.7.0` today, so **`@lingui/swc-plugin@^6` is a hard build break on current Next.js** — that is why the install line above pins `~6.6.0`.
++- **`@lingui/swc-plugin@6.7.0` does not run on any Next.js release.** It fails on 16.1.7, 16.2.12 and 16.3.4 alike — its pinned `swc_core@77.1.1` is newer than every plugin runner Next has shipped (observed `swc_plugin_runner` **23.0.0** on 16.1.7, **24.0.0** on 16.2.12, **30.0.1** on 16.3.4). `^6` resolves to `6.7.1` today — a rebuild of `6.7.0` (new Rust toolchain, README-only option docs) whose macro output is byte-identical, measured 2026-10-09 — so **`@lingui/swc-plugin@^6` is a hard build break on current Next.js** — that is why the install line above pins `~6.6.0`.
+ - **`6.0.0`, `6.2.0` and `6.6.0` all transform correctly on Next.js ≥ 16.1.0.**
+ - **The pin is a split pin, and that is fine.** `@lingui/swc-plugin@~6.6.0` alongside `@lingui/core`/`@lingui/react`/`@lingui/cli` at `^6` means `npm ls` shows the plugin one minor behind the rest of the family. Verified by build on Next.js 16.3.4 with plugin `6.6.0` + core/react/cli/format-po `6.7.0`: `next build` succeeds with the macro transformed, and `lingui extract` then `lingui compile` both exit 0. Do **not** pin the rest of the family back to `6.6.0` to "match" the plugin — the plugin's own peer range is `@lingui/core@5 || 6`, so the mismatch is not one.
+ - **Below Next.js 16.1.0 no `6.x` plugin works at all.** 16.0.0, 16.0.11, 15.5.25 and 14.2.35 reject `6.0.0`, `6.1.0`, `6.2.0`, `6.6.0` and `6.7.0` alike. Pinning the plugin backwards is **not** a remedy on those hosts — see the Babel fallback below.
+diff --git a/skills/globalize-guide/references/languages/js-ts/libraries/lingui/setup.locale-module.md b/skills/globalize-guide/references/languages/js-ts/libraries/lingui/setup.locale-module.md
+index 9e5d302..abdce47 100644
+--- a/skills/globalize-guide/references/languages/js-ts/libraries/lingui/setup.locale-module.md
++++ b/skills/globalize-guide/references/languages/js-ts/libraries/lingui/setup.locale-module.md
+@@ -35,7 +35,7 @@ Lingui 6 has two hard install-time preconditions. Neither is advisory, both are
+ 
+ **If the project is below the Node floor, or is locked to CJS config files it cannot convert, stop and tell the user** rather than installing a runtime they cannot run. This mirrors the orchestrator-level check in `SKILL.md` §2.0; the check is repeated here because this file is the first reference read on every Lingui variant, and the orchestrator installs packages before dispatching the setup subagent.
+ 
+-*Verified against the `@lingui/*` 6.7.0 packuments — the version `^6` installs today. Both preconditions are unchanged from 6.6.0: the seven packages named above still declare `engines: { "node": ">=22.19.0" }`, `@lingui/swc-plugin` still declares none, and all eight are still `"type": "module"` with no `require` condition in `exports`. One detail worth having if you automate this check: `@lingui/swc-plugin` is also the one package that **does** carry a `main` field (`"./lingui_macro.wasm"`), so a check written as "no `main` field" misclassifies it. Test the `require` condition, not `main`.*
++*Verified 2026-10-09 against the live `@lingui/*` packuments: `^6` installs **6.9.0** for the seven, and **6.7.1** for `@lingui/swc-plugin`, which tracks its own slower line. Both preconditions are unchanged from 6.6.0: the seven packages named above still declare `engines: { "node": ">=22.19.0" }`, `@lingui/swc-plugin` still declares none, and all eight are still `"type": "module"` with no `require` condition in `exports`. One detail worth having if you automate this check: `@lingui/swc-plugin` is also the one package that **does** carry a `main` field (`"./lingui_macro.wasm"`), so a check written as "no `main` field" misclassifies it. Test the `require` condition, not `main`.*
+ 
+ ---
+ 

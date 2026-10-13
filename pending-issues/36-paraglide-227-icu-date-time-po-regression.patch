@@ -1,0 +1,23 @@
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
+index 3a4e2f0..1b8976a 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
+@@ -233,8 +233,16 @@ date formats (`'MM/DD/YYYY'`), and any existing `new Intl.` construction outside
+ project that already hand-rolls `formatPrice()` should have that function rewritten to delegate to
+ `money()`, not have its call sites rewritten. The full find-and-replace table, the never-convert list,
+ and the ordering rule are in `references/languages/js-ts/convert.format-pass.md`. (ICU `number` skeletons
+-inside `msgstr` also work, but ICU `date`/`time` skeletons are not yet runtime-verified in this setup —
+-prefer the format module for dates/times.)
++inside `msgstr` also work. **ICU `date` / `time` in a `msgstr` are now measured, and on this PO setup a
++*styleless* one is wrong — prefer the format module for dates and times.** The PO plugin imports both ICU
++`{d, date}` and `{d, time}` as the inlang `datetime` annotation, carrying a style argument through and
++passing no options when there is none; `@inlang/paraglide-js@2.27.0` then fills an option-less `datetime`
++with its default `dateStyle=medium timeStyle=short`, which `2.26.0` and below dropped. So on `^2` today,
++`Due {d, date}` renders `Due Jan 15, 2026, 2:30 PM` — a time nobody asked for — where the same catalog on
++`2.26.0` rendered `Due 1/15/2026`, and `At {d, time}` renders a full date on both. Neither version warns.
++A style is unaffected: `{d, date, short}` is `1/15/26` on both. If a catalog must carry an ICU date or
++time, **always give it a style**; on the ICU-JSON format (`json-format.convert.md`) the `plugin-icu1`
++import keeps ICU's own defaults and a styleless `{d, date}` is correct from `2.27.0` on.)
+ 
+ ---
+ 

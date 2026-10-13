@@ -1,0 +1,57 @@
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md
+index cb86938..7c9dd0b 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md
+@@ -53,7 +53,7 @@ export default defineNuxtConfig({
+     ],
+     bundle: {
+       compositionOnly: true,  // tree-shake Legacy API
+-      runtimeOnly: false,     // include the message compiler — required for our custom ICU compiler
++      runtimeOnly: false,     // @nuxtjs/i18n's own default; does NOT control the message compiler
+       fullInstall: true,      // keep <i18n-t> / <i18n-d> / <i18n-n> available
+     },
+     compilation: {
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md
+index a81a2e3..1d6af8f 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md
+@@ -23,7 +23,7 @@ Use the project's detected package manager (pnpm / yarn / bun) instead of `npm`
+ 
+ ## Build Tool Integration (Step 4)
+ 
+-**This modifies `vite.config.ts`.** Describe the change before making it: adding `VueI18nPlugin` with `runtimeOnly: false` (so the message-compiler runtime our custom ICU compiler plugs into stays in the bundle) and `strictMessage: false` (so ICU placeholder syntax doesn't trip the plugin's HTML check).
++**This modifies `vite.config.ts`.** Describe the change before making it: adding `VueI18nPlugin` with `runtimeOnly: false` (the plugin's non-default value, kept explicit — it does **not** control whether the message compiler is present on `vue-i18n@^11`; see `setup.shared.md` Step 4's option notes) and `strictMessage: false` (so ICU placeholder syntax doesn't trip the plugin's HTML check).
+ 
+ **Do NOT set the `include` option.** Pre-compiling the catalog JSON would hand our custom ICU `messageCompiler` a pre-built function instead of the raw source string, breaking ICU parsing. Vite's built-in JSON importer loads the catalogs as plain objects, which is what we want.
+ 
+diff --git a/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/setup.shared.md b/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/setup.shared.md
+index c77c017..9e29c24 100644
+--- a/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/setup.shared.md
++++ b/skills/globalize-guide/references/languages/js-ts/libraries/vue-i18n/setup.shared.md
+@@ -544,7 +544,7 @@ Follow the variant-specific reference file for this step. It specifies the exact
+ 
+ **Key option notes** (common to all variants):
+ 
+-- `runtimeOnly: false` — include the vue-i18n message compiler in the build. The ICU compiler (our custom `messageCompiler`) runs against string messages at runtime. Without this, the compiled bundle drops the message-compiler runtime that our custom function plugs into.
++- `runtimeOnly: false` — kept explicit (the plugin's default is `true`), but **it is not what keeps a message compiler available**, and the ICU setup works either way. In `vue-i18n@^11` the plugin's two alias targets — `vue-i18n/dist/vue-i18n.esm-bundler.js` and `…vue-i18n.runtime.esm-bundler.js` — re-export `dist/vue-i18n.mjs` and `dist/vue-i18n.runtime.mjs`, which on 11.4.13 differ **only in one comment** and both unconditionally call `registerMessageCompiler(compile)`. The 9.x split that this note was written for (the full build registered `compileToFunction`, the runtime build registered nothing unless `__INTLIFY_JIT_COMPILATION__` was set) was removed in **vue-i18n 10.0.0** along with `compileToFunction`. The option that really gates the built-in compiler is the plugin's separate `dropMessageCompiler` (default `false`), which defines `__INTLIFY_DROP_MESSAGE_COMPILER__` — and even that does not reach our compiler: `createCoreContext` resolves `isFunction(options.messageCompiler) ? options.messageCompiler : _compiler`, so a custom `messageCompiler` **replaces** the built-in `compile` rather than plugging into it. What actually breaks ICU is build-time pre-compilation — see `include` below.
+ - `compositionOnly: true` — tree-shake the Legacy API (default for the plugin; keep it explicit).
+ - `strictMessage: false` — disable the plugin's built-in HTML-tag check. ICU messages may legitimately contain angle-bracketed placeholders (e.g. within rich text via `<i18n-t>`), which the check flags as false positives.
+ - **`include` — deliberately omitted.** The plugin's `include` option pre-compiles matched JSON/YAML/JS/TS files into AST/JS at build time, which would bypass our custom ICU `messageCompiler` (it would receive a compiled function instead of the source string). Letting Vite's built-in JSON importer load the catalogs as plain objects — which is what happens when `include` is not set — keeps them as raw strings for the ICU compiler to process at lookup time.
+@@ -640,7 +640,7 @@ Seed each file with a couple of example keys so the app can boot without a catal
+ }
+ ```
+ 
+-> **Nuxt exception — ship a non-ICU seed.** With `@nuxtjs/i18n` + `bundle.runtimeOnly: false` (the default this setup phase emits), `unplugin-vue-i18n` pre-compiles the lazy locale JSON at build time using its **default**, non-ICU compiler — *before* the custom `messageCompiler` registered in `i18n.config.ts` runs. A seed containing `{count, plural, one {...} other {...}}` will fail the build with `error code: 2`. For Nuxt, drop the `messages` entry from the seed (keep only `welcome`). See `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md` § ICU seed upgrade for how to re-enable build-time ICU once the catalog is actually in use.
++> **Nuxt exception — ship a non-ICU seed.** `@nuxtjs/i18n` passes its own `include: localePaths` straight to `unplugin-vue-i18n` (`dist/module.mjs`, `vueI18nPluginOptions`), so on Nuxt the lazy locale JSON is pre-compiled at build time using the plugin's **default**, non-ICU compiler — *before* the custom `messageCompiler` registered in `i18n.config.ts` runs. A seed containing `{count, plural, one {...} other {...}}` will fail the build with `error code: 2`. **The cause is that `include`, not `bundle.runtimeOnly`** — `runtimeOnly` is already `false` by default in `@nuxtjs/i18n@^10` and does not control the compiler either way (see Step 4's option notes); unlike the Vite SPA path, the `include` here is set by `@nuxtjs/i18n` itself and cannot be switched off from this skill's config. For Nuxt, drop the `messages` entry from the seed (keep only `welcome`). See `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md` § ICU seed upgrade for how to re-enable build-time ICU once the catalog is actually in use.
+ 
+ ```json
+ {
+@@ -1012,7 +1012,7 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
+ 
+ ## Common Gotchas
+ 
+-- **`[i18n] ICU compiler requires string messages`** — the `@intlify/unplugin-vue-i18n` plugin's `include` option has been added (or a `?jit` / `?ast` query suffix is being used), which pre-compiles catalogs into a message **AST** before our custom ICU `messageCompiler` sees them. It surfaces as a **thrown** error out of `t()`, not as a key-shaped placeholder: `@intlify/core-base` re-throws what the compiler passes to `onError` (wrapped as `SyntaxError: Message compilation error: …` in a development build, raw in a production one). **Fix**: remove `include` from the plugin config (or drop `?jit` / `?ast` query suffixes on catalog imports). Keep `runtimeOnly: false` so the message-compiler runtime the custom function plugs into stays in the bundle. If you need `include` for SFC `<i18n>` blocks, know that those blocks will be compiled by the plugin's default compiler, not the ICU one — prefer plain JSON catalogs.
++- **`[i18n] ICU compiler requires string messages`** — the `@intlify/unplugin-vue-i18n` plugin's `include` option has been added (or a `?jit` / `?ast` query suffix is being used), which pre-compiles catalogs into a message **AST** before our custom ICU `messageCompiler` sees them. It surfaces as a **thrown** error out of `t()`, not as a key-shaped placeholder: `@intlify/core-base` re-throws what the compiler passes to `onError` (wrapped as `SyntaxError: Message compilation error: …` in a development build, raw in a production one). **Fix**: remove `include` from the plugin config (or drop `?jit` / `?ast` query suffixes on catalog imports). `runtimeOnly` is **not** the knob here — on `vue-i18n@^11` it does not control whether a message compiler is present (see Step 4's option notes), so changing it will not fix this error. If you need `include` for SFC `<i18n>` blocks, know that those blocks will be compiled by the plugin's default compiler, not the ICU one — prefer plain JSON catalogs.
+ - **ICU syntax renders literally, or a plural picks the wrong branch, with no error at all** — the catalog reached vue-i18n as a pre-compiled message **function** rather than a string or an AST. `core-base` tests `isMessageFunction` *before* it calls any custom compiler, so such a catalog never reaches the ICU one and is rendered with vue-i18n's own pipe-plural syntax instead. This is the silent failure the error above is not: nothing throws. Sources are a `.js` / `.ts` catalog, or `include` configured with `jit: false`. **Fix**: keep catalogs as `.json` (or `.po`) and leave `include` unset, which is what this setup phase emits.
+ - **`useI18n()` returns `undefined` for `t`** — the `i18n` plugin isn't installed on the app. For Vite, ensure `app.use(i18n)` is called before `app.mount()`. For Quasar, ensure the boot file is registered in `quasar.config.ts`. For Nuxt, ensure `@nuxtjs/i18n` is in `modules` (not `buildModules`).
+ - **`Not Available in Legacy Mode`** — you're calling `useI18n()` without `legacy: false` in `createI18n`. Set `legacy: false`.

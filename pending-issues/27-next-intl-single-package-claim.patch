@@ -1,0 +1,13 @@
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md
+index 40666a7..680da0a 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md
+@@ -56,7 +56,7 @@ Only one package is required:
+ |---------|------|---------|
+ | `next-intl` | runtime | Full i18n: translations, formatting, routing, navigation |
+ 
+-Unlike LinguiJS (which requires `@lingui/swc-plugin` separately), next-intl bundles everything — routing, middleware, server/client APIs — in a single package.
++That is one package to install **by name** — routing, middleware and the server/client APIs all come from `next-intl` itself. It is not a single-package install, though: `next-intl@4.14.8` declares ten runtime dependencies, among them `@swc/core@~1.16.0` and `next-intl-swc-plugin-extractor@4.14.8`. next-intl does use an SWC plugin — unlike LinguiJS it pins and loads one for you, rather than asking you to install `@lingui/swc-plugin` yourself. Expect a failing build to be able to surface inside `@swc/core` rather than inside next-intl.
+ 
+ Pick the correct `next-intl` version based on the detected Next.js version: Next.js 14 → `next-intl@^3`; Next.js 15+ → `next-intl@^4` (current). The examples below pin to `^4`; substitute `^3` if the project is on Next.js 14.
+ 

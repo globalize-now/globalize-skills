@@ -1,0 +1,37 @@
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/webext/setup.add-ons.md b/skills/globalize-guide/references/languages/js-ts/frameworks/webext/setup.add-ons.md
+index e5f01c7..22d257d 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/webext/setup.add-ons.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/webext/setup.add-ons.md
+@@ -258,6 +258,9 @@ Verified by running `web-ext@10.6.0` against fixtures:
+ | `JSON_INVALID`, `JSON_DUPLICATE_KEY` | error | a `messages.json` doesn't parse, or repeats a key |
+ | `MISSING_PLACEHOLDER` | warning | a `$name$` in a message is not declared in that entry's `placeholders` |
+ | `PREDEFINED_MESSAGE_NAME` | warning | a key collides with a reserved `@@…` predefined message |
++| `NO_MESSAGES_FILE_IN_LOCALES` | error | a `_locales/<code>/` directory holds files but no `messages.json` (a *wholly* empty directory is invisible to the scanner and reports nothing) |
++| `NO_PLACEHOLDER_CONTENT` | error | a declared `placeholders` entry has no `content` property |
++| `INVALID_PLACEHOLDER_NAME` | error | a `placeholders` key is outside `A-Za-z0-9_@` |
+ 
+ **What it does NOT catch — verified; do not claim otherwise:**
+ 
+@@ -266,7 +269,12 @@ Verified by running `web-ext@10.6.0` against fixtures:
+   check (`SKILL.md §3.5`, step 2) is the only gate for this.
+ - **Illegal message names.** A key of `"manifest.name"` — a `.` is outside Chrome's `A-Za-z0-9_@`
+   charset — lints clean, and Chrome then silently fails to substitute it. On the Lingui variant, the id
+-  → message-name mapping in `scripts/build-locales.mjs` is what must guarantee legality.
++  → message-name mapping in `scripts/build-locales.mjs` is what must guarantee legality. This is
++  structural, not a gap in one release: `addons-linter` *declares* an `INVALID_MESSAGE_NAME` message
++  ("String name contains invalid characters") and exports it, but nothing in the shipped bundle ever
++  raises it — zero reference sites outside the declaration, measured on the `addons-linter@10.13.0`
++  that `web-ext@10.7.0` bundles. The code below keeps it in `I18N_CODES` anyway, so the gate picks it
++  up for free if upstream ever wires it; do not read its presence there as coverage you have today.
+ 
+ **It is an AMO linter, so it reports Firefox-only findings on a healthy Chrome-only extension** —
+ `ADDON_ID_REQUIRED` (error) and `MISSING_DATA_COLLECTION_PERMISSIONS` (warning) both fire on a valid
+@@ -281,6 +289,8 @@ const sourceDir = process.argv[2] ?? 'dist'
+ const I18N_CODES = new Set([
+   'NO_DEFAULT_LOCALE', 'NO_MESSAGES_FILE', 'NO_MESSAGES_FILE_IN_LOCALES', 'NO_MESSAGE',
+   'MISSING_PLACEHOLDER', 'NO_PLACEHOLDER_CONTENT', 'INVALID_PLACEHOLDER_NAME',
++  // INVALID_MESSAGE_NAME is declared by addons-linter but never raised (10.13.0) — kept so the
++  // gate covers it for free if that changes; it catches nothing today.
+   'INVALID_MESSAGE_NAME', 'PREDEFINED_MESSAGE_NAME', 'JSON_INVALID', 'JSON_DUPLICATE_KEY',
+ ])
+ 

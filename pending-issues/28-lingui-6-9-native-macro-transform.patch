@@ -1,0 +1,106 @@
+diff --git a/evals/library-checks/lingui.sh b/evals/library-checks/lingui.sh
+index 100c952..668ff8d 100755
+--- a/evals/library-checks/lingui.sh
++++ b/evals/library-checks/lingui.sh
+@@ -378,10 +378,16 @@ case "$VARIANT" in
+     ;;
+ 
+   vite-swc|vite-swc-lingui)
++    # Macros reach the build by one of two routes: the SWC plugin inside
++    # react({ plugins: … }), or @lingui/vite-plugin >= 6.9.0 with
++    # macroTransform, which transforms them natively and needs no SWC plugin.
++    # Asserting only the first fails a correct native-transform setup.
+     if grep -q "@lingui/swc-plugin" vite.config.ts 2>/dev/null; then
+-      pass "@lingui/swc-plugin in vite.config.ts"
++      pass "macro transform configured (@lingui/swc-plugin in vite.config.ts)"
++    elif grep -q "macroTransform" vite.config.ts 2>/dev/null; then
++      pass "macro transform configured (macroTransform in vite.config.ts)"
+     else
+-      fail "@lingui/swc-plugin not found in vite.config.ts"
++      fail "no macro transform in vite.config.ts: expected @lingui/swc-plugin or macroTransform"
+     fi
+     if grep -q "@lingui/vite-plugin" vite.config.ts 2>/dev/null; then
+       pass "@lingui/vite-plugin in vite.config.ts"
+@@ -396,10 +402,12 @@ case "$VARIANT" in
+     ;;
+ 
+   vite-babel|vite-babel-lingui)
+-    if grep -q "lingui" vite.config.ts 2>/dev/null; then
+-      pass "Lingui babel plugin in vite.config.ts"
++    if grep -q "@lingui/babel-plugin-lingui-macro" vite.config.ts 2>/dev/null; then
++      pass "macro transform configured (Lingui babel plugin in vite.config.ts)"
++    elif grep -q "macroTransform" vite.config.ts 2>/dev/null; then
++      pass "macro transform configured (macroTransform in vite.config.ts)"
+     else
+-      fail "No lingui reference in vite.config.ts"
++      fail "no macro transform in vite.config.ts: expected @lingui/babel-plugin-lingui-macro or macroTransform"
+     fi
+     if grep -q "@lingui/vite-plugin" vite.config.ts 2>/dev/null; then
+       pass "@lingui/vite-plugin in vite.config.ts"
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md
+index 882dfc9..cabe15c 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/vite/react-babel/lingui.setup.md
+@@ -7,12 +7,12 @@ This covers Vite projects using `@vitejs/plugin-react` (Babel-based, without the
+ 
+ > **Version gate — `@vitejs/plugin-react` v6+**: `@vitejs/plugin-react@6.0.0` (Oct 2025) dropped the `babel` option from its public `Options` type. Only `include`, `exclude`, `jsxImportSource`, `jsxRuntime`, and `reactRefreshHost` remain. The `react({ babel: {...} })` form below is silently ignored on v6+ — macros never get transformed, `tsc` errors with TS2353 on the `babel` property, and `@lingui/vite-plugin`'s macro-import check fails at build time.
+ >
+-> Before applying this reference, read the project's installed `@vitejs/plugin-react` version (from `package.json` or `package-lock.json` / `pnpm-lock.yaml` / `bun.lock`). If the major is 6 or higher:
++> Before applying this reference, read the project's installed `@vitejs/plugin-react` version (from `package.json` or `package-lock.json` / `pnpm-lock.yaml` / `bun.lock`). If the major is 6 or higher, **do not switch the project to SWC for this reason alone**. Take the first of these that applies:
+ >
+-> 1. Switch the project to `@vitejs/plugin-react-swc` + `@lingui/swc-plugin`.
+-> 2. Use `references/vite-swc.md` instead of this file for the rest of the setup.
++> 1. **Preferred — `@lingui/vite-plugin@^6.9.0` transforms macros itself.** `6.9.0` (2026-10-01) added `lingui({ macroTransform: true })`, which transforms Lingui macros natively via `@lingui/native-tools` and needs neither `@lingui/babel-plugin-lingui-macro` nor `@lingui/swc-plugin`. It runs as its own `enforce: 'pre'` Vite transform, so it does not depend on the `babel` option `@vitejs/plugin-react@6` removed, and it keeps the project on `@vitejs/plugin-react`. Follow *Native macro transform* under "Build Tool Integration" below instead of the `react({ babel: … })` form, and skip `@lingui/babel-plugin-lingui-macro` in the install line. Upstream documents this as the recommended Vite setup and says it will be the default in the next major.
++> 2. If `@lingui/vite-plugin` cannot be moved to `>= 6.9.0`, or the project needs a macro option the native transform does not support (for example `macro.jsxRuntime: "solid"`), switch the project to `@vitejs/plugin-react-swc` + `@lingui/swc-plugin` and use `references/vite-swc.md` instead of this file for the rest of the setup. Read that file's `@lingui/swc-plugin` version-compatibility section first — the SWC path has a live host-side failure mode of its own.
+ >
+-> If the project is locked to v5 or lower (e.g. the lockfile pins a Vite/React combo that pre-dates v6), this reference still applies verbatim. Do not proactively downgrade `@vitejs/plugin-react`.
++> If the project is locked to v5 or lower (e.g. the lockfile pins a Vite/React combo that pre-dates v6), this reference still applies verbatim. Do not proactively downgrade `@vitejs/plugin-react`. The native transform in option 1 is available on v5 too and is the better setup there as well, but on v5 the `react({ babel: … })` form below still works, so switching is optional.
+ 
+ ## Packages
+ 
+@@ -34,11 +34,44 @@ npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/detect-locale@^6'
+ npm install -D '@lingui/cli@^6' '@lingui/babel-plugin-lingui-macro@^6' '@lingui/vite-plugin@^6'
+ ```
+ 
++**If you are taking option 1 of the version gate** (the native macro transform, `@lingui/vite-plugin >= 6.9.0`), the dev line is instead:
++
++```bash
++npm install -D '@lingui/cli@^6' '@lingui/vite-plugin@^6.9.0'
++```
++
++`@lingui/babel-plugin-lingui-macro` is not needed in that form, and the `@lingui/vite-plugin` row in the table above then reads "Vite integration for catalog compilation **and macro transformation**".
++
+ ## Build Tool Integration
+ 
+ **This modifies `vite.config.ts`.** Describe the changes to the user before making them: adding `@lingui/babel-plugin-lingui-macro` to the `react()` plugin's Babel config and adding `lingui()` as a top-level Vite plugin. If the config has unusual structure or unfamiliar plugins, show the proposed diff and ask for confirmation.
+ 
+-Modify `vite.config.ts` to add the Babel plugin and the Lingui Vite plugin:
++### Native macro transform
++
++**Use this form when `@lingui/vite-plugin` is `>= 6.9.0`**, and always on `@vitejs/plugin-react@6+` (see the version gate at the top of this file). `@lingui/vite-plugin@6.9.0` carries the macro transform itself, so there is no Babel macro plugin to install or configure:
++
++```ts
++import { defineConfig } from 'vite'
++import react from '@vitejs/plugin-react'
++import { lingui } from '@lingui/vite-plugin'
++
++export default defineConfig({
++  plugins: [react(), lingui({ macroTransform: true })],
++})
++```
++
++With this form, drop `@lingui/babel-plugin-lingui-macro` from the install line in *Packages* and require `'@lingui/vite-plugin@^6.9.0'` rather than `'@lingui/vite-plugin@^6'` — `^6` admits `6.8.0`, where `macroTransform` is not a recognised option and macros are then silently left untransformed.
++
++Four things to know before using it:
++
++- **Macro options come from `lingui.config.ts`, which must already exist.** The plugin reads the Lingui config eagerly when `macroTransform` is set — before Vite's `configResolved` — so create `lingui.config.ts` before adding this to `vite.config.ts`. Per-project overrides go in `lingui({ macroTransform: { macro: { … } } })`.
++- **`@lingui/native-tools` is a native addon** (`@lingui/vite-plugin@6.9.0` declares `@lingui/native-tools@^0.1.5` as a runtime dependency), with prebuilt binaries for darwin x64/arm64, linux x64/arm64 in both gnu and musl, win32 x64/arm64, and android arm64. On a platform outside that list the install resolves no binary and the transform cannot load — use option 2 of the version gate there.
++- **If the project also runs Babel for the React Compiler** through `@rolldown/plugin-babel`, keep that plugin for the compiler only and place `lingui()` before it in the `plugins` array.
++- **The rest of this file still applies unchanged** — catalog layout, provider setup, extraction and the `lingui compile` → `vite build` → `tsc --noEmit` ordering are all independent of which transformer handles the macros.
++
++### Babel macro transform
++
++Use this form on `@vitejs/plugin-react@5` or lower when `@lingui/vite-plugin` is below `6.9.0`. Modify `vite.config.ts` to add the Babel plugin and the Lingui Vite plugin:
+ 
+ ```ts
+ import { defineConfig } from 'vite'

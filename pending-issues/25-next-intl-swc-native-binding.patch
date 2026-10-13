@@ -1,0 +1,144 @@
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md
+index 40666a7..5577b11 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/app-router/next-intl.setup.md
+@@ -306,6 +306,67 @@ const nextConfig = {
+ module.exports = withNextIntl(nextConfig);
+ ```
+ 
++### If `next.config` fails to load with `Failed to load native binding`
++
++**`next-intl` pulls a native SWC addon as a direct dependency, and `next-intl/plugin` loads it at module scope.** From `4.14.0` (2026-08-27) the `dependencies` block carries `"@swc/core": "~1.16.0"` — a runtime dependency, not a peer, so it is installed whether or not the project uses SWC itself. Importing `next-intl/plugin` loads it eagerly, by both entry points:
++
++| entry | how `@swc/core` is reached |
++|---|---|
++| `require('next-intl/plugin')` (`next.config.js`) | `dist/cjs/development/plugin.cjs` line 9 — `require('@swc/core')` at module scope |
++| `import … from 'next-intl/plugin'` (`next.config.ts` / `.mjs`) | `plugin/createNextIntlPlugin.js` → `plugin/extractor/initExtractionCompiler.js` → `extractor/ExtractionCompiler.js` → `extractor/extractor/MessageExtractor.js`, static `import {transform} from '@swc/core'` |
++
++Both are unconditional. If the addon cannot load, the failure happens while Next.js is still reading its own config — **before** anything i18n-related runs — and the message names neither `next-intl` nor SWC plugins:
++
++```
++Error: Failed to load native binding
++  [cause] ERR_SWC_NATIVE_CACHE: SWC native addon: validate cache root <path>:
++  cache root has a parent writable by another user without trusted sticky protection.
++```
++
++**`@swc/core@1.16.12`** (2026-09-29) is the first release to ship the addon as a stub that materializes the real binary into a cache directory at `dlopen` time and **validates that directory by ancestor ownership**. **`1.16.18`** (2026-10-11) is the current `latest` and what `~1.16.0` resolves to today. Every release from `1.16.12` onward keeps the same packaging and the same predicate, and the JavaScript side of the npm package is byte-identical across `1.16.12`, `1.16.13`, `1.16.17` and `1.16.18` apart from `package.json` — but **`1.16.17` added an explicit opt-out**, which is the first remedy below.
++
++The check walks the cache root **and every ancestor**, rejecting any whose owner is neither the effective user nor root, and any that is group- or other-writable without the sticky bit. It therefore fails wherever an ancestor of the cache root belongs to another non-root user — containers with uid remapping and some CI images, notably; on the machine this was measured, `/` itself is owned by `nobody`, which rejects every candidate root including `/tmp` and `/var/tmp` despite their sticky bit. Setting `SWC_NATIVE_BINDING_CACHE`, which the error names, does **not** help there: the predicate is about ancestors the caller does not own, and no reachable root satisfies it — re-measured on `1.16.18`, where pointing it at a fresh directory still fails with `custom cache failed: validate cache root …: cache root has a parent writable by another user without trusted sticky protection`. The default root is `$XDG_CACHE_HOME`, else `$HOME/Library/Caches` on macOS and `$HOME/.cache` elsewhere; a root on a `noexec` mount is rejected separately, with a message naming `noexec`.
++
++On an ordinary workstation this all passes — `/` and `/Users` (or `/home`) are root-owned and not group-writable, and the user's own cache directory is owned by the user — so treat this as an environment-shaped failure, not a universal one. One caveat for macOS: until `1.16.13`, a writable installation on macOS took an APFS self-replacement path that never touched the cache root, so this predicate could not fail there. From `1.16.13` every macOS first load goes through the cache instead, which makes the predicate load-bearing on macOS too — relevant if `XDG_CACHE_HOME` points somewhere unusual, such as a shared or network volume.
++
++**`npm install` exits 0 either way.** `@swc/core`'s `postinstall` detects the failed load and installs `@swc/wasm` as a fallback, but `@swc/core/index.js` requires `./binding` at module scope (line 66), outside the `try/catch` that would use that fallback — so it is installed and never reached. There is no install-time warning to go on.
++
++**Remedy 1 — skip the ancestor check (`@swc/core >= 1.16.17`, preferred).** `1.16.17` added an environment opt-out for exactly this case, documented in its own source as *"some isolated CI executors cannot satisfy ancestor ownership or mode requirements"*:
++
++```bash
++SWC_NATIVE_BINDING_CACHE_SKIP_SECURITY_CHECK=1
++```
++
++Set it for the build — in the CI job's environment, the container image, or the `dev`/`build` script — not in committed application code. It must be exactly `1`; any other value, including `0`, leaves the check on. Absolute-path, private-cache and `noexec`-mount requirements are still enforced, so this relaxes one predicate rather than disabling the cache. It is a **no-op below `1.16.17`**, so it is not a substitute for Remedy 2 on an older pinned host.
++
++Because it skips ancestor validation, it also permits symlinked ancestors: use it where you control the filesystem (your own CI image, a dev container), not on a host whose cache path other users can rename.
++
++**Remedy 2 — pin the host below the repackaging.** Use this when the resolved `@swc/core` is `1.16.12`–`1.16.13`, which have no opt-out, or when setting an environment variable for the build is not an option:
++
++```json
++// package.json — npm
++"overrides": { "@swc/core": "1.16.2" }
++```
++
++```json
++// package.json — pnpm / yarn
++"resolutions": { "@swc/core": "1.16.2" }
++```
++
++Keep it inside `~1.16.0` — `1.16.2` is the newest release that still ships a real addon (33 MB; every release from `1.16.12` on is a ~10.6 MB stub). Dropping to `^1.15` leaves `next-intl@^4.14`'s own declared range.
++
++**Verified**, on a machine where `/` is owned by `nobody`, against `next-intl@4.14.9` with `~1.16.0` resolving to `@swc/core@1.16.18`:
++
++| | `require('@swc/core')` | `require('next-intl/plugin')` | `import('next-intl/plugin')` |
++|---|---|---|---|
++| default install, no variable | throws | throws | throws |
++| `SWC_NATIVE_BINDING_CACHE_SKIP_SECURITY_CHECK=1` | **loads** | **loads** | **loads** |
++| `SWC_NATIVE_BINDING_CACHE=<fresh dir>` | throws | throws | — |
++| the variable against `@swc/core@1.16.13` | throws (no-op) | — | — |
++| `overrides` resolving `1.16.2` | loads | loads | loads |
++
++A `transformSync('const a=1;')` through the host loaded via the opt-out returns `var a = 1;`, so the addon is genuinely materialized and not merely past the check.
++
+ ### Composing with other plugins
+ 
+ If the project already uses other Next.js plugins (e.g., `@next/bundle-analyzer`, `next-pwa`), wrap them in sequence:
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md
+index 5aa5a81..c2eb999 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/nextjs/pages-router/next-intl.setup.md
+@@ -151,6 +151,67 @@ The `i18n` key tells Next.js to:
+ - Set the `<html lang>` attribute automatically
+ - Redirect bare paths (`/about`) based on the `Accept-Language` header or cookie
+ 
++### If `next.config` fails to load with `Failed to load native binding`
++
++**`next-intl` pulls a native SWC addon as a direct dependency, and `next-intl/plugin` loads it at module scope.** From `4.14.0` (2026-08-27) the `dependencies` block carries `"@swc/core": "~1.16.0"` — a runtime dependency, not a peer, so it is installed whether or not the project uses SWC itself. Importing `next-intl/plugin` loads it eagerly, by both entry points:
++
++| entry | how `@swc/core` is reached |
++|---|---|
++| `require('next-intl/plugin')` (`next.config.js`) | `dist/cjs/development/plugin.cjs` line 9 — `require('@swc/core')` at module scope |
++| `import … from 'next-intl/plugin'` (`next.config.ts` / `.mjs`) | `plugin/createNextIntlPlugin.js` → `plugin/extractor/initExtractionCompiler.js` → `extractor/ExtractionCompiler.js` → `extractor/extractor/MessageExtractor.js`, static `import {transform} from '@swc/core'` |
++
++Both are unconditional. If the addon cannot load, the failure happens while Next.js is still reading its own config — **before** anything i18n-related runs — and the message names neither `next-intl` nor SWC plugins:
++
++```
++Error: Failed to load native binding
++  [cause] ERR_SWC_NATIVE_CACHE: SWC native addon: validate cache root <path>:
++  cache root has a parent writable by another user without trusted sticky protection.
++```
++
++**`@swc/core@1.16.12`** (2026-09-29) is the first release to ship the addon as a stub that materializes the real binary into a cache directory at `dlopen` time and **validates that directory by ancestor ownership**. **`1.16.18`** (2026-10-11) is the current `latest` and what `~1.16.0` resolves to today. Every release from `1.16.12` onward keeps the same packaging and the same predicate, and the JavaScript side of the npm package is byte-identical across `1.16.12`, `1.16.13`, `1.16.17` and `1.16.18` apart from `package.json` — but **`1.16.17` added an explicit opt-out**, which is the first remedy below.
++
++The check walks the cache root **and every ancestor**, rejecting any whose owner is neither the effective user nor root, and any that is group- or other-writable without the sticky bit. It therefore fails wherever an ancestor of the cache root belongs to another non-root user — containers with uid remapping and some CI images, notably; on the machine this was measured, `/` itself is owned by `nobody`, which rejects every candidate root including `/tmp` and `/var/tmp` despite their sticky bit. Setting `SWC_NATIVE_BINDING_CACHE`, which the error names, does **not** help there: the predicate is about ancestors the caller does not own, and no reachable root satisfies it — re-measured on `1.16.18`, where pointing it at a fresh directory still fails with `custom cache failed: validate cache root …: cache root has a parent writable by another user without trusted sticky protection`. The default root is `$XDG_CACHE_HOME`, else `$HOME/Library/Caches` on macOS and `$HOME/.cache` elsewhere; a root on a `noexec` mount is rejected separately, with a message naming `noexec`.
++
++On an ordinary workstation this all passes — `/` and `/Users` (or `/home`) are root-owned and not group-writable, and the user's own cache directory is owned by the user — so treat this as an environment-shaped failure, not a universal one. One caveat for macOS: until `1.16.13`, a writable installation on macOS took an APFS self-replacement path that never touched the cache root, so this predicate could not fail there. From `1.16.13` every macOS first load goes through the cache instead, which makes the predicate load-bearing on macOS too — relevant if `XDG_CACHE_HOME` points somewhere unusual, such as a shared or network volume.
++
++**`npm install` exits 0 either way.** `@swc/core`'s `postinstall` detects the failed load and installs `@swc/wasm` as a fallback, but `@swc/core/index.js` requires `./binding` at module scope (line 66), outside the `try/catch` that would use that fallback — so it is installed and never reached. There is no install-time warning to go on.
++
++**Remedy 1 — skip the ancestor check (`@swc/core >= 1.16.17`, preferred).** `1.16.17` added an environment opt-out for exactly this case, documented in its own source as *"some isolated CI executors cannot satisfy ancestor ownership or mode requirements"*:
++
++```bash
++SWC_NATIVE_BINDING_CACHE_SKIP_SECURITY_CHECK=1
++```
++
++Set it for the build — in the CI job's environment, the container image, or the `dev`/`build` script — not in committed application code. It must be exactly `1`; any other value, including `0`, leaves the check on. Absolute-path, private-cache and `noexec`-mount requirements are still enforced, so this relaxes one predicate rather than disabling the cache. It is a **no-op below `1.16.17`**, so it is not a substitute for Remedy 2 on an older pinned host.
++
++Because it skips ancestor validation, it also permits symlinked ancestors: use it where you control the filesystem (your own CI image, a dev container), not on a host whose cache path other users can rename.
++
++**Remedy 2 — pin the host below the repackaging.** Use this when the resolved `@swc/core` is `1.16.12`–`1.16.13`, which have no opt-out, or when setting an environment variable for the build is not an option:
++
++```json
++// package.json — npm
++"overrides": { "@swc/core": "1.16.2" }
++```
++
++```json
++// package.json — pnpm / yarn
++"resolutions": { "@swc/core": "1.16.2" }
++```
++
++Keep it inside `~1.16.0` — `1.16.2` is the newest release that still ships a real addon (33 MB; every release from `1.16.12` on is a ~10.6 MB stub). Dropping to `^1.15` leaves `next-intl@^4.14`'s own declared range.
++
++**Verified**, on a machine where `/` is owned by `nobody`, against `next-intl@4.14.9` with `~1.16.0` resolving to `@swc/core@1.16.18`:
++
++| | `require('@swc/core')` | `require('next-intl/plugin')` | `import('next-intl/plugin')` |
++|---|---|---|---|
++| default install, no variable | throws | throws | throws |
++| `SWC_NATIVE_BINDING_CACHE_SKIP_SECURITY_CHECK=1` | **loads** | **loads** | **loads** |
++| `SWC_NATIVE_BINDING_CACHE=<fresh dir>` | throws | throws | — |
++| the variable against `@swc/core@1.16.13` | throws (no-op) | — | — |
++| `overrides` resolving `1.16.2` | loads | loads | loads |
++
++A `transformSync('const a=1;')` through the host loaded via the opt-out returns `var a = 1;`, so the addon is genuinely materialized and not merely past the check.
++
+ ### Composing with other plugins
+ 
+ If the project already uses other plugins, wrap them in sequence:

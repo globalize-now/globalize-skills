@@ -1,0 +1,89 @@
+diff --git a/skills/globalize-guide/SKILL.md b/skills/globalize-guide/SKILL.md
+index 036fe2b..4044e55 100644
+--- a/skills/globalize-guide/SKILL.md
++++ b/skills/globalize-guide/SKILL.md
+@@ -605,7 +605,7 @@ If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-com
+ 
+ `gitignore_artifacts` runs in the collapse case too, and it is the **only** place the step can find pre-existing *tracked* generated catalogs: an already-configured Lingui or Paraglide project almost always has them committed. There the step does two things — append the ignore rule, and (with the user's consent) `git rm --cached` the tracked generated files so the working tree keeps them while git stops seeing them. Omit the step for runtime-catalog libraries, which generate nothing.
+ 
+-**Paraglide ICU-JSON → PO migration collapse-case.** If `existing.library === "paraglide"`, `existing.configured === true`, the project currently has `messages/*.json` (ICU-JSON / `@inlang/plugin-icu1`), and the user chose `decisions.setup.catalogFormat === "po"`, Phase 2 is a **format migration**, not a from-scratch setup. The plan steps are: `migrate_settings` (swap the icu1 module + key for the PO module + `plugin.globalizeNow.po` with `"messageFormat": "icu"`), `migrate_catalogs` (rewrite each `messages/{locale}.json` → `messages/{locale}.po` — lossless: `"key": "ICU body"` → `msgid "key"` / `msgstr "ICU body"`, carrying interpolation/plural/select verbatim; add the `msgid ""` header block; delete the old `.json`), `paraglide_compile`, and `build_verification`. The migration is driven by the **Migration: existing ICU-JSON → PO** section of `references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md` (the default PO setup file). The per-file `migrate_catalogs` rewrite is independent across locales, so dispatch it as parallel background subagents (one per `messages/{locale}.json`). After migrating, run the plural-render check from that file's **Verify** step — a missing `"messageFormat": "icu"` or a botched ICU escape fails **silently** (renders raw ICU), so the build passing is not sufficient.
++**Paraglide ICU-JSON → PO migration collapse-case.** If `existing.library === "paraglide"`, `existing.configured === true`, the project currently has `messages/*.json` (ICU-JSON / `@inlang/plugin-icu1`), and the user chose `decisions.setup.catalogFormat === "po"`, Phase 2 is a **format migration**, not a from-scratch setup. The plan steps are: `migrate_settings` (swap the icu1 module + key for the PO module + `plugin.globalizeNow.po` with `"messageFormat": "icu"`), `migrate_catalogs` (rewrite each `messages/{locale}.json` → `messages/{locale}.po` — lossless: `"key": "ICU body"` → `msgid "key"` / `msgstr "ICU body"`, carrying interpolation/plural/select verbatim; add the `msgid ""` header block; delete the old `.json`), `paraglide_compile`, and `build_verification`. The migration is driven by the **Migration: existing ICU-JSON → PO** section of `references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md` (the default PO setup file). The per-file `migrate_catalogs` rewrite is independent across locales, so dispatch it as parallel background subagents (one per `messages/{locale}.json`). After migrating, run the plural-render check from that file's **Verify** step — a missing `"messageFormat": "icu"` or a botched ICU escape fails **silently** (exit 0, empty stderr) — a plural renders raw ICU, a select renders `undefined` — so the build passing is not sufficient.
+ 
+ ---
+ 
+@@ -680,7 +680,7 @@ If any returns `failed`, surface error. The verify subagent should still run on
+ >
+ > For Paraglide:
+ > 1. Run `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide` (both flags; single-quoted pin so zsh's `EXTENDED_GLOB` does not eat the caret). Capture errors. Atomically update `progress/verify.json` after this step.
+-> 2. Run the project's typecheck and build command. Capture pass/fail. (No extract step.) **Default PO format:** (a) inspect a compiled plural message (`src/lib/paraglide/messages/<key>.js`) to confirm it emits CLDR `registry.plural(...)` branches and **not** the raw `{count, plural, …}` source as a literal — raw source means `"messageFormat": "icu"` is missing or an `msgstr` is malformed (both fail silently); (b) run a comment-review pass over the base `messages/{baseLocale}.po`, adding `#.` comments where the reference's heuristic says one should exist. **ICU-JSON format (`catalogFormat === "json"`):** skip both — there is no comment field, and the ICU1 plugin already fails the build on malformed ICU.
++> 2. Run the project's typecheck and build command. Capture pass/fail. (No extract step.) **Default PO format:** (a) inspect a compiled plural message (`src/lib/paraglide/messages/<key>.js`) to confirm it emits CLDR `registry.plural(...)` branches and **not** the raw `{count, plural, …}` source as a literal — raw source means `"messageFormat": "icu"` is missing or an `msgstr` is malformed (both fail silently); a `select` message does **not** show raw source under a missing `messageFormat` — it compiles its branch bodies into the input signature and renders `undefined` — so check a select as well as a plural; (b) run a comment-review pass over the base `messages/{baseLocale}.po`, adding `#.` comments where the reference's heuristic says one should exist. **ICU-JSON format (`catalogFormat === "json"`):** skip both — there is no comment field, and the ICU1 plugin already fails the build on malformed ICU.
+ > 3. **Recall self-check.** Paraglide has no official `no-unlocalized-strings` rule (see `paraglide/setup.add-ons.md`), so run the tuned grep scan from `references/languages/js-ts/convert.recall-self-check.md` over `src/` (adapted to `.svelte` templates). Write `result.recallViolations`; on non-empty, `status: "needs_cleanup"` and let the orchestrator run the cleanup loop (the cleanup subagent authors the missing `m.key()` entries per the Paraglide convert reference).
+ >
+ > For Rails:
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
+index 3a4e2f0..8ef3da0 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
+@@ -305,5 +305,5 @@ Then verify:
+ 
+ 1. The dev server boots and the converted pages render the expected text in the base locale.
+ 2. Switching locale via the language switcher changes the visible copy with no missing-key warnings in the console.
+-3. **A plural renders as CLDR logic, not raw ICU.** Render a plural at `count: 5` (and `1`) and confirm the output is `5 items` / `1 item`, not the literal `{count, plural, …}` source. Raw ICU showing through means `"messageFormat": "icu"` is missing from the plugin config or the `msgstr` is malformed — both fail silently at import, so this is the only check that catches them.
++3. **A plural renders as CLDR logic, not raw ICU — and so does a select.** Render a plural at `count: 5` (and `1`) and confirm the output is `5 items` / `1 item`, not the literal `{count, plural, …}` source. Then render one `select` message and confirm you get the branch text and not `undefined` — a missing `"messageFormat": "icu"` renders a select as `{g, select, female undefined …}`, **not** as raw ICU, so the plural check alone does not cover it. Both a missing `messageFormat` and a malformed `msgstr` import silently (exit 0, empty stderr), so these two renders are the only signal — except for the select, which also fails the typecheck with `TS2353` on the selector argument.
+ 4. The production build (`npm run build`, or the detected manager's equivalent) completes.
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md
+index 4f3f452..a8d5c6e 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md
+@@ -67,7 +67,15 @@ Create `project.inlang/settings.json`. The PO plugin owns the message catalogs 
+ - **The CDN module URL is what inlang loads and runs at compile time** — pin it. `@0.1` resolves the latest `0.1.x`, which is the first ICU-capable line (ICU support landed in `0.1.2`). This mirrors the icu1 plugin's `@1` pin and keeps the loaded version reproducible. Do not drop the `@0.1` — an unpinned URL would float to a future `0.2` with breaking changes.
+ - `plugin.globalizeNow.po` is the settings key the plugin reads. `pathPattern` must contain `{locale}` and end in `.po`.
+ 
+-> **`messageFormat: "icu"` is required and load-bearing.** The default is `"plain"`, which reads only `{name}`-style placeholders and renders ICU `plural` / `select` / `selectordinal` bodies as **literal text** — silently, with no build error. Without `"messageFormat": "icu"` every plural and select message in the project is broken. Always set it.
++> **`messageFormat: "icu"` is required and load-bearing.** The default is `"plain"`, which reads only `{name}`-style placeholders. Without `"messageFormat": "icu"` every message carrying an ICU construct is broken and **the build still exits 0 with an empty stderr and no warning** — but the three symptoms do not look alike (measured on `@inlang/paraglide-js@2.26.0` with the PO plugin at `0.1.2`):
++>
++> | plain-mode `msgstr` | renders as |
++> | --- | --- |
++> | `{count, plural, one {# like} …}`, `{n, selectordinal, one {#st} …}`, **and a bare `{amount, number}`** | the raw ICU source, verbatim |
++> | `{count, plural, one {{count} like} …}` | the ICU scaffolding with the count pasted into every branch: `{count, plural, one {5 like} other {5 likes}}` |
++> | `{g, select, female {She} male {He} other {They}}` | `{g, select, female undefined male undefined other undefined}` — plain treats the **branch bodies** as placeholders, so `She` / `He` / `They` become the message's inputs |
++>
++> Two things follow. `{amount, number}` is in scope, so a project with **no** plural and **no** select is still silently broken. And `select` is the one case a typecheck catches: the call site you would write, `m.replied({ g: … })`, fails with `TS2353: … 'g' does not exist in type 'RepliedInputs'`, whereas plural and `{x, number}` messages compile to an `{}` input type that accepts any object and pass the typecheck clean. Always set it.
+ 
+ Then create the base-locale catalog with a sample message and an ICU plural. A `.po` file opens with the required empty-`msgid` header block:
+ 
+@@ -377,7 +385,7 @@ The Paraglide compiler also emits a `.gitignore` of its own inside `outdir` by d
+ 
+    The two numbers must match, and the first must be **> 0**. Zero means the catalog plugin imported nothing — the `.po` files are untouched on disk and look fine, so nothing else in the tree hints at it. Two settings mistakes produce exactly this, both verified: the `plugin.globalizeNow.po` key missing or misspelled (most likely halfway through the ICU-JSON → PO migration below, where the module URL is swapped but the old `plugin.inlang.icu-messageformat-1` key is left behind), and a `pathPattern` that matches no file. In both cases every `m.*()` call is then `undefined` at runtime.
+ 2. Start the dev server (`npm run dev` or the detected manager's equivalent). It should boot without errors and the page should render the sample message. Switch locale via the switcher — the visible text changes and (with `url` in the strategy) the URL gains the locale prefix; reloading that URL keeps the chosen locale (cookie + URL persistence working under SSR).
+-3. **Render a plural and confirm it selects the correct form.** Call `m.likes({ count: 1 })` and `m.likes({ count: 5 })` somewhere on a page and confirm the output is `1 like` and `5 likes` — **not** the raw `{count, plural, …}` source and not an empty string. Raw-source output means `messageFormat: "icu"` is missing (or the plugin URL is below `0.1.2`); fix that before continuing. This check is non-negotiable — it is the only signal that ICU is actually being evaluated (a malformed or unparsed ICU body is imported as literal text with no build error).
++3. **Render a plural *and* a select, and confirm both evaluate.** Call `m.likes({ count: 1 })` and `m.likes({ count: 5 })` somewhere on a page and confirm the output is `1 like` and `5 likes` — **not** the raw `{count, plural, …}` source and not an empty string. Then render one `select` message and confirm the branch text appears and **not** the word `undefined`: under plain mode a select renders `{g, select, female undefined …}`, so a plural-only check passes a project whose every select is broken. Either symptom means `messageFormat: "icu"` is missing (or the plugin URL is below `0.1.2`); fix that before continuing. This check is non-negotiable — a malformed or unparsed ICU body is imported as literal text and the build exits 0 with an empty stderr. The one thing the typecheck catches for you is the select (`TS2353` on the selector argument); plural and `{x, number}` messages compile to an `{}` input type and pass it clean, so they need the render.
+ 4. Run the production build (`npm run build`). **Exit 0 is not the check here either — read the warnings.**
+ 
+    A **missing** `project.inlang/settings.json` does fail the build:
+diff --git a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md
+index 856af34..a4093a5 100644
+--- a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md
++++ b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md
+@@ -22,7 +22,7 @@ Where the base PO file shows a `.po` entry, ICU-JSON uses a flat key → ICU-str
+ 
+ Call sites are identical to the base: `{m.dashboard_title()}`, `m.greeting({ name })`, `m.cart_item_count({ count })`.
+ 
+-The ICU message bodies (`{name}`, `{count, plural, …}`, `{g, select, …}`, selectordinal) are exactly the same strings as in the PO base — only the envelope (JSON value vs. `msgstr`) differs. No ICU-mode `messageFormat` setting and no apostrophe/`<b>` caveats apply: the ICU1 plugin always parses ICU and **fails the build** on malformed ICU (the PO plugin's silent-literal behavior is a PO-only footgun).
++The ICU message bodies (`{name}`, `{count, plural, …}`, `{g, select, …}`, selectordinal) are exactly the same strings as in the PO base — only the envelope (JSON value vs. `msgstr`) differs. No ICU-mode `messageFormat` setting and no apostrophe/`<b>` caveats apply: the ICU1 plugin always parses ICU and **fails the build** on malformed ICU (the PO plugin's silent-import behavior — raw ICU for a plural, `undefined` for a select — is a PO-only footgun).
+ 
+ ## Key naming carries all the context
+ 
+diff --git a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md
+index 3854581..0862ed7 100644
+--- a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md
++++ b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md
+@@ -286,7 +286,7 @@ The PO plugin parses `msgstr` as ICU, not as plain gettext. A few things behave
+ 
+ - **Escaping is ICU apostrophe-based, not backslash.** Use `'{'` to emit a literal `{`, and `''` to emit a literal `'`. This matters for elision languages — French `l'{article}` must be written so the apostrophe and placeholder both survive ICU parsing (e.g. `l''{article}` for a literal apostrophe before the placeholder).
+ - **ICU markup like `<b>…</b>` is treated as literal text.** Do not put HTML or component tags inside a `msgstr` — they will render as literal characters. Compose formatting in markup instead (wrap the message in the element, or split the copy).
+-- **A malformed ICU `msgstr` is silently imported as literal text — no build error.** If a string renders as raw `{count, plural, …}` on screen, the ICU body is malformed or the plugin's `"messageFormat": "icu"` setting is missing.
++- **A malformed ICU `msgstr` is silently imported as literal text — no build error.** If a string renders as raw `{count, plural, …}` on screen, the ICU body is malformed or the plugin's `"messageFormat": "icu"` setting is missing. A missing `messageFormat` has two further symptoms that are easy to misread: a **select** renders `{g, select, female undefined …}` — plain mode turns the branch bodies into the message's inputs, so the call site also fails the typecheck with `TS2353` — and a bare `{amount, number}` renders verbatim even though the message contains no plural and no select.
+ <!-- /if -->
+ 
+ ## What not to wrap

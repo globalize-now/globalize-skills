@@ -1,0 +1,12 @@
+Put a GitHub fine-grained personal access token on ONE line in a file named
+.github-token in this directory (library-checks/.github-token).
+
+Repository access: globalize-now/globalize-skills
+Permissions:  Contents: Read and write
+              Pull requests: Read and write
+              Issues: Read and write
+              Metadata: Read-only (implied)
+
+The whole library-checks/ directory is gitignored, so the token never enters
+the repository. Rotate it like any other credential; the daily Library check
+falls back to writing drafts if it is missing or expired.

@@ -1,0 +1,138 @@
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
+index 3a4e2f0..6c76fce 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md
+@@ -89,7 +89,7 @@ Any string whose wording changes with a number or a category (gender, status, ty
+ ```po
+ #. Cart item count badge in the header
+ msgid "cart_item_count"
+-msgstr "{count, plural, one {# item} other {# items}}"
++msgstr "{count, plural, one {{count, number} item} other {{count, number} items}}"
+ ```
+ 
+ ```svelte
+diff --git a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md
+index 4f3f452..c76b430 100644
+--- a/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md
+@@ -85,7 +85,7 @@ msgstr "Hello, {name}!"
+ 
+ #. Number of likes on a post
+ msgid "likes"
+-msgstr "{count, plural, one {# like} other {# likes}}"
++msgstr "{count, plural, one {{count, number} like} other {{count, number} likes}}"
+ ```
+ 
+ - The empty `msgid ""` header block is required by the PO spec; keep `Content-Type` and `Language`.
+diff --git a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md
+index 856af34..69dd6f3 100644
+--- a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md
++++ b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.convert.md
+@@ -16,7 +16,7 @@ Where the base PO file shows a `.po` entry, ICU-JSON uses a flat key → ICU-str
+ {
+   "dashboard_title": "Dashboard",
+   "greeting": "Hello, {name}!",
+-  "cart_item_count": "{count, plural, one {# item} other {# items}}"
++  "cart_item_count": "{count, plural, one {{count, number} item} other {{count, number} items}}"
+ }
+ ```
+ 
+diff --git a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.setup.md b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.setup.md
+index 1e2e435..c59a119 100644
+--- a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.setup.md
++++ b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/json-format.setup.md
+@@ -39,7 +39,7 @@ Use this in place of the PO base's `messages/en.po`. Create the base-locale cata
+ // messages/en.json
+ {
+   "hello_world": "Hello, {name}!",
+-  "likes": "{count, plural, one {# like} other {# likes}}"
++  "likes": "{count, plural, one {{count, number} like} other {{count, number} likes}}"
+ }
+ ```
+ 
+@@ -64,7 +64,7 @@ The compile command is also unchanged: `npx '@inlang/paraglide-js@^2' compile --
+ 
+ 1. Start the dev server (`npm run dev` or the detected manager's equivalent). It should boot without errors and the page should render the sample message.
+ 2. Switch locale via the switcher — the visible text changes and (with `url` in the strategy) the URL gains the locale prefix; reloading that URL keeps the chosen locale (cookie + URL persistence working under SSR).
+-3. Run the production build (`npm run build`). **Exit 0 is not the check — read the warnings.** Three outcomes, all verified against `@inlang/plugin-icu1@1.1.0` on Paraglide 2.25.2:
++3. Run the production build (`npm run build`). **Exit 0 is not the check — read the warnings.** Four outcomes, all verified against `@inlang/plugin-icu1@1.2.0` on Paraglide **2.27.0** and **2.26.0** (the versions the `@1` module pin and `@inlang/paraglide-js@^2` resolve to; `plugin-icu1`'s `dist/index.js` is byte-identical at 1.1.0 and 1.1.1, so the first three outcomes are unchanged from the 2.25.2 measurement):
+ 
+    - A **malformed ICU string** *does* fail the build, exit 1 — this is the one place ICU-JSON is stricter than PO, whose plugin imports an unparsed body as literal text with no build error:
+ 
+@@ -82,6 +82,14 @@ The compile command is also unchanged: `npx '@inlang/paraglide-js@^2' compile --
+ 
+      **Treat any `is not exported by "…/paraglide/messages.js"` warning as a build failure.** Shipping past it produces a server that returns **500 on every page** — the missing named import bundles as `undefined`, so the first `m.*()` call throws `TypeError: (void 0) is not a function` during SSR. Step 1 above is what catches it cheaply: a page that renders the sample message cannot have an empty catalog.
+ 
++   - An **ICU `#` count placeholder on a lockfile below `@inlang/paraglide-js@2.27.0`** emits a warning and is then **ignored**:
++
++     ```
++      WARN  [paraglide-js] The formatter "icu:pound" is unknown and will be ignored. The value is interpolated without formatting. Supported formatters: plural, number, datetime, relativetime.
++     ```
++
++     The build exits **0** and the message still renders, but the count is interpolated raw — `1234567` instead of `1,234,567`, in every locale — and the warning fires **once per build**, not once per message, so it does not say how many messages are affected. **`2.27.0` (2026-10-09) implements `#` and `offset:`** on this format, so the warning is absent and the count is formatted there. Since `^2` floats, a project can be on either side of that line: write `{count, number}` inside each plural branch and the output is correct on both (see `paraglide/rules.template.md`). **On the PO format `#` is unformatted at every 2.x version and entirely silent** — no warning — which is why the rule, not the warning, is the defence.
++
+ ## Translator comments
+ 
+ **Not supported on ICU-JSON.** The inlang/ICU JSON message model has no comment, context, or description field, so there is nowhere to attach translator notes — see the "Translator comments" section in `paraglide/rules.template.md`. The only disambiguation lever is a descriptive key name (`cart_remove_button`, not `remove`). Do not attempt to wire comment metadata into JSON messages. To get translator comments, use the default PO format (`paraglide.setup.md`) — its migration section converts an existing ICU-JSON project losslessly.
+diff --git a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md
+index 3854581..2a033c3 100644
+--- a/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md
++++ b/skills/globalize-guide/references/languages/js-ts/libraries/paraglide/rules.template.md
+@@ -37,7 +37,7 @@ Does the string's wording change based on a number (e.g. "3 items" / "1 item")?
+   YES → ICU plural inside the msgstr
+         #. Number of likes on a post
+         msgid "likes"
+-        msgstr "{count, plural, one {# like} other {# likes}}"
++        msgstr "{count, plural, one {{count, number} like} other {{count, number} likes}}"
+         call: m.likes({ count })
+         (see "Plurals, select, ordinal" below)
+ 
+@@ -59,7 +59,7 @@ Plain static text?
+ ```
+ Does the string's wording change based on a number (e.g. "3 items" / "1 item")?
+   YES → ICU plural inside the message value
+-        "likes": "{count, plural, one {# like} other {# likes}}"
++        "likes": "{count, plural, one {{count, number} like} other {{count, number} likes}}"
+         call: m.likes({ count })
+         (see "Plurals, select, ordinal" below)
+ 
+@@ -151,12 +151,12 @@ Any time a string's wording depends on a number — singular/plural nouns, subje
+ ```po
+ #. Number of likes on a post
+ msgid "likes"
+-msgstr "{count, plural, one {# like} other {# likes}}"
++msgstr "{count, plural, one {{count, number} like} other {{count, number} likes}}"
+ ```
+ <!-- else -->
+ ```json
+ {
+-  "likes": "{count, plural, one {# like} other {# likes}}"
++  "likes": "{count, plural, one {{count, number} like} other {{count, number} likes}}"
+ }
+ ```
+ <!-- /if -->
+@@ -181,12 +181,12 @@ msgstr "{g, select, male {He liked it} female {She liked it} other {They liked i
+ ```po
+ #. Finishing position in a race, e.g. "1st"
+ msgid "rank"
+-msgstr "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}"
++msgstr "{n, selectordinal, one {{n, number}st} two {{n, number}nd} few {{n, number}rd} other {{n, number}th}}"
+ ```
+ <!-- else -->
+ ```json
+ {
+-  "rank": "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}"
++  "rank": "{n, selectordinal, one {{n, number}st} two {{n, number}nd} few {{n, number}rd} other {{n, number}th}}"
+ }
+ ```
+ <!-- /if -->
+@@ -196,7 +196,8 @@ msgstr "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}"
+ ### Rules
+ 
+ - `other` is **always required** — it is the fallback for every language.
+-- `#` is the count placeholder inside a plural/selectordinal branch — do not repeat the variable name there.
++- **Write `{count, number}` as the count placeholder, not `#`.** ICU `#` is implemented only on the ICU-JSON format *and* only from `@inlang/paraglide-js` **2.27.0** onward. On the PO format (this skill's default) it is unformatted at **every** 2.x version, and on ICU-JSON at **2.26.x and below** — `1234567` renders as `1234567` in every locale instead of `1,234,567` / `1 234 567` / `1.234.567`. Bare `{count}` inside a branch is unformatted everywhere, by design. **`{count, number}`** (and `{n, number}` for selectordinal) is the one form that is locale-aware on both formats at every version `@inlang/paraglide-js@^2` can resolve to, so write that. Where `#` is unimplemented, ICU-JSON warns once per build (`The formatter "icu:pound" is unknown and will be ignored`) and **PO is silent**.
++- `offset:` in a plural body follows the same split — honoured on ICU-JSON from **2.27.0** (`{count, plural, offset:1 …}` with `count = 1234567` renders `1,234,566`), and **parsed then dropped, with no warning, on PO at every version and on ICU-JSON below 2.27.0**. Do not emit it unless the project is ICU-JSON and pinned at `>= 2.27.0`.
+ - CLDR categories: `zero`, `one`, `two`, `few`, `many`, `other` — not `singular` / `plural`. English cardinals need only `one` + `other`.
+ - Ordinal categories differ from cardinal — English ordinals use `one` (1st, 21st), `two` (2nd, 22nd), `few` (3rd, 23rd), `other` (4th+).
+ - Keep all branches in **one** message body — never split them into separate entries.
