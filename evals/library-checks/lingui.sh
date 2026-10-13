@@ -378,10 +378,16 @@ case "$VARIANT" in
     ;;
 
   vite-swc|vite-swc-lingui)
+    # Macros reach the build by one of two routes: the SWC plugin inside
+    # react({ plugins: … }), or @lingui/vite-plugin >= 6.9.0 with
+    # macroTransform, which transforms them natively and needs no SWC plugin.
+    # Asserting only the first fails a correct native-transform setup.
     if grep -q "@lingui/swc-plugin" vite.config.ts 2>/dev/null; then
-      pass "@lingui/swc-plugin in vite.config.ts"
+      pass "macro transform configured (@lingui/swc-plugin in vite.config.ts)"
+    elif grep -q "macroTransform" vite.config.ts 2>/dev/null; then
+      pass "macro transform configured (macroTransform in vite.config.ts)"
     else
-      fail "@lingui/swc-plugin not found in vite.config.ts"
+      fail "no macro transform in vite.config.ts: expected @lingui/swc-plugin or macroTransform"
     fi
     if grep -q "@lingui/vite-plugin" vite.config.ts 2>/dev/null; then
       pass "@lingui/vite-plugin in vite.config.ts"
@@ -396,10 +402,12 @@ case "$VARIANT" in
     ;;
 
   vite-babel|vite-babel-lingui)
-    if grep -q "lingui" vite.config.ts 2>/dev/null; then
-      pass "Lingui babel plugin in vite.config.ts"
+    if grep -q "@lingui/babel-plugin-lingui-macro" vite.config.ts 2>/dev/null; then
+      pass "macro transform configured (Lingui babel plugin in vite.config.ts)"
+    elif grep -q "macroTransform" vite.config.ts 2>/dev/null; then
+      pass "macro transform configured (macroTransform in vite.config.ts)"
     else
-      fail "No lingui reference in vite.config.ts"
+      fail "no macro transform in vite.config.ts: expected @lingui/babel-plugin-lingui-macro or macroTransform"
     fi
     if grep -q "@lingui/vite-plugin" vite.config.ts 2>/dev/null; then
       pass "@lingui/vite-plugin in vite.config.ts"
