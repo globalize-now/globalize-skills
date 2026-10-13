@@ -239,6 +239,6 @@ module.exports = {
 
 Both options default to these values, which suit any LTR latin-script language. The plugin rewrites each logical property to the physical equivalent for the **one** direction configured here and drops the logical declaration — since 6.0.0 it no longer emits `:dir(ltr)` / `:dir(rtl)` pairs. So a single build serves a single direction: for an RTL locale set `inlineDirection: 'right-to-left'` in a separate build, and if the site must serve both directions from one stylesheet, keep the logical properties and skip this plugin.
 
-This lets you write logical properties and generates fallback physical properties for browsers that don't support them. Browser support for logical properties is excellent in modern browsers (95%+ global coverage), so this fallback is only needed if you support IE11 or very old mobile browsers.
+This lets you write logical properties in source and compile them to physical properties for one direction, for browsers that don't support logical properties. Browser support for logical properties is excellent in modern browsers (95%+ global coverage), so this compilation is only needed if you support IE11 or very old mobile browsers.
 
-> **Note:** This plugin is a build-time convenience, not a substitute for writing logical properties in source code. The goal is to write logical properties in your source and let the tool handle fallbacks if needed.
+> **Note:** This plugin is a build-time convenience, not a substitute for writing logical properties in source code. The goal is to write logical properties in your source and let the tool compile them for older browsers if needed.
