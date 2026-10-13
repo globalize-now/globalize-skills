@@ -193,3 +193,5 @@ historical fact and does not go stale. Also re-checked today: `git apply --check
 `48a676ae`, and `@lingui/native-tools` moved `^0.1.5` → `^0.1.6` in both `@lingui/cli` and
 `@lingui/vite-plugin` — the draft's prose quotes `@lingui/native-tools@^0.1.5` as what
 `@lingui/vite-plugin@6.9.0` declares, which also remains true of `6.9.0`.
+
+Filed: https://github.com/globalize-now/globalize-skills/pull/96 (2026-10-13, draft)
