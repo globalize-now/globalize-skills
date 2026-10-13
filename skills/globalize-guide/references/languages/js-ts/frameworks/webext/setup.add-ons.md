@@ -248,7 +248,10 @@ either works — still prefer the built output, because that is what gets upload
 
 ### What it actually catches for i18n
 
-Verified by running `web-ext@10.6.0` against fixtures:
+Verified by running `web-ext@10.6.0` — which bundles `addons-linter@10.10.0` — against fixtures.
+The table still describes `web-ext@10.7.0`: the only logic change in `addons-linter`'s `src/` between
+10.10.0 and the 10.13.0 that 10.7.0 bundles is one `update_url` condition for enterprise add-ons, and
+the locale validation is untouched.
 
 | Code | Severity | Trigger |
 |---|---|---|
