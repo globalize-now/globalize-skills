@@ -107,3 +107,5 @@ Draft `19-untracked-installed-and-gating-packages.md` §Fix step 3 is the identi
 ---
 
 **Still unfiled 2026-10-03.** Tenth consecutive run blocked on the same `401 Bad credentials`. **The split is unchanged at three minors and the carried claim holds:** `@lingui/*` family `latest` **6.9.0** (no publish in this run's window — the 6.9.0 train was 10-01), `@lingui/swc-plugin` `latest` still **6.7.0** (`next` still `6.0.0-next.3`, did not follow the train for a second day), and `~6.6.0` still resolves **6.6.0**. The App Router pin is therefore still three minors behind the family. Checked against `main` `48a676ae`; #91 touched no Lingui pin (its two `lingui.setup.md` edits are both in the *Locale Routing Strategy* section, +2/-0 each, a Capacitor skip note).
+
+Filed: https://github.com/globalize-now/globalize-skills/pull/95 (2026-10-13, cutover run)

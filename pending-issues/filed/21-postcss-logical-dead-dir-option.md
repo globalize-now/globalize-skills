@@ -205,3 +205,5 @@ export declare type pluginOptions = {
 | `{ inlineDirection: 'right-to-left' }` | `margin-right: 10px; padding-right: 1px; padding-left: 2px; text-align: right;` | 0 |
 
 So on the current `latest`, the reference's `{ dir: 'ltr' }` is still silently ignored, still warning-free, and the third row is still the control proving the real option works. The draft's severity rationale — *"the one case where a user would most want it, RTL, silently produces LTR output"* — is now confirmed on 9.0.2 by execution, with `dir: 'rtl'` as the input rather than `dir: 'ltr'`, which is the harsher version of the same demonstration.
+
+Filed: https://github.com/globalize-now/globalize-skills/pull/92 (2026-10-13, cutover run)

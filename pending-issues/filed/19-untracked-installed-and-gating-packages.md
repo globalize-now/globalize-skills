@@ -208,3 +208,5 @@ So the category is **not** a one-instance rule written to fit `@angular/localize
 `web-ext` is already in the tracked set (`latest` 10.7.0) and `^10` resolves to it, so this second hit is **not** a live defect. It is the stronger argument for the category: a package can be installed by a stack that declares no packages *and* be tracked, which means the existing three categories would never have shown the connection between the two. Four stacks in, two with install lines, zero false positives.
 
 **Status of the three recommendations:** (1) done 10-03, tracked set 33. (2) done 10-03, 22 → 23 names. (3) **done 10-04**, numbers above. All three are local; none has reached the repo, because there is still no write path.
+
+Filed: https://github.com/globalize-now/globalize-skills/issues/60#issuecomment-6140900275 (2026-10-13, cutover run)

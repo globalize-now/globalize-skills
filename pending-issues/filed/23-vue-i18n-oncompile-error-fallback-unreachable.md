@@ -135,3 +135,5 @@ A security-hardening release. Two behaviour changes, neither reachable from anyt
 2. **`escapeParameter` now escapes `named` as well as `list`, into a copy.** `else if (isObject(options.named))` became `if (…)`, so a call passing **both** `list` and `named` previously left `named` **unescaped**; and the escape now builds a new object instead of mutating the caller's. `grep -rn 'escapeParameter' skills/` → **0 occurrences**, so no setup this repo emits enables it.
 
 Everything else in the diff is cosmetic (`isMessageFormat` extraction, two reflowed ternaries). **No patch, no new draft** — recorded here so the next run does not re-investigate it.
+
+Filed: https://github.com/globalize-now/globalize-skills/pull/94 (2026-10-13, cutover run)
