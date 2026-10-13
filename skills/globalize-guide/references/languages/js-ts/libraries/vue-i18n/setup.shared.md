@@ -267,10 +267,20 @@ import type { MessageCompiler, MessageContext, CompileError } from 'vue-i18n'
 
 export const messageCompiler: MessageCompiler = (message, { locale, key, onError }) => {
   if (typeof message !== 'string') {
-    // Defensive fallback: ICU compilation needs the raw string. If a bundler ever
-    // feeds us a pre-compiled AST or function (e.g. because someone added the
-    // plugin's `include` option to the locales directory), fail loudly rather
-    // than silently mis-render.
+    // ICU compilation needs the raw string. A non-string here is a message AST,
+    // which is what `@intlify/unplugin-vue-i18n`'s `include` option (or a `?ast`
+    // / `?jit` query suffix) emits. Calling `onError` aborts the `t()` call:
+    // `@intlify/core-base` re-throws whatever it is handed, in production builds
+    // as well as development ones, so this does NOT fall back to rendering the
+    // key — `t()` throws and the surrounding render is the thing that has to
+    // handle it. The `return` below only runs on a host that passes no
+    // `onError` at all.
+    //
+    // Note what this does NOT catch: a pre-compiled message *function*
+    // (`include` with `jit: false`, or a `.js` / `.ts` catalog). `core-base`
+    // checks `isMessageFunction` before it calls any custom compiler, so such a
+    // catalog bypasses ICU silently and renders with vue-i18n's own syntax.
+    // Omitting `include`, as this setup phase does, is what prevents that one.
     onError?.(new Error(`[i18n] ICU compiler requires string messages (key: ${key})`) as CompileError)
     return () => key
   }
@@ -1002,7 +1012,8 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
 
 ## Common Gotchas
 
-- **`[i18n] ICU compiler requires string messages`** — the `@intlify/unplugin-vue-i18n` plugin's `include` option has been added (or a `?jit` / `?ast` query suffix is being used), which pre-compiles catalogs into AST/JS functions before our custom ICU `messageCompiler` sees them. This setup phase deliberately **omits** `include` so Vite's built-in JSON importer loads catalogs as plain objects and the ICU compiler processes raw strings. **Fix**: remove `include` from the plugin config (or drop `?jit` / `?ast` query suffixes on catalog imports). Keep `runtimeOnly: false` so the message-compiler runtime the custom function plugs into stays in the bundle. If you need `include` for SFC `<i18n>` blocks, know that those blocks will be compiled by the plugin's default compiler, not the ICU one — prefer plain JSON catalogs.
+- **`[i18n] ICU compiler requires string messages`** — the `@intlify/unplugin-vue-i18n` plugin's `include` option has been added (or a `?jit` / `?ast` query suffix is being used), which pre-compiles catalogs into a message **AST** before our custom ICU `messageCompiler` sees them. It surfaces as a **thrown** error out of `t()`, not as a key-shaped placeholder: `@intlify/core-base` re-throws what the compiler passes to `onError` (wrapped as `SyntaxError: Message compilation error: …` in a development build, raw in a production one). **Fix**: remove `include` from the plugin config (or drop `?jit` / `?ast` query suffixes on catalog imports). Keep `runtimeOnly: false` so the message-compiler runtime the custom function plugs into stays in the bundle. If you need `include` for SFC `<i18n>` blocks, know that those blocks will be compiled by the plugin's default compiler, not the ICU one — prefer plain JSON catalogs.
+- **ICU syntax renders literally, or a plural picks the wrong branch, with no error at all** — the catalog reached vue-i18n as a pre-compiled message **function** rather than a string or an AST. `core-base` tests `isMessageFunction` *before* it calls any custom compiler, so such a catalog never reaches the ICU one and is rendered with vue-i18n's own pipe-plural syntax instead. This is the silent failure the error above is not: nothing throws. Sources are a `.js` / `.ts` catalog, or `include` configured with `jit: false`. **Fix**: keep catalogs as `.json` (or `.po`) and leave `include` unset, which is what this setup phase emits.
 - **`useI18n()` returns `undefined` for `t`** — the `i18n` plugin isn't installed on the app. For Vite, ensure `app.use(i18n)` is called before `app.mount()`. For Quasar, ensure the boot file is registered in `quasar.config.ts`. For Nuxt, ensure `@nuxtjs/i18n` is in `modules` (not `buildModules`).
 - **`Not Available in Legacy Mode`** — you're calling `useI18n()` without `legacy: false` in `createI18n`. Set `legacy: false`.
 - **`$tc` / `tc` is not a function** — `$tc` / `tc` were removed in vue-i18n v11. Use `t(key, count)` with ICU plural syntax instead:
