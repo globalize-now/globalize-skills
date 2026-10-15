@@ -58,6 +58,15 @@
     "library": "lingui",
     "variant": "vite-babel-lingui"
   },
+  "vite5-react18-brewline": {
+    "category": "positive",
+    "type": "local",
+    "path": "fixtures/vite5-react18-brewline",
+    "library": "lingui",
+    "variant": "vite-babel-lingui",
+    "expectedConversion": "evals/expectations/conversion/vite5-react18-brewline.json",
+    "headlessPrompt": "Internationalize this project with the globalize-guide skill. This run is headless: nobody will answer questions, so use these answers for every Phase 1 question and never stop to ask. Library: Lingui. Scope: setup and convert; do NOT connect Globalize.now. Setup mode: unguided. Source locale: en. Target locale: lv-LV. Routing: none (the app has no router). App domain: a coffee-bean subscription storefront. Optional add-ons: none. Branch: stay on the current branch. If the Lingui + Vite version gate fires, upgrade Vite to ^6. Run Phases 2 and 3 to completion."
+  },
   "webext-wxt-react-lingui": {
     "category": "positive",
     "type": "local",

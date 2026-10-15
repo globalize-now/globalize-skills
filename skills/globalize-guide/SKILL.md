@@ -20,1023 +20,264 @@ description: >-
 
 # i18n Orchestrator
 
-This skill drives the full i18n journey through five stages:
+## Start here
 
-| Stage | Goal |
-|---|---|
-| 1 — Inspect and decide | Detect stack, ask all user questions, generate an executable plan |
-| 1.5 — Globalize account (upfront) | Install CLI + sign in + verify org via `globalize-now-account-setup` |
-| 2 — Setup | Install + configure the chosen library |
-| 3 — Convert | Wrap hardcoded strings, extract + compile catalogs |
-| 4 — Globalize project (end) | Create project + connect repo + set patterns via `globalize-now-project-setup` |
+This file is the map. The detailed instructions for every step live in `references/` and are loaded **on demand**. You will not find library setup code in this file — do not write any from memory.
 
-Stages 1.5 and 4 only run when the user keeps Globalize connection in scope (default-on; see 1.6). The Globalize work is split deliberately: account creation is interactive and project-independent, so it runs **upfront** while the user is engaged; project + repo setup needs the converted catalog paths, so it runs at the **end**.
+### Phase map
 
-The orchestrator (this SKILL.md) is library-agnostic. Library- and stack-specific guidance lives in `references/` and is loaded by subagents at dispatch time, driven by `manifest.json`.
+| Stage | Goal | Load before acting |
+|---|---|---|
+| 1 — Inspect and decide | Detect stack, ask all questions, write the plan | `references/orchestrator/inspect.md` + `detect.<language>.md`, then `compat.<language>.md`, `library-choice.md`, `setup-choices.md` |
+| 1.5 — Globalize account | Sign in, via the `globalize-now-account-setup` skill | — |
+| 2 — Setup | Install + configure the library | `references/orchestrator/setup-subagent.md` + every `references.setup` and `references.rulesTemplate` path |
+| 3 — Convert | Wrap strings, convert formatting, extract + compile | `references/orchestrator/wrap-subagent.md`, `verify-subagent.md`, `cleanup-loop.md` + every `references.convert` path |
+| 4 — Globalize project | Create project + connect repo, via `globalize-now-project-setup` | `references/orchestrator/globalize-inputs.md` |
 
-**Architectural rule:** the orchestrator never executes work directly. It asks Phase 1 questions, generates the plan, dispatches subagents in the background, polls a shared progress workspace at `.globalize/`, and surfaces results. All file modifications, all bash commands, and all reference reading happen inside subagents. **One carve-out:** the interactive Globalize steps (account sign-in in 1.5, project + repo connection in Phase 4) run on the main thread by **delegating to the `globalize-now-account-setup` / `globalize-now-project-setup` skills via the Skill tool** — the orchestrator never inlines Globalize CLI commands itself (those skills own the authoritative command surface).
+Stages 1.5 and 4 run only when Globalize stays in scope (default-on; §1.6). Account sign-in needs no project data, so it runs **upfront**; project + repo setup needs the converted catalog paths, so it runs at the **end**.
+
+### How to load references
+
+1. **Orchestrator procedure files** live in `references/orchestrator/` and are named in the phase map and in each section below.
+2. **Stack-specific files come from `manifest.json`.** Its `stacks[]` entries each carry `match` (the §1.3 predicate), `packages` (`runtime` / `dev`, pinned) and `references`: `setup` (array, read in order), `convert` (array, read in order), `rulesTemplate`, optional `optional.*`. All paths are relative to this skill's directory. After §1.11, read `.globalize/manifest-snapshot.json` (the frozen chosen entry) instead of the live manifest.
+3. **Read before you edit.** Every reference a step names is read **in full, before the first project file is edited for that step**. If a tool truncates or pages output, keep reading by offset / line range until the end of the file — never act on a partial file. Ordering and ownership rules for multi-file arrays: `references/orchestrator/reading-references.md`.
+
+### Execution mode
+
+**Default — subagents.** The orchestrator asks the Phase 1 questions, writes the plan, dispatches workers, polls, and surfaces results; all project-file edits, build commands and reference reading for Phases 2–3 happen inside workers. Phase 1.1 inspect runs as a foreground subagent; Phase 2 setup, Phase 3 wrap (all partitions in **one** tool-use message, so they run in parallel) and verify run in the background, and the orchestrator polls `.globalize/progress/*.json`. Each worker's full prompt is its `references/orchestrator/*-subagent.md` / `inspect.md` file — pass the worker that file's path plus the paths it lists, not a paraphrase.
+
+**Single-agent fallback.** Use it when there is no subagent/Agent tool, a dispatch fails, or the harness is headless / non-interactive. Then the main agent does each worker's job itself, **in the same order**, and:
+
+- **First reads the worker's file** (`inspect.md`, `setup-subagent.md`, `wrap-subagent.md`, `verify-subagent.md`, `cleanup-loop.md`) **and every reference that file tells the worker to read** — exactly as the worker would. No project file is edited before that reading is done.
+- Processes Phase 3 partitions one after another instead of in parallel.
+- Still writes `.globalize/progress/*.json` (resumability depends on it); skips polling.
+- Treats a worker's `needs_decision` as its own: ask the user; if no user can answer (headless), **stop and report the question** — never improvise past it.
+- Headless: Phase 1 answers come from the user's prompt. A question it leaves open takes the default this file or the reference names (pre-checked, "recommended", "unguided default"); with no named default — e.g. the Lingui + Vite version gate — stop and report.
+
+The Globalize stages (1.5, 4) are never subagents in either mode: they delegate to the `globalize-now-account-setup` / `globalize-now-project-setup` skills via the Skill tool, and the orchestrator never inlines Globalize CLI commands.
+
+### Rules that hold in every phase
+
+- No library setup or wrapping from memory — only from the manifest's references and `.agents/globalize-rules.md`.
+- Never install with `--legacy-peer-deps` or `--force`. A peer conflict is a version gate: pick a compatible version the references name, or stop and ask.
+- A step the references do not cover → `needs_decision`, not a guess.
+- A passing build is not the finish line — every verify gate in `verify-subagent.md` for the stack must pass.
 
 ---
 
 ## Workspace: `.globalize/`
 
-Created in the **target project root** (the project being internationalized). Every artifact the orchestrator and subagents share lives here.
+Created in the **target project root**. Every artifact the orchestrator and workers share lives here:
 
 ```
 .globalize/
-  detection.json              # output of inspect subagent (Phase 1.1)
+  detection.json              # Phase 1.1 output
   decisions.md                # frozen user choices from Phase 1
   plan.md                     # executable plan for phases 1.5/2/3/4
   manifest-snapshot.json      # frozen copy of the chosen manifest entry
-  rules-values.json           # resolved template conditions and values; written by the core `generate_coding_rules` step in Phase 2, consumed when rendering `.agents/globalize-rules.md`
-  globalize-inputs.json       # resolved Globalize project inputs (written in Phase 4, read by globalize-now-project-setup)
+  rules-values.json           # resolved template values (Phase 2 generate_coding_rules)
+  format-module.json          # formatters module record (Phase 2 generate_format_helpers)
+  globalize-inputs.json       # Globalize project inputs (Phase 4)
   progress/
-    setup.json                # Phase 2 setup subagent
-    wrap-1.json…wrap-N.json   # Phase 3 wrap subagents (one per partition)
-    verify.json               # Phase 3 verify subagent
+    setup.json, wrap-1.json…wrap-N.json, verify.json, wrap-cleanup-{round}.json
     archive/<ISO-timestamp>/  # archived after each phase completes
 ```
 
-### First-run setup
+**First run.** If `.globalize/` is absent, create it and append `/.globalize/` to the project's `.gitignore` (create the file if missing; if it already has rules, show the diff first). Tell the user: "Created `.globalize/` in your project root and added it to `.gitignore`. It holds local progress files, decisions, and plans so we can resume mid-run and you can audit what was decided. It stays out of git." The project's **own** generated i18n artifacts (compiled catalogs) are ignored later by Phase 2's `gitignore_artifacts` step, never here.
 
-If `.globalize/` does not exist in the target project, create it and append `/.globalize/` to the project's `.gitignore` (create the file if missing). Confirm with the user only if `.gitignore` exists and already has rules — show the diff before appending.
-
-> **User-facing message** (when actually creating the folder):
-> "Created `.globalize/` in your project root and added it to `.gitignore`. This folder holds local progress files, decisions, and plans so we can resume mid-run and so you can audit what was decided. It stays out of git."
-
-> The project's **own** generated i18n artifacts (Lingui's compiled catalogs, Paraglide's `outdir`) are a separate concern, ignored later inside Phase 2's `gitignore_artifacts` step (see §2.2) — the orchestrator never writes those rules itself.
-
-### Resumability
-
-If `.globalize/` exists when the orchestrator starts, read `plan.md` and `progress/*.json` to determine state. If a plan is already in flight (some phases incomplete), tell the user:
-
-> "Found an in-progress i18n setup at `.globalize/`. Last completed step: `<step>`. Want me to resume from there, or start over with a fresh plan?"
-
-Proceed accordingly.
-
-**Globalize auth is global, not local.** Sign-in state lives in `~/.globalize/config.json` (or the `GLOBALIZE_API_KEY` env var), **not** in `.globalize/`, so never infer the account step's done-ness from a local marker — it may have been configured outside this run. On resume, just re-delegate: both Globalize skills are idempotent. The account skill self-skips when `auth status` already returns valid credentials; the project skill lists-before-creates (`projects list`, `github installations`, existing repo connections), so re-invoking it fast-paths whatever is already done. That idempotency is why Phase 4 needs no `progress/globalize.json`.
+**Resume.** If `.globalize/` exists, read `plan.md` and `progress/*.json`. If a plan is in flight: "Found an in-progress i18n setup at `.globalize/`. Last completed step: `<step>`. Want me to resume from there, or start over with a fresh plan?" Globalize auth lives in `~/.globalize/config.json` / `GLOBALIZE_API_KEY`, never in `.globalize/` — on resume, just re-delegate; both Globalize skills are idempotent (the account skill self-skips when `auth status` is valid; the project skill lists before it creates). That is why Phase 4 has no progress file.
 
 ---
 
 ## Phase 1 — Inspect and Decide
 
-Phase 1 ends with a fully populated `.globalize/` (detection, decisions, plan, manifest snapshot) and the user's "go" before any work happens. Every decision this skill collects lives in Phase 1 — Phases 1.5/2/3/4 are execution (the two Globalize stages delegate their own sign-in / browser interaction to the `globalize-now-account-setup` / `globalize-now-project-setup` skills).
+Phase 1 ends with a fully populated `.globalize/` and the user's "go" before any work happens. **Every decision lives in Phase 1**; later phases execute.
 
-> **User-facing message** (orchestrator kickoff, before 1.1):
-> "Hey — I'll walk you through internationalizing this project: inspect the stack, sign in to Globalize, set up the library, wrap your hardcoded strings, and finally create your Globalize project + connect the repo. First I'll do a read-only scan of your project — framework, router, existing i18n setup, files with translatable text. No changes yet. After that I'll ask a small set of questions to shape the plan (including whether to connect Globalize — it's on by default, and you can opt out)."
+> **Kickoff message:** "Hey — I'll walk you through internationalizing this project: inspect the stack, sign in to Globalize, set up the library, wrap your hardcoded strings, and finally create your Globalize project + connect the repo. First a read-only scan — framework, router, existing i18n setup, files with translatable text. No changes yet. Then a few questions to shape the plan (including whether to connect Globalize — on by default, you can opt out)."
 
-### 1.1 Inspect subagent
+### 1.1 Inspect
 
-Dispatch a subagent (foreground, blocking — small output, no progress polling needed) with this prompt:
+Dispatch the inspect worker (foreground) with `references/orchestrator/inspect.md` as its instructions — or, single-agent, read that file and the matching `detect.<language>.md` and do it yourself. Output: `.globalize/detection.json`, nothing else. Then surface the scan-done message from the end of `inspect.md`.
 
-> You are inspecting a project to gather i18n setup context. Read-only — do not modify any files.
->
-> First decide the project **language**, applying these rules **in order, first match wins** (the order is load-bearing — a root `package.json` must beat native signals so hybrid/web wrappers route to JS):
-> 1. A `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` is present → **ruby** (read the Ruby signals below instead of the JS ones).
-> 2. A root `package.json` is present → **js-ts** (read the JS signals; this deliberately includes hybrid/web-wrapper apps — **React Native, Capacitor, Cordova, Ionic** — which ship a native `android/` or `ios/` folder but localize in the JS layer, so they belong on the JS path or its §1.2 stop, never a native path).
-> 2b. A `manifest.json` at the repo root, in `src/`, or in `public/` contains a `"manifest_version"` key, and there is **no** root `package.json` → **js-ts** with `framework: "webext"`, `extensionFramework: "none"`, `packageManager: null` — a browser extension with no build step. (A bundled extension already matched rule 2; the framework rules below then identify it. Without this rule a build-less extension falls through to `unknown` and gets a stop that tells the user nothing.)
-> 3. Native-Android Gradle signals are present (`AndroidManifest.xml`, OR a `build.gradle`/`build.gradle.kts` applying `com.android.application`/`com.android.library`, plus `gradlew`/`settings.gradle`) **AND** there is no root `package.json` **AND** no `pubspec.yaml` → **android** (read the Android signals below). (A `pubspec.yaml` means Flutter — it ships an `android/` Gradle subfolder but localizes via `.arb`, not native `strings.xml`; it is excluded here and stopped in §1.2.)
-> 4. `*.xcodeproj`/`*.xcworkspace`/`Package.swift`/`*.swift` is present (and none of the above matched) → **swift** (read the Swift/Apple signals table below).
-> 5. Otherwise → **unknown**.
->
-> For a **js-ts** project, read the project's `package.json`, build config files (`vite.config.*`, `next.config.*`, `.babelrc`), and survey the source tree. Output **only** a single JSON object matching this schema, written to `.globalize/detection.json`:
->
-> ```json
-> {
->   "language": "js-ts" | "ruby" | "android" | "swift" | "unknown",
->   "framework": "next" | "vite" | "tanstack-start" | "remix" | "react-router-framework" | "nuxt" | "quasar" | "sveltekit" | "webext" | "angular" | "cra" | "rails" | "android" | "unknown",
->   "router": "app" | "pages" | "tanstack-router" | "tanstack-start" | "react-router" | "vue-router" | "sveltekit" | "angular-router" | "none",
->   "compiler": "swc" | "babel" | null,
->   "extensionFramework": "wxt" | "crxjs" | "vite-plain" | "plasmo" | "webpack" | "none" | null,
->   "manifestVersion": 2 | 3 | null,
->   "react": true | false,
->   "vue": true | false,
->   "svelte": true | false,
->   "angular": true | false,
->   "ionic": true | false,
->   "hybrid": "capacitor" | "cordova" | null,
->   "typescript": true | false,
->   "packageManager": "npm" | "yarn" | "pnpm" | "bun" | "bundler" | "gradle",
->   "platform": "ios" | "macos" | null,
->   "buildSystem": "xcode" | "spm" | null,
->   "uiFramework": "swiftui" | "uikit" | null,
->   "version": string | null,
->   "sourceDir": "src" | "app" | string,
->   "routeEntries": ["src/app/**/page.tsx", ...] | null,
->   "git": { "isRepo": true | false, "branch": string | null, "remote": string | null },
->   "existing": {
->     "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "rails-i18n" | "android-strings" | "string-catalog" | "webext-native" | "@angular/localize" | "@jsverse/transloco" | "@ngneat/transloco" | "@ngx-translate/core" | "none",
->     "configured": true | false,
->     "providerWired": true | false,
->     "catalogsScaffolded": true | false,
->     "stringsWrapped": "yes" | "partial" | "no"
->   },
->   "candidateFiles": [
->     { "path": "src/components/Navbar.tsx", "matchCount": 8 }
->   ],
->   "formatCandidateFiles": [
->     { "path": "src/lib/pricing.ts", "matchCount": 5 }
->   ],
->   "localeSignals": {
->     "existingLocaleDirs": ["src/locales/en", "src/locales/de"],
->     "envHints": ["DEFAULT_LOCALE=en"],
->     "readmeHints": ["mentions: English, German, French"]
->   }
-> }
-> ```
->
-> **Detection rules:**
->
-> | Field | How to detect |
-> |---|---|
-> | `language` | Apply in order (first match wins): (1) `Gemfile`/`Gemfile.lock` (containing `rails`), `bin/rails`, or `config/application.rb` → `ruby`. (2) root `package.json` present → `js-ts` (this beats native signals on purpose, so RN/Capacitor/Cordova/Ionic hybrids route to JS). (2b) a `manifest.json` at the repo root, `src/`, or `public/` containing `"manifest_version"`, with no root `package.json` → `js-ts` + `framework: "webext"` + `extensionFramework: "none"` (a build-less browser extension). (3) native-Android Gradle signals (`AndroidManifest.xml`, or `build.gradle{,.kts}` applying `com.android.application`/`com.android.library`, plus `gradlew`/`settings.gradle`) AND no root `package.json` AND no `pubspec.yaml` → `android`. (4) `*.xcodeproj`/`*.xcworkspace`/`Package.swift`/`*.swift` present (none of the above) → `swift` (read the Swift/Apple detection rules below, not these). (5) none → `unknown`. (The JS-path rules below apply only when `language === "js-ts"`; the Ruby table only when `language === "ruby"`; the Android table only when `language === "android"`; the Swift/Apple table only when `language === "swift"`.) |
-> | `framework` | Evaluate in this order, first match wins: **browser-extension signals → webext** (see the row below — checked first because WXT, CRXJS and plain-Vite extensions all carry `vite` in devDeps and would otherwise take the `vite` fallback and be handed a setup reference that wires URL locale prefixes into a project with no URLs). `next` in deps → next. `nuxt` in deps → nuxt. `quasar` in deps → quasar. `@tanstack/react-start` in deps → tanstack-start. Any `@remix-run/*` runtime package in deps → remix. `react-router` in deps AND `@react-router/dev` in devDeps AND a `react-router.config.{ts,js}` file at the repo root → react-router-framework. `@sveltejs/kit` in deps or devDeps → sveltekit. `@angular/core` in deps → angular (checked after SvelteKit and before the `vite` fallback: AnalogJS carries both `@angular/core` and `vite`, and must reach §1.2's AnalogJS stop instead of a Vite variant). `vite` in devDeps (and none of the above) → vite. `react-scripts` in deps → cra. (Order matters: Remix v2, React Router v7 framework mode, and SvelteKit all ship `vite` in devDeps, so they must be checked before the `vite` fallback. React Router v7 SPA mode — `react-router` without `@react-router/dev` — correctly falls through to `vite` with `router: "react-router"`, and Angular must be checked before the `vite` fallback for the same reason.) |
-> | `router` | App Router: `app/` or `src/app/` with `layout.tsx`/`layout.js`. Pages Router: `pages/` with `_app.tsx`/`_app.jsx`. TanStack Start: deps include `@tanstack/react-start`. TanStack Router (client): `@tanstack/react-router` without `react-start`. React Router: `react-router` in deps (also the value reported for `framework: "remix"` and `framework: "react-router-framework"`, since both use react-router internally; this is informational only, no matcher predicates on it for those frameworks). **Under `framework: "vite"`, `router` is load-bearing** — no manifest entry keys on it, but it selects the routing branch inside the Vite setup reference: `react-router` → the declarative-SPA branch (locale prefixes supported), `tanstack-router` → the file-based per-page-catalog branch, `none` → the plain-SPA branch (Option 3 only). Getting it wrong costs the project its locale routing, so resolve it from `package.json` rather than defaulting. Vue Router: `vue-router` in deps (Vite SPA / Quasar). SvelteKit: `framework === "sveltekit"` — file-based routing under `src/routes/`. **Browser extension: always `none`** — an extension's popup, options page and side panel are separate HTML entrypoints, not routes, and there is no URL a locale prefix could live in. Report `none` even when the popup happens to use React Router internally. Angular: `@angular/router` in deps → `angular-router` (informational only — no manifest entry keys on it). |
-> | `compiler` | `@vitejs/plugin-react-swc` → swc. `@vitejs/plugin-react` (no `-swc`) → babel. Next.js → swc unless `.babelrc` exists. TanStack Start → swc if `@vitejs/plugin-react-swc` (or `@vitejs/plugin-react@6+`) is in devDeps; babel otherwise. Remix v2 and React Router v7 framework mode → swc if `@vitejs/plugin-react-swc` is in devDeps; babel otherwise (both default to Babel via `@vitejs/plugin-react`). SvelteKit uses neither — the Svelte compiler runs through Vite (esbuild), and none of the rules above match — so the field is a don't-care for SvelteKit; report whatever the heuristic yields (it will not match any rule) and treat the value as not meaningful: the SvelteKit manifest entry does not key on `compiler`. **For `framework: "webext"` the field is load-bearing and must be `null` unless a Vite build is actually present**: `extensionFramework` of `wxt` / `crxjs` / `vite-plain` → `swc` if `@vitejs/plugin-react-swc` **or `@vitejs/plugin-react@6+`** is in devDeps, `babel` otherwise. The `@6+` clause is the same rule the TanStack Start row applies and it is load-bearing here, because WXT's `@wxt-dev/module-react` accepts `@vitejs/plugin-react` `^4 || ^5 || ^6` and v6 dropped the `babel` option — routing such a project to the Babel variant would leave the macros a silent no-op. On WXT the React plugin is usually **transitive** rather than a direct devDep, so when neither plugin is declared directly, read the resolved `@vitejs/plugin-react` version out of the lockfile; if that is unresolvable too, report `babel` — the Babel setup reference opens with a version gate that stops and asks rather than emitting macros that silently do nothing. `plasmo` (Parcel), `webpack`, and `none` → **`null`**. That null is what keeps the Lingui extension variants — which key on `compiler` — from being offered to a project whose build cannot expand their macros; it needs no matcher special case, just structural equality. Angular → `null` (the Angular compiler is not modeled; the Angular entry does not key on `compiler`). |
-> | `framework: "webext"` signals | Any one of: `wxt`, `@crxjs/vite-plugin`, `plasmo`, `vite-plugin-web-extension`, or `@samrum/vite-plugin-web-extension` in deps/devDeps; **or** a `manifest.json` at the repo root, `src/`, or `public/`, or a `manifest.config.{ts,js}`, containing a `"manifest_version"` key. `@types/chrome` and `webextension-polyfill` are **not** sufficient on their own — an ordinary web app can carry either. |
-> | `extensionFramework` | Only meaningful when `framework === "webext"`; `null` otherwise. `wxt` in deps/devDeps → `wxt`. `@crxjs/vite-plugin` → `crxjs`. `plasmo` → `plasmo`. A `vite.config.*` with no extension plugin (or `vite-plugin-web-extension` / `@samrum/vite-plugin-web-extension`) → `vite-plain`. A `webpack.config.*` and no Vite → `webpack`. No build config at all → `none`. |
-> | `manifestVersion` | Read `manifest_version` from the `manifest.json` / `manifest.config.*`, or from the `manifest:` key in `wxt.config.*` (WXT defaults to MV3 when the key is absent). `null` if genuinely unreadable — but a `webext` detection should almost always resolve it, since §1.2 stops MV2. |
-> | `react` | `react` in deps or devDeps. |
-> | `vue` | `vue` in deps or devDeps. |
-> | `svelte` | `svelte` in deps or devDeps. |
-> | `angular` | `@angular/core` in deps or devDeps. |
-> | `ionic` | An Ionic Framework package in deps or devDeps: `@ionic/angular`, `@ionic/react`, `@ionic/vue`, or `@ionic/core`. **Not** any `@ionic/*` package — `@ionic/pwa-elements` (common in plain Capacitor apps for the Camera web fallback), `@ionic/cli` and `@ionic/eslint-config` ship without the framework, and reporting `true` for them would hand the setup an Ionic switcher that imports a package the project does not have. |
-> | `hybrid` | `@capacitor/core` in deps → `capacitor` (wins if both are present). Else `cordova` or any `cordova-*` package in deps, or a root `config.xml` with a `<widget>` root → `cordova`. Else `null`. |
-> | `version` | For `framework === "angular"`: the resolved `@angular/core` version as `major.minor` — read the lockfile first; if there is none, the lowest version the `package.json` range admits. §1.2's Angular floor and the setup's `ng add` pin read it. `null` for every other JS framework. |
-> | `packageManager` | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
-> | `routeEntries` | App Router: `<root>/src/app/**/page.tsx`. TanStack file-based: `<root>/src/routes/**/*.tsx`. Remix v2 or React Router v7 framework mode: `<root>/app/routes/**/*.{tsx,jsx,ts,js}`. SvelteKit: `<root>/src/routes/**/*.svelte`. Browser extension: `null` (entrypoints are not routes). None if no file-based routing detected. |
-> | `existing.library` | First match in deps/devDeps from the union of i18n libraries listed above. For `framework === "webext"`, a dependency match still wins (an extension using Lingui reports `lingui`); if there is none and a `_locales/*/messages.json` exists anywhere in the project, report `webext-native` — extension message catalogs are a platform built-in with no package to depend on. `@angular/localize`, `@jsverse/transloco`, `@ngneat/transloco` (Transloco's pre-v7 name) and `@ngx-translate/core` are matched by exact package name, and **on an Angular project the three competing libraries are checked before `@angular/localize`**: `@angular/localize` is often present only as a polyfill another library needs (ng-bootstrap, Clarity), so letting it win the first match would hide a Transloco or ngx-translate app from §1.2's migration stop. |
-> | `existing.configured` | `lingui.config.*` present AND macro plugin wired in build config; OR `next-intl` config present AND plugin wired; OR (Vue) `createI18n(` present in `src/i18n/index.*` (Vite/Quasar) or `defineI18nConfig(` in `i18n.config.*` (Nuxt) AND `messageCompiler` wired; OR (Paraglide) `project.inlang/settings.json` present AND `paraglideVitePlugin` in `vite.config.*`; OR (Angular) the runtime-loading model is in place: `loadTranslations(` in `src/main.ts` AND `scripts/xliff-to-json.mjs` exists. `@angular/localize` installed with an `i18n` block is **not** enough — a project that only ran `ng add`, or one built per locale with `ng build --localize`, looks exactly like that and needs the full setup (whose Step 1 handles the compile-time case). |
-> | `existing.providerWired` | Layout/main file imports and renders `I18nProvider` (Lingui) or `NextIntlClientProvider` (next-intl); OR (Vue) `app.use(i18n)` in `main.*` (Vite) / boot file registered (Quasar) / `@nuxtjs/i18n` listed in `modules` (Nuxt); OR (Paraglide) `paraglideMiddleware` in `src/hooks.server.ts`; OR (Angular) `loadTranslations(` appears in `src/main.ts`. |
-> | `existing.catalogsScaffolded` | Locale directories with at least one message file exist. |
-> | `existing.stringsWrapped` | Glob source tree (`.{tsx,jsx,js,svelte}`), sample up to 50 files, count files with bare markup text vs. files importing macros/message functions (for Paraglide, `import { m } from '$lib/paraglide/messages.js'`): > 80% imported → "yes", > 20% → "partial", else → "no". For Angular, glob `src/**/*.{html,ts}` and count files carrying an `i18n` / `i18n-*` attribute or a `$localize` tag. |
-> | `candidateFiles` | Glob `src/**/*.{tsx,ts,jsx,js,svelte}`, exclude tests/configs/`.d.ts`, grep each for: bare markup text (`>Word<`, including Svelte template text), user-visible attrs (`placeholder=`, `aria-label=`, `title=`, `alt=`), exported user-facing string literals, **and display-copy string literals inside exported data/content modules** — string *values* under object/array keys whose name matches `name`, `title`, `label`, `heading`, `subheading`, `description`, `summary`, `body`, `text`, `message`, `caption`, `placeholder`, `tooltip`, `alt`, `cta`, or `content` (e.g. `export const products = [{ name: '…', description: '…' }]`). Deliberately narrow — do **not** treat identifier/config keys as display copy (`id`, `slug`, `sku`, `key`, `href`, `src`, `type`, `variant`, `icon`, `role`, `className`, `testid`); those are covered by the coding rules' skip-list and must not inflate the candidate set. This is a recall signal: a data module matching it becomes a wrap candidate so a Phase 3 subagent opens it; the subagent still applies the skip-list, so occasional over-match is harmless. Return files with ≥1 match, sorted by match count desc. **For `framework === "webext"`, also glob `**/*.html`** — popup, options and side-panel markup carries user-visible text that no JS-only glob sees — and include the manifest file itself when its `name`, `short_name`, `description`, `action.default_title`, or any `commands.*.description` holds a literal rather than a `__MSG_…__` reference. **For `framework === "angular"`, also glob `src/**/*.html`** — component templates carry most of the user-visible text — excluding `src/index.html` (it is outside Angular; the convert reference covers the document title). Count bare text nodes and the attributes above, plus Ionic text props (`label=`, `text=`, `header=`, `message=`, `cancel-text=`, `ok-text=`) with literal values. |
-> | `formatCandidateFiles` | Glob the same source set as `candidateFiles`, **plus `.vue`** (formatting lives in `<script setup>` blocks too): `src/**/*.{tsx,ts,jsx,js,svelte,vue}`, excluding tests, configs and `.d.ts`. Grep each for hand-rolled value formatting: `toFixed(`, `toLocaleString(`, `toLocaleDateString(`, `toLocaleTimeString(`, `new Intl.`, `'$' +`, `"$" +`, the three-character sequence `` $${ `` (a literal `$` immediately before a template-literal interpolation) — **match it literally, `grep -F '$${'`, or escaped as `\$\$\{` if you are already in a regex**; an unescaped `$${` as a regex means "end-of-line, then `${`" and matches nothing. `moment(`, `dayjs(`, and — **only in a file that also imports from `date-fns`** — a bare `format(` / `formatDistance` call (an unqualified `format(` grep alone matches half the codebase, so the import is part of the predicate). **Exclude the project's i18n directory** (`src/i18n/`, `src/locales/`, `src/lib/paraglide/`, whatever `localeSignals.existingLocaleDirs` and the existing config point at) **and any file named `format.*` / `i18n-format.*`** — the formatters module constructs `Intl` on purpose, so leaving it in guarantees a false positive on every already-set-up project. Return files with ≥1 match, sorted by match count desc. **For `framework === "webext"`, also glob `**/*.html`** and match a currency symbol adjacent to a digit (`$`, `€`, `£`, `¥` immediately before or after a number) — popup, options and side-panel markup carries prices that no JS-only glob sees. **For `framework === "angular"`, also glob `src/**/*.html`** and match: a `$` immediately before `{{`; `| currency` with no currency-code argument (it defaults to USD); `| date:'` followed by a custom pattern — any value other than Angular's twelve named formats (`short`, `medium`, `long`, `full`, and each with a `Date` or `Time` suffix: `shortDate` … `fullTime`), matched as an exact list, never by "contains `y`/`M`/`d`" (`medium`, `mediumDate` and `mediumTime` contain a `d`); and `.toFixed(` inside `{{ }}`. Exclude `src/app/i18n/format.ts`. |
-> | `localeSignals` | List existing locale dirs (e.g., `src/locales/`), env vars matching `*LOCALE*`, README mentions of language names. For `framework === "webext"`, list the `_locales/*/` directory names and normalize their underscored codes to BCP-47 (`pt_BR` → `pt-BR`, `zh_CN` → `zh-CN`) so they can be offered as target locales in §1.7. |
->
-> **`formatCandidateFiles` is not a subset of `candidateFiles`** — on any language. Hand-rolled formatting lives in price, date and utility modules that contain no user-visible copy at all, so the string-detection glob never opens them, and a module full of `<Trans>` may format nothing. The two lists overlap; neither contains the other. **Phase 3 partitions the union of the two lists**, and each wrap subagent is told, per file, whether that file is in scope for `strings`, `formatting`, or `both` (see §3.2). Emit both lists in full — never prune one against the other, and never emit `formatCandidateFiles` as a filtered view of `candidateFiles`.
->
-> **Ruby / Rails detection rules** (apply only when `language === "ruby"`; the JS rules above do not apply):
->
-> | Field | How to detect |
-> |---|---|
-> | `framework` | `rails` gem in `Gemfile`/`Gemfile.lock`, OR `bin/rails`, OR `config/application.rb` → `rails`. Otherwise `unknown` (non-Rails Ruby — Sinatra, Hanami, plain `i18n` gem — is not supported; see 1.2). |
-> | `packageManager` | `bundler` (Rails projects use Bundler + `Gemfile`). |
-> | `version` | Parse `Gemfile.lock`: the line `rails (N.M.x)` → extract `N.M` (e.g. `"8.1"`). Used for the soft EOL warning in 1.2 and the `rails-i18n` pin. `null` if not resolvable. |
-> | `router` | `none` (Rails routing is not modeled here; the `version` field is what the Rails path keys on). |
-> | `existing.library` | `rails-i18n` in `Gemfile`/`Gemfile.lock` → `rails-i18n`; else `none`. (Rails' built-in `I18n` API is always present; `rails-i18n` adds CLDR plural data.) |
-> | `existing.configured` | `config.i18n.*` keys (e.g. `default_locale`, `available_locales`) set in `config/application.rb` or a `config/initializers/*.rb`. |
-> | `existing.providerWired` | An `around_action`/`switch_locale` or `I18n.with_locale` locale switcher present in `app/controllers/application_controller.rb`. |
-> | `existing.catalogsScaffolded` | `config/locales/*.{yml,rb}` present with at least one populated, non-stub locale file (note split layouts — `devise.en.yml`, nested dirs — all auto-loaded by Rails). |
-> | `existing.stringsWrapped` | Glob `app/views/**/*.erb`, `app/controllers/**/*.rb`, sample up to 50 files, count files using `t(`/`l(` helpers vs. files with bare user-visible text: > 80% using helpers → "yes", > 20% → "partial", else → "no". |
-> | `candidateFiles` | Glob `app/views/**/*.erb`, `app/controllers/**/*.rb`, `app/mailers/**/*.rb`, `app/models/**/*.rb`; grep for bare user-visible text and string literals not already wrapped in `t(`/`l(`. Return files with ≥1 match, sorted by match count desc. |
-> | `formatCandidateFiles` | Glob `app/views/**/*.erb`, `app/helpers/**/*.rb`, `app/models/**/*.rb`, `app/mailers/**/*.rb`; grep for `strftime(`, `$#{` (a literal `$` immediately before a Ruby interpolation — match it **without** a leading `"`, since the overwhelmingly common form is mid-string, `"Total: $#{amount}"`, where the quote is nowhere near the `$`), `number_to_currency(` carrying an inline `unit:` or `precision:`, `number_with_delimiter(`, `number_with_precision(`, `time_ago_in_words(`, `.join(", ")`, and `.round(` **inside an ERB output tag** (`<%= … .round( … %>` — a `.round(` in a controller is arithmetic, not display). **Exclude `app/helpers/format_helper.rb`** — that is the formatters module the setup phase creates or extends, and it calls these helpers on purpose. Return files with ≥1 match, sorted by match count desc. |
-> | `localeSignals` | List `config/locales/` files and the locale codes present; `config.i18n.default_locale`/`available_locales` values; README mentions of language names. |
->
-> **Name-collision guardrail (Ruby):** the gems `globalize`, `mobility`, and `traco` translate **DB/model content** (per-row data like a product's `name`), NOT UI strings, and are entirely **unrelated to Globalize.now**. Do **not** treat `globalize` (the gem) as the Globalize.now platform. If any is present in `Gemfile`/`Gemfile.lock`, record it in `localeSignals.readmeHints` (or a free-form note) as a detect-and-warn signal — it must never trigger UI-string i18n logic and is surfaced to the user in 1.2 but is non-blocking.
->
-> **Android detection rules** (apply only when `language === "android"`; the JS and Ruby rules above do not apply). "Module `res/` root" means the main module's resource dir — default to `app/src/main/res` (note multi-module/flavor layouts: `feature/src/main/res`, `src/<flavor>/res` — surface them in `localeSignals` but target the app module in v1):
->
-> | Field | How to detect |
-> |---|---|
-> | `framework` | `android` (native Android — Gradle + `AndroidManifest.xml`). |
-> | `packageManager` | `gradle`. |
-> | `version` | `null` — Android emits no version-gated i18n code (string resources are stable across all API levels), so no version is captured. |
-> | `router` | `none` (Android routing is not modeled here). |
-> | `existing.library` | `android-strings` if `<module>/res/values/strings.xml` exists; else `none`. (String resources are platform-built-in — there is no library to depend on.) |
-> | `existing.configured` | At least one target resource dir `<module>/res/values-*/strings.xml` exists (a locale overlay is present). |
-> | `existing.providerWired` | A locale-selection mechanism is wired: `AppCompatDelegate.setApplicationLocales(` in source, OR `android:localeConfig` in `AndroidManifest.xml` with a `res/xml/locales_config.xml`. (Optional — per-app language is an add-on; `false` is normal.) |
-> | `existing.catalogsScaffolded` | `<module>/res/values/strings.xml` (the source catalog) exists. |
-> | `existing.stringsWrapped` | Sample up to 50 files across `<module>/res/layout/**/*.xml` and `**/*.{kt,java}`; count files referencing resources (`@string/`, `getString(`, `getText(`, `stringResource(`, `pluralStringResource(`) vs. files with bare user-visible literals: > 80% referencing → "yes", > 20% → "partial", else → "no". |
-> | `candidateFiles` | Glob `<module>/res/layout/**/*.xml`, `<module>/res/menu/**/*.xml`, `<module>/res/xml/**/*.xml` (grep bare `android:text="literal"`, `android:hint=`, `android:title=`, `android:contentDescription=` with a non-`@string/` value), plus `**/*.{kt,java}` (string literals passed to `setText(`, `Text(`, `Toast`, etc., not already `getString`/`stringResource`). Return files with ≥1 match, sorted by match count desc. |
-> | `formatCandidateFiles` | Glob `**/*.{kt,java}` (exclude `src/test/`, `src/androidTest/`, and generated `build/` output); grep `SimpleDateFormat(`, `DateTimeFormatter.ofPattern(`, `DecimalFormat(`, `NumberFormat.get`, `String.format("%.`, `DateUtils.getRelativeTimeSpanString(`, `joinToString(`, and a literal currency symbol beside a value. For the currency case match **both** dialects: `"$" +` (Java concatenation) **and** `\$` or `${'$'}` immediately before a Kotlin string-template interpolation — Kotlin escapes a literal `$`, so a `"$" +` grep alone finds zero Kotlin sites, which is most of a modern codebase. Plus glob `<module>/res/**/*.xml` and match a positional `%1$d` / `%1$f` (any `%N$d` / `%N$f`) inside a `<string>` or `<item>` body — those format with the **system** locale and must become `%1$s` fed by a pre-formatted value. **Exclude the generated `Formatters.kt`** (the file `.globalize/format-module.json` → `path` names once it exists; before Phase 2 it does not, so exclude any `Formatters.kt` under an `i18n` package). Return files with ≥1 match, sorted by match count desc. |
-> | `localeSignals` | Locale codes parsed from `<module>/res/values-*/` dir qualifiers — normalize both legacy (`values-pt-rBR`) and BCP47 (`values-b+sr+Latn`) forms to BCP47; note any non-app-module `res/` dirs; README mentions of language names. |
->
-> **Swift / Apple (iOS) detection rules** (apply only when `language === "swift"`; the JS, Ruby, and Android rules above do not apply):
->
-> | Field | How to detect |
-> |---|---|
-> | `language` | `*.xcodeproj`/`*.xcworkspace`, `Package.swift`, or `*.swift` present → `swift`. (Only reached when there is no Gemfile-rails, no root `package.json`, and no native-Android Gradle signals — a root `package.json` routes React Native / Capacitor / Flutter to `js-ts` first.) |
-> | `framework` / `router` / `compiler` / `react` / `vue` / `svelte` / `typescript` | Not meaningful for native Apple — set `framework: "unknown"`, `router: "none"`, and leave `compiler`/`react`/`vue`/`svelte` as `null`/`false`. No iOS manifest variant keys on any of them (iOS variants key on `language`/`buildSystem`/`platform`/`uiFramework`). |
-> | `buildSystem` | `Package.swift` present and NO `.xcodeproj`/`.xcworkspace` → `spm`. `.xcodeproj`/`.xcworkspace` present → `xcode`. |
-> | `uiFramework` | The `@main` entry point decides: a file with `import SwiftUI` + a `struct …: App` + `@main` → `swiftui` (even if it also uses a `UIApplicationDelegateAdaptor`). `@UIApplicationMain`/AppDelegate/SceneDelegate (a type conforming to `UIApplicationDelegate`/`UIResponder`) and/or `.storyboard`/`.xib` files with no SwiftUI `App` → `uikit`. Genuine ambiguity → default `swiftui`. An SPM library with no app entry point → `null`. NEVER emit `"mixed"` (it is unroutable). |
-> | `platform` | iOS deployment target / `IPHONEOS_DEPLOYMENT_TARGET` / iOS SDK → `ios` (the default for an app target). SPM library → `null`. |
-> | `packageManager` | `null` (Swift has no npm-style package manager; SPM is the build system and is recorded under `buildSystem`). |
-> | `existing.library` | A `.xcstrings` present anywhere → `string-catalog`; else `none`. |
-> | `existing.configured` | A `.xcstrings` present. |
-> | `existing.catalogsScaffolded` | A `.xcstrings` present (same signal). |
-> | `existing.stringsWrapped` | Sample `*.swift` files: > 80% of user-visible literals using `String(localized:` / `Text("…")` literals vs. bare user-visible `String` literals → "yes", > 20% → "partial", else → "no". |
-> | `candidateFiles` | Glob `**/*.swift` (exclude tests and `Package.swift`), grep each for user-visible string literals not already in `String(localized:` / `Text(` / `NSLocalizedString(`. Return files with ≥1 match, sorted by match count desc. |
-> | `formatCandidateFiles` | Glob `**/*.swift`, excluding test targets and `Package.swift`; grep `String(format: "%.`, `dateFormat =`, `DateFormatter(`, `NumberFormatter(`, `RelativeDateTimeFormatter(`, `$\(` (a literal `$` immediately before a Swift interpolation — match it **without** a leading `"`, since the overwhelmingly common form is mid-string, `"Total: $\(amount)"`, where the quote is nowhere near the `$`), and `joined(separator: ", ")`. **Then one read-and-judge step, which is deliberately not a pure grep:** list the lines where a `Text(` or `String(localized:` argument contains a `\(` interpolation, open each, and keep only those whose interpolated symbol is declared numeric (`Int`, `Double`, `Decimal`) or `Date` — `\(userName)` is a `String` and not a formatting site, so a bare `\(` grep would flag most of the UI. Report the judged set, not the raw grep hits. **Exclude the generated `Formatters.swift`** (the file `.globalize/format-module.json` → `path` names once it exists; before Phase 2 it does not, so exclude any file named `Formatters.swift`). Return files with ≥1 match, sorted by match count desc. |
-> | `localeSignals` | `.lproj` dirs; Info.plist `CFBundleLocalizations` / `CFBundleDevelopmentRegion`; existing `.strings`/`.stringsdict`/`.xcstrings` files; README language mentions. |
->
-> For a `swift` detection, `platform`, `buildSystem`, and `uiFramework` MUST be populated (never left undefined) — the §1.3 matcher checks these structural keys by equality, and an undefined field never matches an iOS variant. For `js-ts`, `ruby`, and `android` detections, all three are `null`.
->
-> Likewise, for a `framework: "webext"` detection `extensionFramework`, `manifestVersion`, and `compiler` MUST all be populated — `compiler` explicitly to `null` where no Vite build exists, since that null is the predicate that withholds the Lingui variants. For every non-`webext` detection, `extensionFramework` and `manifestVersion` are `null`.
->
-> For **every** detection, `angular`, `ionic` and `hybrid` MUST be populated — on non-`js-ts` detections they are `false`, `false`, `null`. The §1.2 hybrid rows and the §1.7 routing skip read them.
->
-> Write the JSON file and exit. Do not engage in conversation.
+### 1.2 Compatibility hard-stops
 
-> **User-facing message** (after the inspect subagent returns and `detection.json` is written):
-> For `language === "js-ts"` (JS/TS): "Scan done. Detected: **{framework}** + **{router}** ({compiler} compiler, {packageManager}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
-> For `framework === "angular"` (`compiler` is not meaningful, so omit it): "Scan done. Detected: **Angular {version}**{ + Ionic when `ionic`}{ + Capacitor/Cordova when `hybrid`} ({packageManager}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
-> For `language === "ruby"` (Rails — `router` is "none" and `compiler` is not meaningful, so omit them): "Scan done. Detected: **rails** (bundler). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
-> For `language === "android"` (native Android — `router` is "none" and `compiler` is not meaningful, so omit them): "Scan done. Detected: **android** (gradle). Existing i18n: **{existing.library}** ({existing.configured ? 'string resources already present' : 'no string resources yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
-> For `framework === "webext"` (browser extension — `router` is "none", so omit it): "Scan done. Detected: **browser extension** (MV{manifestVersion}, **{extensionFramework}**{, compiler when non-null}{, packageManager when non-null}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
-> For `language === "swift"` (iOS — router/compiler are not meaningful, so omit them): "Scan done. Detected: **iOS** (**{uiFramework}**, **{buildSystem}**). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
->
-> If `existing.library !== "none"`, also surface:
-> "Heads up — you already have `{existing.library}` in your dependencies. If it's compatible, we'll continue with it; if not, I'll flag it in the next step."
-
-### 1.2 Apply compatibility hard-stops
-
-Read `detection.json`. Apply these rules top-to-bottom. If any matches, **STOP** the orchestrator with the corresponding message — do not proceed to 1.3.
-
-**Evaluate first (signal stops):** the **React Native** and **Flutter** rows in the "Android compatibility rules" block below are checked **before** the generic rows in the table that follows, so those projects receive their specific, actionable message rather than the generic "supported frameworks" stop. The Capacitor/Cordova/Ionic row is **not** a signal stop any more: it applies only when `language === "android"`. On the JS path a hybrid app is localized in its web layer like any other web app, and the Angular and Vite entries match it.
-
-When stopping, prefix the message with `Compatibility check — found a blocker:` so the user sees a clear framing rather than an abrupt error.
+Read `detection.json`. **Signal stops first** (independent of `language`):
 
 | Condition | Stop message |
 |---|---|
-| `language === "js-ts"` AND `framework !== "webext"` AND `react === false` AND `vue === false` AND `svelte === false` AND `angular === false` | "globalize-guide currently supports React-based, Vue-based, Svelte-based, and Angular-based projects only. This project uses {framework}. No supported library available." |
-| `framework === "cra"` | "Create React App is no longer supported by this skill. Migrate to Vite or Next.js, then re-run." |
-| `existing.library` is one of `react-intl`, `i18next`, `react-i18next`, `next-translate`, `typesafe-i18n`, `i18next-vue`, `@tolgee/vue`, `fluent-vue`, `@jsverse/transloco`, `@ngneat/transloco`, `@ngx-translate/core` | "This project already uses {library}. Migrating between i18n libraries is out of scope for this skill. Either continue with {library} (use its native tooling), or remove it first and re-run." |
-| `framework === "next"` AND `router === "pages"` AND user wants Lingui | (Surface only after library choice in 1.5) "Lingui setup does not currently cover the Next.js Pages Router. Use next-intl on Pages Router, or migrate to App Router." |
-| `@remix-run/react` in deps with major version `< 2` (i.e. Remix v1) | "Remix v1 is no longer supported by this skill. Upgrade to Remix v2 (`@remix-run/*` ≥ 2) or migrate to React Router v7 framework mode, then re-run." |
-| `framework === "remix"` AND (`@remix-run/dev` major.minor `< 2.7` OR `vite` not in devDeps) | "This Remix v2 project uses the classic compiler (pre-Vite). Lingui requires the Vite-based build. Upgrade to `@remix-run/dev` ≥ 2.7 and follow Remix's classic-compiler → Vite migration, then re-run." |
-| `framework === "sveltekit"` AND `@sveltejs/kit` major.minor `< 2.3` | "Paraglide's URL-based locale routing relies on SvelteKit's `reroute` hook, added in `@sveltejs/kit` 2.3.0 — your project is on an older version. Upgrade to SvelteKit ≥ 2.3, then re-run. (If you must stay below 2.3, a different, deprecated routing approach is required that this skill does not cover.)" |
-| `svelte === true` AND `framework !== "sveltekit"` | "This skill currently supports Svelte only through SvelteKit (the Paraglide setup relies on SvelteKit's hooks and routing). A plain Vite + Svelte SPA is not yet supported. Adopt SvelteKit, or wait for SPA support, then re-run." |
-| `language === "js-ts"` AND `framework !== "webext"` AND custom build pipeline (no `vite.config`, `next.config`, `nuxt.config`, `quasar.config`, `angular.json`, or `react-scripts`) | "This project uses an unsupported build pipeline. Lingui requires SWC or Babel; next-intl requires Next.js; vue-i18n requires Vite, Nuxt, or Quasar. Angular requires `angular.json`." |
+| `react-native` in `package.json` AND an `android/` folder present | "This is a React Native app. React Native localizes through JS i18n libraries (i18next, react-intl, Lingui), not native Android string resources. Native `android-strings` support targets native Kotlin/Java apps. Use the JS path, or wait for RN support." |
+| `pubspec.yaml` present (Flutter) | "This is a Flutter app. Flutter localizes via `.arb` files and `gen_l10n`, not native Android `strings.xml`. Flutter support isn't available yet." |
 
-**Browser-extension compatibility rules** (apply only when `framework === "webext"`; the two generic JS rows above are guarded by `framework !== "webext"`, so a build-less or vanilla-JS extension does not falsely STOP there):
-
-| Condition | Action |
-|---|---|
-| `framework === "webext"` AND `manifestVersion === 2` | **STOP.** "This extension is on Manifest V2. Chrome disabled MV2 for every user in Chrome 138 (July 2025) and removed the last MV2 listings from the Web Store in August 2026 — it will not load. Migrate to MV3, then re-run. (Firefox still runs MV2, but this skill targets MV3 only, and the two share the same `_locales` mechanism, so the i18n work carries over unchanged after you migrate.)" |
-| `framework === "webext"` AND `extensionFramework === "plasmo"` | **Warn (non-blocking).** "Plasmo's last release and last commit on `main` are both 2025-05-17, with several hundred issues open — treat it as unmaintained. The native `chrome.i18n` path works fine on it (Plasmo reads `assets/_locales/`), so that's what I'll set up; the Lingui path isn't covered for Plasmo's Parcel build. Consider `npx wxt@latest init` for new work." |
-| `framework === "webext"` AND `extensionFramework === "webpack"` | **Warn (non-blocking).** "This extension builds with webpack. The native `chrome.i18n` path works there without any build integration, so that's what I'll set up; the Lingui path is only covered for Vite-based builds (WXT, CRXJS, plain Vite)." |
-| `framework === "webext"` AND `extensionFramework === "none"` | **Warn (non-blocking).** "This extension has no build step, so the native `chrome.i18n` path is the only option — which is fine: it needs no bundler, no dependencies, and no compile step. If you later want ICU plurals or an in-extension language picker, adopt a Vite-based build and re-run." |
-| Safari packaging present (an `.xcodeproj` produced by `safari-web-extension-converter`, or a `Safari*Extension` target beside the web sources) | **Warn (non-blocking).** "There are open, unresolved reports of `browser.i18n.getMessage()` returning empty strings in Safari after conversion. Verify i18n explicitly on Safari once set up — don't assume parity with Chrome." |
-
-**No MV3-era version warning otherwise.** Unlike the JS framework version branches, `_locales` and `chrome.i18n` have been stable since the API shipped, so there is no version-gated emission and nothing else to warn about.
-
-**Angular compatibility rules** (apply only when `framework === "angular"`):
-
-| Condition | Action |
-|---|---|
-| `@angular/ssr` in deps | **STOP.** "This Angular app uses server-side rendering (`@angular/ssr`). The supported setup loads translations at runtime with `loadTranslations()`, which sets a process-wide global — on a server it cannot differ between two concurrent requests, so one visitor would be served another's language. SSR is not supported yet. Remove `@angular/ssr` for a client-only build, or wait for SSR support, then re-run." |
-| Any `@analogjs/*` package in deps or devDeps | **STOP.** "This is an AnalogJS app. AnalogJS (Vite-based Angular meta-framework) is not supported — the Angular setup targets the Angular CLI application builder." |
-| Any `projectType: "application"` project in `angular.json` whose `architect.build.builder` is neither `@angular/build:application` nor `@angular-devkit/build-angular:application` | **STOP.** "This project builds with `{builder}`. The Angular setup needs the application builder (`@angular/build:application`). Migrate with `ng update @angular/cli --name use-application-builder`, then re-run." |
-| `version` major `< 18` | **STOP.** "This project is on Angular {version}. The Angular setup supports Angular 18 and later (Ionic 9's floor). Upgrade with `ng update`, then re-run." |
-
-**Ruby / Rails compatibility rules** (apply only when `language === "ruby"`; the two JS rows above — React/Vue/Svelte and custom-build-pipeline — are guarded by `language === "js-ts"`, so they apply only to JS projects and a Rails, Android, or Swift/iOS project does not falsely STOP there):
-
-| Condition | Action |
-|---|---|
-| `language === "ruby"` AND `framework !== "rails"` | **STOP.** "globalize-guide currently supports Ruby only through Rails (built-in `I18n` API + locale-rooted YAML). Non-Rails Ruby (Sinatra, Hanami, plain `i18n` gem) is not supported. Point me at a Rails app, or use the `i18n` gem docs directly." |
-| `gettext_i18n_rails` OR `fast_gettext` in `Gemfile`/`Gemfile.lock` | **STOP.** "This project uses `gettext_i18n_rails` — the catalog format is PO, not YAML. The v1 Rails path supports locale-rooted YAML only; the PO/gettext overlay for Rails is not yet supported. Proceed manually, or wait for the PO overlay." |
-
-**Name-collision warning (Ruby, non-blocking):** if `globalize`, `mobility`, or `traco` was detected (the model/DB-content translation gems — unrelated to Globalize.now), surface but do **not** stop: "I found `{gem}` in your Gemfile. It translates DB/model content (per-row data), not UI strings, and is unrelated to Globalize.now. The i18n setup won't touch it, and its content won't be in the connected catalog. Proceeding with UI-string i18n." Never conflate the `globalize` gem with the Globalize.now platform.
-
-**Soft EOL warning (Ruby, non-blocking — NO emission gating):** if `language === "ruby"` AND the detected Rails `version` is `7.1` or earlier: "This project is on Rails {version}, which reached end-of-life. The Rails path supports 6.1 → 8.1 at the same code level (no version-gated i18n branches) — the emitted code is identical — but running EOL Rails in production isn't recommended. Consider upgrading. Proceeding." The default target is Rails 8.1; support runs down to 6.1. There is **no** version-gated emission for Rails (clean contrast with the JS framework version branches above).
-
-**Android compatibility rules.** Only the React Native and Flutter rows fire on **signals** (deps / files), independent of the detected `language` — the §1.1 rule already routes hybrid and Flutter projects away from `language: "android"`, so these stops exist to give the user a clear, specific reason rather than a generic "no manifest entry matches". The Capacitor/Cordova/Ionic row applies only to an `android` detection:
-
-| Condition | Action |
-|---|---|
-| `react-native` in `package.json` AND an `android/` folder present | **STOP.** "This is a React Native app. React Native localizes through JS i18n libraries (i18next, react-intl, Lingui), not native Android string resources. Native `android-strings` support targets native Kotlin/Java apps. Use the JS path, or wait for RN support." |
-| `language === "android"` AND (`@capacitor/core`, `cordova`, or any `@ionic/*` in `package.json`) AND an `android/` folder present | **STOP.** "This looks like a Capacitor/Cordova/Ionic hybrid app — its UI is localized in the web layer, not in native `strings.xml`. Run globalize-guide against the web UI (the JS path)." |
-| `pubspec.yaml` present (Flutter) | **STOP.** "This is a Flutter app. Flutter localizes via `.arb` files and `gen_l10n`, not native Android `strings.xml`. Flutter support isn't available yet." |
-| `language === "android"` AND a Kotlin/Compose **Multiplatform** layout (resources under `commonMain` / a `compose.resources` setup, no `app/src/main/res`) | **Warn (non-blocking).** "This looks like a Kotlin/Compose Multiplatform project, which uses a different resource mechanism (`compose.resources`) than standard Android `res/values/strings.xml`. v1 covers standard Android only — I'll proceed against the Android resource dirs I can find, but multiplatform resources won't be handled." |
-
-**No EOL / version warning for Android** (clean contrast with the JS framework version branches and the Rails soft-EOL note): string resources are stable across all API levels, so there is no version to warn about and no version-gated emission. The only API-gated features — the `b+` qualifier dir form (API 24+) and per-app language (API 33+) — are optional add-ons, never required.
-
-**Hybrid-app notes** (non-blocking; apply on any framework):
-
-| Condition | Action |
-|---|---|
-| `hybrid === "cordova"` | **Warn (non-blocking).** "This is a Cordova app. Its web layer is localized exactly like a browser app, so the setup proceeds; Cordova itself is in maintenance mode and only the Capacitor path has been exercised." |
-| `hybrid !== null` AND an `android/` or `ios/` folder exists | **Notice (non-blocking).** "The app name and native permission prompts (`NS*UsageDescription`, Android `app_name`) live in native files and stay in the source language — this setup localizes the web UI only." |
-
-These are not hard-stops, but note for the Paraglide path:
-
-- If `existing.library === "paraglide"` AND `existing.configured === true`, do **not** run a from-scratch setup — route Phase 2 to the collapse / already-configured case (see "Phase 2 collapse-case").
-- If `@inlang/paraglide-sveltekit` (the Paraglide 1.x SvelteKit adapter) is in deps, this is a **migration**, not a fresh setup: Paraglide 2.x replaced the dedicated adapter with the framework-agnostic `reroute` + `handle` model. Flag it to the user before proceeding; the setup reference covers the migration steps.
-
-**Swift / Apple (iOS) compatibility rules** (apply only when `language === "swift"`; the two flipped JS rows above are exempted for Swift via their `language === "js-ts"` guard):
-
-| Condition | Action |
-|---|---|
-| `language === "swift"` AND a `.xcstrings` cannot be created and none exists (legacy `.strings`-only on a pre-Xcode-15 toolchain with no migration path) | **Note (non-blocking where possible).** Offer the **Edit ▸ Convert to String Catalog** migration; only STOP if there is genuinely no path to a catalog. |
-| `language === "swift"` AND a non-iOS Apple target out of v1 scope (macOS/watchOS/tvOS) with no iOS app and no Swift package | **STOP (scope).** "v1 of the iOS String Catalog path targets iOS apps and Swift packages. {platform} is out of scope — the shared catalog mechanics may still apply manually." |
+Then read the language's file — `references/orchestrator/compat.js-ts.md`, `compat.ruby.md`, `compat.android.md` or `compat.swift.md` — and apply its rows top-to-bottom. Prefix every stop with `Compatibility check — found a blocker:`. A STOP ends the run before §1.3. Rows marked **Decision** (e.g. the Lingui + Vite ≥ 6.3 gate) are asked, and their answer is recorded in `decisions.md` before the plan is written.
 
 ### 1.3 Resolve supported stacks from manifest
 
-Read `manifest.json`. Filter `stacks[]` entries whose `match` predicate is satisfied by `detection`. The result is the set of `(library, variant)` options the user can choose from in 1.5.
+Filter `manifest.json` `stacks[]` to the entries whose `match` is satisfied by `detection`. The result is the §1.5 choice set.
 
-**Matcher predicate (load-bearing).** A `match` object mixes two kinds of keys, handled differently — every `match` key names a same-named `detection` field **except `library`**, which has no detection counterpart:
+- **Structural keys** — every `match` key except `library` (`framework`, `router`, `compiler`, `platform`, `buildSystem`, `uiFramework`, …) — must equal the same-named `detection` field.
+- **`language`**: present → must equal `detection.language`; **absent → treated as `"js-ts"`**. This keeps the JS, Ruby, Android and Swift entry sets disjoint.
+- **`library`** is not a predicate. It names the option an entry offers and is never compared to `detection.existing.library` (which only drives §1.2 stops and the already-configured handling). Two entries can share structural keys and differ only in `library` — e.g. Next App Router yields {lingui, next-intl}.
 
-- **Structural keys** — `framework`, `router`, `compiler`, and any other detection-state key an entry declares — must each equal the same-named field in `detection`. (Example: `nextjs-app-router-*` entries declare `framework: "next"`, `router: "app"`.)
-- **`language`** is structural but special-cased:
-  - If `match.language` is **present**, it must equal `detection.language` (so `rails-yaml`, which declares `match.language: "ruby"`, matches **only** when `detection.language === "ruby"`).
-  - If `match.language` is **absent**, treat it as `"js-ts"` — i.e. the entry matches only when `detection.language === "js-ts"`. All existing JS entries omit `language`, so they keep matching exactly as before and are inert for Ruby projects.
-- **`library`** is **not** a structural predicate. It is the **identifier of the variant/option** the entry offers — surfaced as a choice in §1.5. It is **never** matched against `detection.existing.library` (there is no top-level `detection.library`). `detection.existing.library` describes prior setup state and is used only by the §1.2 stops and the §1.6 / Phase 2 already-configured handling — it never filters the candidate set. This is why two entries can share identical structural keys and differ only in `library` (e.g. `nextjs-app-router-lingui` and `nextjs-app-router-next-intl`, both `framework: "next", router: "app"`): a fresh Next app-router project (`existing.library: "none"`) matches **both**, and the {lingui, next-intl} pair is surfaced as the §1.5 choice.
-- **`platform`, `buildSystem`, `uiFramework`** are ordinary **structural keys** (each must equal the same-named `detection` field) that discriminate *among* the iOS variants — NOT a new special-cased matcher axis (only `language`'s absent⇒`js-ts` default is special). A `match.language: "swift"` matches only `detection.language === "swift"`, keeping the Swift, JS, and Ruby entry sets disjoint. No matcher-logic change beyond treating these three as plain structural keys.
-
-This keeps the Ruby and JS entry sets disjoint by `language`: a Ruby detection can match only `rails-yaml`; a `js-ts` detection can match only the JS entries (never `rails-yaml`); a `swift` detection can match only the iOS variants.
-
-**Hand-trace (iOS).** A `{swift, xcode, ios, swiftui}` detection selects **only** `ios-swiftui-string-catalog`: `ios-uikit-string-catalog` fails on `uiFramework` (uikit≠swiftui), `ios-spm-string-catalog` fails on `buildSystem` (spm≠xcode), every JS entry fails on absent⇒`js-ts` (≠swift), `rails-yaml` fails on `language` (ruby≠swift), and `android-strings` fails on `language` (android≠swift). A `{swift, spm}` detection (buildSystem `spm`, no app entry point) selects **only** `ios-spm-string-catalog`: the two app variants fail on `buildSystem` (xcode≠spm).
-
-**Hand-trace (browser extension).** A `{js-ts, webext, babel, react: true}` detection (a WXT + React project) selects **`webext-native-messages`** and **`webext-babel-lingui`**: every other JS entry fails on `framework` (next/vite/remix/… ≠ webext), `webext-swc-lingui` fails on `compiler` (swc ≠ babel), and `rails-yaml` / `android-strings` / the iOS entries fail on `language`. §1.5 then offers that two-way choice. A build-less extension detects `compiler: null`, so **both** Lingui entries fail on `compiler` and only `webext-native-messages` survives — the null is doing the work a hard-stop would otherwise have to. A Vue extension detects `react: false`, so both Lingui entries fail on `react` and the native entry again stands alone. No new matcher logic: `framework`, `compiler` and `react` are ordinary structural keys.
-
-**Hand-trace (Angular).** A `{js-ts, angular}` detection selects **only** `angular-localize`: every other JS entry fails on `framework` (next/vite/… ≠ angular), and `rails-yaml` / `android-strings` / the iOS entries fail on `language`. An Ionic React or Ionic Vue app is **not** Angular — it detects `framework: "vite"` and matches the Vite entries exactly like any other Vite app; `hybrid` and `ionic` never filter the candidate set.
-
-**Net effect.** A fresh Next app-router project yields **{lingui, next-intl}** candidates → §1.5 offers the choice. A fresh Rails project (`existing.library: "none"`) yields exactly **{rails-yaml}** → §1.5 confirms "Rails built-in I18n (YAML)". A fresh native-Android project yields exactly **{android-strings}** (its `match.language: "android"` requires `detection.language === "android"`) → §1.5 confirms "Android string resources (XML)". A fresh iOS project yields exactly **one** iOS variant → §1.5 confirms it (no multi-option prompt). A fresh browser extension yields **{webext-native, lingui}** when it has a Vite build and React, and exactly **{webext-native}** otherwise → §1.5 offers the choice or confirms the single option. A fresh `js-ts` detection never yields `rails-yaml`, `android-strings`, or an iOS variant (their `match.language` is `ruby`/`android`/`swift`, which fail), and never yields a `webext` variant (their `match.framework` is `webext`). A fresh Angular project yields exactly **{angular-localize}** → §1.5 confirms it.
-
-If the filtered list is empty, surface a STOP with: "Your stack is supported in principle but no manifest entry currently matches. Detected: {summary}. File an issue or pick a different setup."
+Empty result → STOP: "Your stack is supported in principle but no manifest entry currently matches. Detected: {summary}. File an issue or pick a different setup." Worked examples: `references/orchestrator/matcher-traces.md`.
 
 ### 1.4 Branch recommendation
 
-If `git.isRepo === true` AND `git.branch` is one of `main`, `master`, `develop`:
-
-> You're on `{branch}`. Setup will modify several files, so I'd recommend a dedicated branch — easier to review or revert later:
-> ```
-> git checkout -b chore/i18n-setup
-> ```
-> Want me to create this branch when Phase 2 starts, stay on `{branch}`, or use a different name? (No git commands run yet — just answering the question.)
-
-Record the answer in `decisions`.
+If `git.isRepo` AND `git.branch` ∈ {`main`, `master`, `develop`}: "You're on `{branch}`. Setup will modify several files, so I'd recommend a dedicated branch (`git checkout -b chore/i18n-setup`). Want me to create it when Phase 2 starts, stay on `{branch}`, or use a different name? (No git commands run yet.)" Record in `decisions`. No git repo → skip silently.
 
 ### 1.5 Library choice
 
-> **User-facing message** (before showing options):
-> "Picking the i18n library. Based on **{framework}** + **{router}**, my recommendation is **{recommended-library}** — {one-line rationale from the table below}. You can override if you have a strong preference."
-
-Show the user the list of supported variants from 1.3, with the recommendation marked. Recommendation rules (apply first match):
-
-| Detection | Recommendation | Rationale |
-|---|---|---|
-| `framework === "next"` | **next-intl** | Purpose-built for Next.js; first-class App Router (RSC + middleware) and Pages Router support. Uses ICU MessageFormat. No compile step. |
-| `framework === "next"` AND user wants compile-time extraction | **Lingui** (alternative) | Compile-time macros, zero-runtime-overhead translations. |
-| `framework === "nuxt"` | **vue-i18n via @nuxtjs/i18n** | The Nuxt module wraps vue-i18n with SSR-aware routing, lazy-loaded locale catalogs, and locale meta via `useLocaleHead`. The canonical Nuxt choice. |
-| `framework === "quasar"` OR (`vue === true` AND `framework === "vite"`) | **vue-i18n** | The official Intlify library and de-facto standard across Vue 3 projects. Composition API + ICU via custom `messageCompiler`. |
-| `framework === "remix"` | **Lingui** | Remix v2 (≥ 2.7, Vite-based) ships with no first-party i18n primitive. Lingui plugs in via `@lingui/vite-plugin`, gives compile-time extraction, and aligns with Remix's per-route `loader` pattern (dynamic catalog import per route). |
-| `framework === "react-router-framework"` | **Lingui** | React Router v7 framework mode is the same shape: Vite + `loader` + root `<html>` rendering. Lingui's per-route catalogs map cleanly onto the routes config. |
-| `framework === "sveltekit"` | **Paraglide JS** | First-party Svelte CLI add-on (`sv add paraglide`); compiler-based with tree-shaken messages; SSR-correct via AsyncLocalStorage; integrates through `reroute` + `handle` hooks. |
-| `framework === "rails"` | **Rails built-in I18n (YAML)** | Rails ships a full `I18n` stack (`t`/`l` helpers, locale-rooted YAML at `config/locales/`, `%{name}` interpolation, CLDR plurals via `rails-i18n`); no third-party UI-string library needed. |
-| `framework === "android"` | **Android string resources (XML)** | Android ships localization built in — `res/values/strings.xml` + `values-<qualifier>` overlays, `getString`/`stringResource` accessors, positional `%1$s` args, native `<plurals>` (CLDR categories). No third-party library to install. |
-| `framework === "webext"` AND (`compiler === null` OR `react === false`) | **Native `chrome.i18n` message catalogs** | The only option here — Lingui needs a Vite build to expand its macros and a React tree to render into. `_locales/<code>/messages.json` is the platform's built-in mechanism: no dependencies, no compile step, works identically in the popup, options page, content scripts and the service worker. |
-| `framework === "webext"` AND `compiler !== null` AND `react === true` | **Lingui** | A React UI plus a Vite build. Lingui brings the three things `chrome.i18n` structurally cannot: CLDR plural categories, ICU MessageFormat, and `#.` translator comments — plus a language the user can pick inside the extension instead of one dictated by the browser UI. The manifest and store-listing strings still land in `_locales`, generated from the same PO catalog. Native offered as the zero-dependency alternative. |
-| `language === "swift"` | **Apple String Catalog (built-in)** | Apple ships a full localization stack (String Catalogs, `String(localized:)`/`Text` literals, `.stringsdict`/`variations` plurals via CLDR) built into the SDK — no third-party library or install needed. |
-| `framework === "angular"` | **@angular/localize** | Angular's built-in i18n and the only maintained Angular option whose translator descriptions reach the catalog (Transloco and ngx-translate have no comment channel). XLIFF 2.0 catalogs, ICU plurals in templates, translations loaded at runtime so one build serves every language (what Capacitor needs). |
-| anything else (vite + react, tanstack-start, etc.) | **Lingui** | The only library with reference support for non-Next.js React stacks today. |
-
-Use AskUserQuestion if multiple variants apply. If only one variant matches, surface the choice as confirmation rather than a multi-option prompt. For `language === "swift"` exactly one iOS variant matches (see §1.3 hand-trace), so the choice is surfaced as a **confirmation** of the Apple String Catalog, not a multi-option prompt. For `framework === "webext"` with a Vite build and React, exactly two variants match, so use AskUserQuestion for the {native, Lingui} choice and state the trade-off plainly rather than only the recommendation: native has **no plurals and no ICU**, caps substitutions at 9, and follows the browser UI language unless the custom-loader option is chosen at §1.7; Lingui has all of those but adds a dependency, a compile step, and a generated `_locales` bridge for the manifest strings. Where only the native variant matches, surface it as a confirmation. All three `webext` variants are `supportLevel: "experimental"` — say so, in the same shape as the iOS wording below. For `framework === "angular"` exactly one variant matches — confirm it, and say it is **experimental**: "Setting up @angular/localize with runtime translation loading. Heads up: Angular support is **experimental** — the Globalize XLIFF 2.0 round-trip and an on-device run haven't been verified yet."
-
-The iOS variants are `supportLevel: "experimental"` — when confirming, tell the user so: e.g. "Setting up the Apple String Catalog path (built into the SDK — no install). Heads up: iOS/`.xcstrings` support is **experimental** — the live Globalize.now round-trip for this format hasn't been verified end-to-end yet, so double-check the Phase-4 connection."
+Read `references/orchestrator/library-choice.md` (recommendation table + confirmation wording). "Picking the i18n library. Based on **{framework}** + **{router}**, my recommendation is **{library}** — {rationale}. You can override." Multiple variants → AskUserQuestion; one → confirm. State `supportLevel: "experimental"` when it applies. After the choice, apply any `compat.<language>.md` rows that depend on it (Pages Router + Lingui stop; Lingui + Vite version gate).
 
 ### 1.6 Journey scope
 
-> **User-facing message** (before asking):
-> "Which parts do you want to run? I've pre-checked the ones that make sense given what's already in the project. Connecting **Globalize.now** to translate your catalogs is included by default — you can uncheck it to skip the platform."
+"Which parts do you want to run? I've pre-checked the ones that make sense given what's already in the project. Connecting **Globalize.now** is included by default — uncheck it to skip the platform." AskUserQuestion, multi-select (setup / convert / connect translation platform), defaults:
 
-Ask which parts to run. Defaults derived from `existing`:
+- setup — when `existing.configured === false`
+- convert — when (`existing.stringsWrapped !== "yes"` AND `candidateFiles.length > 0`) **or** `formatCandidateFiles.length > 0` (wrapped strings say nothing about hand-rolled prices and dates)
+- connect — **always pre-checked**; only an explicit uncheck skips 1.5 and 4
 
-- If `existing.configured === false` → setup is suggested
-- If (`existing.stringsWrapped !== "yes"` AND `candidateFiles.length > 0`) **OR** `formatCandidateFiles.length > 0` → convert is suggested. The second clause matters on its own: a project whose strings are all wrapped can still format every price and date by hand, and that is exactly the project where the convert phase is easiest to skip by mistake.
-- **Connecting Globalize is default-on — pre-check it.** The user can uncheck to decline the platform; only then do stages 1.5 and 4 get skipped.
-
-Use AskUserQuestion with three multi-select options (setup / convert / connect translation platform) and the inferred defaults pre-checked — including `connect translation platform`. Record the result under `decisions.scope` (`decisions.scope.globalize` is `true` unless the user unchecked it).
+Record `decisions.scope` (`scope.globalize` is `true` unless unchecked).
 
 ### 1.7 Setup choices
 
-> **User-facing message** (before asking):
-> "A few setup details. Locales drive which catalog folders we scaffold and which CLI flags we pass; the routing strategy determines how locale shows up in URLs; setup mode is just how chatty I should be while running Phase 2."
-
-If `setup` is in scope, collect:
-
-- **Setup mode** — guided (per-step explanations, consent gates on file modifications) vs. unguided (run end-to-end, summarize at end)
-- **Source locale** — default to `localeSignals` first existing or `en`
-- **Target locales** — multi-input. Suggest from `localeSignals.existingLocaleDirs` and README hints
-- **Routing strategy** — **Skipped when `framework === "angular"`** (one build, translations loaded at startup, language changed by reload — there is no URL locale to route) **and when `hybrid === "capacitor"` AND `framework === "vite"`** (Ionic React / Ionic Vue: a Capacitor app has no URL bar, so the locale is a stored preference defaulting to the device language, and the Vite setup references have that branch). Record `decisions.setup.routing = "none"` and write the `decisions.md` section as `None — <Angular runtime loading | Capacitor app>: locale is a stored preference`. A Capacitor app on any other framework still gets the question — those setup references have no Capacitor branch yet. If the user pre-answered a routing strategy, record `None` anyway and tell them why in one sentence. Also **skipped entirely when `framework === "webext"`** (an extension has no URLs to put a locale in; ask the locale-source question below instead). Otherwise, for JS/TS stacks, if file-based routing is detected **or** `framework === "vite" && router === "react-router"`; ask: prefix-based (`/en/...`) or domain-based or none. The second case is a declarative React Router SPA (`<Routes>`/`<Route>` in `App.tsx`, no `@react-router/dev`). It has no route files, so the file-based gate alone would skip the question — but a `<Routes>` tree takes a locale segment as readily as a file-based one, and the Vite setup reference has a prefixed branch for it. Skipping the question there silently forces "none". **For Rails** (`language === "ruby"`): Rails detection sets `router: "none"`, so the file-based gate would skip this question — ask it explicitly here instead. URL-locale routing embeds the locale in the path (`scope "/:locale"`, e.g. `/en/books`) and edits `config/routes.rb` + adds `ApplicationController#default_url_options`. Ask: URL-locale routing (prefix `/:locale`) or none. Unguided default = **included** (the Rails Guide's recommended locale-persistence approach). Record under `decisions.setup` so `rails.setup.md` Step 5 reads the decision instead of silently applying its own default.
-- **Catalog format** *(Paraglide only)* — defaults to **PO (gettext)** and **do not ask** for a fresh setup. PO is the default because a `.po` catalog carries `#.` translator comments that flow to the Globalize platform (the single biggest quality lever for AI translation), which the ICU-JSON model cannot. Set `decisions.setup.catalogFormat = "po"` silently. The **only** time to surface a choice is an **already-configured** Paraglide project on ICU-JSON (existing `messages/*.json` + `@inlang/plugin-icu1`): ask whether to **convert to PO** (recommended — a lossless migration, since both formats use ICU bodies; see "Phase 2 collapse-case" → migration) or **keep ICU-JSON** (`catalogFormat = "json"`). Omit entirely for non-Paraglide libraries.
-- **Application project** *(Angular only)* — list `angular.json` projects with `"projectType": "application"`. Exactly one → record its name as `decisions.setup.angularProject` without asking. More than one → ask which one to localize; there is no default, so this is asked whichever setup mode was chosen. Then, if the chosen project's `root` is not `""`, **STOP**: "This setup currently localizes the application at the workspace root (`src/`). `{project}` lives in `{sourceRoot}`, which isn't supported yet." It is checked here, not in Phase 2, because §2.0 passes the project to `ng add --project` before the setup subagent runs.
-
-- **Locale source** *(browser extensions only — asked **instead of** the routing-strategy question, which is meaningless without URLs)*. An extension's UI language comes from the browser by default, and `chrome.i18n.getMessage()` takes no locale argument, so letting the user pick a language inside the extension is a deliberate architectural choice, not a toggle. Ask:
-  - **Browser UI language only** — zero extra code. `browser.i18n` resolves `en_GB` → `en` → `default_locale` on its own. Records `decisions.setup.localeSwitcher = "native"`.
-  - **User-selectable picker** — the extension reads its own catalogs and stores the choice in `browser.storage.sync`. Records `decisions.setup.localeSwitcher = "custom-loader"`. On the **Lingui** variant this is always the case — Lingui owns the runtime either way — so set it silently and do not ask. On the **native** variant it is a real choice: it means loading `_locales/<code>/messages.json` by `fetch(browser.runtime.getURL(...))` instead of calling `getMessage()`, and re-implementing the fallback chain the browser was doing for you.
-
-  Also, once target locales are known, **warn about any that Chrome does not support** (its `_locales` table is ~55 entries — `en_AU`, `pt_BR`, `zh_CN`, `es_419` and so on; unsupported directories are silently ignored). On the native variant such a locale simply will not load. On the Lingui variant the in-extension picker still works, but the manifest strings and the store listing will not localize for it.
-
-Record under `decisions.setup`.
+If setup is in scope: "A few setup details — locales drive which catalog folders we scaffold, routing decides how the locale shows up in URLs, and setup mode is how chatty I am during Phase 2." Read `references/orchestrator/setup-choices.md` and collect: setup mode (guided / unguided), source locale, target locales, routing strategy (with its stack-specific skips), and the stack-specific extras it lists (Paraglide catalog format, Angular project, extension locale source). Record under `decisions.setup`.
 
 ### 1.8 Convert choices
 
-> **User-facing message** (before asking):
-> "What's this app about? One-sentence answer is fine. I'll pass it to the wrapping workers in Phase 3 so the translator comments they add have the right context (e.g., '[Cart]', '[Onboarding tooltip]')."
-
-If `convert` is in scope, ask the user to confirm the **app domain**. Infer from `package.json` description, README, route names, or component names. Default suggestion + freeform override.
-
-The domain string flows into wrap-subagent prompts so they write better translator comments. For Paraglide on the default **PO** catalog format, `.po` entries carry `#.` translator comments, so the domain informs comments **and** key naming, exactly as for Lingui/next-intl. For Paraglide on the **ICU-JSON** catalog format (`decisions.setup.catalogFormat === "json"`, which has no translator-comment field), the app domain instead informs *key naming* only — it helps the wrap subagent choose descriptive, context-encoding keys (e.g. `cart_remove_button`), the only disambiguation lever available there.
+If convert is in scope: "What's this app about? One sentence is fine — it goes to the wrapping workers so their translator comments have the right context." Infer a default from `package.json` description / README / route names. Record `decisions.appDomain`. (On Paraglide ICU-JSON it informs key naming only — that format has no comment field.)
 
 ### 1.9 Globalize-now choices
 
-> **User-facing message** (before asking):
-> "Translation-platform setup uses Globalize.now. I just need a project name and which git provider hosts your repo — both have sensible defaults from your `package.json` and git remote."
-
-If `connect translation platform` is in scope, collect:
-
-- **Project name** — default = repo name (from `package.json`).
-- **Repo provider** — auto-detect from `git.remote` (github.com → GitHub, gitlab.com → GitLab); confirm.
+If connect is in scope: project name (default: repo name from `package.json`) and repo provider (auto-detect from `git.remote`; confirm).
 
 ### 1.10 Optional steps
 
-> **User-facing message** (before asking):
-> "Optional add-ons — none of these are required. Separately, and not optional: I always generate a coding-rules file tailored to this setup (`.agents/globalize-rules.md`) and point your `CLAUDE.md` and `AGENTS.md` at it, because the conversion phase wraps strings against it and it's what keeps me from re-introducing hardcoded strings on future edits."
+"Optional add-ons — none required. Not optional: I always generate a coding-rules file for this setup (`.agents/globalize-rules.md`) and point `CLAUDE.md` and `AGENTS.md` at it — conversion wraps strings against it, and it keeps future edits from re-introducing hardcoded strings."
 
-Multi-select for setup-time optionals: ESLint plugin, CI/CD integration (extract+compile in build), test setup wrapper.
+Multi-select: ESLint plugin, CI/CD integration (extract+compile in build), test setup wrapper. Angular instead: CI extraction check. Browser extensions instead: `web-ext lint` in CI (catches a missing `default_locale`, `messages.json` or empty message — not a dangling `__MSG_` reference, which the verify worker's manifest-wiring check owns), a store-listing locale checklist, and (Lingui variant) CI extract+compile including the `_locales` bridge.
 
-For `framework === "angular"`, offer instead: **CI extraction check** (`npm run i18n:extract` + `git diff --exit-code` on the source XLIFF).
+**`generate_format_helpers` → `generate_coding_rules` → `install_coding_rules` are core Phase 2 steps, never options, in that order:** the formatters module and `.globalize/format-module.json` must exist before the rules render (it fails closed without them), and the rules must exist before Phase 3 wraps against them. `install_coding_rules` edits `CLAUDE.md` / `AGENTS.md` (creating either if absent); guided mode confirms each edit.
 
-For `framework === "webext"`, offer instead: **`web-ext lint` in CI** (catches a missing `default_locale`, a missing `messages.json` and empty messages before a store upload rejects them — but not a dangling `__MSG_` reference, which the §3.5 manifest-wiring check owns), a **store-listing locale checklist** (which locales the uploaded package will expose in the Chrome Web Store / Edge Partner Center dropdown, and which listing fields stay dashboard-only), and — on the Lingui variant — the standard CI extract+compile step, extended to run the `_locales` bridge script.
+### 1.11 Write `plan.md`, `decisions.md`, `manifest-snapshot.json`
 
-**Generating the format helpers, generating the rules file, and wiring it in are none of them optional, and none is in this list.** They are three core Phase 2 steps, and they run in this order:
+"Got everything I need. Writing your plan to `.globalize/plan.md` and your choices to `.globalize/decisions.md` so this run is auditable and resumable." Formats: `references/orchestrator/plan-format.md`. Copy the chosen manifest entry verbatim to `manifest-snapshot.json`.
 
-- `generate_format_helpers` runs as soon as the stack's config is on disk, because both of the other two point at what it creates: it writes the project's formatters module and records `{ specifier, path, surface, defaultCurrency, currencySource }` to `.globalize/format-module.json`. Phase 3's format pass rewrites hand-rolled formatting toward that module, and `generate_coding_rules` reads the file back to resolve `<<formatModule>>`.
-- `generate_coding_rules` runs **after** it, because Phase 3 wrap subagents read the result — the tailored rules ARE the conversion contract (macro decision tree, plural rules, skip-list, real catalog paths, and the formatters module's real import specifier). If `.globalize/format-module.json` is missing it **fails closed** rather than guessing an import path, so running it first does not degrade the rules file, it prevents one.
-- `install_coding_rules` then points `CLAUDE.md` (`@.agents/globalize-rules.md`) and `AGENTS.md` (a pointer section) at it, creating either file if absent. Rules nothing loads are close to useless, so this is not a decision the user is asked to make up front — but it does edit files they own, so guided mode still describes each edit and waits for confirmation before making it.
+### 1.12 Final go
 
-### 1.11 Generate `plan.md` + `manifest-snapshot.json` + `decisions.md`
-
-> **User-facing message** (before writing):
-> "Got everything I need. Writing your plan to `.globalize/plan.md` and your choices to `.globalize/decisions.md` so this run is auditable and resumable."
-
-Write the three artifacts to `.globalize/`. See "Plan and decisions formats" below for shape.
-
-Copy the chosen manifest entry verbatim to `.globalize/manifest-snapshot.json` so subsequent runs and subagents read a stable snapshot, not the live manifest.
-
-### 1.12 Render plan + final go
-
-Show `plan.md` to the user as a checklist. Ask:
-
-> "Here's the plan. Ready to execute? (**yes** / **cancel** / **edit**)
-> Once you say yes, I won't pause for more questions unless a subagent gets stuck or finishes a phase."
-
-Cancel writes nothing further. Edit re-enters the relevant 1.x step. Yes proceeds to Phase 1.5 (when Globalize is in scope) or otherwise straight to Phase 2.
+Show `plan.md` as a checklist: "Here's the plan. Ready to execute? (**yes** / **cancel** / **edit**) Once you say yes, I won't pause for more questions unless a worker gets stuck or a phase finishes." Cancel writes nothing further; edit re-enters the relevant 1.x step; yes → Phase 1.5 (Globalize in scope) or Phase 2.
 
 ---
 
 ## Phase 1.5 — Globalize account (upfront, interactive)
 
-**Gate:** run this stage only if `decisions.scope.globalize === true`. If the user unchecked Globalize at 1.6, skip 1.5 **and** Phase 4 entirely and go to Phase 2.
+Gate: `decisions.scope.globalize === true`; otherwise skip 1.5 **and** 4.
 
-This stage gets the user signed in to Globalize **before** any code changes, so the platform is ready the moment the catalogs are done. It is the one interactive Globalize step that has nothing to wait for — account creation needs no project data — so doing it now keeps the long Phase 2/3 work hands-off.
+"Before we touch your code, let's get you signed in to Globalize so it's ready when your catalogs are done. A browser window may open for device-flow sign-in. (Near the very end, when we connect your repo, you'll do one quick browser approval for Globalize's GitHub/GitLab app — I'll remind you.)"
 
-> **User-facing message** (at stage start):
-> "Before we touch your code, let's get you signed in to Globalize so it's ready when your catalogs are done. A browser window may open for device-flow sign-in. (Heads up: near the very end, when we connect your repo, you'll do one quick browser approval to authorize Globalize's GitHub/GitLab app — I'll remind you then.)"
-
-**Delegate to the account skill (main thread).** Invoke the **`globalize-now-account-setup`** skill via the Skill tool. It runs install → sign-in → verify on the main thread (interactive device flow), and **self-skips the login** if `auth status` already reports valid credentials. Do **not** inline any CLI commands here — the skill owns them.
-
-When it completes, record the authenticated org under `decisions.md` → `## Globalize-now` → `Authenticated org` (a soft audit marker), and mark `delegate_account_setup` done in `plan.md`.
-
-**If `globalize-now-account-setup` is not installed** (globalize-guide installed on its own), the Skill invocation fails. Tell the user:
-
-> "I couldn't load the `globalize-now-account-setup` skill — install the Globalize skills with `npx skills add globalize-now/globalize-skills`, then I'll continue." (The standard install co-installs all of them, so this is rare.)
-
-**If the user cancels sign-in** (declines the browser step even though Globalize is in scope): don't block the run. Continue to Phase 2, and set a soft flag so Phase 4's `auth status` re-check re-offers account setup before the project step.
+Invoke the **`globalize-now-account-setup`** skill (Skill tool, main thread). It installs, signs in (self-skips if `auth status` is valid) and verifies. Record the org under `decisions.md` → `## Globalize-now` → `Authenticated org`; mark `delegate_account_setup` done. Skill missing → "I couldn't load the `globalize-now-account-setup` skill — install the Globalize skills with `npx skills add globalize-now/globalize-skills`, then I'll continue." User cancels sign-in → continue to Phase 2; §4.2 re-offers it.
 
 ---
 
 ## Phase 2 — Setup
 
-Single setup subagent. Orchestrator installs packages on the main thread first, then pre-creates the progress file and dispatches the subagent in the background.
+One setup worker. The orchestrator installs packages on the main thread first (lockfile stays in sync), then dispatches.
 
-> **User-facing message** (at Phase 2 start):
-> "Starting Phase 2 — setup. {for JS/TS: `First I'll install the i18n packages on my main thread so your lockfile stays in sync, then I'll dispatch one background worker that wires your build config, sets up the provider, scaffolds catalog folders for your locales, and verifies with a typecheck and build.`; for Rails: `I'll dispatch one background worker that installs the i18n gems with Bundler, wires `config/application.rb`, scaffolds `config/locales/` for your locales, sets up the locale switcher in `ApplicationController`, and verifies by booting the app and parsing the source catalog.`; for Android: `Nothing to install — string resources are built into the platform. I'll dispatch one background worker that creates `res/values/strings.xml` as your source catalog, scaffolds `res/values-<qualifier>/strings.xml` for your target locales, optionally wires per-app language selection, and verifies by parsing the catalogs (and running Lint if the Android SDK is available).`; for Swift: `No packages to install — Apple's localization stack ships with the SDK. I'll dispatch one background worker that creates the String Catalog (`Localizable.xcstrings`), enables build-time string extraction (`SWIFT_EMIT_LOC_STRINGS`), registers your locales, and verifies the catalog is valid.`; for Angular: `First I'll run `ng add @angular/localize`, matched to your Angular major, on my main thread so your lockfile stays in sync, then I'll dispatch one background worker that configures extraction, adds the XLIFF → JSON compile step, rewires `main.ts` to load translations before the app starts, and verifies with an extract, compile and build.`} I'll show progress as a checklist that updates every ~30 seconds. If the worker hits something it can't decide on its own, it'll pause and ask."
+> **Start message:** "Starting Phase 2 — setup. I'll install the i18n packages on my main thread, then one worker wires the build config and provider, scaffolds catalogs for your locales, generates the coding rules, and verifies with a typecheck and build. If it hits something it can't decide, it'll pause and ask." Other stacks' wording (Rails, Android, Swift, Angular): `references/orchestrator/messages.md`.
 
 ### 2.0 Install packages (main thread)
 
-Read `manifest-snapshot.json`'s `packages.runtime` and `packages.dev`. Run the install commands in the foreground using the package manager from `detection.json`. Stream output to the user.
+1. **`upgrade_vite` first**, only when `decisions.setup.viteUpgrade` is set (`compat.js-ts.md` → Lingui + Vite version gate): `npm install -D 'vite@^6'` (plus the React plugin bump that gate names, if needed), then run the project's build — it must pass before anything else is installed.
+2. Install `manifest-snapshot.packages.runtime` and `.dev` with the detected package manager — `npm install` / `yarn add` / `pnpm add` / `bun add`, dev with `-D`. **Single-quote every pinned spec** (`'@lingui/core@^6'`) — zsh `EXTENDED_GLOB` eats an unquoted `^`. Runtime packages go to `dependencies`, dev packages to `devDependencies`; never move one.
+3. **Never `--legacy-peer-deps` / `--force`.** An `ERESOLVE` is a version gate the plan missed: stop and surface it — do not retry with a flag.
+4. Lingui v6 needs **Node ≥ 22.19 or ≥ 24** (ESM-only). Check `node -v` / `.nvmrc` / `engines` first; older → tell the user and pause.
 
-> **Lingui (v6+) requires Node ≥ 22.19 or ≥ 24** — it ships ESM-only and fails to load on older Node. If the resolved stack installs `@lingui/*`, check the project's Node version (`node -v`, plus any `.nvmrc` / `engines` field) before installing. If it's older, tell the user and pause rather than installing a runtime they can't run.
+Both lists are empty by design for Rails (gems install inside the worker, `bundle install`), Android and Swift (platform built-ins) — 2.0 is a no-op there, not an error. **Angular** runs `ng_add_localize` here instead: `npx ng add '@angular/localize@^<major>' --skip-confirmation --use-at-runtime --project <decisions.setup.angularProject>` (`<major>` = detection `version` major; `pnpm exec` / `yarn` / `bunx` for other managers). Install failure → stop the run with the error.
 
-| Package manager | Runtime command | Dev command |
-|---|---|---|
-| `npm` | `npm install <pkgs>` | `npm install -D <pkgs>` |
-| `yarn` | `yarn add <pkgs>` | `yarn add -D <pkgs>` |
-| `pnpm` | `pnpm add <pkgs>` | `pnpm add -D <pkgs>` |
-| `bun` | `bun add <pkgs>` | `bun add -D <pkgs>` |
+### 2.1 Pre-create `progress/setup.json`
 
-**Wrap each `<pkgs>` entry in single quotes** when constructing the shell command — the manifest pins use `^` (e.g. `next-intl@^4`), and zsh interprets unquoted `^` as a glob negation operator under `EXTENDED_GLOB` (common on macOS via oh-my-zsh). Emit `npm install 'next-intl@^4'` rather than `npm install next-intl@^4`. The single quotes are inert under bash/dash and prevent zsh expansion.
+`{ "subagentId": "setup", "phase": 2, "status": "pending", "plan": [...steps from plan.md...], "completed": [], "current": null, "startedAt": null, "updatedAt": "<now>" }` — full schema in `plan-format.md`.
 
-Skip the runtime or dev command if its package list is empty. For `packageManager === "bundler"` (Rails), both package lists are empty by design — gem installation is delegated to the setup subagent via `rails.setup.md` Step 2 (`bundle install`); the §2.0 install step is intentionally a no-op for Rails, not an error. For `packageManager === "gradle"` (Android), both lists are also empty by design — string resources are platform-built-in, so there is **nothing to install**; the §2.0 step is a no-op for Android too. For `language === "swift"` both package lists are likewise empty by design (native localization ships with the SDK — there is no third-party package to install), so §2.0 is a no-op for Swift too, not an error. For `framework === "angular"` both lists are empty by design — `@angular/localize`'s major must equal `@angular/core`'s, so instead of the table above §2.0 runs `ng add` here on the main thread (step `ng_add_localize`): `npx ng add '@angular/localize@^<major>' --skip-confirmation --use-at-runtime --project <project>`, where `<major>` is detection `version`'s major and `<project>` is `decisions.setup.angularProject` (§1.7). With pnpm, Yarn or Bun, run it through `pnpm exec`, `yarn` or `bunx` instead of `npx`. `ng add` installs the package (lockfile included) and edits `angular.json` polyfills, `tsconfig*.json` types and `src/main.ts`; the setup subagent only verifies those edits (setup reference Step 2). If the install command fails (network error, registry rejection, lockfile conflict), stop the run with the error — do not advance to 2.1.
+### 2.2 Run the setup worker
 
-Running on the main thread keeps the install outside the subagent sandbox, so the user's lockfile stays in sync. The setup subagent in 2.2 will not re-install these packages.
+Dispatch in the background with `references/orchestrator/setup-subagent.md` as the prompt (or, single-agent, follow it yourself). It reads `references.setup`, `references.rulesTemplate`, and the `.globalize/` inputs **before editing anything**. Already-configured projects (`existing.configured === true`) and the Paraglide ICU-JSON → PO migration use the reduced plans in `references/orchestrator/setup-collapse.md`.
 
-> **User-facing message** (before running):
-> "Installing the i18n packages on my main thread first so your lockfile stays in sync — I'll run `{install command}` and stream the output."
+### 2.3 Poll
 
-### 2.1 Pre-create progress file
-
-```json
-{
-  "subagentId": "setup", "phase": 2, "status": "pending",
-  "plan": [...steps from plan.md...],
-  "completed": [], "current": null,
-  "startedAt": null, "updatedAt": "<now>"
-}
-```
-
-### 2.2 Dispatch setup subagent (background)
-
-Subagent prompt skeleton:
-
-> You are executing Phase 2 (Setup) of an i18n journey. Read `.globalize/decisions.md`, `.globalize/detection.json`, `.globalize/plan.md`, and `.globalize/manifest-snapshot.json` for full context.
->
-> Your plan steps are listed in `.globalize/progress/setup.json` under `plan`. Execute them in order.
->
-> Read these reference files for variant-specific instructions:
-> - {paths from manifest-snapshot.references.setup, joined}
-> - Format helpers — create the project's formatters module and write `.globalize/format-module.json` (step `generate_format_helpers`, always runs). Its section lives inside the setup references above (search them for `generate_format_helpers`). It must complete **before** `generate_coding_rules`, which resolves `<<formatModule>>` by reading `specifier` out of that file and **fails closed** if it is absent — so a rules render that runs first has nothing to resolve and produces no rules file at all.
-> - Coding rules template — render this into `.agents/globalize-rules.md` (step `generate_coding_rules`, always runs, **after** `generate_format_helpers`), then wire it into `CLAUDE.md` and `AGENTS.md` (step `install_coding_rules`, always runs): {manifest-snapshot.references.rulesTemplate joined}
->
-> **Packages already installed.** The orchestrator ran the package install on the main thread (Phase 2.0) for the manifest's `packages.runtime` and `packages.dev` before dispatching you. Do **not** run `npm install` / `yarn add` / `pnpm add` / `bun add` for those packages. If a reference's setup instructions list an install command for them, treat it as already done and move on. Only flag an extra install if the reference explicitly calls for a package that is **not** in the manifest's `packages` (e.g., a pinned remediation version after a build failure or an opt-in extra) — in that case, write `status: "needs_decision"` with a `needsDecision: { step: "extra_install", question: "An extra package install is needed: <command>. Run it on the main thread?", options: ["yes", "skip"] }` and exit so the orchestrator runs it on the main thread. On Angular the install is `ng_add_localize`, which the orchestrator also ran in Phase 2.0 — do **not** re-run `ng add`; Step 2 of the setup reference only verifies its edits.
->
-> **Generated catalog artifacts must be gitignored (step `gitignore_artifacts`).** Compiled/generated catalogs are build output, not source. Append the pattern block from your setup reference's `` `.gitignore` `` section to the project's root `.gitignore` (create the file if missing). Consent follows the same rule as the workspace entry (see "Workspace → First-run setup"): append directly when `.gitignore` is absent or empty, otherwise show the diff before appending. **Never ignore the catalog *sources*** — the `.po` files (and `messages/*.json` for Paraglide ICU-JSON) are what Globalize imports from the repo in Phase 4. Wherever compiled output shares a directory with sources (every Lingui layout), the patterns must be **extension-scoped, never directory-scoped**, and must never use `messages.*`. If compiled catalogs are **already tracked** (a re-run, or an already-configured project), `.gitignore` alone will not untrack them: surface `git rm --cached <paths>` (files stay on disk) and run it only with the user's consent. Angular: `<assetsDir>/i18n/*.json` written by `scripts/xliff-to-json.mjs`; the `src/locale/*.xlf` files are sources and are never ignored. Skip this step entirely for runtime-catalog libraries (next-intl, vue-i18n, Rails, Android, iOS) — they emit nothing to ignore.
->
-> **Progress reporting:** After each step transition, atomically update `.globalize/progress/setup.json` (write `<file>.tmp` then `mv`). Set `status: "running"` on first update; populate `completed`, `current`, `currentDetail`, `filesCreated`, `filesModified`, `updatedAt`.
->
-> **Ambiguity protocol:** If you hit a case the references don't cover (e.g., two layout files, custom config shape), do NOT improvise. Write `status: "needs_decision"` with a `needsDecision: { step, question, options }` object and exit. The orchestrator will ask the user and re-dispatch you.
->
-> **Verification:** After all steps, run the project's typecheck (`tsc --noEmit` if TypeScript) and build command. Capture pass/fail in `result.verificationResult`. Set `status: "succeeded"` or `"failed"` accordingly.
->
-> **Angular:** the typecheck is part of `ng build`; run `npm run build` (it runs the compile first) and record it under `build`; set `typecheck` to `null`. Also run `npm run i18n:extract` and the `main.ts` import check from the setup reference's Verification section.
->
-> **Rails (`language === "ruby"` / `framework === "rails"`):** Rails has no typecheck and no build step, so instead run a **boot/smoke** check that proves the app boots and the i18n stack loads. Run `bin/rails runner 'I18n.t("site.title", default: "ok"); puts "i18n ok"'` (or `bin/rails about` as a lighter boot probe) and confirm it exits 0 and prints `i18n ok`. Then confirm the source-locale catalog parses: load `config/locales/{default_locale}.yml` and verify it is valid YAML (a malformed catalog is a setup failure). Map the result into the existing `verificationResult` shape: set the JS-only `typecheck` and `build` fields to `null` (not applicable to Rails), and record the boot/smoke pass/fail and YAML-parse pass/fail. Set `status: "succeeded"` only if both the boot/smoke and the catalog parse pass; otherwise `"failed"`.
->
-> **Android (`language === "android"` / `framework === "android"`):** Android has no typecheck and the full Gradle build needs the Android SDK, so verification has two tiers and **degrades gracefully**: (1) **Always** parse every `res/values/strings.xml` and `res/values-*/strings.xml` for XML well-formedness (a malformed resource file is a setup failure) and confirm a target dir exists for each configured locale. (2) **If the Android SDK + Gradle are available** (`./gradlew` present and `ANDROID_HOME`/`ANDROID_SDK_ROOT` set, or `local.properties` has `sdk.dir`), run `./gradlew lint` and capture the `MissingTranslation` / `ExtraTranslation` results; if the SDK is absent, **skip the Gradle step, do not fail**, and record that lint was skipped for lack of a toolchain. Map into `verificationResult`: set the JS-only `typecheck` and `build` fields to `null`; record the XML-parse pass/fail and the lint result (or `"skipped: no Android SDK"`). Set `status: "succeeded"` if the XML parses and covers every locale (and lint is clean when it ran); otherwise `"failed"`.
->
-> **Swift / Apple (`language === "swift"`):** Swift/Apple has no `tsc` and no JS build step, so instead run a **catalog-integrity check** using the headless `xcstringstool` three-step form (NOT a pipe):
-> ```
-> DIR=$(mktemp -d)
-> xcrun xcstringstool extract <sources> --SwiftUI --modern-localizable-strings [--legacy-localizable-strings] --output-directory "$DIR"
-> xcrun xcstringstool sync <catalog> --stringsdata "$DIR"/*.stringsdata
-> xcrun xcstringstool print <catalog>
-> ```
-> This confirms the catalog is valid JSON and covers the used keys. Map into the existing `verificationResult` shape: set the JS-only `typecheck` and `build` fields to `null` (not applicable to Swift), and record the catalog-integrity pass/fail. **Graceful degradation:** if `xcrun xcstringstool` is absent (no Xcode toolchain — e.g. a non-Apple CI machine), author + static-JSON-validate the catalog instead (parse the `.xcstrings` as JSON; check it has `sourceLanguage`, `strings`, and `version`) and mark build-verify **deferred** (NOT failed) — the build-time `SWIFT_EMIT_LOC_STRINGS = YES` extraction (or a later `xcstringstool` run on macOS) will populate it. Set `status: "succeeded"` if the catalog-integrity check passes (or static-JSON-validate passes with build-verify deferred); `"failed"` only on a genuine integrity failure.
-
-### 2.3 Poll progress
-
-While `progress/setup.json` is in `running` state, wake every 30–60 seconds, read the file, update the user-visible todo list (one todo per `plan` step), and surface `currentDetail` as a transient status hint.
+Every 30–60 s read `progress/setup.json`, update one todo per `plan` step, surface `currentDetail`.
 
 ### 2.4 On completion
 
-- `succeeded` → archive `progress/setup.json` to `progress/archive/<timestamp>/setup.json`, render summary (files created, files modified, verification result), advance to Phase 3. User-facing wrap-up:
-  > "Setup verified — {for JS/TS: `typecheck and build are clean`; for Rails: `the app boots and the i18n config loads`; for Android: `the string resources parse and cover every locale (Lint clean)` or, when the SDK was absent, `the string resources parse and cover every locale (Lint skipped — no Android SDK)`; for Swift: `the String Catalog is valid and registered`; for Angular: `extraction, compile and build are clean`}. Files created: {N}, files modified: {M}. Moving on to Phase 3 — wrapping your hardcoded strings."
-- `failed` → archive, render error, ask user how to proceed (retry, edit plan, abort). User-facing wrap-up:
-  > "Setup hit an error during `{step}`: {one-line error summary}. Want me to retry, edit the plan, or stop here?"
-- `needs_decision` → surface the question to the user, capture answer, append to `decisions.md`, re-dispatch the same subagent (it reads existing `progress/setup.json` and resumes from `completed`). User-facing framing:
-  > "The setup worker paused — it needs you to decide on `{question}`. Once you answer I'll send it back to finish from where it left off."
-
-### Phase 2 collapse-case
-
-If `existing.configured === true`, `plan.md` reduces Phase 2 to a verify-and-complete plan (verify what exists, add only what's missing — no from-scratch `create_config`): `verify_config`, `verify_provider`, `add_missing_locale_dirs`, a library-appropriate catalog step, `gitignore_artifacts`, `generate_format_helpers`, `generate_coding_rules`, `install_coding_rules`, and `build_verification`. **None of `generate_format_helpers`, `generate_coding_rules` or `install_coding_rules` is dropped by the collapse** — an already-configured project still needs the tailored rules file for Phase 3, and its values come from the config that already exists, which makes it cheaper here than in a from-scratch run, not more expensive. `generate_format_helpers` survives the collapse for exactly the same reason and keeps its position immediately before `generate_coding_rules`: a project that configured its i18n library by hand almost never has a formatters module, Phase 3's format pass has nothing to point at without one, and `generate_coding_rules` fails closed on a missing `.globalize/format-module.json`. Where a formatters module **does** already exist, the step does not overwrite it — it adds any missing exports and records the specifier actually in use. The collapse case is also the most likely place to find a `.claude/globalize-rules.md` from an older version of this skill, which `generate_coding_rules` migrates. The catalog step follows the variant's catalog workflow (see its `references.setup`): a **compile-time** library (Lingui) re-runs `extract_compile` to regenerate runtime catalogs from source; a **runtime-catalog** library (next-intl, vue-i18n; **Rails** — loads `config/locales/*.yml` directly at runtime; and **Android** — the platform loads `res/values*/strings.xml` at runtime) loads message files directly with no compile step, so the step is `verify_catalogs` — confirm the existing catalog files parse and cover every locale (for Rails, also run `bundle exec i18n-tasks missing -t used` to confirm every used key has a source-locale entry — not `health`, which false-fails on incomplete target stubs; for Android, confirm every `res/values-*/strings.xml` is well-formed XML and covers the source keys, running `./gradlew lint` for `MissingTranslation` when the SDK is available); an **extract-from-source, compile-to-JSON** library (Angular) re-runs `extract_compile` (`npm run i18n:extract` then `npm run i18n:compile`), and its `add_missing_locale_dirs` means adding each missing locale to `LOCALES` in `src/locale-config.ts` plus its locale-data import and `LOCALE_DATA` entry in `src/main.ts` — never a hand-written target `.xlf`; a **compile-from-catalog** library (Paraglide) re-runs `paraglide_compile` (`npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`) to regenerate `src/lib/paraglide/` from the hand-authored `messages/{locale}.{json,po}` catalogs. Same dispatch pattern.
-
-`gitignore_artifacts` runs in the collapse case too, and it is the **only** place the step can find pre-existing *tracked* generated catalogs: an already-configured Lingui or Paraglide project almost always has them committed. There the step does two things — append the ignore rule, and (with the user's consent) `git rm --cached` the tracked generated files so the working tree keeps them while git stops seeing them. Omit the step for runtime-catalog libraries, which generate nothing.
-
-**Paraglide ICU-JSON → PO migration collapse-case.** If `existing.library === "paraglide"`, `existing.configured === true`, the project currently has `messages/*.json` (ICU-JSON / `@inlang/plugin-icu1`), and the user chose `decisions.setup.catalogFormat === "po"`, Phase 2 is a **format migration**, not a from-scratch setup. The plan steps are: `migrate_settings` (swap the icu1 module + key for the PO module + `plugin.globalizeNow.po` with `"messageFormat": "icu"`), `migrate_catalogs` (rewrite each `messages/{locale}.json` → `messages/{locale}.po` — lossless: `"key": "ICU body"` → `msgid "key"` / `msgstr "ICU body"`, carrying interpolation/plural/select verbatim; add the `msgid ""` header block; delete the old `.json`), `paraglide_compile`, and `build_verification`. The migration is driven by the **Migration: existing ICU-JSON → PO** section of `references/languages/js-ts/frameworks/sveltekit/paraglide.setup.md` (the default PO setup file). The per-file `migrate_catalogs` rewrite is independent across locales, so dispatch it as parallel background subagents (one per `messages/{locale}.json`). After migrating, run the plural-render check from that file's **Verify** step — a missing `"messageFormat": "icu"` or a botched ICU escape fails **silently** (renders raw ICU), so the build passing is not sufficient.
+- `succeeded` → archive to `progress/archive/<timestamp>/`, summarize files created / modified / verification. "Setup verified — {stack's verification summary, from `messages.md`}. Files created: {N}, modified: {M}. Moving on to Phase 3."
+- `failed` → archive, show the error: "Setup hit an error during `{step}`: {summary}. Want me to retry, edit the plan, or stop here?"
+- `needs_decision` → ask, append the answer to `decisions.md`, re-dispatch (it resumes from `completed`). "The setup worker paused — it needs you to decide on `{question}`."
 
 ---
 
 ## Phase 3 — Convert
 
-Multiple wrap subagents in parallel, then one verify subagent.
+Parallel wrap workers, then one verify worker.
 
-> **User-facing message** (at Phase 3 start):
-> "Starting Phase 3 — converting hardcoded strings and hand-rolled formatting. I'm splitting **{file count}** files across **{N}** workers that run in parallel — each one walks its assigned files, wraps user-visible strings with the right macro, adds short translator comments where context isn't obvious, and routes hand-rolled prices, numbers and dates through the formatters module set up in Phase 2 (some files need only one of the two — each worker is told which). After they all finish, a final verify worker {for JS/TS: `runs extract + compile + build, then a recall self-check that catches any user-facing string the first pass missed (data modules, helpers) and self-heals it, so nothing ships unwrapped`; for Rails: `checks that every wrapped key has a matching source-locale entry, tidies any leftover scaffold keys, and runs your test suite if you have one`; for Android: `checks every `strings.xml` is well-formed and that target locales cover the source keys (running Lint for `MissingTranslation` if the Android SDK is available)`; for Swift: `runs a catalog-integrity check — confirming the String Catalog is valid JSON and covers the keys your code uses (no extract/compile step; the build populates the catalog)`; for Angular: `runs extraction, checks every message has a description, compiles the runtime JSON, builds, and runs a recall scan over templates and overlay-controller calls`}."
+> **Start message:** "Starting Phase 3 — converting hardcoded strings and hand-rolled formatting. I'm splitting **{file count}** files across **{N}** workers; each wraps user-visible strings with the right macro, adds translator comments where context isn't obvious, and routes hand-rolled prices, numbers and dates through the formatters module. Then a verify worker extracts, compiles, builds, and runs a recall scan that catches anything missed." `{file count}` is the size of the union in §3.1. Other stacks' verify wording: `messages.md`.
 
-### 3.1 Pre-create progress files
+### 3.1 Partition
 
-For each `wrap-N` subagent declared in `plan.md`, write `progress/wrap-N.json` with `status: "pending"` and the planned per-file step list. Write `progress/verify.json` with `status: "pending"` and verify plan.
+Partition the **union** of `candidateFiles` and `formatCandidateFiles` — neither contains the other — and tag each file: `strings` (in `candidateFiles` only), `formatting` (in `formatCandidateFiles` only — do not hunt for strings), `both` (wrap first, then format). Never split one file across two workers. **Angular:** a component's `.html` and its sibling `.ts` go in the same partition (add the missing sibling, tagged `strings`). Write each `<path> — <tag>` into `plan.md` and pre-create `progress/wrap-N.json` plus `progress/verify.json` (`status: "pending"`).
 
-**Partition the union of `candidateFiles` and `formatCandidateFiles`, and tag every file with its scope.** Neither list contains the other (see §1.1), so partitioning either one alone silently drops work: partitioning `candidateFiles` alone leaves every price/date/utility module unformatted, and partitioning `formatCandidateFiles` alone leaves most of the UI unwrapped. Build the union, then tag each entry:
+### 3.2 Run the wrap workers
 
-| Tag | Meaning |
-|---|---|
-| `strings` | in `candidateFiles` only — wrap strings; run no format pass on it |
-| `formatting` | in `formatCandidateFiles` only — run the format pass; **do not hunt for strings here**, detection already looked and found none |
-| `both` | in both lists — wrap strings first, then run the format pass over the same file |
+Each partition gets `references/orchestrator/wrap-subagent.md` as its prompt, with its file list and `decisions.appDomain`. All in **a single tool-use message** (parallel). Single-agent: one partition at a time, after reading `.agents/globalize-rules.md` and every `references.convert` file. Workers never run extract or compile.
 
-Partition the tagged union across the `wrap-N` subagents (keeping a file's two concerns in the **same** partition — never split one file across two workers, which would race on the same edit) and write each file's tag beside its path in `plan.md` and in the pre-created `progress/wrap-N.json`. The Phase 3 start message's `{file count}` is the size of the union, not of `candidateFiles`.
+### 3.3 Poll / 3.4 wait
 
-**Angular: a component's template and class are one unit.** Put `<name>.html` and its sibling `<name>.ts` (`cart.page.html` + `cart.page.ts`, `foo.component.html` + `foo.component.ts`) in the **same** partition, adding the sibling to the union (tagged `strings`) when detection listed only one of them. Converting a template edits its class — `FmtPipe` goes into the component's `imports`, a bound attribute's text moves into a `$localize` field, a now-unused `formatPrice()` is deleted — so two workers holding the two halves race on the same `.ts` file.
+Every 30–60 s read all `wrap-N.json` ("wrap-1: 3/8 files, wrap-2: 4/4 ✓"). `needs_decision` → ask and re-dispatch as in Phase 2. `failed` → surface it; verify still runs over what succeeded unless the failure is catastrophic.
 
-### 3.2 Dispatch wrap subagents in parallel
+### 3.5 Run the verify worker
 
-Send all wrap subagents in **a single Agent tool message** so they launch in parallel. Each wrap subagent prompt includes:
+Dispatch `references/orchestrator/verify-subagent.md`. Its steps are library-specific (extract/compile/build, catalog-integrity gates, recall self-check, format-violation scan on every language) and it writes `result` into `progress/verify.json`.
 
-> You are wrapping hardcoded UI strings with the project's i18n macros **and** converting hand-rolled value formatting. Read `.globalize/decisions.md` and `.globalize/detection.json` for context. App domain: {decisions.appDomain}.
->
-> Your assigned files (process in order; layout/shell first, then shared, then pages, then utilities). **Each carries a scope tag — `strings`, `formatting`, or `both` — and it is binding:** do the tagged work and only the tagged work. A `formatting`-only file was scanned for translatable strings and had none; do not go looking again. A `strings`-only file has no hand-rolled formatting; do not go looking there either.
-> {numbered list from plan.md for this partition, each entry as `<path> — <tag>`}
->
-> Read `.agents/globalize-rules.md` **first** — Phase 2 generated it for exactly this project, and it is the authority on which macro to use, how to handle plurals, what to skip, and where catalogs live. Then read these reference files for the mechanics of finding and converting existing strings: {paths from manifest-snapshot.references.convert}. If the two ever disagree on an authoring rule, `.agents/globalize-rules.md` wins — it carries this project's real paths and locales.
->
-> For each file: identify translatable strings, wrap with the correct macro, add translator comments inline per the rules in the reference. (Paraglide is key-authored with no macro — instead of wrapping, author a descriptive, context-encoding key plus its catalog entry and replace the string with the `m.key()` call. **On the default PO catalog format**, author the entry into `messages/{baseLocale}.po` as `#.` comment + `msgid "key"` + `msgstr "ICU body"` — `.po` carries `#.` comments, so DO add them, following `references/languages/js-ts/frameworks/sveltekit/paraglide.convert.md`. **On the ICU-JSON catalog format** (`decisions.setup.catalogFormat === "json"`), the inlang/ICU JSON model has no translator-comment field, so do NOT add comments — descriptive key naming is the only disambiguation lever; follow `references/languages/js-ts/libraries/paraglide/json-format.convert.md` instead. **Android is also key-authored, with no macro and no automated extractor** — author a `<string name="key">value</string>` (or `<plurals>`) entry into `res/values/strings.xml`, then replace the literal with `getString(R.string.key)` / `resources.getQuantityString(R.plurals.key, count, count)` in Kotlin/Java, `stringResource(R.string.key)` / `pluralStringResource(...)` in Compose, or `@string/key` in XML layouts. Android XML **supports `<!-- -->` comments**, so DO add a short translator comment above non-obvious keys, plus `<xliff:g>` for do-not-translate runs; follow `references/languages/android/native/android-strings.convert.md`.) Update `.globalize/progress/wrap-N.json` after each file (atomic write). Do NOT run `extract` or `compile` — that runs once after all wrap subagents complete (Android has no extract/compile — the verify worker only validates).
->
-> **The format pass** (files tagged `formatting` or `both`): wrapping a string makes it translatable; it does not make a number, price or date render correctly. Phase 2 created this project's formatters module and `.agents/globalize-rules.md` names its real import specifier. Follow `references/languages/js-ts/convert.format-pass.md` for the rewrite table, the never-convert list and the progress fields — or, on Rails / Android / iOS, the **"Convert hand-rolled formatting"** section of the language's own convert reference (`rails.convert.md`, `android-strings.convert.md`, `string-catalog.convert.md`), which carries the same guidance in that language. **Convert formatting AFTER wrapping the strings in the same file**, never before: a formatted value usually ends up as a placeholder inside a wrapped message, so the placeholder-naming rule in `.agents/globalize-rules.md` applies to it, and doing formatting first means naming the placeholder twice. On a `formatting`-only file there is nothing to wrap, so the format pass is the whole job.
->
-> Ambiguity protocol and progress schema as in Phase 2.
+#### 3.5.1 Cleanup loop
 
-### 3.3 Poll all wrap subagents
-
-Wake every 30–60s, read all `wrap-N.json` files, update the user-visible todo list (per-file todos under each subagent group). Surface aggregated progress: "wrap-1: 3/8 files, wrap-2: 2/5 files, wrap-3: 4/4 ✓".
-
-### 3.4 Wait for all wrap subagents to terminate
-
-If any returns `needs_decision`, pause polling, surface to user, re-dispatch as in Phase 2.
-
-If any returns `failed`, surface error. The verify subagent should still run on whatever files were successfully wrapped — don't block extraction on a single partition failure unless catastrophic.
-
-### 3.5 Dispatch verify subagent (background)
-
-> You are verifying the convert phase. Read `.globalize/decisions.md` for catalog format and locales. Read manifest snapshot for library.
->
-> Plan steps depend on the library's catalog model:
-> - **Compile-time extraction (Lingui)** and **runtime-catalog (next-intl/vue-i18n)**: extract_clean, compile, build_check, comment_review_pass.
-> - **Compile-from-catalog (Paraglide)**: paraglide_compile, build_check. There is **no extract step** (keys are authored by hand, not extracted). On the **default PO** format `.po` carries `#.` comments, so a comment_review_pass over the base `.po` **does** apply, plus an ICU plural-render sanity check (see below). On the **ICU-JSON** format (`catalogFormat === "json"`) there is **no comment_review_pass** (the inlang/ICU JSON model has no translator-comment field).
-> - **Runtime-catalog, no compile (Rails)**: ensure_i18n_tasks, source_completeness_check, unused_cleanup, optional test_suite. There is **no extract step** and **no compile step** (Rails loads `config/locales/*.yml` directly at runtime). The verify gate is **base-locale completeness**: confirm the source-locale YAML parses and that every key used in code has a base-locale entry (`i18n-tasks missing -t used` is empty). Target-locale gaps are expected (stubs deferred to the connect phase) and never fail the gate; orphaned keys are cleaned, not gated. There is **no normalize-drift gate** — the catalog is left in its authored reading order (canonical ordering is a CI / connect-time concern, see `setup.add-ons.md` Add-on 3).
-> - **Runtime-catalog, no compile (Android)**: xml_validity_check, locale_coverage_check, optional lint_check. There is **no extract step** and **no compile step** (the platform loads `res/values*/strings.xml` at runtime). The verify gate is catalog integrity: confirm every `strings.xml` is well-formed XML and that each target `res/values-*/strings.xml` covers the source keys; **if the Android SDK is available**, run `./gradlew lint` and surface `MissingTranslation`/`ExtraTranslation`, otherwise skip lint without failing.
-> - **Extract-from-source, compile-to-JSON (Angular)**: i18n_extract, description_check, i18n_compile, build_check, recall_self_check, main_ts_import_check.
-> - **Single multi-locale catalog, build-time populated (Swift / Apple)**: catalog_integrity_check (no extract/compile codemod step). The wrap subagents make strings localizable per `string-catalog.convert.md`; there is **no extract or compile codemod** — a normal Xcode build with `SWIFT_EMIT_LOC_STRINGS = YES` emits `.stringsdata` that populates `Localizable.xcstrings` (or, headless, `xcrun xcstringstool extract → sync` does the same). The verify gate is **catalog integrity**: the `.xcstrings` is valid JSON and covers the used keys (see the Swift arm below).
->
-> For Lingui / next-intl / vue-i18n:
-> 1. Run `npx lingui extract --clean` (Lingui) or `npx next-intl extract` if applicable. Capture errors. Atomically update `progress/verify.json` after this step.
-> 2. Run `npx lingui compile` (with `--typescript` if TS). Capture errors.
-> 3. Run the project's typecheck and build command. Capture pass/fail.
-> 4. **Recall self-check (backstop for detection misses).** Following `references/languages/js-ts/convert.recall-self-check.md`, scan the full source root for user-facing strings that were never wrapped — Lingui: install + run `lingui/no-unlocalized-strings` (per Add-on 2; guided-mode consent before installing, unguided installs directly; declined → grep scan); next-intl: tuned grep scan; vue-i18n: `@intlify/eslint-plugin-vue-i18n` `no-raw-text` or grep. Write findings to `result.recallViolations`. If **empty**, continue to step 5. If **non-empty**, write `status: "needs_cleanup"` and stop — the orchestrator runs the cleanup loop (below), which self-heals via `wrap-cleanup` subagents (each re-catalogs and re-scans itself) until the recall scan is clean or the budget is hit; once it settles, resume at step 5.
-> 5. Read the extracted catalog. For entries lacking translator comments where the heuristic in the reference says one should exist (single-/two-word phrases, action labels without object, domain-sensitive terms), edit the source file to add the missing comment.
->
-> For Paraglide:
-> 1. Run `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide` (both flags; single-quoted pin so zsh's `EXTENDED_GLOB` does not eat the caret). Capture errors. Atomically update `progress/verify.json` after this step.
-> 2. Run the project's typecheck and build command. Capture pass/fail. (No extract step.) **Default PO format:** (a) inspect a compiled plural message (`src/lib/paraglide/messages/<key>.js`) to confirm it emits CLDR `registry.plural(...)` branches and **not** the raw `{count, plural, …}` source as a literal — raw source means `"messageFormat": "icu"` is missing or an `msgstr` is malformed (both fail silently); (b) run a comment-review pass over the base `messages/{baseLocale}.po`, adding `#.` comments where the reference's heuristic says one should exist. **ICU-JSON format (`catalogFormat === "json"`):** skip both — there is no comment field, and the ICU1 plugin already fails the build on malformed ICU.
-> 3. **Recall self-check.** Paraglide has no official `no-unlocalized-strings` rule (see `paraglide/setup.add-ons.md`), so run the tuned grep scan from `references/languages/js-ts/convert.recall-self-check.md` over `src/` (adapted to `.svelte` templates). Write `result.recallViolations`; on non-empty, `status: "needs_cleanup"` and let the orchestrator run the cleanup loop (the cleanup subagent authors the missing `m.key()` entries per the Paraglide convert reference).
->
-> For Rails:
-> 0. **Ensure `i18n-tasks` is installed (this phase owns the install).** If `i18n-tasks` is not in `Gemfile.lock`, add `gem "i18n-tasks", "~> 1.0"` to the `:development, :test` group, run `bundle install`, and scaffold `config/i18n-tasks.yml` if absent (per `rails.convert.md` Step 4). If `bundle install` fails, record the error, mark the gate **skipped** (not failed), and continue — do not block the run on missing audit tooling. (Rails installs gems inside subagents; Phase 2.0 is a no-op for bundler.)
-> 1. **Base-locale completeness gate:** run `bundle exec i18n-tasks missing -t used` — the keys used in code that have no entry in the base locale. The gate **passes** when this reports **no keys** (every wrapped key has a source entry). **Judge by the reported keys, not the process exit code:** `i18n-tasks missing` is a report command and may exit `0` even with findings (only `i18n-tasks health` is contracted to exit non-zero for CI). Inspect the output — any base-locale key listed under `-t used` is a gate failure; for a machine-checkable form, `bundle exec i18n-tasks missing -t used -f keys` prints one key per line and an empty result means pass. Capture pass/fail. Atomically update `progress/verify.json` after this step. Do **not** run `i18n-tasks health` — its all-locale `missing` + `unused` would false-fail on the empty target stubs and on setup seed keys (both by design). Target-locale gaps (`bundle exec i18n-tasks missing -t diff`) are expected — report them as informational, never as a failure. (Confirm the exact `-t used` flag with `bundle exec i18n-tasks missing --help` if the gem version differs.) There is **no extract step** and **no compile step** — Rails loads `config/locales/*.yml` directly at runtime.
-> 2. **Unused cleanup (not a gate):** run `bundle exec i18n-tasks unused` and delete genuinely-orphaned scaffold seed keys (e.g. the `site.title` seed the setup phase added that the app never references) from the source catalog, so the shipped catalog — and the later CI `i18n-tasks health` gate — stays clean. This is a cleanup action, not a pass/fail gate. Do **not** run `i18n-tasks normalize` here: leave the catalog in its authored reading order (canonical ordering is handled by CI Add-on 3). Confirm the catalogs parse and cover every configured locale.
-> 3. **If a test suite is present** (`spec/` with RSpec, or `test/` for Minitest): run it. With `config.i18n.raise_on_missing_translations = true` set in `config/environments/test.rb` (configured by the setup phase), any missing key raises immediately, so a green suite confirms catalog coverage. Capture pass/fail. If no suite is present, skip this step.
->
-> For Swift / Apple:
-> 1. **Catalog-integrity gate (no extract/compile codemod step).** The wrap subagents already made strings localizable per `string-catalog.convert.md`; there is no separate extract or compile codemod (build-time `SWIFT_EMIT_LOC_STRINGS = YES` / `xcstringstool` populates the catalog). Run the headless three-step form (NOT a pipe) to confirm the catalog is valid and covers the used keys:
->    ```
->    DIR=$(mktemp -d)
->    xcrun xcstringstool extract <sources> --SwiftUI --modern-localizable-strings [--legacy-localizable-strings] --output-directory "$DIR"
->    xcrun xcstringstool sync <catalog> --stringsdata "$DIR"/*.stringsdata
->    xcrun xcstringstool print <catalog>
->    ```
->    Capture pass/fail. Atomically update `progress/verify.json` after this step. **Graceful degradation:** if `xcrun xcstringstool` is absent (no Xcode toolchain), author + static-JSON-validate the catalog instead (parse the `.xcstrings` as JSON; check `sourceLanguage`, `strings`, `version`) and mark build-verify **deferred** (NOT failed) — a later macOS build / `xcstringstool` run populates it. Authoritative commands: `references/languages/ios/native/string-catalog.convert.md`.
->
-> Authoritative commands: `references/languages/ruby/frameworks/rails/rails.convert.md` Steps 4-5 and `references/languages/ruby/frameworks/rails/setup.add-ons.md` Add-on 3.
->
-> For a **browser extension** (`framework === "webext"`):
-> 1. **Catalog validity** — parse every `_locales/*/messages.json`. Each top-level value must be an object with a string `message`; keys must match `[A-Za-z0-9_@]+` and must not start with `@@` (reserved for the browser's predefined messages). Any malformed file is a failure. Capture pass/fail. Atomically update `progress/verify.json` after this step.
-> 2. **Manifest wiring** — `default_locale` is set; every `__MSG_x__` reference in the manifest resolves to a key present in the default-locale catalog; and every `__MSG_` reference sits in a field the browser actually substitutes. Chromium's list is fixed: `name`, `short_name`, `description`, `action.default_title`, `omnibox.keyword`, `commands.*.description`, and the `chrome_settings_overrides.*` keys. A `__MSG_` anywhere else (`default_popup`, `icons`, `permissions`) renders literally in Chrome and is a failure — flag it, and note that Firefox's list differs, so only `name`, `short_name`, `description` and `action.default_title` are portable.
-> 3. **Locale coverage** — every configured target locale has a `_locales/<code>/messages.json` (underscored spelling) defining every key present in the default-locale catalog. Report any missing keys.
-> 4. **Placeholder integrity** — every `$name$` used in a `message` is declared in that entry's `placeholders`; every declared placeholder's `content` is `$1`–`$9` or a literal; no entry exceeds **9** substitutions (Chrome returns `undefined` past that).
-> 5. **Lint (if available)** — `npx web-ext@^10 lint --source-dir <the built package dir>` and capture the `_locales`-related findings (`NO_DEFAULT_LOCALE`, `NO_MESSAGES_FILE`, `NO_MESSAGE`, `MISSING_PLACEHOLDER`, `PREDEFINED_MESSAGE_NAME`). **This is a supplement, not the authoritative gate** — it is Mozilla's AMO linter, so it also emits Chrome-irrelevant findings (`ADDON_ID_REQUIRED`, `MISSING_DATA_COLLECTION_PERMISSIONS`) on a perfectly valid Chrome MV3 package, and — verified by running it — it does **not** catch an unresolvable `__MSG_missingKey__` in the manifest or an illegal message name. Steps 2 and 3 above are the real gate for those. Never fail on its exit code; filter its JSON output for the codes above. **If it is unavailable or the run fails to start, skip and do not fail** — record `lint: "skipped: web-ext unavailable"` and rely on steps 1-4.
->
-> On the **Lingui** extension variant, run the standard Lingui steps first (`lingui extract` + `lingui compile`), then run the project's `_locales` bridge script and apply checks 1-3 to its output — the bridge is what puts the manifest strings on disk, so an unrun bridge is a silent failure.
->
-> Authoritative commands: `references/languages/js-ts/frameworks/webext/webext-native.convert.md` (verify section) and `references/languages/js-ts/frameworks/webext/setup.add-ons.md` (CI/lint add-on).
->
-> For Android:
-> 1. **XML validity** — parse every `res/values/strings.xml` and `res/values-*/strings.xml`; any malformed file (unescaped `&`/`'`, broken tag) is a failure. Capture pass/fail. Atomically update `progress/verify.json` after this step. (There is **no extract step** and **no compile step** — the platform loads resources at runtime.)
-> 2. **Locale coverage** — for each configured target locale, confirm `res/values-<qualifier>/strings.xml` exists and defines every `name` present in the source `res/values/strings.xml` (including each `<plurals>` group). Report any missing keys. Also confirm a `comment_review_pass` over the source `strings.xml`, adding `<!-- -->` translator comments and `<xliff:g>` annotations where the reference's heuristic says one should exist (Android XML carries comments — they DO apply, unlike Paraglide ICU-JSON).
-> 3. **Lint (if the Android SDK is available)** — run `./gradlew lint` and capture `MissingTranslation` / `ExtraTranslation`; this is the authoritative coverage gate when the toolchain is present. **If the SDK/Gradle is absent, skip this step and do not fail** — record `lint: "skipped: no Android SDK"` and rely on steps 1-2.
->
-> Authoritative commands: `references/languages/android/native/android-strings.convert.md` (verify section) and `references/languages/android/native/setup.add-ons.md` (CI/lint add-on).
->
-> For Angular:
-> 1. `npm run i18n:extract`. Exit 0 required; any output line containing "duplicate" (case-insensitive) is a failure — two messages share an ID with different text. Atomically update `progress/verify.json`.
-> 2. **Description check** — every `<unit>` in the source XLIFF has a non-empty `<note category="description">`. For each one missing, edit the source (`i18n="…"` / `$localize`) to add a description following the rules file, then re-extract.
-> 3. `npm run i18n:compile` — writes one JSON per existing target file (none yet is normal before Phase 4).
-> 4. `npm run build`.
-> 5. **Recall self-check** — the Angular grep scan in `convert.recall-self-check.md`; non-empty → `needs_cleanup`.
-> 6. **`main.ts` import check** — `grep -nE "from[[:space:]]*['\"]\./app/|^[[:space:]]*import[[:space:]]*['\"]\./app/" src/main.ts` must print nothing (it keys on `from './app/…'`, so a static import wrapped over several lines is caught too); a hit means some text will silently stay in the source language. Fix it by converting the import to `import()` inside `main()`.
->
-> Authoritative commands: `references/languages/js-ts/frameworks/angular/angular-localize.setup.md` (Verification).
->
-> **Format-violation scan (`format_violations_check`) — runs on EVERY language, after that language's gate above.** Re-run the language's `formatCandidateFiles` grep from §1.1 over the whole source root — the same patterns, with one change: exclude the formatters module itself by the path `.globalize/format-module.json` → `path` names (that file exists by now, so use it rather than the §1.1 filename heuristic, and exclude nothing else on its account). Every surviving hit is a formatting site the wrap pass did not convert. Record `result.formatViolations` as `[{file,line,text}]`. An empty array is the pass condition; **never** report a scan you did not run as an empty array — if the scan could not run, record the reason in `errors` and leave `formatViolations` as `[]` with that error attached, not as a silent pass.
->
-> **The gate runs the mechanically-greppable patterns only.** §1.1's Swift row ends with a read-and-judge step (open each `Text(` / `String(localized:` argument containing a `\(` and keep only those whose interpolated symbol is declared numeric or `Date`). That step is right for detection, where over-inclusion just means a file gets opened — but it is expensive and ambiguous inside a gate, where its output decides pass/fail. **Skip it here.** The Swift arm of this scan runs exactly `String(format: "%.`, `dateFormat =`, `DateFormatter(`, `NumberFormatter(`, `RelativeDateTimeFormatter(`, `$\(`, and `joined(separator: ", ")` — every one a deterministic string match with no judgement — and records what they find. A numeric interpolation with no currency symbol therefore does not fail the gate; it was already in scope for the wrap subagent via `formatCandidateFiles`, and the gate is a backstop, not a second detection pass. Every other language's patterns are already mechanical and run unchanged.
->
-> Write `result` with `{ catalogPath, totalMessages, extractOk, compileOk, buildOk, commentsAdded, recallViolations, cleanupRounds, stringsWrappedInCleanup, residualViolations, formatViolations }`. `formatViolations` is **populated on every language** — unlike the four recall fields below, which are `null` outside JS/TS, it is never `null` on any stack, because every stack got a formatters module in Phase 2 and every stack can be grepped for what bypasses it. The other four are the recall self-check fields (`recallViolations`: `[{file,line,text}]` from the scan; `cleanupRounds`: how many cleanup rounds ran; `stringsWrappedInCleanup`: total strings the cleanup subagents wrapped; `residualViolations`: any left when the loop stopped, reported to the user). For libraries with no recall scan run (Rails/Android/Swift this pass), set all four to `null`. For Paraglide, set `extractOk` to `null`; set `commentsAdded` to the count added on the default PO format and to `null` on ICU-JSON; report compile success under `compileOk`. For Rails, set `extractOk` to `null` (no extraction — keys are hand-authored in YAML); report the base-locale completeness result (`i18n-tasks missing -t used` empty) under `compileOk` (Rails' catalog-integrity gate stands in for compile; a gate skipped because `bundle install` failed reports as `null` with the error noted in `errors`); set `buildOk` to the test-suite result when a suite ran, else `null` (Rails has no build step); set `commentsAdded` to `null`. For Rails, `catalogPath` is `config/locales/{default_locale}.yml` and `totalMessages` is the key count in that file (Rails has no extraction step to count from). For Android, set `extractOk` to `null` (no extraction — keys are hand-authored in XML); report the combined XML-validity + locale-coverage result under `compileOk` (Android's catalog-integrity gate stands in for compile); set `buildOk` to the `./gradlew lint` result when it ran, else `null` (lint skipped / no SDK); set `commentsAdded` to the count of `<!-- -->` comments added (Android XML carries comments). For Android, `catalogPath` is `app/src/main/res/values/strings.xml` and `totalMessages` is the `<string>` + `<plurals>` count in that file. For a **browser extension on the native variant**, set `extractOk` to `null` (no extraction — keys are hand-authored in `messages.json`); report the combined catalog-validity + manifest-wiring + coverage result under `compileOk`; set `buildOk` to the `web-ext lint` result when it ran, else `null`; set `commentsAdded` to the count of `description` fields written. `catalogPath` is `_locales/{sourceLocale}/messages.json` and `totalMessages` is the key count in that file. On the **Lingui** extension variant every field behaves exactly as for any other Lingui stack (`catalogPath` = `src/locales/{sourceLocale}/messages.po`), with the bridge output checked as described above. For Swift, set `extractOk` to `null` (no extraction codemod — keys land via build-time `SWIFT_EMIT_LOC_STRINGS`/`xcstringstool`); report the catalog-integrity result under `compileOk` (and `null` with build-verify-deferred noted in `errors` when `xcstringstool` is absent and only static-JSON-validate ran); set `buildOk` to `null` (no JS build step); set `commentsAdded` to `null`. For Swift, `catalogPath` is the `.xcstrings` (e.g. `Localizable.xcstrings`) and `totalMessages` is the key count in `strings`. For Angular, `extractOk` is step 1, `compileOk` step 3, `buildOk` step 4, `commentsAdded` the descriptions added in step 2; `catalogPath` is the source XLIFF (`src/locale/messages.<sourceLocale>.xlf`) and `totalMessages` its `<unit>` count.
-
-#### 3.5.1 Cleanup loop (JS/TS recall backstop)
-
-If the verify subagent returns `status: "needs_cleanup"` with `result.recallViolations`, the orchestrator self-heals the missed strings — this is the backstop for any `candidateFiles` detection miss (data modules, toast/error helpers, config copy). Drive it per `references/languages/js-ts/convert.recall-self-check.md`:
-
-**`result.formatViolations` joins `recallViolations` in feeding this loop — but only where the loop already runs (JS/TS).** A non-empty `formatViolations` is enough on its own to set `status: "needs_cleanup"`: it is the backstop for a `formatCandidateFiles` detection miss, exactly as `recallViolations` is for a `candidateFiles` miss. Union the two files-to-fix sets before step 1 below, and tag each file for the cleanup subagent the same way §3.1 does — a file that appears only in `formatViolations` is tagged `formatting`, and the cleanup subagent must not go string-hunting in it. On **Rails, Android, Swift and the native browser-extension variant** the loop does not run (see the paragraph at the end of this section), so `formatViolations` there is **reported to the user with file+line** at 3.6 alongside the cost estimate, never dropped silently and never quietly reduced to a count:
-
-> "**{formatViolations.length}** values are still formatted by hand and won't localize — {file}:{line} … Fix them by routing each through the formatters module, or leave them if they're machine-readable output."
-
-That reporting duty applies on **every** language, including JS/TS: whatever the loop leaves behind is surfaced with file+line in the same place `residualViolations` is.
-
-For up to `maxCleanupRounds` (default **2**) rounds:
-1. Collect the distinct files in `recallViolations` **∪ `formatViolations`**, carrying each file's tag (`strings`, `formatting`, or `both`). If more than **40**, cap to the 40 highest-violation files and surface how many were dropped (no silent truncation).
-2. Dispatch a **`wrap-cleanup` subagent** (background, same dispatch pattern as Phase 3.2) whose prompt mirrors the Phase 3.2 wrap prompt — `.agents/globalize-rules.md` plus `manifest-snapshot.references.convert` — with the file list = the violating files and the "these files were MISSED by detection; wrap per the coding rules, apply the skip-list, leave genuine non-translatables" note from the recall reference. Pre-create `progress/wrap-cleanup-{round}.json`.
-3. Before returning, the `wrap-cleanup` subagent itself re-runs the library's catalog step (Lingui: `lingui extract --clean` + `compile`; Paraglide: `paraglide compile`; Angular: `npm run i18n:extract` + `npm run i18n:compile`; next-intl/vue-i18n: none — runtime catalogs), the recall scan **and the format-violation scan**, writing its round's residual `recallViolations`, residual `formatViolations`, and the counts it wrapped and converted to `progress/wrap-cleanup-{round}.json` (per the reference — there is no separate verify re-dispatch). The orchestrator reads those residuals and aggregates the per-round counts into the verify `result`.
-4. Stop when: **both** scans are clean; **or** a round wrapped zero new strings **and** converted zero formatting sites; **or** the round budget is reached. Report any `residualViolations` and any residual `formatViolations` to the user with file+line (never drop silently).
-
-Record `result.cleanupRounds` and surface a one-line summary: "Self-heal wrapped **{stringsWrappedInCleanup}** strings that detection missed{, N left for manual review if residual}." Then proceed to `comment_review_pass` and 3.6.
-
-Rails/Android/Swift do not run this loop this pass — their verify gates (`i18n-tasks missing -t used`, `./gradlew lint`, catalog integrity) already report coverage; extending the loop to them (`erb_lint`, `gradlew` `HardcodedText`, grep) is a follow-up. Their `formatViolations` are still **collected** by the verify subagent (that scan runs on every language) and still **reported with file+line** — only the self-heal is unavailable there. The **Lingui** browser-extension variant **does** run it — it is a `js-ts` Lingui stack and `convert.recall-self-check.md` applies unchanged. The **native** extension variant does not: set the four recall fields to `null` as Rails/Android/Swift do. Extending the scan to it means grepping for bare text outside `browser.i18n.getMessage(` / `data-i18n` in `.html` as well as `.ts`/`.tsx`, which is a follow-up.
+On `status: "needs_cleanup"`, follow `references/orchestrator/cleanup-loop.md`: up to 2 `wrap-cleanup` rounds over `recallViolations ∪ formatViolations` (JS/TS only), then report any residuals with file + line.
 
 ### 3.6 Cost estimate (Phase 3 → 4 bridge)
 
-After verify succeeds, parse the extracted catalog (JS, including the Lingui extension variant) / the source XLIFF's `<source>` text (Angular) / the source-locale YAML (Rails) / the source `res/values/strings.xml` (Android) / `_locales/{sourceLocale}/messages.json` (native browser extension) to compute word count. Show the user:
+Parse the source catalog for a word count (`result.catalogPath`: the extracted `.po` on Lingui; the source XLIFF's `<source>` text on Angular; the source YAML on Rails; `res/values/strings.xml` on Android; `_locales/{sourceLocale}/messages.json` on a native extension): "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now." Prepend the self-heal summary when `stringsWrappedInCleanup > 0`. When `result.formatViolations` is non-empty, append every entry **with file + line** — never a bare count, never omitted because the catalog gate passed.
 
-> "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now."
-
-When `result.stringsWrappedInCleanup > 0` (the 3.5.1 recall cleanup loop ran), prepend the recall self-heal summary to this message: "Self-heal wrapped **{stringsWrappedInCleanup}** strings that detection missed{, N left for manual review if residual}."
-
-When `result.formatViolations` is non-empty, append the format report **with file+line for each entry** — on every language, whether or not the cleanup loop was available (see §3.5.1). Never reduce it to a bare count and never omit it because the catalog gate passed: these values will ship untranslated-looking in every target locale, and the run is the last moment anyone is looking at them.
-
-If `decisions.scope.globalize === true`, advance to Phase 4 with:
-
-> "Moving on to Phase 4 — creating your Globalize project and connecting the repo. You're already signed in from earlier, so this is mostly automated (one quick browser approval to authorize the GitHub/GitLab app)."
-
-Otherwise (the user unchecked Globalize at 1.6), end with:
-
-> "Skipping the translation-platform step for now. Re-run `globalize-guide` with `connect translation platform` checked when you're ready to wire it up."
+Globalize in scope → "Moving on to Phase 4 — creating your Globalize project and connecting the repo. You're already signed in, so this is mostly automated (one quick browser approval for the GitHub/GitLab app)." Otherwise → "Skipping the translation-platform step. Re-run `globalize-guide` with `connect translation platform` checked when you're ready."
 
 ### Phase 3 collapse-cases
 
-- `existing.stringsWrapped === "yes"` **AND `formatCandidateFiles` is empty** → skip wrap subagents; run only verify.
-- `existing.stringsWrapped === "yes"` **AND `formatCandidateFiles` is non-empty** → still dispatch wrap subagents, over `formatCandidateFiles` alone, every file tagged `formatting`. Wrapped strings say nothing about formatting: this is the single most common shape for an already-i18n'd project, and skipping the phase here is how hand-rolled prices survive the whole run.
-- `existing.stringsWrapped === "partial"` → Phase 1 candidate list already excluded already-wrapped files. `formatCandidateFiles` is unaffected by that exclusion and is partitioned in full.
+- `stringsWrapped === "yes"` AND `formatCandidateFiles` empty → skip wrap workers; run verify only.
+- `stringsWrapped === "yes"` AND `formatCandidateFiles` non-empty → wrap workers over `formatCandidateFiles` alone, all tagged `formatting`.
+- `stringsWrapped === "partial"` → `candidateFiles` already excludes wrapped files; `formatCandidateFiles` is partitioned in full.
 
 ---
 
 ## Phase 4 — Globalize project (connect repo + patterns)
 
-The gate already passed: Globalize is in scope and the user signed in back in Phase 1.5. This stage creates the project and connects the repo by **delegating to `globalize-now-project-setup`** on the main thread — the orchestrator assembles the inputs and invokes the skill; it does **not** inline Globalize CLI commands.
-
-> **User-facing message** (at Phase 4 start):
-> "Phase 4 — creating your Globalize project and connecting your repo. You're already signed in, so I just hand the project details and your finished catalog paths to the project-setup skill. One quick browser approval authorizes Globalize's GitHub/GitLab app, then it creates the project, connects the repo, and wires the catalog file patterns."
+"Phase 4 — creating your Globalize project and connecting your repo. One quick browser approval authorizes Globalize's GitHub/GitLab app, then the project-setup skill creates the project, connects the repo, and wires the catalog patterns."
 
 ### 4.1 Assemble `.globalize/globalize-inputs.json`
 
-Build the inputs bundle the project skill consumes, from data already on hand — no re-detection:
-
-- **projectName**, **provider**, **sourceLocale**, **targetLocales** ← `decisions.md` (collected in 1.7 / 1.9).
-- **owner**, **repo**, **gitUrl** ← `detection.json` `git.remote` (parse owner/repo; convert SSH → HTTPS for `--git-url`).
-- **catalogPath** ← Phase 3 verify `result.catalogPath`.
-- **localePathPattern** + **fileFormat** ← derive from the library (the one piece of Globalize knowledge the orchestrator still owns, because it depends on the just-converted catalog):
-  - **Lingui** → `po`, e.g. `src/locales/{locale}/messages.po`.
-  - **next-intl** → `json-nested`, e.g. `messages/{locale}.json`.
-  - **Paraglide** → `po` at `messages/{locale}.po` by default; if `decisions.setup.catalogFormat === "json"`, `json-flat` at `messages/{locale}.json`.
-  - **Rails** (`detection.language === "ruby"`, `framework === "rails"`) → `yaml-rails` at `config/locales/{locale}.yml`; source = detected `default_locale` (or `en`). Rails locale codes are already hyphenated (`pt-BR`, `zh-TW`) — pass through verbatim, no underscore normalization.
-  - **Android** (`detection.language === "android"`) → `android-strings`; **no `{locale}` segment** — point `localePathPattern` at the source `app/src/main/res/values/strings.xml` and let the handler discover the `values-*` target overlays (it normalizes legacy `values-pt-rBR` and BCP47 `values-b+sr+Latn` ⇄ BCP47). Do not synthesize a `{locale}` token.
-  - **Browser extension, native** (`detection.framework === "webext"`, variant `webext-native-messages`) → `chrome-messages` at `_locales/{locale}/messages.json`. The `{locale}` segment **is** used, but Chrome spells locale directories with an **underscore** while Globalize languages are BCP-47, and `{locale}` is a literal substitution with no transform. So also assemble a **`pathLocales`** array — one `{ pattern, locale, pathLocale }` entry per target locale whose code carries a region or script subtag (`pt-BR` → `pt_BR`, `zh-CN` → `zh_CN`, `en-GB` → `en_GB`, `es-419` → `es_419`) — and pass it through to `globalize-now-project-setup`, which forwards it to `repositories create --path-locales`. Plain two-letter locales (`de`, `fr`, `ja`) need no entry. Emit the overrides explicitly rather than relying on server-side normalization: an override that states the spelling the handler would have derived anyway is consistent either way, whereas omitting one that was needed silently mis-targets every file for that language.
-  - **Browser extension, Lingui** (`detection.framework === "webext"`, variant `webext-*-lingui`) → `po` at `src/locales/{locale}/messages.po`, exactly as for any other Lingui stack, and **no `pathLocales`** (PO directories are spelled with the BCP-47 code). The generated `public/_locales/**` must **not** get a pattern of its own — it is build output derived from the PO, and a second pattern over it would re-import machine-written files as source.
-  - **Angular** (`detection.framework === "angular"`) → `xliff-2` at `src/locale/messages.{locale}.xlf` (read `extract-i18n.options.outputPath` / `outFile` from `angular.json` if they differ). The source file `messages.<sourceLocale>.xlf` matches the same pattern. No `pathLocales`.
-  - **Swift / Apple** (`detection.language === "swift"`) → `xcstrings`; **single file, no `{locale}` segment** — `Localizable.xcstrings` (or `**/*.xcstrings` for multiple tables). The catalog holds every locale; source = the catalog's `sourceLanguage` / `CFBundleDevelopmentRegion`.
-- **pathLocales** ← the array derived above; omit the key entirely (or send `[]`) for every stack other than the native browser-extension variant.
-- **importMode**: `"ignore"`, **importScope**: `"new_keys_only"`, **mode**: `"orchestrated"`.
-
-Write the file to `.globalize/globalize-inputs.json` and mark `assemble_globalize_inputs` done in `plan.md`.
+Follow `references/orchestrator/globalize-inputs.md` (per-library `localePathPattern` + `fileFormat`, `pathLocales` for native extensions). Mark `assemble_globalize_inputs` done.
 
 ### 4.2 Re-check auth
 
-The account skill ran in Phase 1.5, but the token may be absent (user skipped sign-in) or expired. Delegate a quick `auth status` check. If **not** authenticated, invoke `globalize-now-account-setup` now (main thread) before proceeding; if authenticated, continue.
+Delegate a quick `auth status` check; not authenticated → invoke `globalize-now-account-setup` first.
 
 ### 4.3 Delegate to `globalize-now-project-setup` (main thread)
 
-Invoke the **`globalize-now-project-setup`** skill via the Skill tool, in **orchestrated mode**:
+Invoke it via the Skill tool: "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect the git provider (one browser approval if the GitHub App / GitLab OAuth isn't installed yet), create the project, connect the repo, and set the catalog patterns from the supplied `localePathPattern` + `fileFormat`." The skill owns the whole CLI surface. Mark `delegate_project_setup` done. Skill missing → tell the user to run `npx skills add globalize-now/globalize-skills --skill globalize-now-project-setup` and re-invoke.
 
-> "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect the git provider (one browser approval if the GitHub App / GitLab OAuth isn't installed yet), create the project, connect the repo, and set the catalog patterns from the supplied `localePathPattern` + `fileFormat`."
+### 4.4 Finish
 
-The skill owns the entire CLI surface (auth precheck, `projects create`, provider connect, `repositories create`, etc.). The interactive GitHub-App / GitLab-OAuth approval happens here — the project skill front-loads it before the create/connect work. Mark `delegate_project_setup` done in `plan.md` when it returns.
-
-**If `globalize-now-project-setup` is not installed**, the Skill invocation fails — tell the user to run `npx skills add globalize-now/globalize-skills --skill globalize-now-project-setup` and re-invoke. (The standard install co-installs all the Globalize skills.)
-
-### 4.4 Surface and finish
-
-Show the project URL and a one-line summary:
-
-> "All set. Project created: **{projectUrl}**. Repo connected, catalog patterns wired. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI directly) for ongoing translation work — pulling translations, tracking status, requesting new languages."
-
----
-
-## Plan and decisions formats
-
-### `plan.md`
-
-Markdown with YAML frontmatter for metadata. Body uses strict checklist syntax (`- [ ] step_id`) so the orchestrator can parse it.
-
-Skeleton:
-```markdown
----
-version: 1
-createdAt: <ISO timestamp>
-manifestSnapshot: .globalize/manifest-snapshot.json
-detection: .globalize/detection.json
-decisions: .globalize/decisions.md
----
-
-# i18n Setup Plan
-
-Stack: **{framework + router}** + **{library}** (variant: `{variant-id}`)
-Branch: {decision summary}
-
-<!-- Include the Phase 1.5 section only when decisions.scope.globalize === true -->
-## Phase 1.5 — Globalize account
-Orchestrator-owned steps (main thread, delegated to `globalize-now-account-setup`):
-- [ ] delegate_account_setup
-
-## Phase 2 — Setup
-Subagent: `setup`
-Progress: `.globalize/progress/setup.json`
-References:
-- {paths joined from manifest.references.setup}
-- {paths joined from manifest.references.rulesTemplate}
-
-Orchestrator-owned steps (main thread, before subagent dispatch):
-- [ ] install_packages_main_thread
-- [ ] ng_add_localize   <!-- Angular only: `npx ng add '@angular/localize@^<major>' --skip-confirmation --use-at-runtime --project <decisions.setup.angularProject>` on the main thread (§2.0); replaces install_packages_main_thread -->
-
-Subagent steps:
-- [ ] checkout_branch
-- [ ] create_config
-- [ ] build_tool_integration
-- [ ] provider_wiring
-- [ ] language_switcher
-- [ ] scaffold_catalogs
-- [ ] gitignore_artifacts   <!-- libraries that emit on-disk generated catalogs only. Lingui: the compiled `.ts`/`.js` siblings of the committed `.po` sources. Paraglide: the compiler `outdir` (`src/lib/paraglide/`). Angular: `<assetsDir>/i18n/*.json` written by `scripts/xliff-to-json.mjs` (never the `src/locale/*.xlf` sources). Runs BEFORE the first seed/extract/compile so generated files are never staged. Omit for runtime-catalog libraries (next-intl, vue-i18n, Rails, Android, iOS) — nothing lands on disk to ignore. -->
-- [ ] extract_compile   <!-- compile-time libraries only (Lingui), and Angular (`npm run i18n:extract` + `npm run i18n:compile`, the XLIFF → runtime JSON step); runtime-catalog libraries (next-intl, vue-i18n) consume the scaffolded catalogs directly — omit this step. Compile-from-catalog libraries (Paraglide) use `paraglide_compile` instead — see below. -->
-- [ ] paraglide_compile   <!-- compile-from-catalog libraries only (Paraglide): `npx '@inlang/paraglide-js@^2' compile --project ./project.inlang --outdir ./src/lib/paraglide`; replaces extract_compile, omit for all other libraries -->
-- [ ] generate_format_helpers   <!-- ALWAYS present, every library, every variant, including the collapse case. Creates the project's formatters module (the `generate_format_helpers` section inside manifest.references.setup) and writes `.globalize/format-module.json`. MUST precede generate_coding_rules, which resolves `<<formatModule>>` from that file and fails closed without it. Phase 3's format pass rewrites hand-rolled formatting toward this module. Never gate this on a §1.10 selection. -->
-- [ ] generate_coding_rules   <!-- ALWAYS present, every library, every variant, including the collapse case. Runs AFTER generate_format_helpers. Renders manifest.references.rulesTemplate against this project's resolved values into `.agents/globalize-rules.md`, then removes any `.claude/globalize-rules.md` left by an older version of this skill. Phase 3 wrap subagents read that file, so Phase 2 cannot be considered done without it. Never gate this on a §1.10 selection. -->
-- [ ] install_coding_rules   <!-- ALWAYS present, same as above. Points `CLAUDE.md` (`@.agents/globalize-rules.md`) and `AGENTS.md` (pointer section) at the generated file, creating either if absent, and strips any stale `@.claude/globalize-rules.md` line. Skipped only if generate_coding_rules produced no file. Never gate this on a §1.10 selection. -->
-- [ ] {optional steps if opted in}
-- [ ] build_verification
-
-## Phase 3 — Convert
-Partitions: {N} wrap subagents covering {file count} files
-<!-- {file count} is the size of the UNION of detection.candidateFiles and detection.formatCandidateFiles — neither list is a subset of the other (SKILL.md §1.1). Every file entry carries its scope tag. -->
-
-### wrap-1 ({subtree summary})
-- [ ] {file path} — strings|formatting|both
-- [ ] {file path} — strings|formatting|both
-…
-
-### verify
-<!-- compile-time extraction (Lingui) and runtime-catalog (next-intl, vue-i18n): -->
-- [ ] extract_clean
-- [ ] compile
-- [ ] build_check
-- [ ] recall_self_check   <!-- JS/TS backstop: scan for unwrapped strings, self-heal via wrap-cleanup subagents (see convert.recall-self-check.md); ≤2 rounds -->
-- [ ] comment_review_pass
-<!-- compile-from-catalog (Paraglide) instead: no extract step, no comment_review_pass (inlang/ICU has no comment field):
-- [ ] paraglide_compile
-- [ ] build_check
-- [ ] recall_self_check
--->
-<!-- Angular (@angular/localize) instead:
-- [ ] i18n_extract
-- [ ] description_check
-- [ ] i18n_compile
-- [ ] build_check
-- [ ] recall_self_check
-- [ ] main_ts_import_check
--->
-<!-- runtime-catalog, no compile (Rails) instead: no extract step, no compile step, no build step (Rails loads config/locales/*.yml directly at runtime). The gate is base-locale completeness (i18n-tasks missing -t used); there is no normalize-drift gate. test_suite is optional — include only if a spec/ or test/ dir exists (run with raise_on_missing_translations):
-- [ ] ensure_i18n_tasks
-- [ ] source_completeness_check
-- [ ] unused_cleanup
-- [ ] test_suite
--->
-<!-- runtime-catalog, no compile (Android) instead: no extract step, no compile step (the platform loads res/values*/strings.xml at runtime). lint_check is optional — include only when the Android SDK/Gradle is available:
-- [ ] xml_validity_check
-- [ ] locale_coverage_check
-- [ ] lint_check
--->
-<!-- Appended to WHICHEVER arm above applies — format_violations_check is the one verify step that is
-     not library-specific and is present on EVERY language, always last so it runs after that arm's
-     gate. It re-runs the language's formatCandidateFiles grep (minus the formatters module named by
-     .globalize/format-module.json) and records result.formatViolations as [{file,line,text}].
-     Never omit it and never report it as null. -->
-- [ ] format_violations_check
-
-<!-- Include the Phase 4 section only when decisions.scope.globalize === true -->
-## Phase 4 — Globalize project
-Orchestrator-owned steps (main thread, delegated to `globalize-now-project-setup`):
-- [ ] assemble_globalize_inputs
-- [ ] delegate_project_setup
-```
-
-### `decisions.md`
-
-Markdown with YAML frontmatter, sections per category. Doubles as a project record if committed (note: `.globalize/` is gitignored by default — see Workspace section).
-
-```markdown
----
-createdAt: <ISO>
----
-
-# i18n Setup Decisions
-
-## Library
-**{library}** (recommended; user accepted | user override)
-
-## Scope
-- [x] Setup
-- [x] Convert existing strings
-- [x] Connect Globalize.now   <!-- default-on; unchecked only if the user declined the platform at 1.6 -->
-
-## Branch
-Create new branch: `chore/i18n-setup`
-
-## Setup mode
-**Unguided**
-
-## Locales
-- Source: `en`
-- Targets: `de`, `fr`, `es`
-
-## Routing strategy
-Prefix-based
-
-## App domain
-{user-confirmed domain}
-
-## Optional setup steps
-- [x] ESLint plugin
-- [ ] CI/CD integration
-- [ ] Test setup wrapper
-<!-- Generating the coding rules and wiring them into CLAUDE.md / AGENTS.md are core steps, not decisions — do not record them here. -->
-
-## Globalize-now
-- Project name: `{name}`
-- Repo provider: GitHub
-- Authenticated org: `{org}`   <!-- recorded after Phase 1.5 sign-in completes -->
-```
-
-### Progress file schema (per subagent)
-
-```json
-{
-  "subagentId": "setup",
-  "phase": 2,
-  "status": "pending|running|succeeded|failed|needs_decision|needs_cleanup",
-  "startedAt": "<ISO>", "updatedAt": "<ISO>",
-  "plan": ["step_id_1", "step_id_2"],
-  "completed": ["step_id_1"],
-  "current": "step_id_2",
-  "currentDetail": "modifying vite.config.ts",
-  "skipped": [],
-  "filesCreated": [],
-  "filesModified": [{ "path": "...", "summary": "..." }],
-  "errors": [],
-  "needsDecision": null,
-  "result": null
-}
-```
-
----
-
-## Reading the reference files (subagents)
-
-Reference files under `references/languages/.../*.md` walk through their variant's setup or convert work linearly via section headings (e.g., "Packages", "Build Tool Integration", "Provider Setup", "Language Switcher"). Follow them in document order — section headings are the authoritative ordering, not the orchestrator's plan step IDs (those are higher-level phase markers used by the polling loop).
-
-**When `references.setup` (or `.convert`) lists more than one file, read them in array order and respect their ownership boundary.** A library-level shared reference (`libraries/<lib>/setup.*.md`) and a framework reference (`frameworks/.../<lib>.setup.md`) split the work by *emitted path*, not by topic: the shared reference owns a named set of modules and states which ones in its own inventory; the framework reference owns everything else — build config, the library config file, provider and root-document wiring, routes, middleware, catalog layout, `.gitignore`. **A framework reference must never define a module a shared reference emits**; where it needs one it shows an import and a call site. If the two disagree about a file the shared reference owns, **the shared reference wins** — do not merge the two shapes, and note the disagreement in your progress file so the skill can be fixed. The array order is load-bearing: a shared file placed *before* the framework file emits something the framework file consumes (e.g. the locale constants a library config imports), and one placed *after* needs a decision the framework file collects first.
-
-**`references.convert` arrays work the other way round**, because convert files emit no modules — they describe how to wrap. A framework convert file is an **overlay** on the shared one: read the shared file first for the wrapping patterns, then the overlay for what this target changes, and **where they disagree the overlay wins** (it is the more specific document). The overlay never restates the shared rules; it states only the deltas and the target-specific skip-list.
-
-Some references include catalog-format sub-references for an **alternate** format (e.g., `references/languages/js-ts/libraries/next-intl/po-format.setup.md`, and for Paraglide `references/languages/js-ts/libraries/paraglide/json-format.{setup,convert}.md`). When the user is on the alternate format, substitute that reference's snippets in place of the default examples — the variant reference itself flags the substitution points. For Paraglide specifically: the **default is PO**, so the base files (`frameworks/sveltekit/paraglide.{setup,convert}.md`) are the PO path and apply as-is. Only when `decisions.setup.catalogFormat === "json"` does the setup subagent apply `json-format.setup.md` over `paraglide.setup.md` and the wrap subagents apply `json-format.convert.md` over `paraglide.convert.md`. The coding rules are **not** format-split any more: one `libraries/paraglide/rules.template.md` covers both, and `generate_coding_rules` renders the matching branch from the `catalogFormat` condition (see the add-ons reference).
-
-If a reference's instructions appear to require user input that wasn't collected in Phase 1, do not improvise: write `status: "needs_decision"` to your progress file and exit so the orchestrator can ask.
-
-## Subagent dispatch mechanics
-
-- Use the Agent tool with `run_in_background: true` for all phase subagents (Phase 2 setup, Phase 3 wrap and verify). The orchestrator polls progress files instead of waiting on the subagent's terminal output.
-- For Phase 1.1 (inspect), foreground (blocking) is fine — the subagent only writes one JSON file and returns.
-- **Phase 1.5 (account) and Phase 4 (project) are not subagents.** They run on the main thread by delegating to the `globalize-now-account-setup` / `globalize-now-project-setup` skills via the Skill tool (interactive sign-in and repo-connection browser steps need the main thread). No background dispatch, no `progress/*.json` polling for these two.
-- All wrap subagents in Phase 3 must be dispatched **in a single tool-use message** to launch in parallel.
-- Subagents must use atomic file writes (write `<file>.tmp`, then `mv`) when updating progress files.
-- Each subagent reads the same set of inputs from `.globalize/`: it does not need orchestrator-side state passed via prompt beyond pointers to those files.
+"All set. Project created: **{projectUrl}**. Repo connected, catalog patterns wired. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI) for ongoing translation work — pulling translations, tracking status, requesting new languages."
 
 ---
 
 ## Edge cases
 
-- **Multiple frameworks detected** (e.g., both `next` and `vite` in deps): Next.js takes precedence — use Rule 1 in 1.5.
-- **Monorepo**: Detect from the closest `package.json` to the working directory. Do not aggregate deps across workspace packages.
-- **User overrides recommendation** with a library that doesn't match a manifest entry: surface the supported list and ask them to pick one of those.
-- **`.globalize/` already exists from a prior run**: see Resumability section above.
-- **No `git` repo**: skip 1.4 (branch recommendation) silently.
-- **`decisions.md` is hand-edited between runs**: re-validate against `manifest-snapshot.json` before re-dispatching subagents — fail loudly if invalid.
+- **Multiple frameworks** (e.g. `next` and `vite`): Next.js wins (§1.5 first row).
+- **Monorepo**: use the `package.json` closest to the working directory; never aggregate deps across workspace packages.
+- **Override to an unsupported library**: show the supported list and ask the user to pick from it.
+- **`decisions.md` hand-edited between runs**: re-validate against `manifest-snapshot.json` before re-dispatching — fail loudly if invalid.
