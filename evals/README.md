@@ -7,7 +7,9 @@ Testing runs in two layers:
 - **Layer A — orchestration.** Runs the skill through Phase 1 only (detect → decide → generate plan). No package installs, no setup execution. Fast and cheap. Asserts framework detection, the generated plan, and — for incompatible stacks — that the skill refuses with a hard-stop instead of planning.
 - **Layer B — end-to-end.** Injects a pre-generated plan, then runs the skill's Phase 2 to completion (install packages, wire build config, scaffold catalogs, extract/compile, build). Slow. Asserts the resulting project actually works.
 
-Both layers drive the real skill via `claude -p`, so they exercise the SKILL.md prose as shipped — not a mirrored copy of its logic.
+- **Headless — setup + convert, no human, any agent.** One non-interactive prompt pre-answers Phase 1; the agent runs Phases 1–3 alone and the converted project is asserted (`run-eval-headless.sh`). No prefill, so the agent must navigate SKILL.md → `references/orchestrator/` → the manifest's references itself — the path a truncated SKILL.md broke.
+
+All layers drive the real skill via a CLI agent (`claude -p` by default), so they exercise the SKILL.md prose as shipped — not a mirrored copy of its logic.
 
 ## Quick Start
 
@@ -19,6 +21,10 @@ Both layers drive the real skill via `claude -p`, so they exercise the SKILL.md 
 
 # Layer B — full setup + build, ~5 min, requires a prefill
 ./evals/run-eval-layer-b.sh nextjs-app-router-lingui
+
+# Headless — Phases 1–3 with no human; any CLI agent via AGENT_CMD (prompt is in $EVAL_PROMPT)
+./evals/run-eval-headless.sh vite5-react18-brewline
+AGENT_CMD='opencode run "$EVAL_PROMPT"' SKILL_DIRS=".claude/skills <the agent's own skill dir>" ./evals/run-eval-headless.sh vite5-react18-brewline
 ```
 
 Keep the work directory for debugging:
@@ -35,12 +41,15 @@ With `KEEP_WORKDIR=1` the temp dir survives, so you can re-run a verifier agains
 
 ## Static verifiers (no model, no network)
 
-Two scripts run standalone against a checkout and need neither `claude` nor a fixture:
+Three scripts run standalone against a checkout and need neither `claude` nor a fixture:
 
 ```bash
 ./evals/verify-manifest.sh        # manifest.json: schema, path resolution, cross-file invariants
 ./evals/verify-rules-template.sh  # rules templates: frontmatter, marker grammar, budgets
+./evals/verify-skill-size.sh      # SKILL.md ≤ 40 KB; globalize-guide's map in its first 5 KB; orchestrator refs resolve (runs in CI)
 ```
+
+`verify-skill-size.sh` exists because harnesses truncate the Skill tool's output: a headless opencode run cut globalize-guide's old 159 KB SKILL.md at ~50 KB, and the agent improvised the whole Lingui setup from memory. It fails when any SKILL.md exceeds 40 KB (exemptions are listed in the script with a reason — currently only the platform-bundled `lovable-i18n`), when the phase map, reference-loading rules or single-agent fallback leave the first 5 KB of globalize-guide's SKILL.md, or when a `references/` path named by SKILL.md or `references/orchestrator/` is missing or an orchestrator file is unreachable. `.github/workflows/skill-checks.yml` runs it on every PR that touches `skills/`.
 
 `verify-manifest.sh` validates `skills/globalize-guide/manifest.json` against `skills/globalize-guide/manifest.schema.json`, checks that **every** path-shaped string in the manifest resolves on disk (not only those under a `references` block), and asserts the invariants a schema cannot express — unique `variant` ids, `rulesTemplate` coverage, and that `$schema` itself points at a file that exists. It also asserts the schema *rejects* four deliberately malformed manifests, so a schema that has quietly stopped constraining anything fails rather than passing.
 
@@ -60,6 +69,14 @@ Layer 1 needs `jsonschema` (`pip install jsonschema`); without it that layer war
 3. `npm install` the fixture's baseline deps.
 4. Run `claude -p` with a "resume" prompt → the skill runs Phase 2 to completion.
 5. Verify: `verify-setup.sh` (dispatches to the per-library checker), `check-behavior.sh`, and `verify-string-wrapping.sh` (if an expectations file exists).
+
+**Headless** (`run-eval-headless.sh`):
+1. Prepare the fixture, `npm ci`, and commit it as a git baseline.
+2. Install the skill into every directory in `SKILL_DIRS` (default `.claude/skills`).
+3. Run `AGENT_CMD` (default `claude -p`) with the fixture's `headlessPrompt` — every Phase 1 answer, including "upgrade Vite if the version gate fires".
+4. Verify with `verify-lingui-conversion.sh` against `expectations/conversion/<fixture>.json`: Vite ≥ 6.3, one `@lingui/*` version, no `@lingui/macro`, runtime packages in `dependencies`, no invalid peers and no `--legacy-peer-deps` in the transcript; a macro transform wired; no `require(`, `'use client'`, effect-based activation or path-locale detection; `.po` catalogs with no `#~`; every placeholder named and no literal `${…}` in a msgid; the expected msgids (ICU plural, `<strong>` inside its sentence, attributes with their values); data modules kept as `msg` descriptors, never unrolled; no `=== 1 ?` ternaries, literal attributes, `en-US`, locale-less `toLocale*String()`, `toFixed()` or symbol concatenation; untouched lines left verbatim; a passing build with no macro stub and no `require(` in `dist/`; and, when Chrome is installed, the app rendering in the target locale.
+
+The verifier was checked against a hand-converted solution of `vite5-react18-brewline` (all checks pass) and against the unconverted fixture, a bare-`lingui()` build, and a `require()` catalog loader (each fails on the expected checks).
 
 ## Fixtures
 

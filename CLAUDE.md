@@ -27,6 +27,7 @@ Skills currently in this repo:
 ## Conventions
 
 - **Flat skill directories**: Each skill is exactly one level deep under `skills/`. Skill name = directory name = `name:` field in `SKILL.md` frontmatter, all lowercase-with-hyphens.
+- **SKILL.md size budget — 40 KB, enforced in CI** (`evals/verify-skill-size.sh`, `.github/workflows/skill-checks.yml`). Harnesses truncate the Skill tool's output (opencode cut the old 159 KB `globalize-guide` SKILL.md at ~50 KB, and the agent improvised everything after it). SKILL.md is the map: phase table and how to load references in the first 5 KB; per-language tables, worker prompts and formats live in `references/` and load on demand. `globalize-guide`'s orchestrator procedures live in `references/orchestrator/`. Only `lovable-i18n` (single-file by platform requirement) is exempt.
 - **Self-contained**: Each skill directory has everything it needs. No shared abstractions between skills. Duplication is acceptable.
 - **SKILL.md frontmatter**: Required fields are `name` and `description`. Description explains when the skill should trigger.
 - **References live inside the skill**: Variant-specific instructions, manifest files, and other supporting docs go in `<skill>/references/`. Internal nesting inside `references/` is unconstrained — organize by stack, language, framework, etc. as the skill needs.

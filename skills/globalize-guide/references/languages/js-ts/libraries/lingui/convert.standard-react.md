@@ -73,6 +73,24 @@ When wrapping strings in a file whose links look wrong for the project's strateg
 
 > **Translator comments:** Use the object form `msg({ message: \`...\`, comment: "..." })` when a string is ambiguous — short words like "Dashboard" benefit from context like "Main navigation sidebar" so translators know the UI location.
 
+## Data modules (plans, products, reviews, FAQs)
+
+The same pattern applies to any exported array of records. **Convert the data module in place and keep its shape**: each display field becomes a `MessageDescriptor` (`msg`), its type changes from `string` to `MessageDescriptor`, and every component that renders the field resolves it with `t(record.field)` (or `i18n._(record.field)`). Non-copy fields — `id`, `slug`, prices, counts, author names — stay as they are.
+
+```ts
+// src/data/plans.ts — before: name: 'Starter'
+import { msg } from '@lingui/core/macro'
+import type { MessageDescriptor } from '@lingui/core'
+export type Plan = { id: string; name: MessageDescriptor; bagsPerMonth: number; priceEur: number }
+export const plans: Plan[] = [
+  { id: 'starter', name: msg({ message: 'Starter', comment: 'Subscription plan name' }), bagsPerMonth: 1, priceEur: 14.5 },
+]
+```
+
+**Never unroll the records into components** — replacing `plans.map(...)` with one hand-written `<PlanCard>` per plan, or copying each record's text into JSX `<Trans>`. It looks translated, but the data module is now dead or out of sync, adding a plan means editing a component, and every value derived from a record (`title={…plan.name…}`) is left behind. Values computed from a record go through a local variable so the placeholder gets a name: `const name = t(plan.name)` then `` t`Choose the ${name} plan` ``.
+
+**Before you mark a file done**, re-check it against the *Anti-patterns* section of `.agents/globalize-rules.md` — plural ternaries, `${x}` in plain strings, unwrapped `title` / `aria-label` / `placeholder` / `alt`, markup split out of a `<Trans>`, locale-less or hardcoded-locale formatting, unused imports, and reformatted lines you did not need to touch.
+
 ---
 
 ## Route titles (TanStack Router)

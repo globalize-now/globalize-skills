@@ -11,7 +11,7 @@ template: lingui
 templateVersion: 5
 conditions: [router, perPageCatalogs, localeNavigation, appTarget, ssr]
 values: [catalogPath, sourceLocale, targetLocales, localesModule, formatModule, navModule, navHooksModule, manifestStringsModule, localesBridgeScript]
-budget: { "router == \"app\"": 308, "appTarget == \"browser-extension\"": 288, "default": 298 }
+budget: { "router == \"app\"": 340, "appTarget == \"browser-extension\"": 320, "default": 330 }
 # Never add a value named `locale`: the typed-links block contains `params={{ locale }}`
 # inside a fence, which the template linter would then flag as a `{{ }}` placeholder.
 ---
@@ -96,7 +96,7 @@ t`Welcome back, ${name}!`                            // non-React code: import {
 
 ### Naming placeholders
 
-Lingui auto-names a placeholder only when the interpolated value is a **bare variable** (`${name}` → `{name}`). Any other expression — property access (`user.name`), a function or method call (`getName()`, `f.money(amount)`), `new Date()`, arithmetic — extracts as positional `{0}`, which tells the translator nothing. This holds in both `t` and `<Trans>`. Fix it either by assigning the value to a local variable first, or by naming it inline with `ph()` (import from `@lingui/core/macro`, also inside JSX).
+Lingui auto-names a placeholder only when the interpolated value is a **bare variable** (`${name}` → `{name}`). Any other expression — property access (`user.name`), a function or method call (`getName()`, `f.money(amount)`), `new Date()`, arithmetic — extracts as positional `{0}`, which tells the translator nothing. This holds in `t`, `<Trans>`, and the `value` of `<Plural>` / `<Select>` / `<SelectOrdinal>` (`value={plan.bagsPerMonth}` → `{0, plural, …}`). Fix it either by assigning the value to a local variable first, or by naming it inline with `ph()` (import from `@lingui/core/macro`, also inside JSX).
 
 ```tsx
 const name = user.name
@@ -302,6 +302,40 @@ count === 1 ? t`item` : t`items`   // ❌ wrong — two messages, broken in many
 - English only uses `one` and `other` — no need for `zero` in English plurals
 - Ordinal categories differ from cardinal — English ordinals use `one` (1st, 21st), `two` (2nd, 22nd), `few` (3rd, 23rd), `other` (4th+)
 - Keep all plural branches in one message — never split them into separate `t` calls
+
+## Anti-patterns — never write these
+
+Each ❌ compiles, extracts and ships broken. Check every edit against this list before finishing it.
+
+```tsx
+// Records in a data module: keep the copy there as descriptors — never unroll records into JSX
+❌ <PlanCard name={<Trans>Starter</Trans>} /> <PlanCard name={<Trans>Explorer</Trans>} />
+✅ export const plans = [{ id: 'starter', name: msg`Starter` }]   // data module keeps its shape
+✅ {plans.map((p) => <h3 key={p.id}>{t(p.name)}</h3>)}            // i18n._(p.name) is equivalent
+
+// Counts: one plural message — Latvian, Polish, Arabic and others have more than two forms
+❌ {n} {n === 1 ? 'bag' : 'bags'}        ❌ n === 1 ? t`bag` : t`bags`
+❌ <Plural value={plan.bagsPerMonth} … />   // property access extracts as "{0, plural, …}"
+✅ <Plural value={n} one="# bag" other="# bags" />   // bare variable, or value={ph({ bags: plan.bagsPerMonth })}
+
+// Values: a placeholder inside the message — never "${x}" in a plain string, never concatenation
+❌ t('Choose the ${name} plan')      ❌ <Trans>{`Rated ${rating} of 5`}</Trans>      ❌ t`Choose` + ' ' + name
+✅ t`Choose the ${name} plan`        ✅ <Trans>Rated {rating} of 5</Trans>
+
+// Attributes are user-visible copy: title, aria-label, placeholder, alt — through t, values included
+❌ title={`Choose the ${plan.name} plan`}       ❌ aria-label="Select plan"
+✅ const name = t(plan.name)  →  title={t`Choose the ${name} plan`}  aria-label={t`Select ${name}`}
+
+// Inline markup stays inside the one message — splitting it fixes English word order on every language
+❌ <Trans>Ships on</Trans> <strong>{date}</strong>
+✅ <Trans>Ships on <strong _t="date">{date}</strong>.</Trans>
+
+// Formatting: the formatters module, which formats in the active locale
+❌ '€' + price.toFixed(2)     ❌ d.toLocaleDateString('en-US', opts)     ❌ n.toLocaleString()
+✅ f.money(price)             ✅ f.date(d, 'long')                       ✅ f.number(n)
+```
+
+**Edit hygiene.** Import only the macros you use, and remove imports your edit made dead. Never reformat, re-indent or reorder code you did not otherwise change — the diff should show i18n changes and nothing else.
 
 ## What not to wrap
 

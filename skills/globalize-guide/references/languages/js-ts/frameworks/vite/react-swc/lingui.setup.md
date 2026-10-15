@@ -5,6 +5,16 @@
 
 This covers Vite projects using `@vitejs/plugin-react-swc` — including plain Vite, TanStack Router, React Router, and any other SWC-based Vite setup.
 
+## Before anything else: version gates and install rules
+
+> **Vite ≥ 6.3 — hard requirement of `@lingui/vite-plugin` 6.** Its peer range is `vite: ^6.3.0 || ^7 || ^8`. On Vite 5 (or 6.0–6.2), `npm install -D '@lingui/vite-plugin@^6'` fails with `ERESOLVE … peer vite@"^6.3.0 || ^7 || ^8"`. Read the **installed** Vite version (lockfile or `node_modules/vite/package.json`) before installing anything. If it is below 6.3 and `.globalize/decisions.md` does not record a Vite upgrade, stop with `needs_decision` (step `vite_version_gate`, options: upgrade Vite to `^6` / stop). If the upgrade was decided, it already ran on the main thread (`upgrade_vite`) — confirm `vite` now resolves to ≥ 6.3 before continuing.
+>
+> **Install rules — no exceptions:**
+> - **Never `--legacy-peer-deps` or `--force`.** They install a plugin that cannot run on the project's Vite; the failure moves from install time to build or run time. An `ERESOLVE` is a version gate, not noise.
+> - **Every `@lingui/*` package on one version** (`@lingui/swc-plugin` and `@lingui/native-tools` excepted — separate release lines). Never install `@lingui/macro`: it was deprecated in v5 and is unmaintained in v6. Macros import from `@lingui/core/macro` and `@lingui/react/macro`.
+> - **`@lingui/core`, `@lingui/react` and `@lingui/detect-locale` are runtime `dependencies`**; `@lingui/cli`, `@lingui/vite-plugin` and the macro plugin are `devDependencies`.
+> - **No Lingui 5 fallback.** The rules this setup generates rely on v6-only config (`macro.jsxPlaceholderAttribute`); downgrading Lingui to fit an old Vite produces rules that are silently wrong.
+
 ## Packages
 
 
@@ -55,6 +65,11 @@ export default defineConfig({
 ```
 
 If the project already has other Vite plugins (e.g., TanStack Router plugin), keep them — just add the `lingui()` plugin alongside them and add `@lingui/swc-plugin` to the `react()` plugin's `plugins` array.
+
+**Macros must be compiled at build time — `lingui()` alone does not do it.** `@lingui/vite-plugin`'s `lingui()` compiles `.po` catalogs on import; it does **not** transform `t`, `msg`, `<Trans>` or `<Plural>` unless told to. With a bare `lingui()` and no macro transform, `vite build` **still succeeds**, but the bundle contains `@lingui/core/macro`'s runtime stub, and the app throws *"The macro you imported from "@lingui/core/macro" is being executed outside the context of compilation"* on load — a blank page (verified on Vite 6.4 + Lingui 6.9.1). Exactly one transform is required:
+
+- the `react()` plugin entry shown above (this reference's default), **or**
+- `lingui({ macroTransform: true })` — the plugin's native transform (`@lingui/native-tools`), available from **`@lingui/vite-plugin` 6.9.0**; with it, the React plugin needs no Lingui entry. Read the installed plugin version before choosing this: on 6.0–6.8 the option does not exist and is ignored.
 
 **Example with TanStack Router:**
 
@@ -782,25 +797,32 @@ export function saveLocale(locale: string) {
   history.replaceState(history.state, '', url)
 }
 
-// Detect and load the user's preferred locale
-loadCatalog(detectLocale())
-
 export { i18n }
 ```
 
-Wrap the app with `I18nProvider` in `main.tsx`:
+Activate the locale, **then** render — in `main.tsx`:
 
 ```tsx
 import { I18nProvider } from '@lingui/react'
-import { i18n } from './i18n'
+import { i18n, detectLocale, loadCatalog } from './i18n'
 import App from './App'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <I18nProvider i18n={i18n}>
-    <App />
-  </I18nProvider>,
-)
+// Activate before the first render. I18nProvider renders nothing until a locale is active.
+loadCatalog(detectLocale()).then(() => {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <I18nProvider i18n={i18n}>
+      <App />
+    </I18nProvider>,
+  )
+})
 ```
+
+Keep the project's existing `createRoot` import and any wrappers (`StrictMode`, routers, stores) — only the activation-then-render order and the `I18nProvider` are new. Load-bearing details:
+
+- **Activate before the first render, not in a `useEffect`.** `I18nProvider` renders `null` until `i18n.activate()` / `loadAndActivate()` has run, so activation from a component *under* the provider never mounts and the page stays blank, and any tree rendered before activation paints untranslated. Without a router there is nothing for an effect to wait on — activate in `main.tsx` as shown. (The only effect-based form in this file is the routed `LocaleLayout`, which must re-load on a path change and renders nothing until its catalog is active.) Use `.then()`, not top-level `await` — Vite's default build target rejects top-level await.
+- **Catalogs load with dynamic `import()` only — never `require()`.** The app is ESM; a `require()` survives into the browser bundle and throws `ReferenceError: require is not defined` at run time (verified: the build passes, the page is blank). If Rollup complains about a dynamic import, fix the specifier — it must start with `./` or `../` and end in a literal extension, as above — do not switch to `require()`. This reference imports the **compiled** catalog (`messages.ts`, written by `lingui compile`). Importing the `.po` source instead (`` import(`../locales/${locale}/messages.po`) ``), which `lingui()` compiles on the fly, is equally valid — it then needs a `declare module '*.po'` type, and the compiled `messages.ts` files, their ignore rule and the `lingui compile` script prefixes become unnecessary. Pick one and use it everywhere.
+- **No `'use client'`.** That directive is a React Server Components marker for Next.js; in a Vite SPA it is meaningless noise. Do not add it anywhere.
+- **No URL-path locale detection without a router.** This branch has no route to carry a locale, so never parse `location.pathname` for a locale prefix or use `fromPath`. The sources are exactly the three above: `?lang=`, `localStorage`, the browser.
 
 ### 6. Language Switcher
 
@@ -1044,6 +1066,18 @@ Known limitation: in dev, a `.po` edited after startup (e.g. a Globalize deliver
 **Which extractor:** `lingui extract --clean` above is the single-catalog form. For the per-page layout the extract script is `lingui extract-experimental` instead — the per-page extractor is what resolves the route files' dynamic `import()` specifiers. Use the one matching the layout you set up.
 
 **TypeScript projects:** this reference ships no `lingui.config.ts` block, so there is no `compileNamespace: 'ts'` to rely on. If the project has a `tsconfig.json`, use `lingui compile --typescript` everywhere `lingui compile` appears above (the `lingui:compile` script and the `dev` / `build` prefixes) so the compiler emits `.ts` catalogs the route `import()`s can resolve and type-check. Omit the flag for plain-JS projects.
+
+### Verify the build output, not just the exit code
+
+`vite build` exits 0 in both of the failure modes this file guards against, so after `npm run build`:
+
+```bash
+grep -rl "executed outside the context of compilation" dist   # must print nothing — a hit means no macro transform is wired
+grep -rlE '\brequire\(' dist                                   # must print nothing — a hit is a require() that throws in the browser
+grep -c '^#~' src/locales/*/messages.po                          # every count 0 — a #~ entry means extract ran without --clean
+```
+
+The `#~` check applies to the single-catalog layout; for per-page catalogs, run it over the `.po` files under `src/routes/**/locales/`.
 
 ### `.gitignore`
 

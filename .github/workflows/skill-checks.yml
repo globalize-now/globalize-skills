@@ -1,0 +1,19 @@
+name: Skill checks
+
+on:
+  pull_request:
+    paths: [skills/**, evals/verify-skill-size.sh, .github/workflows/skill-checks.yml]
+  push:
+    branches: [main]
+    paths: [skills/**, evals/verify-skill-size.sh, .github/workflows/skill-checks.yml]
+
+jobs:
+  skill-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Fails when a SKILL.md exceeds 40 KB, when globalize-guide's phase map / reference-loading
+      # rules leave its first 5 KB, or when an orchestrator reference is missing or unreachable.
+      - name: SKILL.md size budget
+        run: ./evals/verify-skill-size.sh

@@ -1,0 +1,28 @@
+{
+  "_comment": "Assertions for verify-lingui-conversion.sh. Regression fixture for a failed headless run (opencode + devstral, Vite 5 + React 18, en -> lv-LV) that never saw past the first 50 KB of SKILL.md.",
+  "sourceLocale": "en",
+  "targetLocales": ["lv-LV"],
+  "minVite": "6.3.0",
+  "dataModules": [
+    { "file": "src/data/plans.ts", "export": "plans", "copy": ["Starter", "Explorer", "Café", "One single-origin roast, picked by our head roaster."] },
+    { "file": "src/data/reviews.ts", "export": "reviews", "copy": ["The best beans I have ever had delivered.", "Great variety, and skipping a month is easy."] }
+  ],
+  "msgids": [
+    { "label": "plural bags per month (ICU plural, not a ternary)", "regex": "\\{[A-Za-z_]+, plural, .*one \\{# bag" },
+    { "label": "<strong> kept inside the delivery-date message", "regex": "delivery ships on <[A-Za-z0-9_]+>\\{[A-Za-z_]+\\}</[A-Za-z0-9_]+>" },
+    { "label": "title attribute with the plan name as a named placeholder", "regex": "Choose the \\{[A-Za-z_]+\\} plan" },
+    { "label": "aria-label with the plan name as a named placeholder", "regex": "^Select \\{[A-Za-z_]+\\}$" },
+    { "label": "rating title with a named placeholder", "regex": "Rated \\{[A-Za-z_]+\\} out of 5" },
+    { "label": "input placeholder", "regex": "^you@example\\.com$" },
+    { "label": "email aria-label", "regex": "^Email address$" },
+    { "label": "logo alt text", "regex": "^Brewline logo$" },
+    { "label": "subscriber count sentence with a named placeholder or ICU plural #", "regex": "Join (\\{[A-Za-z_]+\\}|#) coffee lovers" }
+  ],
+  "untouchedLines": [
+    { "file": "src/App.tsx", "line": "const NEXT_DELIVERY = new Date(2026, 10, 3)" },
+    { "file": "src/App.tsx", "line": "  const selected = plans.find((p) => p.id === selectedId) ?? plans[0]" },
+    { "file": "src/components/PlanCard.tsx", "line": "export function PlanCard({ plan, selected, onSelect }: Props) {" },
+    { "file": "src/components/PlanCard.tsx", "line": "        onClick={() => onSelect(plan.id)}" },
+    { "file": "src/components/OrderSummary.tsx", "line": "export function OrderSummary({ plan, nextDelivery, subscribers }: Props) {" }
+  ]
+}

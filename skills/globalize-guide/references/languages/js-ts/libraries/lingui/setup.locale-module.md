@@ -51,6 +51,7 @@ A framework reference must never *define* a module listed in the inventory below
 |---|---|---|
 | `<i18nDir>/locales.ts` | this file | `sourceLocale`, `locales`, `Locale`, `resolveLocale`, `getDirection`, `localeDisplayName`, `DEFAULT_CURRENCY`, `DATE_PRESETS`, `DatePreset`, `CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME` |
 | `<i18nDir>/format.ts` | this file | `formatLocale`, `createFormatters`, `useFormatters`, `getFormatters`, `Formatters`, `DateInput` |
+| `<i18nDir>/lingui-jsx.d.ts` | this file (§5) | the `_t` JSX attribute type — TypeScript projects only |
 | `<i18nDir>/navigation.ts` | `setup.navigation.md` | `stripLocalePrefix`, `localePath`, `switchLocalePath`, `useLocale`, `useLocalePath` — **not created on the `webext-*` variants** |
 | `<componentsDir>/LanguageSwitcher.tsx` | `setup.navigation.md`, **or the framework file on the `webext-*` variants** | the switcher |
 
@@ -104,13 +105,16 @@ export const sourceLocale = 'en'
 export const locales = ['en'] as const
 export type Locale = (typeof locales)[number]
 
-/** Normalize an untrusted locale string: exact match, then regional fallback (es-MX → es), then source. */
+/**
+ * Normalize an untrusted locale string: exact match, then the bare language (es-MX → es),
+ * then a regional target of the same language (lv → lv-LV), then source.
+ */
 export function resolveLocale(raw: string | undefined | null): Locale {
   if (!raw) return sourceLocale
   if ((locales as readonly string[]).includes(raw)) return raw as Locale
   const base = raw.split('-')[0]
   if ((locales as readonly string[]).includes(base)) return base as Locale
-  return sourceLocale
+  return locales.find((l) => l.split('-')[0] === base) ?? sourceLocale
 }
 
 const RTL_LOCALES = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'yi'])
@@ -326,6 +330,23 @@ Whatever else the framework file puts in `lingui.config.ts`, it must also carry:
 ```
 
 Without it, an inline tag inside `<Trans>` extracts as a positional `<0>` / `<1>`: adding a wrapper element renumbers every tag after it and obsoletes the finished translations for that message, and two structurally different call sites with the same text collapse into a single catalog entry. The generated coding rules teach `<a _t="tos">` as the fix, and **the macro ignores `_t` silently when this setting is absent** — the attribute is then passed straight through to the DOM. A `_t="..."` visible in the browser means this setting is missing.
+
+**TypeScript projects also need `_t` declared.** No `@lingui/*` package ships a JSX type for it, so the first `<strong _t="date">` fails `tsc` with *TS2322: Property '_t' does not exist on type 'DetailedHTMLProps<…>'* (verified on Lingui 6.9.1, `@types/react` 18). Create `<i18nDir>/lingui-jsx.d.ts` in the same step that writes the config — it must sit inside a directory the app's `tsconfig` `include`s:
+
+```ts
+// <i18nDir>/lingui-jsx.d.ts
+// Lingui's macro consumes `_t` (lingui.config.ts → macro.jsxPlaceholderAttribute) at build time.
+// Declare it so TypeScript accepts it on any JSX element; it never reaches the DOM.
+import 'react'
+
+declare module 'react' {
+  interface Attributes {
+    _t?: string
+  }
+}
+```
+
+`React.Attributes` is the base of every intrinsic element's props and of `JSX.IntrinsicAttributes`, so this one declaration covers `<a>`, `<strong>` and components alike. Skip it on plain-JS projects.
 
 The four references that ship a `lingui.config.ts` block (`remix/`, `remix/swc/`, `webext/`, `webext/swc/`) already include it. The other variants build the config in `create_config` with no block to copy — add the `macro` key there.
 
