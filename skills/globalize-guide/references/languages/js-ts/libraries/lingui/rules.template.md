@@ -96,7 +96,7 @@ t`Welcome back, ${name}!`                            // non-React code: import {
 
 ### Naming placeholders
 
-Lingui auto-names a placeholder only when the interpolated value is a **bare variable** (`${name}` → `{name}`). Any other expression — property access (`user.name`), a function or method call (`getName()`, `f.money(amount)`), `new Date()`, arithmetic — extracts as positional `{0}`, which tells the translator nothing. This holds in `t`, `<Trans>`, and the `value` of `<Plural>` / `<Select>` / `<SelectOrdinal>` (`value={plan.bagsPerMonth}` → `{0, plural, …}`). Fix it either by assigning the value to a local variable first, or by naming it inline with `ph()` (import from `@lingui/core/macro`, also inside JSX).
+Lingui auto-names a placeholder only when the interpolated value is a **bare variable** (`${name}` → `{name}`). Any other expression — property access (`user.name`), a function or method call (`getName()`, `f.money(amount)`), `new Date()`, arithmetic — extracts as positional `{0}`, which tells the translator nothing. This holds in `t`, `<Trans>`, and the `value` of `<Plural>` / `<Select>` / `<SelectOrdinal>` (`value={plan.bagsPerMonth}` → `{0, plural, …}`). Fix it either by assigning the value to a local variable first, or by naming it inline with `ph()` (import from `@lingui/core/macro`). `ph()` is valid only inside a message — a `t`/`msg`/`plural`/`select`/`selectOrdinal` argument, or inside `<Trans>`/`<Plural>`/`<Select>`/`<SelectOrdinal>` — never on its own or inside a callback: the macro strips its import and leaves the call, a runtime `ReferenceError`.
 
 ```tsx
 const name = user.name
@@ -104,6 +104,7 @@ t`Welcome back, ${name}!`                          // ✅ "{name}", not {0}
 t`Total: ${f.money(amount)}`                        // ❌ "Total: {0}"
 t`Total: ${ph({ total: f.money(amount) })}`         // ✅ "Total: {total}"
 <Trans>Welcome back, {ph({ username: getUser().name })}!</Trans>   // ph() also works in <Plural>, <Select>, <SelectOrdinal>
+<span>{ph({ stars: '★'.repeat(n) })}</span>                  // ❌ bare JSX child, no message — ReferenceError: ph is not defined
 ```
 
 ### Naming tag placeholders
@@ -188,7 +189,7 @@ f.list(['Alice', 'Bob'], 'or')         // 'Alice or Bob'
 
 `f.money(...)` is a function call, so `` t`Total: ${f.money(amount)}` `` extracts as positional `{0}`. Name it — `` t`Total: ${ph({ total: f.money(amount) })}` `` (see [Naming placeholders](#naming-placeholders)).
 
-**Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and any `new Intl.` outside the format module.
+**Flag for review:** `toFixed()`, a currency symbol concatenated with a number (`'$' + price`), date format strings like `'MM/DD/YYYY'`, `new Date().toLocaleDateString()` with no explicit locale, and any `new Intl.` outside the format module. A string-literal locale passed to `Intl.*`, `toLocale*()` or `getFormatters()` (`'en-US'`, `'en'`) is hardcoded too — it becomes `useFormatters()`, or `getFormatters(i18n.locale)` outside React.
 <!-- if: ssr == "true" -->
 
 **Time zone.** `Intl.DateTimeFormat` uses the *runtime's* zone, so the server renders in the
@@ -322,6 +323,11 @@ Each ❌ compiles, extracts and ships broken. Check every edit against this list
 ❌ t('Choose the ${name} plan')      ❌ <Trans>{`Rated ${rating} of 5`}</Trans>      ❌ t`Choose` + ' ' + name
 ✅ t`Choose the ${name} plan`        ✅ <Trans>Rated {rating} of 5</Trans>
 
+// One sentence or label = one message with placeholders — translators can't reorder adjacent messages
+❌ {t(plan.name)} <Trans>plan</Trans>       ❌ <Plural value={n} one="# bag" other="# bags" /> <Trans>of 250 g per delivery</Trans>
+✅ const name = t(plan.name)  →  <Trans>{name} plan</Trans>
+✅ <Plural value={n} one="# bag of 250 g per delivery" other="# bags of 250 g per delivery" />   // the whole sentence in every branch
+
 // Attributes are user-visible copy: title, aria-label, placeholder, alt — through t, values included
 ❌ title={`Choose the ${plan.name} plan`}       ❌ aria-label="Select plan"
 ✅ const name = t(plan.name)  →  title={t`Choose the ${name} plan`}  aria-label={t`Select ${name}`}
@@ -333,6 +339,7 @@ Each ❌ compiles, extracts and ships broken. Check every edit against this list
 // Formatting: the formatters module, which formats in the active locale
 ❌ '€' + price.toFixed(2)     ❌ d.toLocaleDateString('en-US', opts)     ❌ n.toLocaleString()
 ✅ f.money(price)             ✅ f.date(d, 'long')                       ✅ f.number(n)
+❌ getFormatters('en').date(d)   // a literal locale is still hardcoded — useFormatters(), or getFormatters(i18n.locale) outside React
 ```
 
 **Edit hygiene.** Import only the macros you use, and remove imports your edit made dead. Never reformat, re-indent or reorder code you did not otherwise change — the diff should show i18n changes and nothing else.

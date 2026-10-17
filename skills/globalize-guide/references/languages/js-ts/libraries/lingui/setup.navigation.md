@@ -218,6 +218,7 @@ Create `<componentsDir>/LanguageSwitcher.tsx`. Every stack shares the same shape
 - label each option with `localeDisplayName(loc)` — never construct `Intl.DisplayNames` by hand
 - mark the active locale (`fontWeight: 600`, `aria-current`, or the project's own convention)
 - under a URL strategy, the target is `switchLocalePath(pathname, loc)`
+- give the control a translatable accessible name — `` aria-label={t`Language`} ``, or a visible `<label>` wrapped in `<Trans>`
 
 What differs is **how the choice is committed**, which the framework file already established. Use its mechanism:
 

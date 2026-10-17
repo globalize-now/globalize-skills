@@ -49,7 +49,7 @@ A framework reference must never *define* a module listed in the inventory below
 
 | Path | Owner | Exports |
 |---|---|---|
-| `<i18nDir>/locales.ts` | this file | `sourceLocale`, `locales`, `Locale`, `resolveLocale`, `getDirection`, `localeDisplayName`, `DEFAULT_CURRENCY`, `DATE_PRESETS`, `DatePreset`, `CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME` |
+| `<i18nDir>/locales.ts` | this file | `sourceLocale`, `locales`, `Locale`, `resolveLocale`, `getDirection`, `localeDisplayName`, `DEFAULT_CURRENCY`, `DATE_PRESETS`, `DatePreset`; `CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME` only when an earlier module exported them (§3) |
 | `<i18nDir>/format.ts` | this file | `formatLocale`, `createFormatters`, `useFormatters`, `getFormatters`, `Formatters`, `DateInput` |
 | `<i18nDir>/lingui-jsx.d.ts` | this file (§5) | the `_t` JSX attribute type — TypeScript projects only |
 | `<i18nDir>/navigation.ts` | `setup.navigation.md` | `stripLocalePrefix`, `localePath`, `switchLocalePath`, `useLocale`, `useLocalePath` — **not created on the `webext-*` variants** |
@@ -151,6 +151,7 @@ export const DATE_PRESETS: Record<DatePreset, Intl.DateTimeFormatOptions> = {
   long: { dateStyle: 'long' },
 }
 
+// Only when an earlier locale module already exports these — otherwise omit everything below.
 /** @deprecated Kept so an earlier setup's call sites keep compiling. Use format.ts instead. */
 export const CURRENCY: Intl.NumberFormatOptions = { style: 'currency', currency: DEFAULT_CURRENCY }
 /** @deprecated Use `useFormatters().date(v, 'short')`. */
@@ -162,6 +163,8 @@ export const DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', time
 ```
 
 Substitute the real locale list from `.globalize/decisions.md` — `export const locales = ['en', 'fr', 'de'] as const` — and the real source locale. `sourceLocale` must be a member of `locales`.
+
+**Emit the `@deprecated` exports only when migrating.** Keep each one only if an earlier locale module on disk already exports it (`CURRENCY`, `DATE_SHORT`, `DATE_MEDIUM`, `DATE_TIME`); on a fresh setup omit all four — nothing imports them.
 
 **Set `DEFAULT_CURRENCY` to the project's currency.** Grep the codebase for an existing `currency:` option, a `toLocaleString`/`Intl.NumberFormat` call, or a hardcoded symbol before defaulting. If nothing is findable, leave `'USD'` and append `// adjust to this project's currency` to the line — a wrong currency that looks deliberate is worse than one that flags itself.
 

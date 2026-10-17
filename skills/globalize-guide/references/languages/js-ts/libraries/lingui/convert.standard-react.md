@@ -89,6 +89,8 @@ export const plans: Plan[] = [
 
 **Never unroll the records into components** — replacing `plans.map(...)` with one hand-written `<PlanCard>` per plan, or copying each record's text into JSX `<Trans>`. It looks translated, but the data module is now dead or out of sync, adding a plan means editing a component, and every value derived from a record (`title={…plan.name…}`) is left behind. Values computed from a record go through a local variable so the placeholder gets a name: `const name = t(plan.name)` then `` t`Choose the ${name} plan` ``.
 
+**Wrapping preserves the original copy, dynamic parts included.** `title={"Select the " + plan.name + " plan"}` becomes `` title={t`Select the ${name} plan`} `` — one message with a `{name}` placeholder — not a shortened `` t`Select plan` ``. Never reword, shorten or drop a value while wrapping.
+
 **Before you mark a file done**, re-check it against the *Anti-patterns* section of `.agents/globalize-rules.md` — plural ternaries, `${x}` in plain strings, unwrapped `title` / `aria-label` / `placeholder` / `alt`, markup split out of a `<Trans>`, locale-less or hardcoded-locale formatting, unused imports, and reformatted lines you did not need to touch.
 
 ---
@@ -119,6 +121,8 @@ function UsersPage() {
   )
 }
 ```
+
+**On every router, `<title>` and the meta description are copy.** Resolve both from messages. Where the app sets them imperatively instead of rendering `<title>` / `<meta name="description">`, set `document.title = t(pageTitle)` (and the meta tag's `content`) in an effect keyed on `i18n.locale`, so a locale switch updates them.
 
 ---
 
