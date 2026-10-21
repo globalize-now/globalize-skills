@@ -11,7 +11,7 @@ template: lingui
 templateVersion: 5
 conditions: [router, perPageCatalogs, localeNavigation, appTarget, ssr]
 values: [catalogPath, sourceLocale, targetLocales, localesModule, formatModule, navModule, navHooksModule, manifestStringsModule, localesBridgeScript]
-budget: { "router == \"app\"": 340, "appTarget == \"browser-extension\"": 320, "default": 330 }
+budget: { "router == \"app\"": 355, "appTarget == \"browser-extension\"": 335, "default": 345 }
 # Never add a value named `locale`: the typed-links block contains `params={{ locale }}`
 # inside a fence, which the template linter would then flag as a `{{ }}` placeholder.
 ---
@@ -31,7 +31,7 @@ Apply these rules as you write code. Every user-visible string must be wrapped b
 ## Macro decision tree
 
 ```
-Does the string's wording change based on a number (e.g. "3 items" / "1 item", "You have {n} messages")?
+Does the string's wording change based on a number (e.g. "3 items" / "1 item", "{n} reviews", "You have {n} messages")?
   YES → <Plural> in JSX, or t`{count, plural, one {...} other {...}}` in non-JSX
         (see "Plurals, select, and ICU MessageFormat" below)
 
@@ -150,6 +150,18 @@ function Nav() {
 ```
 
 > Module-scope `msg` calls are side effects a bundler cannot drop. In a lazy-loaded route, wrap the definition in a `/* @__PURE__ */` IIFE: `const items = /* @__PURE__ */ (() => [ ... ])()`.
+
+## Changing existing code
+
+Wrapping changes how text is looked up — never what is shown or how it renders:
+
+- **Never change the value being shown.** Wrap the literal that is there and leave every expression as it was: `{plan.name}` stays `{plan.name}`, never `{plan.id}`, a slug or a key. A value that comes from data (API, database, props) is not a message — leave it alone.
+- **Keep list keys stable.** When a mapped item's label becomes a `MessageDescriptor`, keep the existing `key` (`item.href`, `item.id`). If the key *was* the label string, use `key={item.label.id}` — never the array index, and never the translated text, which changes with the locale.
+- **Translate once.** `t` returns the translated string; never pass it back through `_()`, `i18n._()` or another `t`. `` _(t`Pricing`) `` looks the translated text up as a message ID.
+- **Text inside a `<Trans>` child tag belongs to the parent message**: `<Trans>Read <a _t="terms" href="/terms">the terms</a></Trans>`, never `` {t`the terms`} `` or a nested `<Trans>` inside it. Attributes on those tags are separate strings and do take `t`.
+- **Leave no unused imports** — neither a macro import you ended up not using nor one your edit orphaned.
+
+**Before you finish a file:** no interpolation outside a bare variable or `ph()` (it extracts as `{0}`); every tag inside a `<Trans>` carries `_t`; every single-word message has a `comment`; every count next to a noun is a plural; displayed values and list keys are what they were.
 
 ## Numbers, currencies, dates
 
@@ -280,7 +292,7 @@ const { messages } = await import(`../locales/${locale}/messages`)  // wrong —
 
 ## Plurals, select, and ICU MessageFormat
 
-**When to reach for this:** any time a string's wording depends on a number — singular/plural nouns ("item"/"items"), subject-verb agreement ("is"/"are"), anything else count-sensitive. If a count variable *or a literal number* is part of the string, it is a plural string: use `<Plural>` / ICU plural, not `<Trans>` / plain `t`. Write `"1 new message"` as `<Plural value={1} one="# new message" other="# new messages" />` so both forms stay localizable. In JSX prefer the `<Plural>`, `<Select>` and `<SelectOrdinal>` macros — they compile to `<Trans>` with ICU syntax automatically; in non-JSX contexts use ICU syntax inside `t`. Never use a ternary to pick between two separate translation strings.
+**When to reach for this:** any time a string's wording depends on a number — singular/plural nouns ("item"/"items"), subject-verb agreement ("is"/"are"), anything else count-sensitive. If a count variable *or a literal number* is part of the string, it is a plural string: use `<Plural>` / ICU plural, not `<Trans>` / plain `t`. Write `"1 new message"` as `<Plural value={1} one="# new message" other="# new messages" />` so both forms stay localizable. That includes every `{n} reviews` shape: `` t`${reviewCount} reviews` `` is wrong at 1 in English and at most counts in Slavic languages — write `<Plural value={reviewCount} one="# review" other="# reviews" />`. In JSX prefer the `<Plural>`, `<Select>` and `<SelectOrdinal>` macros — they compile to `<Trans>` with ICU syntax automatically; in non-JSX contexts use ICU syntax inside `t`. Never use a ternary to pick between two separate translation strings.
 
 ```tsx
 <Plural value={count} one="# item" other="# items" />
@@ -354,6 +366,7 @@ Skip these — wrapping them would cause false extractions:
 - `ALL_CAPS` enum values
 - `data-testid` attributes
 - URL strings and API paths — they are never *translated* (locale prefixing, where it applies, is a routing concern, not a macro)
+- Brand and product names on their own — the app's name, a logo wordmark, `GitHub`, `Stripe`. Inside a sentence they stay literal text in that message (`<Trans>Sign in with GitHub</Trans>`); never wrap them separately.
 <!-- if: appTarget == "browser-extension" -->
 - Extension identifiers, which look like copy but are contracts: permission names and host-match patterns (`"storage"`, `"https://*/*"`), the `type` / `action` discriminator on anything sent through `runtime.sendMessage`, `storage` keys, alarm names, context-menu `id`s, `commands.*` key names, and content-script `world` values.
 <!-- /if -->
@@ -365,7 +378,8 @@ Before finishing any string wrap, run this checklist. If the string matches a "m
 ### Ambiguity checklist
 
 **Must comment** (always add):
-- **Single words or two-word phrases** that could have multiple meanings in the source language. The test: *could a translator read this word differently without seeing the UI?*
+- **Every single-word message** — no exceptions, however obvious it looks ("Email", "Save", "Home"). The translator sees the word with no UI around it.
+- **Two-word phrases** that could have multiple meanings in the source language. The test: *could a translator read this phrase differently without seeing the UI?*
 - **Action labels without a visible object**: "Remove", "Add", "Delete" — the comment should say what is being acted on (e.g., "Remove item from cart")
 - **Strings with placeholders where the placeholder meaning isn't obvious**: `{count} remaining` — remaining what? `Hello, {name}` — is name a person, a project, a pet? If the placeholder is a positional `{0}` (any non-bare expression — see [Naming placeholders](#naming-placeholders)), name it with `ph()` first, then comment only if the *named* value is still ambiguous.
 - **Domain-sensitive terms**: words whose meaning depends on the app's domain. E.g., in a music app, "Track" means a song; in a shipping app, it means package tracking.
@@ -378,7 +392,7 @@ Before finishing any string wrap, run this checklist. If the string matches a "m
 **Skip** (no comment needed):
 - **Full sentences with clear meaning**: a complete thought that leaves little room for misinterpretation
 - **Strings where the surrounding message makes context obvious**: `one="# item" other="# items"` inside a Plural
-- **Labels that match their form field name**: `<label>Email</label>` next to an email input
+- **Multi-word labels that match their form field name**: `<label>Email address</label>` next to an email input
 
 ### Comment quality rules
 

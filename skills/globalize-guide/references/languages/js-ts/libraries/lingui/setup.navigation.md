@@ -232,7 +232,12 @@ What differs is **how the choice is committed**, which the framework file alread
 
 Under `no-url-locale` there is no URL to change: commit the cookie or `localStorage` value and reload. A `<select>` is the right control there — there is nothing to link to.
 
-Keep the framework file's rationale for its mechanism; it explains why a client-side swap alone desyncs from the cookie. **Styling:** inline styles are a baseline only — match the project's CSS approach and the surrounding navigation.
+Keep the framework file's rationale for its mechanism; it explains why a client-side swap alone desyncs from the cookie.
+
+Two rules hold on every stack, whatever the framework file's snippet looks like:
+
+- **A translated accessible name.** The switcher's `<nav>`, `<select>` or form carries `` aria-label={t({ message: `Language`, comment: 'Accessible name of the language switcher' })} `` with `t` from `useLingui()` — so the component must render inside the i18n provider. A hard-coded `aria-label="Language"` is an unwrapped string; no label at all leaves an unnamed landmark or combo box.
+- **The project's styling, never inline styles.** Do not copy `style={{…}}` objects or hard-coded colours into the component. Reuse the project's own select / dropdown component if it has one, otherwise the `className` conventions of the header or navigation the switcher sits in.
 
 Place the switcher wherever the framework file says. If the project already has a header or navigation component, put it there rather than in the root layout.
 

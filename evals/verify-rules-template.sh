@@ -545,6 +545,16 @@ run_project_mode() {
       fail "CLAUDE.md has $c '@.agents/globalize-rules.md' imports (expected exactly 1)"
     fi
 
+    # install_coding_rules writes the import as a bare line, and only that. The
+    # substring check above also counts prose that merely names the path — which
+    # is not an import when the `@` is missing or the path sits in a code span.
+    c=$(grep -cxF -- '@.agents/globalize-rules.md' "$claude" || true)
+    if [ "$c" -eq 1 ]; then
+      pass "CLAUDE.md has the exact '@.agents/globalize-rules.md' line"
+    else
+      fail "CLAUDE.md has $c exact '@.agents/globalize-rules.md' line(s) (expected 1) — the import was not written as the bare line install_coding_rules specifies (prose or a code span around the path is not a reliable import)"
+    fi
+
     # No dangling import left by the pre-.agents/ layout.
     c=$(grep -oF -- '@.claude/globalize-rules.md' "$claude" | wc -l | tr -d ' ')
     if [ "$c" -eq 0 ]; then
@@ -568,6 +578,21 @@ run_project_mode() {
       fail "AGENTS.md does not mention '.agents/globalize-rules.md'"
     else
       fail "AGENTS.md mentions '.agents/globalize-rules.md' $c times (expected exactly 1) — the pointer section is not idempotent"
+    fi
+
+    # The pointer section is written verbatim — not paraphrased, not extended
+    # with a catalog path or a summary of the rules.
+    local line missing=0
+    for line in '## Internationalization' \
+      'Before adding or editing any user-facing string, read `.agents/globalize-rules.md`' \
+      "and follow it. It is this project's authoritative i18n authoring contract — which" \
+      'API to use, how to handle plurals, where catalogs live, and what not to wrap.'; do
+      grep -qxF -- "$line" "$agents" || missing=$((missing + 1))
+    done
+    if [ "$missing" -eq 0 ]; then
+      pass "AGENTS.md carries the pointer section verbatim"
+    else
+      fail "AGENTS.md is missing $missing line(s) of the verbatim pointer section — install_coding_rules paraphrased or rewrote it"
     fi
   fi
 

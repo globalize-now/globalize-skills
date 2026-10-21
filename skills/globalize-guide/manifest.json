@@ -76,7 +76,7 @@
       ],
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/detect-locale@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6"]
+        "dev": ["@lingui/cli@^6", "@lingui/swc-plugin@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6"]
       },
       "references": {
         "setup": [
@@ -97,7 +97,7 @@
       "supportLevel": "stable",
       "packages": {
         "runtime": ["@lingui/core@^6", "@lingui/react@^6", "@lingui/detect-locale@^6"],
-        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6"]
+        "dev": ["@lingui/cli@^6", "@lingui/babel-plugin-lingui-macro@^6", "@lingui/vite-plugin@^6", "@lingui/format-po@^6"]
       },
       "references": {
         "setup": [

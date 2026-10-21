@@ -36,12 +36,13 @@ In addition to the core Lingui packages (`@lingui/core`, `@lingui/react`, `@ling
 | `@lingui/detect-locale` | runtime | Browser locale detection (navigator, URL, storage, cookie) |
 | `@lingui/babel-plugin-lingui-macro` | dev | Babel macro transform |
 | `@lingui/vite-plugin` | dev | Vite integration for catalog compilation |
+| `@lingui/format-po` | dev | PO catalog formatter — `lingui.config.ts` imports `formatter()` from it (Lingui 6 removed the `format: 'po'` string) |
 
 **Example (npm):**
 
 ```bash
 npm install '@lingui/core@^6' '@lingui/react@^6' '@lingui/detect-locale@^6'
-npm install -D '@lingui/cli@^6' '@lingui/babel-plugin-lingui-macro@^6' '@lingui/vite-plugin@^6'
+npm install -D '@lingui/cli@^6' '@lingui/babel-plugin-lingui-macro@^6' '@lingui/vite-plugin@^6' '@lingui/format-po@^6'
 ```
 
 ## Build Tool Integration
@@ -102,6 +103,73 @@ export default defineConfig({
 ```
 
 **First-run ordering.** On a clean clone, run `vite build` (or start `vite dev` once) before `tsc -b` / `tsc --noEmit`. The TanStack Router plugin generates `src/routeTree.gen.ts` on first Vite run; `tsc` fails if the generated file does not yet exist. If the project's `npm run build` currently runs `tsc -b && vite build`, reorder to `vite build && tsc --noEmit` (or add a pre-build `vite build --mode dev` step) so the route tree is present before type-checking. `lingui compile` goes first in that chain — the compiled catalogs are gitignored as well, so on a clean clone they do not exist until the compiler has run; the full order is `lingui compile` → `vite build` → `tsc --noEmit`, which is exactly what the prefixed `build` script in "Catalog artifacts" (end of this file) sets up.
+
+## `lingui.config.ts`
+
+Create `lingui.config.ts` at the project root. **Copy the block for the project's routing shape verbatim** (the shapes are defined in the table under *Provider Setup* below) — do not invent a catalog path. Every loader in this file imports a fixed path, and the config is the only thing that decides whether a catalog ever lands there: a config that writes anywhere else extracts and compiles cleanly, then every `import()` fails at runtime and each locale silently falls back to the source.
+
+**Single catalog** — declarative React Router (every strategy) and the plain SPA without a router:
+
+```ts
+// lingui.config.ts
+import { defineConfig } from '@lingui/cli'
+import { formatter } from '@lingui/format-po'
+import { sourceLocale, locales } from './src/i18n/locales'
+
+export default defineConfig({
+  sourceLocale,
+  locales: [...locales],
+  catalogs: [
+    {
+      path: '<rootDir>/src/locales/{locale}/messages',
+      include: ['<rootDir>/src'],
+      exclude: ['**/node_modules/**', '**/locales/**'],
+    },
+  ],
+  format: formatter(),
+  compileNamespace: 'ts',
+  macro: {
+    jsxPlaceholderAttribute: '_t',
+  },
+})
+```
+
+This writes `src/locales/<locale>/messages.po` (the committed source) and, on compile, `src/locales/<locale>/messages.ts` — exactly what `src/i18n/index.ts` imports as `` `../locales/${locale}/messages.ts` ``.
+
+**Per-page catalogs** — TanStack Router file-based routing (every strategy, including Option 3):
+
+```ts
+// lingui.config.ts
+import { defineConfig } from '@lingui/cli'
+import { formatter } from '@lingui/format-po'
+import { sourceLocale, locales } from './src/i18n/locales'
+
+export default defineConfig({
+  sourceLocale,
+  locales: [...locales],
+  catalogs: [],
+  experimental: {
+    extractor: {
+      entries: ['<rootDir>/src/routes/**/*.tsx'],
+      output: '<rootDir>/{entryDir}/locales/{entryName}/{locale}',
+    },
+  },
+  format: formatter(),
+  compileNamespace: 'ts',
+  macro: {
+    jsxPlaceholderAttribute: '_t',
+  },
+})
+```
+
+`src/routes/about.tsx` gets `src/routes/locales/about/<locale>.po` plus the compiled `<locale>.ts` beside it — the `'./locales/about/' + locale + '.ts'` the route imports. A prefixed `src/routes/$locale/about.tsx` gets `src/routes/$locale/locales/about/<locale>.*`.
+
+- **`compileNamespace: 'ts'`** makes `lingui compile` emit the `.ts` modules the loaders import, so no `--typescript` flag is needed anywhere. On a plain-JS project use `compileNamespace: 'es'` instead (ES-module `.js` output) and change the `.ts` suffix in every catalog `import()` in this file to `.js`.
+- **`./src/i18n/locales`** is the module `setup.locale-module.md` created. Do not inline the locale list.
+- **`macro.jsxPlaceholderAttribute: '_t'`** is required (see `setup.locale-module.md`): it lets `<Trans>` name inline tags (`<a _t="terms">`) instead of extracting them as positional `<0>`. Create the `_t` JSX type declaration from that file in the same step.
+- **A `lingui.config.*` already exists:** keep its catalog path and change the loaders' `import()` specifiers to match it — never move catalogs the project already has. Record the path you kept in `decisions.md`; the coding rules are rendered from it.
+
+The import check under *Catalog artifacts* (end of this file) proves the config and the loaders agree. Run it after the first compile; a mismatch here is otherwise invisible until someone switches language.
 
 ## Provider Setup
 
@@ -841,30 +909,24 @@ The switcher **navigates**; it does not write `localStorage`. Under a URL strate
 
 ```tsx
 // src/components/LanguageSwitcher.tsx
+import { useLingui } from '@lingui/react/macro'
 import { useLocation } from 'react-router'
 import { locales, localeDisplayName } from '../i18n'
 import { useLocale, switchLocalePath } from '../i18n/navigation'
 
 export function LanguageSwitcher() {
+  const { t } = useLingui()
   const currentLocale = useLocale()
   const { pathname, search, hash } = useLocation()
 
   return (
-    <nav style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+    <nav aria-label={t({ message: `Language`, comment: 'Accessible name of the language switcher' })}>
       {locales.map((loc) => (
         <a
           key={loc}
           href={`${switchLocalePath(pathname, loc)}${search}${hash}`}
           hrefLang={loc}
           aria-current={loc === currentLocale ? 'true' : undefined}
-          style={{
-            padding: '0.25rem 0.5rem',
-            borderRadius: '0.25rem',
-            textDecoration: 'none',
-            color: 'inherit',
-            fontWeight: loc === currentLocale ? 600 : 400,
-            backgroundColor: loc === currentLocale ? 'rgba(0, 0, 0, 0.06)' : 'transparent',
-          }}
         >
           {localeDisplayName(loc)}
         </a>
@@ -874,7 +936,9 @@ export function LanguageSwitcher() {
 }
 ```
 
-Three details are load-bearing:
+The snippet is **structure only** — style it per *Styling* under *Wiring* below. Four details are load-bearing:
+
+- **The translated `aria-label`.** Without it a screen reader announces a bare "navigation" landmark with no hint what it switches. It is a `t` call, so it is extracted and translated like any other string; keep it on whatever element you end up rendering.
 
 - **Use a plain `<a>`, not a router `<Link>` — on both routers.** On TanStack Router the target route type is not statically known (`switchLocalePath` returns a string), and on either router a full document navigation is what re-runs the route's catalog load in the new locale. A client-side transition would leave the previously activated catalog in place. (On the declarative SPA, `LocaleLayout` would in fact reload the catalog on a client-side transition — but `<a>` keeps one behaviour across all three shapes, and costs nothing on a switch that changes the whole page's language anyway.)
 - **`useLocation()`, not `window.location`.** The switcher re-renders on navigation, so the target of each link tracks the page the user is actually on. Reading `window.location` directly gives a value React never invalidates, and the links go stale after the first in-app navigation.
@@ -898,11 +962,11 @@ No navigation occurs — the switcher loads a new catalog and re-activates the l
 
 ```tsx
 // src/components/LanguageSwitcher.tsx
-import { useLingui } from '@lingui/react'
+import { useLingui } from '@lingui/react/macro'
 import { locales, localeDisplayName, loadCatalog, saveLocale } from '../i18n'
 
 export function LanguageSwitcher() {
-  const { i18n } = useLingui()
+  const { i18n, t } = useLingui()
 
   async function switchLocale(newLocale: string) {
     await loadCatalog(newLocale)
@@ -913,15 +977,7 @@ export function LanguageSwitcher() {
     <select
       value={i18n.locale}
       onChange={(e) => switchLocale(e.target.value)}
-      style={{
-        padding: '0.375rem 0.5rem',
-        borderRadius: '0.375rem',
-        border: '1px solid #d1d5db',
-        backgroundColor: 'transparent',
-        fontSize: 'inherit',
-        fontFamily: 'inherit',
-        cursor: 'pointer',
-      }}
+      aria-label={t({ message: `Language`, comment: 'Accessible name of the language switcher' })}
     >
       {locales.map((loc) => (
         <option key={loc} value={loc}>
@@ -933,7 +989,7 @@ export function LanguageSwitcher() {
 }
 ```
 
-`loadCatalog` already handles the failed-import fallback and updates `<html lang>` / `<html dir>`, so the switcher does not repeat any of it.
+`loadCatalog` already handles the failed-import fallback and updates `<html lang>` / `<html dir>`, so the switcher does not repeat any of it. The `aria-label` is required: a `<select>` with no `<label>` and no accessible name is announced as an unnamed combo box.
 
 **Per-page catalogs with Option 3:** Each route loads its own co-located catalog, so the switcher cannot import from a single known path. Two approaches:
 
@@ -995,7 +1051,7 @@ import { LanguageSwitcher } from './components/LanguageSwitcher'
 
 If the project has a shared header/navigation component, place the switcher there instead of directly in the provider wrapper.
 
-**Styling**: The examples use inline styles as a baseline. Adapt the styling to match the project's CSS approach (Tailwind, CSS Modules, etc.) and the visual style of the surrounding navigation.
+**Styling — the project's, never the snippet's.** The snippets above carry no styling on purpose; do not add inline `style={{…}}` objects or hard-coded colours, which ignore the project's theme and dark mode. Before writing the component, open the header or navigation it will sit in and match it: if the project has its own select / dropdown component (`components/ui/select.tsx`, a design-system `Select`, a `DropdownMenu`), render the switcher with that; otherwise give the native element the same `className` conventions (Tailwind utilities, a CSS Module, styled-components) its neighbouring controls use. Whatever control you end up with, it keeps the translated `aria-label` (or the component's equivalent accessible-name prop).
 
 ---
 
@@ -1070,7 +1126,38 @@ Known limitation: in dev, a `.po` edited after startup (e.g. a Globalize deliver
 
 **Which extractor:** `lingui extract --clean` above is the single-catalog form. For the per-page layout the extract script is `lingui extract-experimental` instead — the per-page extractor is what resolves the route files' dynamic `import()` specifiers. Use the one matching the layout you set up.
 
-**TypeScript projects:** this reference ships no `lingui.config.ts` block, so there is no `compileNamespace: 'ts'` to rely on. If the project has a `tsconfig.json`, use `lingui compile --typescript` everywhere `lingui compile` appears above (the `lingui:compile` script and the `dev` / `build` prefixes) so the compiler emits `.ts` catalogs the route `import()`s can resolve and type-check. Omit the flag for plain-JS projects.
+**No `--typescript` flag.** The `lingui.config.ts` above sets `compileNamespace: 'ts'`, so plain `lingui compile` already emits the `.ts` catalogs the loaders import. (Plain-JS projects use `compileNamespace: 'es'` — see the config section.)
+
+### Check every catalog import resolves (after the first compile)
+
+Run this right after the first successful `lingui compile`, and again whenever the config or a loader changes. It reads every `import()` whose specifier contains `locales/`, substitutes each configured locale, and confirms the file exists. Pass **every** locale from `lingui.config.ts` — source and targets:
+
+```bash
+node --input-type=module -e '
+import { readFileSync, readdirSync, existsSync } from "node:fs"
+import { join, dirname, resolve, relative } from "node:path"
+const locales = process.argv.slice(1)
+const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? (e.name === "node_modules" ? [] : walk(join(d, e.name)))
+  : /\.[cm]?[jt]sx?$/.test(e.name) ? [join(d, e.name)] : [])
+let missing = 0
+for (const file of walk("src")) {
+  for (const [, spec] of readFileSync(file, "utf8").matchAll(/import\(\s*([^)]*locales\/[^)]*?)\s*\)/g)) {
+    for (const locale of locales) {
+      // `../locales/${locale}/messages.ts` and "./locales/about/" + locale + ".ts" alike
+      const rel = spec.replace(/\$\{[^}]+\}/g, locale).split("+").map((s) => s.trim())
+        .map((s) => (/^[`\x27"]/.test(s) ? s.slice(1, -1) : locale)).join("")
+      const target = resolve(dirname(file), rel)
+      if (!existsSync(target)) { missing++; console.log(`MISSING ${relative(".", target)}  <- ${file}`) }
+    }
+  }
+}
+console.log(missing ? `${missing} catalog import target(s) missing` : "every catalog import() target exists")
+process.exit(missing ? 1 : 0)
+' en fr de   # ← replace with every locale in lingui.config.ts
+```
+
+It must print `every catalog import() target exists` and exit 0. A `MISSING` line means the config's catalog path and a loader disagree: fix whichever side departed from the config section above (normally the config), re-run `lingui extract` + `lingui compile`, and re-check. **Do not create the missing file by hand** — a hand-written stub hides the mismatch until the first real translation never arrives. Record the result in `progress/setup.json` before `build_verification`.
 
 ### Verify the build output, not just the exit code
 
@@ -1109,7 +1196,7 @@ src/locales/*/messages.js
 src/locales/*/messages.d.ts
 ```
 
-**Extension caveat.** This reference does not ship a `lingui.config.ts` block, so the compiled extension depends on the config you created in `create_config`: with `compileNamespace: 'ts'` (or `lingui compile --typescript`) the output is `.ts`; with the default (`cjs`) it is `.js`. The block above ignores both, so the rule is correct either way — but derive the real *directory* from the config you wrote (`catalogs[].path`, or `experimental.extractor.output` for the per-page extractor) and from the actual `import()` / `require()` specifiers in the route files, and adjust the paths above if they differ. Confirm with the `git check-ignore` self-check below.
+**Extension caveat.** The config section's `compileNamespace: 'ts'` emits `.ts`; the plain-JS `'es'` form emits `.js`. The block above ignores both, so the rule is correct either way. If you kept a pre-existing config with a different catalog path, derive the directory from that config (`catalogs[].path`, or `experimental.extractor.output`) and adjust the paths above to match. Confirm with the `git check-ignore` self-check below.
 
 **Do not ignore the `.po` files, and do not ignore the directory.** The compiled catalog sits in the *same directory* as its `.po` source, and the `.po` is the translation source of truth — it is what Globalize imports from the repo in Phase 4. So:
 
@@ -1127,6 +1214,14 @@ git check-ignore    <its .po sibling>          # exits 1, prints nothing → sti
 ```
 
 **Sweep for strays before you finish.** Bootstrap stubs seeded at a path the final config does not emit to — e.g. a single-catalog `locale/{locale}/messages.ts` left behind after the config settled on per-page catalogs — are compiled artifacts too, and the pattern above will not match them. After the first successful `lingui compile`, list every compiled catalog on disk and delete any that the resolved `lingui.config.*` no longer produces. Do **not** widen the ignore rule to cover a path nothing imports.
+
+**The sweep covers `.po` files too.** A path abandoned mid-setup leaves a `.po` behind, and that one is worse than a stray stub: it is *not* ignored, so it gets committed, and Globalize's catalog patterns can pick it up as a second source catalog. List them:
+
+```bash
+find . -name '*.po' -not -path './node_modules/*' -not -path './.git/*' | sort
+```
+
+Every line must be a path the final config produces — `catalogs[].path` with `{locale}` filled in for a configured locale, or (per-page) `experimental.extractor.output` filled in for a route file that exists. For each one that is not: if this run created it (`git status --porcelain` shows it untracked, or it is in `filesCreated`), delete it together with any compiled sibling. If it was already in the repo before this run, it is the user's data — do not delete it; list it in the setup summary and ask.
 
 **Already-tracked artifacts.** `.gitignore` does not untrack files. If `git ls-files` shows compiled catalogs already committed (an existing project, or a re-run), tell the user and, with their consent, run:
 
