@@ -229,7 +229,7 @@ npx --no-install tsc --noEmit -p "$TSC" --noUnusedLocals 2>&1 \
 
 It must print nothing. Remove what it lists — only imports and locals your edit added or orphaned; leave pre-existing unused code alone and mention it. Plain-JS projects: run the project's ESLint `no-unused-vars` on the file instead, if it has one.
 
-**Read your diff back** for the three rules no grep can judge: the value each element shows is the one it showed before (see *Changing existing code* in the coding rules), list `key`s are unchanged or `descriptor.id` — never the index — and no text inside a `<Trans>` child tag is wrapped a second time (`` <Trans>Read <a _t="terms" href="/terms">{t`the terms`}</a></Trans> `` must be `<Trans>Read <a _t="terms" href="/terms">the terms</a></Trans>`; attributes on those tags are separate strings and keep their own `t`).
+**Read your diff back** for the three rules no grep can judge: the value each element shows is the one it showed before (see *Changing existing code* in the coding rules), list `key`s are unchanged or `descriptor.id` — never the index — and no text inside a `<Trans>` child tag is wrapped a second time (`` <Trans>Read <a _t="terms" href="/terms">{t`the terms`}</a></Trans> `` must be `<Trans>Read <a _t="terms" href="/terms">the terms</a></Trans>`; text attributes on those tags — `title`, `aria-label`, `alt` — are separate strings and keep their own `t`).
 
 ### Over the extracted catalog (verify subagent, after `lingui extract`)
 

@@ -139,7 +139,7 @@ git check-ignore    <its .po sibling>          # exits 1, prints nothing → sti
 find . -name '*.po' -not -path './node_modules/*' -not -path './.git/*' | sort
 ```
 
-Every line must be a path the final config produces — `catalogs[].path` with `{locale}` filled in for a configured locale, or (per-page) `experimental.extractor.output` filled in for a route file that exists. For each one that is not: if this run created it (`git status --porcelain` shows it untracked, or it is in `filesCreated`), delete it together with any compiled sibling. If it was already in the repo before this run, it is the user's data — do not delete it; list it in the setup summary and ask.
+Every line must be a path the final config produces — `catalogs[].path` with `{locale}` filled in for a configured locale, or (per-page) `experimental.extractor.output` filled in for a route file that exists. For each one that is not: if it is in `filesCreated` — record every `.po` and compiled catalog that `lingui extract` / `lingui compile` writes there as it appears — delete it together with any compiled sibling. Anything else is the user's data, untracked or not (`git status` cannot tell a file this run wrote from one the user never committed): do not delete it; list it in the setup summary and ask.
 
 **Already-tracked artifacts.** `.gitignore` does not untrack files. If `git ls-files` shows compiled catalogs already committed (an existing project, or a re-run), tell the user and, with their consent, run:
 

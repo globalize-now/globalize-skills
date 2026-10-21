@@ -334,7 +334,7 @@ and follow it. It is this project's authoritative i18n authoring contract — wh
 API to use, how to handle plurals, where catalogs live, and what not to wrap.
 ```
 
-Idempotent on the literal `.agents/globalize-rules.md` appearing anywhere in `AGENTS.md`: present → skip silently.
+Idempotent on the section itself: already in `AGENTS.md` verbatim → skip silently. A mention of `.agents/globalize-rules.md` elsewhere in the file is not the section — append it anyway.
 
 ### Check both bridges — exact bytes, nothing else
 
@@ -346,7 +346,7 @@ Then prove it. Run from the repo root:
 grep -cxF '@.agents/globalize-rules.md' CLAUDE.md   # → 1: the exact import line, alone on its line
 grep -c 'globalize-rules\.md' CLAUDE.md             # → 1: no second or stale reference
 for f in CLAUDE.md AGENTS.md; do                    # every line this step added must be one of ours
-  if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then git diff -U0 -- "$f"
+  if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then git diff HEAD -U0 -- "$f"
   else git diff --no-index -U0 /dev/null "$f"; fi
 done | grep '^+[^+]' | grep -vxF \
   -e '+# Project Instructions' -e '+@.agents/globalize-rules.md' \
@@ -355,9 +355,17 @@ done | grep '^+[^+]' | grep -vxF \
   -e "+and follow it. It is this project's authoritative i18n authoring contract — which" \
   -e '+API to use, how to handle plurals, where catalogs live, and what not to wrap.'
 # → no output
+diff <(grep -xF -A4 '## Internationalization' AGENTS.md) - <<'EOF'
+## Internationalization
+
+Before adding or editing any user-facing string, read `.agents/globalize-rules.md`
+and follow it. It is this project's authoritative i18n authoring contract — which
+API to use, how to handle plurals, where catalogs live, and what not to wrap.
+EOF
+# → no output: the pointer section is in AGENTS.md once, verbatim, in order
 ```
 
-Any other output is content this step must not have written: remove it (lines the user had already changed before this run are theirs — leave those). Do not mark `install_coding_rules` complete until all three checks hold.
+Any other output is content this step must not have written: remove it (lines the user had already changed before this run are theirs — leave those). Output from the final `diff` means the section is missing, reworded or duplicated: rewrite it to the block above. Do not mark `install_coding_rules` complete until all four checks hold.
 
 Verify: in a fresh session, ask Claude "how should I wrap a plural string in this project?" — the answer should reference ICU `{count, plural, …}` syntax and `t('key', { count })` patterns from the generated file.
 
