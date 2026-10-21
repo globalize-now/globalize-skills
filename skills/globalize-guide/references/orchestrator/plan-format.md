@@ -103,9 +103,11 @@ Partitions: {N} wrap subagents covering {file count} files
 
 <!-- Include the Phase 4 section only when decisions.scope.globalize === true -->
 ## Phase 4 — Globalize project
-Orchestrator-owned steps (main thread, delegated to `globalize-now-project-setup`):
+Orchestrator-owned steps (main thread; the last two delegated to `globalize-now-project-setup`):
 - [ ] assemble_globalize_inputs
+- [ ] push_setup   <!-- §4.2: the converted catalogs must be on the remote before Globalize can translate them -->
 - [ ] delegate_project_setup
+- [ ] start_first_translation   <!-- done when the project skill reports the first translation started (pull request delivery) -->
 ```
 
 ### `decisions.md`

@@ -13,7 +13,7 @@ description: >-
 
 The Globalize CLI (`@globalize-now/cli-client`) lets AI agents manage translation projects, languages, glossaries, style guides, and repository connections on the [Globalize](https://globalize.now) platform.
 
-This skill creates a translation project, connects your git repository, and sets the catalog file patterns. It assumes you are already signed in.
+This skill creates a translation project, connects your git repository, and sets the catalog file patterns — and, in orchestrated mode, starts the first translation. It assumes you are already signed in.
 
 Follow these steps in order.
 
@@ -37,7 +37,7 @@ If this returns a valid `source` and `key`, continue. If it fails or reports no 
 
 This skill can be driven by another skill (e.g. the `globalize-guide` orchestrator) that has already collected the project details and just-converted catalog paths.
 
-**If `.globalize/globalize-inputs.json` exists in the project root** (or the invoking prompt supplies these values directly), read it and treat its fields as authoritative: skip the **detection** in Step 1 and the **Setup Mode** prompt below, run **unguided**, and proceed straight to Step 2 (provider connection) → Step 3 (create project) → Step 4 (connect repo). Do **not** re-detect or re-prompt for anything the file provides.
+**If `.globalize/globalize-inputs.json` exists in the project root** (or the invoking prompt supplies these values directly), read it and treat its fields as authoritative: skip the **detection** in Step 1 and the **Setup Mode** prompt below, run **unguided**, and proceed straight to Step 2 (provider connection) → Step 3 (reuse or create the project) → Step 4 (connect repo) → Step 5 (first translation). Do **not** re-detect or re-prompt for anything the file provides.
 
 Expected shape:
 
@@ -56,13 +56,16 @@ Expected shape:
   "pathLocales": [],
   "importMode": "ignore",
   "importScope": "new_keys_only",
-  "mode": "orchestrated"
+  "mode": "orchestrated",
+  "firstTranslationBranch": "chore/i18n-setup"
 }
 ```
 
 `localePathPattern` + `fileFormat` are the values to pass to `repositories create --patterns` (skip the server-side `github detect` / `gitlab detect` step — patterns are already known).
 
 Still run the interactive provider connection in Step 2 (GitHub App install / GitLab OAuth) if no installation/connection exists yet — that browser approval is unavoidable.
+
+`firstTranslationBranch` names the branch the caller has pushed the catalogs to; Step 5 translates it. `null` or absent → skip Step 5.
 
 `pathLocales` is **optional** and usually absent or `[]`. When present it carries per-language on-disk spellings for the pattern's `{locale}` segment — see "Path-locale overrides" in Step 4b. Pass it straight through to `repositories create --path-locales`.
 
@@ -97,6 +100,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - [x] Step 2: Connect Git Provider — {GitHub|GitLab} ({owner/repo}) or "skipped — no git remote"
 - [x] Step 3: Create Project — "{name}" (source: {source}, targets: {targets}, config: {config summary or "none"})
 - [x] Step 4: Connect Repository — {owner/repo} connected, patterns: {count configured or "none"}, import mode: {mode}
+- [x] Step 5: First Translation — started on {branch}, delivered as a pull request (orchestrated mode only; or "skipped — {reason}")
 
 ### Warnings (if any)
 - {e.g., Uncommitted changes detected — i18n detection used remote code only}
@@ -327,6 +331,11 @@ npx @globalize-now/cli-client projects list --json
 ```
 
 If projects already exist:
+- **Orchestrated** (inputs supplied): when the list holds **exactly one** project, **reuse it** — never create a second. The organisation's only project is the one this setup belongs to, often left by an earlier attempt or another setup route. Record its ID, then:
+  - its `sourceLanguage.locale` differs from the supplied `sourceLocale` → don't reuse it; create a new project (3b–3e) and note why in the summary;
+  - otherwise add each supplied target locale missing from its `targetLanguages` (`project-languages add --project-id <PROJECT_ID> --name "<NAME>" --locale <LOCALE> --language-id <LANGUAGE_UUID> --json`, name and UUID from `languages list`), leave its existing languages alone, and skip to Step 4. Report "Reused project {name}" in the summary.
+
+  Two or more projects → create a new one, as unguided.
 - **Guided**: present the list (names and IDs) and ask if the user wants to reuse an existing project or create a new one. If reusing, record the project ID and skip to Step 4.
 - **Unguided**: create a new project. If a project with the same name already exists, note it in the summary but proceed.
 
@@ -418,6 +427,8 @@ The response includes `scoredPresets` (ranked i18n preset matches with confidenc
 
 ### 4b. Connect the repository
 
+**Reused project (Step 3a):** first run `repositories list --project-id <PROJECT_ID> --json`. If one already points at this repository (its `gitUrl` names the same `<OWNER>/<REPO>`, case-insensitive), reuse its `id` as the repository ID instead of creating a second — `patterns list --repository-id <REPO_ID> --json`, and `patterns create --repository-id <REPO_ID> --pattern <LOCALE_PATH_PATTERN> --file-format <FORMAT> --json` when the supplied pattern is missing — then go to 4c.
+
 **For GitHub:**
 
 ```bash
@@ -497,6 +508,22 @@ If uncommitted or unpushed changes were detected in Step 1, add a note: "i18n de
 
 ---
 
+## Step 5: Start the first translation (orchestrated mode)
+
+Runs only when the supplied inputs carry a `firstTranslationBranch` **and** Step 4 connected (or reused) a repository. Otherwise skip it and give the reason in the summary ("no repository connected", "setup not pushed"). Standalone runs skip it too — "Next steps" names the command.
+
+```bash
+npx @globalize-now/cli-client repositories translate \
+  --id <REPO_ID> \
+  --branch <FIRST_TRANSLATION_BRANCH> \
+  --delivery-mode pr \
+  --json
+```
+
+Always pass `--delivery-mode pr`: the first translation arrives as a pull request onto that branch, never as a push over it. The call returns `{"accepted": true, "branch": "…"}` as soon as the translation is queued — don't wait for it to finish. An error (no locale path patterns, the branch handled by a Workflow) → report it verbatim in the summary as "First translation not started — {error}"; don't retry. The out-of-credits check happens after the call returns, so a translation refused for credits shows up as a failed job on the dashboard, not here.
+
+---
+
 ## Next step
 
-Project created and repo connected. From here, use the **`globalize-now-cli-use`** skill (or the `globalize` CLI directly) for ongoing translation work — pulling translations, tracking status, managing languages, glossaries, and style guides.
+Project created and repo connected (and, in orchestrated mode, the first translation started). Standalone: start a translation with `repositories translate --id <REPO_ID> --delivery-mode pr`. From here, use the **`globalize-now-cli-use`** skill (or the `globalize` CLI directly) for ongoing translation work — pulling translations, tracking status, managing languages, glossaries, and style guides.
