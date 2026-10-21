@@ -186,6 +186,70 @@ export default function Error({ reset }: { reset: () => void }) {
 
 ---
 
+## Mechanical self-checks
+
+Reading the rules is not enough — run these. Each one targets a mistake that survives a clean build and a passing typecheck.
+
+### Per file, before you mark it done (wrap subagents)
+
+**Unused imports.** A `Trans`, `useLingui` or `msg` import you added but did not use, or an import your edit orphaned (the old copy constant, a helper you inlined). Run the project's own TypeScript against the files you touched — `tsconfig.app.json` on Vite templates, whose root `tsconfig.json` only holds references:
+
+```bash
+TSC=tsconfig.app.json; [ -f "$TSC" ] || TSC=tsconfig.json
+npx --no-install tsc --noEmit -p "$TSC" --noUnusedLocals 2>&1 \
+  | grep -E 'error TS(6133|6192|6196)' | grep -F 'src/components/Pricing.tsx'   # ← the file you just wrapped
+```
+
+It must print nothing. Remove what it lists — only imports and locals your edit added or orphaned; leave pre-existing unused code alone and mention it. Plain-JS projects: run the project's ESLint `no-unused-vars` on the file instead, if it has one.
+
+**Read your diff back** for the three rules no grep can judge: the value each element shows is the one it showed before (see *Changing existing code* in the coding rules), list `key`s are unchanged or `descriptor.id` — never the index — and no text inside a `<Trans>` child tag is wrapped a second time (`` <Trans>Read <a _t="terms" href="/terms">{t`the terms`}</a></Trans> `` must be `<Trans>Read <a _t="terms" href="/terms">the terms</a></Trans>`; attributes on those tags are separate strings and keep their own `t`).
+
+### Over the extracted catalog (verify subagent, after `lingui extract`)
+
+Run against every **source-locale** `.po` — the single catalog's `<source>/messages.po`, or on per-page layouts every `locales/*/<source>.po` (`find <source root> -path '*/locales/*' -name '<source>.po'`). The `Catalogs:` line of `.agents/globalize-rules.md` names the path.
+
+```bash
+node --input-type=module -e '
+import { readFileSync } from "node:fs"
+let fail = 0, review = 0
+const say = (kind, id, f) => console.log(`${kind}: ${JSON.stringify(id)}  (${f})`)
+for (const f of process.argv.slice(1)) {
+  for (const entry of readFileSync(f, "utf8").split(/\n[ \t]*\n/)) {
+    const lines = entry.split("\n")
+    const at = lines.findIndex((l) => l.startsWith("msgid "))
+    if (at < 0) continue
+    let id = JSON.parse(lines[at].slice(6))
+    for (let i = at + 1; lines[i]?.startsWith("\""); i++) id += JSON.parse(lines[i])
+    if (!id) continue // PO header
+    const commented = lines.some((l) => l.startsWith("#. ") && !l.startsWith("#. js-lingui-"))
+    if (/\{\d+[,}]/.test(id)) { fail++; say("FAIL positional placeholder", id, f) }
+    if (/<\/?\d+\/?>/.test(id)) { fail++; say("FAIL unnamed tag inside <Trans>", id, f) }
+    if (/^[\p{L}\p{N}&\x27’-]+[.!?:…]*$/u.test(id) && !commented) { fail++; say("FAIL single word without comment", id, f) }
+    if (/\{\w+\}\s+\p{L}+s\b/u.test(id) && !/, *plural,/.test(id)) { review++; say("REVIEW count next to a plural noun", id, f) }
+  }
+}
+console.log(`${fail} failure(s), ${review} to review`)
+process.exit(fail ? 1 : 0)
+' src/locales/en/messages.po   # ← every source-locale .po (see below)
+```
+
+| Result | Meaning | Fix (in the source file, then re-extract) |
+|---|---|---|
+| `FAIL positional placeholder` | `{0}`, `{1, plural, …}`: an interpolated property access, function call, or arithmetic — or a `t` / `<Trans>` nested inside a `<Trans>`, which leaves the parent with a `{0}` hole | Name it with `ph({ total: … })` or a local variable; unwrap a nested `t`/`<Trans>` so its text joins the parent message; give `<Plural value>` a named variable |
+| `FAIL unnamed tag inside <Trans>` | `<0>terms</0>`: an inline JSX tag with no `_t` name | Add `_t="<name>"` to the tag (`<a _t="terms" href="/terms">`). If `_t` shows up in the rendered DOM, `macro.jsxPlaceholderAttribute` is missing from `lingui.config.ts` |
+| `FAIL single word without comment` | A one-word message with no translator comment | Add `comment` per the coding rules — every single word, however obvious it looks |
+| `REVIEW count next to a plural noun` | `{n} reviews`-shaped text outside an ICU plural | If the variable is a count, convert to `<Plural>` / ICU plural. If it is not (`{name} logs in`), leave it and note it |
+
+Iterate until it prints `0 failure(s)` and exits 0, re-running `lingui extract` after each round of source fixes. Then run the unused-imports check once over **every** file the convert phase touched:
+
+```bash
+TSC=tsconfig.app.json; [ -f "$TSC" ] || TSC=tsconfig.json
+npx --no-install tsc --noEmit -p "$TSC" --noUnusedLocals 2>&1 | grep -E 'error TS(6133|6192|6196)' \
+  | grep -F -f <(git diff --name-only; git ls-files --others --exclude-standard)
+```
+
+---
+
 ## Numbers, currencies, and dates
 
 **Call the project's formatters module.** Phase 2 created it (`generate_format_helpers`) and

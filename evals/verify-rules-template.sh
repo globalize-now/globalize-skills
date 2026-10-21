@@ -545,6 +545,19 @@ run_project_mode() {
       fail "CLAUDE.md has $c '@.agents/globalize-rules.md' imports (expected exactly 1)"
     fi
 
+    # install_coding_rules writes the import as a bare line, and only that. The
+    # substring check above also counts prose that merely names the path — which
+    # is not an import when the `@` is missing or the path sits in a code span —
+    # and a line inside a fenced code block, which is an example, not an import.
+    c=$(awk '/^[ \t]*(```|~~~)/ { fence = !fence; next }
+             !fence && $0 == "@.agents/globalize-rules.md" { n++ }
+             END { print n + 0 }' "$claude")
+    if [ "$c" -eq 1 ]; then
+      pass "CLAUDE.md has the exact '@.agents/globalize-rules.md' line, outside any code fence"
+    else
+      fail "CLAUDE.md has $c exact '@.agents/globalize-rules.md' line(s) outside code fences (expected 1) — the import was not written as the bare line install_coding_rules specifies (prose, a code span or a fenced example around the path is not an import)"
+    fi
+
     # No dangling import left by the pre-.agents/ layout.
     c=$(grep -oF -- '@.claude/globalize-rules.md' "$claude" | wc -l | tr -d ' ')
     if [ "$c" -eq 0 ]; then
@@ -568,6 +581,20 @@ run_project_mode() {
       fail "AGENTS.md does not mention '.agents/globalize-rules.md'"
     else
       fail "AGENTS.md mentions '.agents/globalize-rules.md' $c times (expected exactly 1) — the pointer section is not idempotent"
+    fi
+
+    # The pointer section is written verbatim, as one block — not paraphrased,
+    # not split up, not extended with a catalog path or a summary of the rules.
+    local expected actual
+    expected=$(printf '%s\n' '## Internationalization' '' \
+      'Before adding or editing any user-facing string, read `.agents/globalize-rules.md`' \
+      "and follow it. It is this project's authoritative i18n authoring contract — which" \
+      'API to use, how to handle plurals, where catalogs live, and what not to wrap.')
+    actual=$(grep -xF -A4 -- '## Internationalization' "$agents" || true)
+    if [ "$actual" = "$expected" ]; then
+      pass "AGENTS.md carries the pointer section once, verbatim and in order"
+    else
+      fail "AGENTS.md does not carry the pointer section once, verbatim and in order — install_coding_rules paraphrased, split, duplicated or rewrote it"
     fi
   fi
 

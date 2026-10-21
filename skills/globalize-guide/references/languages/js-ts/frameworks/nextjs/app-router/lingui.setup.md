@@ -592,30 +592,24 @@ The component is a client component (`'use client'`), reads the current locale w
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useLingui } from '@lingui/react/macro'
 import { locales, localeDisplayName } from '../../i18n/locales'
 import { switchLocalePath } from '../../i18n/navigation'
 import { useLocale } from '../../i18n/navigation.hooks'
 
 export function LanguageSwitcher() {
+  const { t } = useLingui()
   const pathname = usePathname()
   const currentLocale = useLocale()
 
   return (
-    <nav style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+    <nav aria-label={t({ message: `Language`, comment: 'Accessible name of the language switcher' })}>
       {locales.map((loc) => (
         <Link
           key={loc}
           href={switchLocalePath(pathname, loc)}
           hrefLang={loc}
           aria-current={loc === currentLocale ? 'true' : undefined}
-          style={{
-            padding: '0.25rem 0.5rem',
-            borderRadius: '0.25rem',
-            textDecoration: 'none',
-            color: 'inherit',
-            fontWeight: loc === currentLocale ? 600 : 400,
-            backgroundColor: loc === currentLocale ? 'rgba(0, 0, 0, 0.06)' : 'transparent',
-          }}
         >
           {localeDisplayName(loc)}
         </Link>
@@ -637,19 +631,19 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 
 // ...inside the return:
 <body>
-  <LanguageSwitcher />
   <LinguiClientProvider
     initialLocale={locale}
     initialMessages={i18n.messages}
   >
+    <LanguageSwitcher />
     {children}
   </LinguiClientProvider>
 </body>
 ```
 
-The `LanguageSwitcher` sits outside the `LinguiClientProvider` because it doesn't use any Lingui macros — it only handles navigation. If the project has a shared header or navigation component, place the switcher there instead.
+The `LanguageSwitcher` sits **inside** the `LinguiClientProvider`: its `aria-label` comes from `useLingui()`, which reads the provider's context. If the project has a shared header or navigation component, place the switcher there instead — as long as that component also renders inside the provider.
 
-**Styling**: The examples use inline styles as a baseline. Adapt the styling to match the project's CSS approach (Tailwind, CSS Modules, etc.) and the visual style of the surrounding navigation.
+**Styling — the project's, never the snippet's.** The snippets above carry no styling on purpose; do not add inline `style={{…}}` objects or hard-coded colours, which ignore the project's theme and dark mode. Before writing the component, open the header or navigation it will sit in and match it: if the project has its own select / dropdown component (`components/ui/select.tsx`, a design-system `Select`, a `DropdownMenu`), render the switcher with that; otherwise give the native element the same `className` conventions (Tailwind utilities, a CSS Module, styled-components) its neighbouring controls use. Whatever control you end up with, it keeps the translated `aria-label` (or the component's equivalent accessible-name prop) — a `<nav>` or `<select>` without one is announced as an unnamed landmark or combo box.
 
 ### Using translations in components
 
@@ -730,6 +724,14 @@ git check-ignore    <its .po sibling>          # exits 1, prints nothing → sti
 ```
 
 **Sweep for strays before you finish.** Bootstrap stubs seeded at a path the final config does not emit to — e.g. a single-catalog `locale/{locale}/messages.ts` left behind after the config settled on per-page catalogs — are compiled artifacts too, and the pattern above will not match them. After the first successful `lingui compile`, list every compiled catalog on disk and delete any that the resolved `lingui.config.*` no longer produces. Do **not** widen the ignore rule to cover a path nothing imports.
+
+**The sweep covers `.po` files too.** A path abandoned mid-setup leaves a `.po` behind, and that one is worse than a stray stub: it is *not* ignored, so it gets committed, and Globalize's catalog patterns can pick it up as a second source catalog. List them:
+
+```bash
+find . -name '*.po' -not -path './node_modules/*' -not -path './.git/*' | sort
+```
+
+Every line must be a path the final config produces — `catalogs[].path` with `{locale}` filled in for a configured locale, or (per-page) `experimental.extractor.output` filled in for a route file that exists. For each one that is not: if it is in `filesCreated` — record every `.po` and compiled catalog that `lingui extract` / `lingui compile` writes there as it appears — delete it together with any compiled sibling. Anything else is the user's data, untracked or not (`git status` cannot tell a file this run wrote from one the user never committed): do not delete it; list it in the setup summary and ask.
 
 **Already-tracked artifacts.** `.gitignore` does not untrack files. If `git ls-files` shows compiled catalogs already committed (an existing project, or a re-run), tell the user and, with their consent, run:
 

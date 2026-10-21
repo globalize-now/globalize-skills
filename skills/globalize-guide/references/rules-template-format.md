@@ -150,6 +150,8 @@ A core step, not an add-on, and not gated on any `SKILL.md §1.10` selection —
 
 Both edits follow the skill's usual guided/unguided rule: guided mode describes the change and waits for confirmation, unguided mode applies it directly.
 
+**Exact bytes, nothing else.** Neither bridge gets any other content — no summary of the rules, no catalog path, no locale list, no commands. Those facts live in the rendered file, resolved from the config on disk; a copy in a bridge is unchecked and drifts (or is wrong from the start). In `CLAUDE.md` the import is the bare line `@.agents/globalize-rules.md`, on its own; a mention of the path without the `@`, or inside a code span, loads nothing. Every library's `install_coding_rules` section ends with the same three-command check — the exact import line is present once, `CLAUDE.md` references the rules file nowhere else, and every line the step added to either file is one of the lines above — and the step is not complete until it passes.
+
 **If `generate_coding_rules` failed and there is no `.agents/globalize-rules.md` on disk, write neither bridge and create neither file.** A pointer or import aimed at a missing file opens every future session with a dangling reference. Because the step-10 deletion is gated on a successful write, a failed run also leaves any existing `.claude/globalize-rules.md` and its import untouched — the project keeps the working rules it already had.
 
 ### Fail closed

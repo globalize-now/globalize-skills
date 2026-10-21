@@ -95,34 +95,37 @@ export const plans: Plan[] = [
 
 ---
 
-## Route titles (TanStack Router)
+## Document title and meta description (client-rendered pages)
 
-TanStack Router's `loader` runs in a component context when using `@tanstack/react-router`, so you can use `getI18n()` or pass the i18n instance through context. The simplest approach is to use `msg` for route meta and resolve in the component.
+On a client-rendered page (every Vite variant, any router or none), set both from **one effect keyed on the locale**, with `t` from `useLingui()`. Copy this shape exactly:
 
 ```tsx
-import { msg } from '@lingui/core/macro'
+import { useEffect } from 'react'
 import { useLingui } from '@lingui/react/macro'
-import { createFileRoute } from '@tanstack/react-router'
 
-// Define message descriptor
-const pageTitle = msg`User Management`
+function PricingPage() {
+  const { t, i18n } = useLingui()
 
-export const Route = createFileRoute('/users')({
-  component: UsersPage,
-})
+  useEffect(() => {
+    document.title = t({ message: `Pricing`, comment: 'Browser tab title of the pricing page' })
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute('content', t`Compare plans and pick the one that fits your team.`)
+  }, [t, i18n.locale])
 
-function UsersPage() {
-  const { t } = useLingui()
-  return (
-    <>
-      <title>{t(pageTitle)}</title>
-      <h1><Trans>User Management</Trans></h1>
-    </>
-  )
+  // ...
 }
 ```
 
-**On every router, `<title>` and the meta description are copy.** Resolve both from messages. Where the app sets them imperatively instead of rendering `<title>` / `<meta name="description">`, set `document.title = t(pageTitle)` (and the meta tag's `content`) in an effect keyed on `i18n.locale`, so a locale switch updates them.
+**On every router, `<title>` and the meta description are copy.** Resolve both from messages. Where the app renders `<title>` / `<meta name="description">` elements, give them `t` values like any other copy; where it sets them imperatively, use the effect above, so a locale switch updates them.
+
+- **`t` from `useLingui()`**, never the standalone `t` from `@lingui/core/macro` and never a module-scope constant — those resolve once, before the user's locale is active, and never again.
+- **Deps `[t, i18n.locale]`.** The effect must re-run when the user switches language, or the tab keeps the old title. `t`'s identity changes with the active locale and catalog, so it is a safe dependency; `i18n.locale` states the intent.
+- **Never `` _(t`…`) ``, `` i18n._(t`…`) `` or `` t(t`…`) ``.** `t` already returns the translated string. Feeding it back in looks that *translated text* up as a message ID — at best a pointless no-op, and it reads as if something else were being translated.
+- **`index.html` keeps its static `<title>` and `<meta name="description">`** in the source locale as the pre-JavaScript fallback. If it has no description meta, add one there — the effect updates an existing element and does nothing when there is none.
+- Put the effect in the page component (or a small `usePageMeta(title, description)` hook taking `MessageDescriptor`s and resolving them with `t(descriptor)` inside the same effect). One title per page — not in shared layout components that every page renders.
+
+**Server-rendered frameworks** (TanStack Start, React Router framework mode, Remix) set the title through the framework's own head/meta API — the route `head()` option on TanStack Start, the `meta` export on React Router framework mode and Remix — so it is in the server HTML, rather than this client effect. The `` _(t`…`) `` ban applies there too.
 
 ---
 
@@ -207,6 +210,72 @@ presentToast({ message: t`Item removed`, duration: 1500 })
 ```
 
 Never set `backButtonText` in `setupIonicReact({...})` — it is one untranslated string.
+
+---
+
+## Mechanical self-checks
+
+Reading the rules is not enough — run these. Each one targets a mistake that survives a clean build and a passing typecheck.
+
+### Per file, before you mark it done (wrap subagents)
+
+**Unused imports.** A `Trans`, `useLingui` or `msg` import you added but did not use, or an import your edit orphaned (the old copy constant, a helper you inlined). Run the project's own TypeScript against the files you touched — `tsconfig.app.json` on Vite templates, whose root `tsconfig.json` only holds references:
+
+```bash
+TSC=tsconfig.app.json; [ -f "$TSC" ] || TSC=tsconfig.json
+npx --no-install tsc --noEmit -p "$TSC" --noUnusedLocals 2>&1 \
+  | grep -E 'error TS(6133|6192|6196)' | grep -F 'src/components/Pricing.tsx'   # ← the file you just wrapped
+```
+
+It must print nothing. Remove what it lists — only imports and locals your edit added or orphaned; leave pre-existing unused code alone and mention it. Plain-JS projects: run the project's ESLint `no-unused-vars` on the file instead, if it has one.
+
+**Read your diff back** for the three rules no grep can judge: the value each element shows is the one it showed before (see *Changing existing code* in the coding rules), list `key`s are unchanged or `descriptor.id` — never the index — and no text inside a `<Trans>` child tag is wrapped a second time (`` <Trans>Read <a _t="terms" href="/terms">{t`the terms`}</a></Trans> `` must be `<Trans>Read <a _t="terms" href="/terms">the terms</a></Trans>`; text attributes on those tags — `title`, `aria-label`, `alt` — are separate strings and keep their own `t`).
+
+### Over the extracted catalog (verify subagent, after `lingui extract`)
+
+Run against every **source-locale** `.po` — the single catalog's `<source>/messages.po`, or on per-page layouts every `locales/*/<source>.po` (`find <source root> -path '*/locales/*' -name '<source>.po'`). The `Catalogs:` line of `.agents/globalize-rules.md` names the path.
+
+```bash
+node --input-type=module -e '
+import { readFileSync } from "node:fs"
+let fail = 0, review = 0
+const say = (kind, id, f) => console.log(`${kind}: ${JSON.stringify(id)}  (${f})`)
+for (const f of process.argv.slice(1)) {
+  for (const entry of readFileSync(f, "utf8").split(/\n[ \t]*\n/)) {
+    const lines = entry.split("\n")
+    const at = lines.findIndex((l) => l.startsWith("msgid "))
+    if (at < 0) continue
+    let id = JSON.parse(lines[at].slice(6))
+    for (let i = at + 1; lines[i]?.startsWith("\""); i++) id += JSON.parse(lines[i])
+    if (!id) continue // PO header
+    const commented = lines.some((l) => l.startsWith("#. ") && !l.startsWith("#. js-lingui-"))
+    if (/\{\d+[,}]/.test(id)) { fail++; say("FAIL positional placeholder", id, f) }
+    if (/<\/?\d+\/?>/.test(id)) { fail++; say("FAIL unnamed tag inside <Trans>", id, f) }
+    if (/^[\p{L}\p{N}&\x27’-]+[.!?:…]*$/u.test(id) && !commented) { fail++; say("FAIL single word without comment", id, f) }
+    if (/\{\w+\}\s+\p{L}+s\b/u.test(id) && !/, *plural,/.test(id)) { review++; say("REVIEW count next to a plural noun", id, f) }
+  }
+}
+console.log(`${fail} failure(s), ${review} to review`)
+process.exit(fail ? 1 : 0)
+' src/locales/en/messages.po   # ← every source-locale .po (see below)
+```
+
+| Result | Meaning | Fix (in the source file, then re-extract) |
+|---|---|---|
+| `FAIL positional placeholder` | `{0}`, `{1, plural, …}`: an interpolated property access, function call, or arithmetic — or a `t` / `<Trans>` nested inside a `<Trans>`, which leaves the parent with a `{0}` hole | Name it with `ph({ total: … })` or a local variable; unwrap a nested `t`/`<Trans>` so its text joins the parent message; give `<Plural value>` a named variable |
+| `FAIL unnamed tag inside <Trans>` | `<0>terms</0>`: an inline JSX tag with no `_t` name | Add `_t="<name>"` to the tag (`<a _t="terms" href="/terms">`). If `_t` shows up in the rendered DOM, `macro.jsxPlaceholderAttribute` is missing from `lingui.config.ts` |
+| `FAIL single word without comment` | A one-word message with no translator comment | Add `comment` per the coding rules — every single word, however obvious it looks |
+| `REVIEW count next to a plural noun` | `{n} reviews`-shaped text outside an ICU plural | If the variable is a count, convert to `<Plural>` / ICU plural. If it is not (`{name} logs in`), leave it and note it |
+
+Iterate until it prints `0 failure(s)` and exits 0, re-running `lingui extract` after each round of source fixes. Then run the unused-imports check once over **every** file the convert phase touched:
+
+```bash
+TSC=tsconfig.app.json; [ -f "$TSC" ] || TSC=tsconfig.json
+npx --no-install tsc --noEmit -p "$TSC" --noUnusedLocals 2>&1 | grep -E 'error TS(6133|6192|6196)' \
+  | grep -F -f <(git diff --name-only; git ls-files --others --exclude-standard)
+```
+
+---
 
 ## Numbers, currencies, and dates
 

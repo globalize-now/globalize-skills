@@ -514,6 +514,14 @@ git check-ignore    <its .po sibling>          # exits 1, prints nothing → sti
 
 **Sweep for strays before you finish.** Bootstrap stubs seeded at a path the final config does not emit to — e.g. a single-catalog `locale/{locale}/messages.ts` left behind after the config settled on per-page catalogs — are compiled artifacts too, and the pattern above will not match them. After the first successful `lingui compile`, list every compiled catalog on disk and delete any that the resolved `lingui.config.*` no longer produces. Do **not** widen the ignore rule to cover a path nothing imports.
 
+**The sweep covers `.po` files too.** A path abandoned mid-setup leaves a `.po` behind, and that one is worse than a stray stub: it is *not* ignored, so it gets committed, and Globalize's catalog patterns can pick it up as a second source catalog. List them:
+
+```bash
+find . -name '*.po' -not -path './node_modules/*' -not -path './.git/*' | sort
+```
+
+Every line must be a path the final config produces — `catalogs[].path` with `{locale}` filled in for a configured locale, or (per-page) `experimental.extractor.output` filled in for a route file that exists. For each one that is not: if it is in `filesCreated` — record every `.po` and compiled catalog that `lingui extract` / `lingui compile` writes there as it appears — delete it together with any compiled sibling. Anything else is the user's data, untracked or not (`git status` cannot tell a file this run wrote from one the user never committed): do not delete it; list it in the setup summary and ask.
+
 **Already-tracked artifacts.** `.gitignore` does not untrack files. If `git ls-files` shows compiled catalogs already committed (an existing project, or a re-run), tell the user and, with their consent, run:
 
 ```bash
@@ -613,18 +621,20 @@ For URL-based strategies, the switcher navigates to the same page under the new 
 
 ```tsx
 // src/components/LanguageSwitcher.tsx
+import { useLingui } from '@lingui/react/macro'
 import { useLocation } from '@tanstack/react-router'
 import { locales, localeDisplayName, type Locale } from '../i18n/locales'
 import { useLocale, switchLocalePath } from '../i18n/navigation'
 import { setLocale } from '../server/locale'
 
 export function LanguageSwitcher() {
+  const { t } = useLingui()
   const currentLocale = useLocale()
   const location = useLocation()
   const hrefFor = (loc: Locale) => switchLocalePath(location.pathname, loc)
 
   return (
-    <nav style={{ display: 'flex', gap: '0.5rem' }}>
+    <nav aria-label={t({ message: `Language`, comment: 'Accessible name of the language switcher' })}>
       {locales.map((loc) => (
         <a
           key={loc}
@@ -635,12 +645,6 @@ export function LanguageSwitcher() {
             e.preventDefault()
             await setLocale({ data: loc })
             window.location.href = hrefFor(loc)
-          }}
-          style={{
-            padding: '0.25rem 0.5rem',
-            textDecoration: 'none',
-            color: 'inherit',
-            fontWeight: loc === currentLocale ? 600 : 400,
           }}
         >
           {localeDisplayName(loc)}
@@ -661,11 +665,13 @@ No URL change. The switcher updates the cookie and reloads; the server re-render
 
 ```tsx
 // src/components/LanguageSwitcher.tsx
+import { useLingui } from '@lingui/react/macro'
 import { locales, localeDisplayName } from '../i18n/locales'
 import { Route as RootRoute } from '../routes/__root'
 import { setLocale } from '../server/locale'
 
 export function LanguageSwitcher() {
+  const { t } = useLingui()
   const { locale: currentLocale } = RootRoute.useRouteContext()
 
   async function switchTo(loc: string) {
@@ -677,7 +683,7 @@ export function LanguageSwitcher() {
     <select
       value={currentLocale}
       onChange={(e) => switchTo(e.target.value)}
-      style={{ padding: '0.375rem 0.5rem' }}
+      aria-label={t({ message: `Language`, comment: 'Accessible name of the language switcher' })}
     >
       {locales.map((loc) => (
         <option key={loc} value={loc}>
@@ -712,7 +718,7 @@ function RootComponent() {
 
 If the project has a shared header or navigation component, place the switcher there instead.
 
-**Styling**: The examples use inline styles as a baseline. Adapt to match the project's CSS approach (Tailwind, CSS Modules, etc.) and the visual style of the surrounding navigation.
+**Styling — the project's, never the snippet's.** The snippets above carry no styling on purpose; do not add inline `style={{…}}` objects or hard-coded colours, which ignore the project's theme and dark mode. Before writing the component, open the header or navigation it will sit in and match it: if the project has its own select / dropdown component (`components/ui/select.tsx`, a design-system `Select`, a `DropdownMenu`), render the switcher with that; otherwise give the native element the same `className` conventions (Tailwind utilities, a CSS Module, styled-components) its neighbouring controls use. Whatever control you end up with, it keeps the translated `aria-label` (or the component's equivalent accessible-name prop). A `<nav>` or `<select>` without an accessible name is announced as an unnamed landmark or combo box.
 
 ---
 

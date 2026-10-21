@@ -133,7 +133,38 @@ and follow it. It is this project's authoritative i18n authoring contract — wh
 API to use, how to handle plurals, where catalogs live, and what not to wrap.
 ```
 
-Idempotent on the literal `.agents/globalize-rules.md` appearing anywhere in `AGENTS.md`: present → skip silently.
+Idempotent on the section itself: already in `AGENTS.md` verbatim → skip silently. A mention of `.agents/globalize-rules.md` elsewhere in the file is not the section — append it anyway.
+
+### Check both bridges — exact bytes, nothing else
+
+Both bridges are pointers, not documentation. **Write nothing into `CLAUDE.md` or `AGENTS.md` beyond the lines shown above** — no summary of the rules, no catalog path, no locale list, no commands, no "i18n notes" prose. Every one of those facts already lives in `.agents/globalize-rules.md`, rendered from the config on disk; a second copy in a bridge is unchecked, goes stale on the first config change, and is often wrong from the start. In `CLAUDE.md` the import is the bare line `@.agents/globalize-rules.md`, on its own — the one form this step writes and checks. A mention of the path without the `@`, or inside a code span, is not an import and loads nothing.
+
+Then prove it. Run from the repo root:
+
+```bash
+grep -cxF '@.agents/globalize-rules.md' CLAUDE.md   # → 1: the exact import line, alone on its line
+grep -c 'globalize-rules\.md' CLAUDE.md             # → 1: no second or stale reference
+for f in CLAUDE.md AGENTS.md; do                    # every line this step added must be one of ours
+  if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then git diff HEAD -U0 -- "$f"
+  else git diff --no-index -U0 /dev/null "$f"; fi
+done | grep '^+[^+]' | grep -vxF \
+  -e '+# Project Instructions' -e '+@.agents/globalize-rules.md' \
+  -e '+# AGENTS.md' -e '+## Internationalization' \
+  -e '+Before adding or editing any user-facing string, read `.agents/globalize-rules.md`' \
+  -e "+and follow it. It is this project's authoritative i18n authoring contract — which" \
+  -e '+API to use, how to handle plurals, where catalogs live, and what not to wrap.'
+# → no output
+diff <(grep -xF -A4 '## Internationalization' AGENTS.md) - <<'EOF'
+## Internationalization
+
+Before adding or editing any user-facing string, read `.agents/globalize-rules.md`
+and follow it. It is this project's authoritative i18n authoring contract — which
+API to use, how to handle plurals, where catalogs live, and what not to wrap.
+EOF
+# → no output: the pointer section is in AGENTS.md once, verbatim, in order
+```
+
+Any other output is content this step must not have written: remove it (lines the user had already changed before this run are theirs — leave those). Output from the final `diff` means the section is missing, reworded or duplicated: rewrite it to the block above. Do not mark `install_coding_rules` complete until all four checks hold.
 
 Verify: in a fresh session, ask Claude "how should I switch locale per request in this project?" — the answer should reference `around_action` with `I18n.with_locale`, and warn against bare `I18n.locale =` assignment.
 

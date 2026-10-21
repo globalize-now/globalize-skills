@@ -768,7 +768,7 @@ This component is owned by *this* file, not by `setup.navigation.md` — see the
 
 ```tsx
 // src/components/LanguageSwitcher.tsx
-import { useLingui } from '@lingui/react'
+import { useLingui } from '@lingui/react/macro'
 import {
   activateLocale,
   locales,
@@ -778,7 +778,7 @@ import {
 } from '../i18n'
 
 export function LanguageSwitcher() {
-  const { i18n } = useLingui()
+  const { i18n, t } = useLingui()
 
   async function switchLocale(next: string) {
     // Activate locally first so the switcher feels instant rather than waiting on
@@ -792,16 +792,7 @@ export function LanguageSwitcher() {
     <select
       value={i18n.locale}
       onChange={(event) => void switchLocale(event.target.value)}
-      aria-label="Language"
-      style={{
-        padding: '0.375rem 0.5rem',
-        borderRadius: '0.375rem',
-        border: '1px solid #d1d5db',
-        backgroundColor: 'transparent',
-        fontSize: 'inherit',
-        fontFamily: 'inherit',
-        cursor: 'pointer',
-      }}
+      aria-label={t({ message: `Language`, comment: 'Accessible name of the language switcher' })}
     >
       {locales.map((loc) => (
         // `lang` is the HTML attribute and keeps its own name; the value it
@@ -816,7 +807,7 @@ export function LanguageSwitcher() {
 }
 ```
 
-Three things are deliberate. **`localeDisplayName` comes from `src/i18n/locales.ts`** (via the `export *` in `src/i18n/index.ts`) and is never redefined here — it returns each language's autonym ("Deutsch", not "German"), which is what a picker must show, and caches its `Intl.DisplayNames` instances. **`useLingui()` is the runtime hook from `@lingui/react`**, not the macro; it subscribes the component to locale changes so `value={i18n.locale}` stays correct when another context switches. And there is **no `document.documentElement` write** — that belongs to `applyDocumentLocale`, wired once per page entrypoint in Step 9. A switcher that also wrote it would be a second source of truth, and would be wrong the moment it is reused inside a content script's shadow UI.
+Three things are deliberate. **`localeDisplayName` comes from `src/i18n/locales.ts`** (via the `export *` in `src/i18n/index.ts`) and is never redefined here — it returns each language's autonym ("Deutsch", not "German"), which is what a picker must show, and caches its `Intl.DisplayNames` instances. **`useLingui()` subscribes the component to locale changes** (the macro form wraps the runtime hook from `@lingui/react`), so `value={i18n.locale}` stays correct when another context switches, and its `t` gives the `aria-label` a translated value — a hard-coded `"Language"` would be read out in English in every locale. And there is **no `document.documentElement` write** — that belongs to `applyDocumentLocale`, wired once per page entrypoint in Step 9. A switcher that also wrote it would be a second source of truth, and would be wrong the moment it is reused inside a content script's shadow UI.
 
 **Where to mount it.** The options page is the natural home; the popup too if that is the extension's main surface. Import it into that entrypoint's root component, inside `<I18nProvider>`:
 
@@ -830,7 +821,7 @@ import { LanguageSwitcher } from '@/src/components/LanguageSwitcher'
 </section>
 ```
 
-**Styling**: the inline styles are a baseline. Adapt to the project's CSS approach (Tailwind, CSS Modules) and the surrounding UI. Extension popups are small — a `<select>` is the right control; a row of links is not, because there is nowhere to navigate to.
+**Styling — the project's, never the snippet's.** The snippet carries no styling on purpose; do not add inline `style={{…}}` objects or hard-coded colours. Match the options page or popup it sits in: reuse the project's own select component if it has one, otherwise the `className` conventions (Tailwind utilities, a CSS Module) of the neighbouring controls. Keep the translated `aria-label` whatever control you end up with. Extension popups are small — a `<select>` is the right control; a row of links is not, because there is nowhere to navigate to.
 
 ---
 
