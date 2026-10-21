@@ -1495,13 +1495,13 @@ Lovable can talk to Globalize through a hosted MCP server, so you can create the
 2. **Otherwise, walk the user through the one-time connector setup:**
 
    > Connect Globalize once so I can set it up from here:
-   > 1. Open **Connectors → Chat connectors → New MCP server**.
-   > 2. **Name:** Globalize
+   > 1. Open **Connectors**, click **+** (top right), and choose **MCP server**.
+   > 2. **Server name:** Globalize
    > 3. **Server URL:** `https://api.globalize.now/mcp`
-   > 4. **Authentication:** choose **Bearer token / API key** and paste your key from **https://app.globalize.now/settings/api-keys**.
-   > 5. Click **Add server**, then tell me to continue.
+   > 4. **Authentication:** keep **OAuth** (the default).
+   > 5. Click **Add & authorize**, sign in to Globalize and approve the access, then tell me to continue.
 
-   Wait for the user to confirm the connector is added, then continue.
+   Wait for the user to confirm the connector is added, then continue. OAuth is the only path — never ask the user to paste a token or key into Lovable. If **MCP server** is greyed out, a workspace admin has disabled custom MCP servers; the user needs the admin to re-enable it, or use the fallback path below.
 3. **Create the project and connect the repo using the Globalize MCP tools.** They mirror the `@globalize-now/cli-client` command groups — use whatever tool names your connector exposes; don't assume exact signatures. Report each step in the chat as you go:
    - **List languages** and match the source/target locale IDs (mirrors `languages list`).
    - **Create the project** with the suggested name and those language IDs (mirrors `projects create`).
@@ -1571,5 +1571,5 @@ npx @globalize-now/cli-client repositories create \
 | CI workflow never runs | GitHub not connected in Lovable; the workflow file didn't sync (GitHub App lacks the `workflows` permission); or the default branch isn't `main` | Connect GitHub; add the YAML via the GitHub web UI; fix `branches:` in the workflow (Phase 5) |
 | CI run fails at the install step (`npm ci`) | Lockfile missing or out of sync — e.g. the repo ships `bun.lockb` or `pnpm-lock.yaml` instead of `package-lock.json`, or the lockfile lags the added dependencies | Switch the step to `npm install --no-audit --no-fund`, or use the setup action + install command matching the repo's lockfile (Phase 5) |
 | CI commits catalog updates but Lovable doesn't show them | Lovable's sync follows the default branch only | Confirm the workflow pushed to the default branch (check the Actions log and the branch of the `chore(i18n)` commit) |
-| Globalize tools not available after adding the connector (Phase 6) | Wrong URL, missing/invalid API key, or the connector was added but this chat turn predates it | Verify the URL is exactly `https://api.globalize.now/mcp`, re-check the key at `app.globalize.now/settings/api-keys`, then reference the Globalize connector again |
+| Globalize tools not available after adding the connector (Phase 6) | Wrong URL, the OAuth authorization wasn't completed, or the connector was added but this chat turn predates it | Verify the URL is exactly `https://api.globalize.now/mcp`, re-run **Add & authorize** (OAuth) and finish the Globalize sign-in, then reference the Globalize connector again |
 | Globalize's GitHub App install looks redundant with Lovable's GitHub | Globalize installs its **own** GitHub App, separate from Lovable's GitHub connection | Have the user approve the Globalize GitHub App in the browser when the connect step (MCP `github install`, or the dashboard) triggers it — Lovable's own GitHub link doesn't cover it |
