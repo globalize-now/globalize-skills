@@ -41,13 +41,16 @@ With `KEEP_WORKDIR=1` the temp dir survives, so you can re-run a verifier agains
 
 ## Static verifiers (no model, no network)
 
-Three scripts run standalone against a checkout and need neither `claude` nor a fixture:
+Four scripts run standalone against a checkout and need neither `claude` nor a fixture:
 
 ```bash
-./evals/verify-manifest.sh        # manifest.json: schema, path resolution, cross-file invariants
-./evals/verify-rules-template.sh  # rules templates: frontmatter, marker grammar, budgets
-./evals/verify-skill-size.sh      # SKILL.md ≤ 40 KB; globalize-guide's map in its first 5 KB; orchestrator refs resolve (runs in CI)
+./evals/verify-manifest.sh          # manifest.json: schema, path resolution, cross-file invariants
+./evals/verify-rules-template.sh    # rules templates: frontmatter, marker grammar, budgets
+./evals/verify-skill-size.sh        # SKILL.md ≤ 40 KB; globalize-guide's map in its first 5 KB; orchestrator refs resolve (runs in CI)
+./evals/verify-globalize-connect.sh # Globalize hand-off: disk fallback, first translation, only-project reuse (runs in CI)
 ```
+
+`verify-globalize-connect.sh` is a tripwire for the prose that gets an agent from "repo connected" to a started translation. It fails when `globalize-guide` answers a sibling skill the Skill tool can't load with a reinstall prompt instead of reading its `SKILL.md` from `.claude/skills/` or `.agents/skills/` (a skill installed mid-session is on disk but not registered); when Phase 4 stops pushing the setup or starting the first translation; when `globalize-now-project-setup`'s Step 5 passes a flag the CLI's `repositories translate` (`api-client/src/commands/repositories.ts`) doesn't define, or drops `--delivery-mode pr`; when `lovable-i18n`'s Phase 6 stops calling the hosted `translate_repository` as a pull request; or when orchestrated project setup stops reusing the organisation's only project (and its already-connected repository).
 
 `verify-skill-size.sh` exists because harnesses truncate the Skill tool's output: a headless opencode run cut globalize-guide's old 159 KB SKILL.md at ~50 KB, and the agent improvised the whole Lingui setup from memory. It fails when any SKILL.md exceeds 40 KB (exemptions are listed in the script with a reason — currently only the platform-bundled `lovable-i18n`), when the phase map, reference-loading rules or single-agent fallback leave the first 5 KB of globalize-guide's SKILL.md, or when a `references/` path named by SKILL.md or `references/orchestrator/` is missing or an orchestrator file is unreachable. `.github/workflows/skill-checks.yml` runs it on every PR that touches `skills/`.
 

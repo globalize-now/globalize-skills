@@ -17,9 +17,9 @@ skills/
 
 Skills currently in this repo:
 
-- `skills/globalize-guide/` — orchestrator for the full i18n journey (detect → setup → convert → connect Globalize: account sign-in upfront, project + repo at the end)
+- `skills/globalize-guide/` — orchestrator for the full i18n journey (detect → setup → convert → connect Globalize: account sign-in upfront, project + repo + first translation at the end)
 - `skills/globalize-now-account-setup/` — install + authenticate the Globalize CLI (account sign-in)
-- `skills/globalize-now-project-setup/` — create a Globalize project, connect a GitHub/GitLab repo, set catalog patterns (assumes account-setup is done)
+- `skills/globalize-now-project-setup/` — create (or, orchestrated, reuse the only) Globalize project, connect a GitHub/GitLab repo, set catalog patterns, start the first translation when orchestrated (assumes account-setup is done)
 - `skills/globalize-now-cli-use/` — manage existing Globalize translation resources
 - `skills/css-i18n/` — audit and convert CSS to logical properties for RTL support
 - `skills/lovable-i18n/` — single-file i18n skill for the Lovable.dev agent (Lingui + PO, both Lovable stacks, AGENTS.md coding rules, CI extraction, Globalize connect) — experimental

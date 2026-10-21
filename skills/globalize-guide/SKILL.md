@@ -32,9 +32,9 @@ This file is the map. The detailed instructions for every step live in `referenc
 | 1.5 — Globalize account | Sign in, via the `globalize-now-account-setup` skill | — |
 | 2 — Setup | Install + configure the library | `references/orchestrator/setup-subagent.md` + every `references.setup` and `references.rulesTemplate` path |
 | 3 — Convert | Wrap strings, convert formatting, extract + compile | `references/orchestrator/wrap-subagent.md`, `verify-subagent.md`, `cleanup-loop.md` + every `references.convert` path |
-| 4 — Globalize project | Create project + connect repo, via `globalize-now-project-setup` | `references/orchestrator/globalize-inputs.md` |
+| 4 — Globalize project | Push the setup, create or reuse the project, connect the repo, start the first translation — via `globalize-now-project-setup` | `references/orchestrator/globalize-inputs.md` |
 
-Stages 1.5 and 4 run only when Globalize stays in scope (default-on; §1.6). Account sign-in needs no project data, so it runs **upfront**; project + repo setup needs the converted catalog paths, so it runs at the **end**.
+Stages 1.5 and 4 run only when Globalize stays in scope (default-on; §1.6). Account sign-in needs no project data, so it runs **upfront**; project + repo setup needs the converted catalog paths, so it runs at the **end** — and ends by starting the first translation.
 
 ### How to load references
 
@@ -55,6 +55,8 @@ Stages 1.5 and 4 run only when Globalize stays in scope (default-on; §1.6). Acc
 - Headless: Phase 1 answers come from the user's prompt. A question it leaves open takes the default this file or the reference names (pre-checked, "recommended", "unguided default"); with no named default — e.g. the Lingui + Vite version gate — stop and report.
 
 The Globalize stages (1.5, 4) are never subagents in either mode: they delegate to the `globalize-now-account-setup` / `globalize-now-project-setup` skills via the Skill tool, and the orchestrator never inlines Globalize CLI commands.
+
+**When the Skill tool can't load a sibling skill, read it from disk — never ask the user to reinstall.** A skill installed during this session is on disk but not yet registered with the Skill tool. Read the first of these that exists, in full: `.claude/skills/<name>/SKILL.md`, `.agents/skills/<name>/SKILL.md` (both in the project root), or `<name>/SKILL.md` beside this skill's own directory. Then follow it on the main thread exactly as if the Skill tool had loaded it — same inputs, same steps. Only when none of those files exists, say which skill is missing and give the install command: `npx skills add globalize-now/globalize-skills --skill '*' -a claude-code -a universal -y`.
 
 ### Rules that hold in every phase
 
@@ -85,7 +87,7 @@ Created in the **target project root**. Every artifact the orchestrator and work
 
 **First run.** If `.globalize/` is absent, create it and append `/.globalize/` to the project's `.gitignore` (create the file if missing; if it already has rules, show the diff first). Tell the user: "Created `.globalize/` in your project root and added it to `.gitignore`. It holds local progress files, decisions, and plans so we can resume mid-run and you can audit what was decided. It stays out of git." The project's **own** generated i18n artifacts (compiled catalogs) are ignored later by Phase 2's `gitignore_artifacts` step, never here.
 
-**Resume.** If `.globalize/` exists, read `plan.md` and `progress/*.json`. If a plan is in flight: "Found an in-progress i18n setup at `.globalize/`. Last completed step: `<step>`. Want me to resume from there, or start over with a fresh plan?" Globalize auth lives in `~/.globalize/config.json` / `GLOBALIZE_API_KEY`, never in `.globalize/` — on resume, just re-delegate; both Globalize skills are idempotent (the account skill self-skips when `auth status` is valid; the project skill lists before it creates). That is why Phase 4 has no progress file.
+**Resume.** If `.globalize/` exists, read `plan.md` and `progress/*.json`. If a plan is in flight: "Found an in-progress i18n setup at `.globalize/`. Last completed step: `<step>`. Want me to resume from there, or start over with a fresh plan?" Globalize auth lives in `~/.globalize/config.json` / `GLOBALIZE_API_KEY`, never in `.globalize/` — on resume, just re-delegate; both Globalize skills are idempotent (the account skill self-skips when `auth status` is valid; in orchestrated mode the project skill reuses the organisation's project when it is the only one, and a repository already connected to it). That is why Phase 4 has no progress file.
 
 ---
 
@@ -93,7 +95,7 @@ Created in the **target project root**. Every artifact the orchestrator and work
 
 Phase 1 ends with a fully populated `.globalize/` and the user's "go" before any work happens. **Every decision lives in Phase 1**; later phases execute.
 
-> **Kickoff message:** "Hey — I'll walk you through internationalizing this project: inspect the stack, sign in to Globalize, set up the library, wrap your hardcoded strings, and finally create your Globalize project + connect the repo. First a read-only scan — framework, router, existing i18n setup, files with translatable text. No changes yet. Then a few questions to shape the plan (including whether to connect Globalize — on by default, you can opt out)."
+> **Kickoff message:** "Hey — I'll walk you through internationalizing this project: inspect the stack, sign in to Globalize, set up the library, wrap your hardcoded strings, and finally create your Globalize project, connect the repo and start the first translation. First a read-only scan — framework, router, existing i18n setup, files with translatable text. No changes yet. Then a few questions to shape the plan (including whether to connect Globalize — on by default, you can opt out)."
 
 ### 1.1 Inspect
 
@@ -174,7 +176,7 @@ Gate: `decisions.scope.globalize === true`; otherwise skip 1.5 **and** 4.
 
 "Before we touch your code, let's get you signed in to Globalize so it's ready when your catalogs are done. A browser window may open for device-flow sign-in. (Near the very end, when we connect your repo, you'll do one quick browser approval for Globalize's GitHub/GitLab app — I'll remind you.)"
 
-Invoke the **`globalize-now-account-setup`** skill (Skill tool, main thread). It installs, signs in (self-skips if `auth status` is valid) and verifies. Record the org under `decisions.md` → `## Globalize-now` → `Authenticated org`; mark `delegate_account_setup` done. Skill missing → "I couldn't load the `globalize-now-account-setup` skill — install the Globalize skills with `npx skills add globalize-now/globalize-skills`, then I'll continue." User cancels sign-in → continue to Phase 2; §4.2 re-offers it.
+Invoke the **`globalize-now-account-setup`** skill (Skill tool, main thread). It installs, signs in (self-skips if `auth status` is valid) and verifies. Record the org under `decisions.md` → `## Globalize-now` → `Authenticated org`; mark `delegate_account_setup` done. Skill tool can't load it → read it from disk (Execution mode). User cancels sign-in → continue to Phase 2; §4.3 re-offers it.
 
 ---
 
@@ -243,7 +245,7 @@ On `status: "needs_cleanup"`, follow `references/orchestrator/cleanup-loop.md`: 
 
 Parse the source catalog for a word count (`result.catalogPath`: the extracted `.po` on Lingui; the source XLIFF's `<source>` text on Angular; the source YAML on Rails; `res/values/strings.xml` on Android; `_locales/{sourceLocale}/messages.json` on a native extension): "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now." Prepend the self-heal summary when `stringsWrappedInCleanup > 0`. When `result.formatViolations` is non-empty, append every entry **with file + line** — never a bare count, never omitted because the catalog gate passed.
 
-Globalize in scope → "Moving on to Phase 4 — creating your Globalize project and connecting the repo. You're already signed in, so this is mostly automated (one quick browser approval for the GitHub/GitLab app)." Otherwise → "Skipping the translation-platform step. Re-run `globalize-guide` with `connect translation platform` checked when you're ready."
+Globalize in scope → "Moving on to Phase 4 — pushing this setup, creating your Globalize project, connecting the repo and starting the first translation. You're already signed in, so this is mostly automated (one quick browser approval for the GitHub/GitLab app)." Otherwise → "Skipping the translation-platform step. Re-run `globalize-guide` with `connect translation platform` checked when you're ready."
 
 ### Phase 3 collapse-cases
 
@@ -253,25 +255,37 @@ Globalize in scope → "Moving on to Phase 4 — creating your Globalize project
 
 ---
 
-## Phase 4 — Globalize project (connect repo + patterns)
+## Phase 4 — Globalize project (connect repo, first translation)
 
-"Phase 4 — creating your Globalize project and connecting your repo. One quick browser approval authorizes Globalize's GitHub/GitLab app, then the project-setup skill creates the project, connects the repo, and wires the catalog patterns."
+"Phase 4 — connecting Globalize. Globalize reads your catalogs from GitHub/GitLab, so I'll check this setup is pushed, then the project-setup skill creates the project (or reuses your only one), connects the repo, wires the catalog patterns and starts the first translation — delivered as a pull request. One quick browser approval authorizes Globalize's GitHub/GitLab app."
 
 ### 4.1 Assemble `.globalize/globalize-inputs.json`
 
 Follow `references/orchestrator/globalize-inputs.md` (per-library `localePathPattern` + `fileFormat`, `pathLocales` for native extensions). Mark `assemble_globalize_inputs` done.
 
-### 4.2 Re-check auth
+### 4.2 Push the setup
+
+Globalize translates the branch **on the remote**, never this working copy: until the converted catalogs are pushed, the first translation finds nothing to translate. Skip this step (and the first translation) when the remote is neither GitHub nor GitLab — the project skill won't connect a repository then.
+
+1. Read `git branch --show-current`, `git status --porcelain` and `git log @{u}..HEAD --oneline` (fails when the branch has no upstream — that counts as unpushed).
+2. Nothing uncommitted and nothing unpushed → this branch is already on the remote.
+3. Otherwise ask, listing `git status --short`: "Globalize reads your catalogs from `{remote}`, not from this machine, so the first translation needs this setup pushed. Commit these files and push `{branch}` now? (**yes** / **I'll push it myself** / **skip the first translation**)". **yes** → `git add -A`, `git commit -m "chore(i18n): set up {library}"`, `git push -u origin {branch}`; a failed push is shown verbatim and the question asked again. **I'll push it myself** → wait, then re-check from 1. **skip** → no first translation. Headless: never commit or push — skip and report it.
+
+Write `firstTranslationBranch` into `globalize-inputs.json`: the pushed branch, or `null` when skipped. Mark `push_setup` done.
+
+### 4.3 Re-check auth
 
 Delegate a quick `auth status` check; not authenticated → invoke `globalize-now-account-setup` first.
 
-### 4.3 Delegate to `globalize-now-project-setup` (main thread)
+### 4.4 Delegate to `globalize-now-project-setup` (main thread)
 
-Invoke it via the Skill tool: "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect the git provider (one browser approval if the GitHub App / GitLab OAuth isn't installed yet), create the project, connect the repo, and set the catalog patterns from the supplied `localePathPattern` + `fileFormat`." The skill owns the whole CLI surface. Mark `delegate_project_setup` done. Skill missing → tell the user to run `npx skills add globalize-now/globalize-skills --skill globalize-now-project-setup` and re-invoke.
+Invoke it via the Skill tool (from disk if the Skill tool can't load it — Execution mode): "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect the git provider (one browser approval if the GitHub App / GitLab OAuth isn't installed yet), reuse the organisation's project if it is the only one or create one, connect the repo, set the catalog patterns from the supplied `localePathPattern` + `fileFormat`, and start the first translation of `firstTranslationBranch` as a pull request." The skill owns the whole CLI surface. Mark `delegate_project_setup` done, and `start_first_translation` once its summary reports the translation started.
 
-### 4.4 Finish
+### 4.5 Finish
 
-"All set. Project created: **{projectUrl}**. Repo connected, catalog patterns wired. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI) for ongoing translation work — pulling translations, tracking status, requesting new languages."
+Translation started → "All set. Project: **{projectUrl}**. Repo connected, catalog patterns wired, and the first translation of `{branch}` has started — Globalize opens a pull request with the translated catalogs when it's done; merge it to ship them. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI) for ongoing translation work — tracking status, requesting new languages."
+
+Not started → the same, but say plainly why ("Skipped — no GitHub or GitLab remote", "Skipped — not pushed", or the refusal the project skill reported) and that the `globalize-now-cli-use` skill can start it once that is fixed.
 
 ---
 

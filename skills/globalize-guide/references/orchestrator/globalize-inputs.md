@@ -19,5 +19,6 @@ Build the inputs bundle the project skill consumes, from data already on hand �
   - **Swift / Apple** (`detection.language === "swift"`) → `xcstrings`; **single file, no `{locale}` segment** — `Localizable.xcstrings` (or `**/*.xcstrings` for multiple tables). The catalog holds every locale; source = the catalog's `sourceLanguage` / `CFBundleDevelopmentRegion`.
 - **pathLocales** ← the array derived above; omit the key entirely (or send `[]`) for every stack other than the native browser-extension variant.
 - **importMode**: `"ignore"`, **importScope**: `"new_keys_only"`, **mode**: `"orchestrated"`.
+- **firstTranslationBranch** ← written by §4.2 once the setup is on the remote: the branch name, or `null` when there is no first translation to start (skipped, not pushed, or no GitHub/GitLab remote).
 
 Write the file to `.globalize/globalize-inputs.json` and mark `assemble_globalize_inputs` done in `plan.md`.
