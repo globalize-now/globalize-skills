@@ -866,10 +866,14 @@ t('items', {count: 3})
 ```
 
 ```tsx
+import {Link} from '../../i18n/navigation';
+
 t.rich('terms', {
-  link: (chunks) => <a href="/terms">{chunks}</a>
+  link: (chunks) => <Link href="/terms">{chunks}</Link>
 })
 ```
+
+Tag callbacks are ordinary JSX, so an internal link inside a message takes the same locale-aware `Link` from the navigation module as any other link. A raw `<a href="/terms">` drops the active locale.
 
 ### Formatting
 

@@ -52,7 +52,7 @@ msgid "Legal.terms"
 msgstr "By signing up you agree to our <link>terms</link>."
 ```
 
-Call site: `t.rich('terms', { link: (chunks) => <a href=\"/terms\">{chunks}</a> })`.
+Call site: `t.rich('terms', { link: (chunks) => <Link href="/terms">{chunks}</Link> })`. Tag callbacks are ordinary JSX, so an internal link inside a message takes the same locale-aware `Link` as any other link — from the project's `createNavigation` module (`i18n/navigation.ts`) on an App Router project with locale-prefixed routes, from `next/link` otherwise. A raw `<a href="/terms">` drops the active locale.
 
 ### Nested namespaces (sub-namespace via dot notation)
 

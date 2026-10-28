@@ -587,7 +587,7 @@ The project's HTML entry point likely has a static `<html lang="en">`. This must
 
 When locale routing is enabled, internal `<RouterLink>` `to` props and programmatic `router.push` calls must include the locale prefix. The reference file provides the idiomatic `localePath()` helper.
 
-For Nuxt, `@nuxtjs/i18n`'s `<NuxtLink>` handles locale prefixes automatically based on the active locale, so no manual link rewriting is needed.
+For Nuxt, a plain `<NuxtLink>` is **not** localized. Internal links use `<NuxtLinkLocale>` or `<NuxtLink :to="localePath(...)">` — see `references/languages/js-ts/frameworks/nuxt/vue-i18n.setup.md` § Link handling.
 
 ---
 
@@ -1052,7 +1052,7 @@ For Nuxt, use `@nuxt/test-utils` and `setup` from `@nuxt/test-utils/e2e` — the
   t('items', { count: 3 })  // ICU: {count, plural, one {# item} other {# items}}
   ```
 - **Missing `dir` attribute / LTR-only CSS in RTL locales** — the `<html>` element must have `dir="rtl"` for Arabic, Hebrew, Persian, Urdu, etc. The `getDirection()` helper covers this. Equally important: CSS must use logical properties (`margin-inline-start` instead of `margin-left`, `padding-inline-end` instead of `padding-right`, `inset-inline-start` instead of `left`). Physical properties don't flip in RTL and require a full CSS audit. Run the `css-i18n` skill for a CSS audit and conversion.
-- **Links navigate to wrong locale** — with `@nuxtjs/i18n`, always use `<NuxtLink>` (not raw `<a>`) for internal paths; the module rewrites `to` props based on the active locale and routing strategy. For Vite SPA with vue-router's Strategy 1 or 2, every `<RouterLink :to>` must go through the `localePath()` helper in `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`.
+- **Links navigate to wrong locale** — with `@nuxtjs/i18n`, a plain `<NuxtLink>` or raw `<a>` is not localized; use `<NuxtLinkLocale>` or `<NuxtLink :to="localePath(...)">` for internal paths. For Vite SPA with vue-router's Strategy 1 or 2, every `<RouterLink :to>` must go through the `localePath()` helper in `references/languages/js-ts/frameworks/vite/vue/vue-i18n.setup.md`.
 - **Nuxt: `vueI18n` config not picked up** — the `vueI18n` path in `nuxt.config.ts` must match the actual file location. Nuxt 4 convention puts the config inside the `i18n/` directory (`i18n: { vueI18n: './i18n/i18n.config.ts' }`); Nuxt 3 convention puts it at project root (`i18n: { vueI18n: './i18n.config.ts' }`). If your config isn't applying, double-check the path.
 - **SFC `<i18n>` custom blocks not recognized** — confirm `@intlify/unplugin-vue-i18n` is listed in `vite.config.ts` `plugins` (or equivalent); the plugin is what activates SFC `<i18n>` blocks. Without it, Vue treats them as unknown elements.
 - **Hydration mismatch on SSR (Nuxt)** — the server renders in one locale, the client hydrates and detects a different preferred locale, causing a mismatch. Use `useLocaleHead()` for `<html lang>` / `<html dir>` and avoid reading `navigator.language` during hydration; let `@nuxtjs/i18n`'s browser-detection middleware handle it.

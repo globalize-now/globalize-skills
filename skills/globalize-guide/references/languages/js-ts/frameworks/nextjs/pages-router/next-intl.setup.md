@@ -538,10 +538,14 @@ t('items', {count: 3})
 ```
 
 ```tsx
+import Link from 'next/link';
+
 t.rich('terms', {
-  link: (chunks) => <a href="/terms">{chunks}</a>
+  link: (chunks) => <Link href="/terms">{chunks}</Link>
 })
 ```
+
+Tag callbacks are ordinary JSX, so an internal link inside a message takes `Link` from `next/link` like any other internal link (see Navigation above). A raw `<a href="/terms">` drops the active locale.
 
 ### Formatting
 

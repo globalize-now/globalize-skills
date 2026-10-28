@@ -101,6 +101,7 @@ Same `t.rich()` pattern as App Router, using hooks:
 ```
 
 ```tsx
+import Link from 'next/link';
 import {useTranslations} from 'next-intl';
 
 function Legal() {
@@ -108,13 +109,15 @@ function Legal() {
   return (
     <p>
       {t.rich('terms', {
-        link: (chunks) => <a href="/terms">{chunks}</a>,
+        link: (chunks) => <Link href="/terms">{chunks}</Link>,
         bold: (chunks) => <strong>{chunks}</strong>
       })}
     </p>
   );
 }
 ```
+
+Tag callbacks are ordinary JSX, so an internal link inside a message takes `Link` from `next/link` like any other internal link — Next's built-in i18n routing adds the active locale to it. A raw `<a href="/terms">` drops the locale.
 
 **HTML in messages** -- for line breaks and simple HTML:
 
