@@ -275,8 +275,9 @@ export const Route = createRootRoute({
     const segments = location.pathname.split('/').filter(Boolean)
     const firstSegment = segments[0]
     if (!firstSegment || !locales.includes(firstSegment)) {
-      // Bare path → redirect to source locale prefix
-      throw redirect({ to: `/${sourceLocale}${location.pathname}` })
+      // Bare path → redirect to source locale prefix, keeping ?query and #hash
+      const suffix = `${location.searchStr}${location.hash ? `#${location.hash.replace(/^#/, '')}` : ''}`
+      throw redirect({ href: `/${sourceLocale}${location.pathname}${suffix}` })
     }
   },
   component: () => (
@@ -286,6 +287,8 @@ export const Route = createRootRoute({
   ),
 })
 ```
+
+Re-append the query string and fragment so a deep link like `/pricing?plan=pro#faq` keeps both through the redirect — `searchStr` already carries its leading `?`, `hash` comes without its `#`. **Use `href`, not `to`:** `to` is strictly typed against the route tree and treats the whole string as a pathname, so a `?` or `#` in it ends up inside the path; `href` accepts an arbitrary path string and splits out the search and hash.
 
 ```tsx
 // src/routes/$locale/about.tsx

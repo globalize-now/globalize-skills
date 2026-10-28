@@ -1,6 +1,6 @@
 # Nuxt Setup
 
-This covers Nuxt 3 and Nuxt 4 projects using `@nuxtjs/i18n`. The module wraps vue-i18n and adds SSR-aware routing, browser-language detection, SEO metadata, and the `<NuxtLink>` / `$switchLocalePath` helpers.
+This covers Nuxt 3 and Nuxt 4 projects using `@nuxtjs/i18n`. The module wraps vue-i18n and adds SSR-aware routing, browser-language detection, SEO metadata, and the `<NuxtLinkLocale>` / `$localePath` / `$switchLocalePath` helpers.
 
 ## Packages (Step 2)
 
@@ -321,7 +321,7 @@ import LanguageSwitcher from '~/components/LanguageSwitcher.vue'
 
 ## Link handling
 
-Internal links should use `<NuxtLink>` throughout — the module rewrites the `to` prop based on the active locale and the chosen `strategy`. For same-page locale switches, use `$switchLocalePath()` / `useSwitchLocalePath()` rather than constructing URLs manually.
+The module does **not** localize a plain `<NuxtLink>` — `<NuxtLink to="/about">` emits `href="/about"` in every locale. Internal links use `<NuxtLinkLocale to="about">`, or `<NuxtLink :to="localePath('about')">` with `useLocalePath()` / `$localePath`, both of which apply the active locale and the chosen `strategy`. Prefer named routes (`about`, `blog-slug`) over path strings: paths depend on `strategy` and custom route paths and can silently stop matching when routing config changes. For same-page locale switches, use `$switchLocalePath()` / `useSwitchLocalePath()` rather than constructing URLs manually.
 
 For programmatic navigation, use `useLocalePath()`:
 
@@ -331,7 +331,7 @@ const localePath = useLocalePath()
 const router = useRouter()
 
 function goToSettings() {
-  router.push(localePath('/settings'))
+  router.push(localePath('settings'))
 }
 </script>
 ```

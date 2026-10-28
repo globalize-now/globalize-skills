@@ -150,20 +150,24 @@ Use `t.rich()` to map custom tags in messages to React components:
 ```
 
 ```tsx
+import {Link} from '@/i18n/navigation';
+
 // Server Component
 const t = await getTranslations('Legal');
 t.rich('terms', {
-  link: (chunks) => <a href="/terms">{chunks}</a>,
+  link: (chunks) => <Link href="/terms">{chunks}</Link>,
   bold: (chunks) => <strong>{chunks}</strong>
 })
 
 // Client Component
 const t = useTranslations('Legal');
 t.rich('terms', {
-  link: (chunks) => <a href="/terms">{chunks}</a>,
+  link: (chunks) => <Link href="/terms">{chunks}</Link>,
   bold: (chunks) => <strong>{chunks}</strong>
 })
 ```
+
+Tag callbacks are ordinary JSX, so an internal link inside a message takes the same locale-aware `Link` from `@/i18n/navigation` as any other link (see Navigation and Sidebar Data below). A raw `<a href="/terms">` emits `/terms` on `/de` and drops the user into the source locale.
 
 Tags can be arbitrarily nested:
 

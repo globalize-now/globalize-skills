@@ -224,10 +224,12 @@ What differs is **how the choice is committed**, which the framework file alread
 | Stack | Commit mechanism |
 |---|---|
 | Next.js App Router | `router.replace(switchLocalePath(usePathname(), loc))` from `next/navigation` in a `'use client'` component; write the cookie too under `no-url-locale` |
-| React Router v7 | `<Form method="post" action="/set-locale">` with hidden `locale` and `returnTo={switchLocalePath(location.pathname, loc)}`; the action route sets the cookie and redirects |
+| React Router v7 | `<Form method="post" action="/set-locale">` with hidden `locale` and `returnTo={switchLocalePath(location.pathname, loc) + location.search}`; the action route sets the cookie and redirects |
 | Remix v2 | same `<Form>`-to-action shape as React Router v7 |
-| TanStack Start | `await setLocale({ data: loc })`, then `window.location.href = switchLocalePath(location.pathname, loc)` — a full document navigation so the next SSR sees the new cookie |
-| Vite + any router (SPA) | write the locale to `localStorage`, call `activateLocale`, and navigate to `switchLocalePath(window.location.pathname, loc)` |
+| TanStack Start | `await setLocale({ data: loc })`, then `window.location.href = switchLocalePath(location.pathname, loc) + location.searchStr + window.location.hash` — a full document navigation so the next SSR sees the new cookie |
+| Vite + any router (SPA) | write the locale to `localStorage`, call `activateLocale`, and navigate to `switchLocalePath(window.location.pathname, loc) + window.location.search + window.location.hash` |
+
+Keep the re-appended query string and fragment where a row shows them — `switchLocalePath` takes and returns a pathname only, so without them switching locale on `/search?q=shoes#results` drops the query and the fragment.
 
 Under `no-url-locale` there is no URL to change: commit the cookie or `localStorage` value and reload. A `<select>` is the right control there — there is nothing to link to.
 

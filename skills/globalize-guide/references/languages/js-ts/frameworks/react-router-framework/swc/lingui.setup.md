@@ -424,9 +424,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 > ```ts
 > import { redirect } from 'react-router'
 > if (urlLocale === sourceLocale) {
->   throw redirect(url.pathname.replace(`/${sourceLocale}`, '') || '/')
+>   throw redirect((url.pathname.replace(`/${sourceLocale}`, '') || '/') + url.search)
 > }
 > ```
+>
+> Re-append `url.search` so a deep link like `/en/pricing?plan=pro` keeps its query string through the redirect; `request.url` never carries the `#hash` (browsers don't send it), and the browser re-applies the original fragment to a redirect whose `Location` has none.
 
 ### Strategy B: All locales prefixed
 
@@ -468,7 +470,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const firstSegment = url.pathname.split('/').filter(Boolean)[0]
   if (!firstSegment || !(locales as readonly string[]).includes(firstSegment)) {
     const locale = await readLocaleFromRequest(request)
-    throw redirect(`/${locale}${url.pathname === '/' ? '' : url.pathname}`)
+    throw redirect(`/${locale}${url.pathname === '/' ? '' : url.pathname}${url.search}`)
   }
   const locale = firstSegment as Locale
   const { messages } = (await import(`./locales/${locale}/messages.ts`)) as { messages: Messages }
@@ -478,6 +480,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   )
 }
 ```
+
+Re-append `url.search` so a deep link like `/pricing?plan=pro` keeps its query string through the redirect; `request.url` never carries the `#hash` (browsers don't send it), and the browser re-applies the original fragment to a redirect whose `Location` has none.
 
 ### Strategy C: Cookie-only
 
@@ -655,8 +659,9 @@ export function LanguageSwitcher() {
   const location = useLocation()
 
   // Strategy A / B: point at the same page under the target locale.
-  // Strategy C: there is no navigation module — use `location.pathname` unchanged.
-  const returnToFor = (loc: Locale) => switchLocalePath(location.pathname, loc)
+  // Strategy C: there is no navigation module — use `location.pathname + location.search` unchanged.
+  // Re-append the query string: `switchLocalePath` takes and returns a pathname only.
+  const returnToFor = (loc: Locale) => switchLocalePath(location.pathname, loc) + location.search
 
   return (
     <nav style={{ display: 'flex', gap: '0.5rem' }}>
@@ -716,7 +721,7 @@ const submit = useSubmit()
 function switchTo(loc: Locale) {
   const formData = new FormData()
   formData.append('locale', loc)
-  formData.append('returnTo', window.location.pathname)
+  formData.append('returnTo', window.location.pathname + window.location.search + window.location.hash)
   submit(formData, { method: 'post', action: '/set-locale' })
 }
 ```

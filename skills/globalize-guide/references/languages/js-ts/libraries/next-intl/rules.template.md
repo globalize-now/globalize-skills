@@ -128,8 +128,14 @@ msgstr "By signing up you agree to our <link>terms</link>."
 <!-- /if -->
 ```tsx
 t('greeting', { name: user.name })
-t.rich('terms', { link: (chunks) => <a href="/terms">{chunks}</a> })
+t.rich('terms', { link: (chunks) => <Link href="/terms">{chunks}</Link> })
 ```
+
+<!-- if: localeNavigation == "create-navigation" -->
+Tag callbacks are ordinary JSX, so an internal link inside a message takes the same locale-aware `Link` from `<<i18nNavigationPath>>` as any other link. Never a raw `<a href="/…">` — it drops the active locale.
+<!-- else -->
+Tag callbacks are ordinary JSX, so an internal link inside a message takes the same `Link` from `next/link` as any other internal link. Never a raw `<a href="/…">` — it bypasses Next's locale handling.
+<!-- /if -->
 
 **Constants and copy modules.** Never put translated strings in module-level constants — `t` is undefined at module load, and the locale is bound per request, so whichever locale loaded first would freeze across all of them:
 

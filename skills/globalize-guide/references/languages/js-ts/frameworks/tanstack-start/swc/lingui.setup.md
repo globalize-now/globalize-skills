@@ -287,7 +287,14 @@ export const Route = createRootRoute({
 
 Strategy 1 doesn't call `getLocale()` — the cookie is only meaningful for first-visit Accept-Language redirects, which Strategy 1 doesn't perform (`/about` is always source locale). The cookie middleware still runs so server functions and future strategy changes behave consistently, but it's not consulted here.
 
-> **Canonicalization:** Visiting `/en/about` (when `en` is the source locale) will render the target-locale route tree with an English catalog — not the canonical `/about`. For SEO hygiene, add a redirect for source-locale-prefixed paths if your site is public: inside the check above, when `firstSegment === sourceLocale`, `throw redirect({ href: location.pathname.slice(sourceLocale.length + 1) || '/' })`. **Use `href`, not `to`.** `to` is strictly typed against TanStack Router's inferred route tree — a `string` built by concatenation doesn't narrow to a known route and fails TypeScript. `href` accepts an arbitrary path string, which is exactly what these locale-prefix redirects need.
+> **Canonicalization:** Visiting `/en/about` (when `en` is the source locale) will render the target-locale route tree with an English catalog — not the canonical `/about`. For SEO hygiene, add a redirect for source-locale-prefixed paths if your site is public: inside the check above, when `firstSegment === sourceLocale`, redirect to the unprefixed path:
+>
+> ```tsx
+> const suffix = `${location.searchStr}${location.hash ? `#${location.hash.replace(/^#/, '')}` : ''}`
+> throw redirect({ href: (location.pathname.slice(sourceLocale.length + 1) || '/') + suffix })
+> ```
+>
+> Re-append the query string and fragment so a deep link like `/en/pricing?plan=pro#faq` keeps both through the redirect — `searchStr` already carries its leading `?`, `hash` comes without its `#`. **Use `href`, not `to`.** `to` is strictly typed against TanStack Router's inferred route tree — a `string` built by concatenation doesn't narrow to a known route and fails TypeScript. `href` accepts an arbitrary path string, which is exactly what these locale-prefix redirects need.
 
 ```tsx
 // src/pages/About.tsx — shared page component
@@ -352,7 +359,9 @@ export const Route = createRootRoute({
     if (!firstSegment || !(locales as readonly string[]).includes(firstSegment)) {
       // Bare path — redirect to cookie-resolved (or Accept-Language) locale
       const locale = await getLocale()
-      throw redirect({ href: `/${locale}${location.pathname}` })   // href, not to — `to` is strictly typed to known routes and rejects template-literal strings
+      // Keep ?query and #hash — the server never sees the hash, so it's only non-empty on client navigations
+      const suffix = `${location.searchStr}${location.hash ? `#${location.hash.replace(/^#/, '')}` : ''}`
+      throw redirect({ href: `/${locale}${location.pathname}${suffix}` })   // href, not to — `to` is strictly typed to known routes and rejects template-literal strings
     }
     // URL already carries a valid locale — use it as context
     return { locale: firstSegment as Locale }
@@ -361,7 +370,7 @@ export const Route = createRootRoute({
 })
 ```
 
-(Import `redirect` from `@tanstack/react-router`, and `locales` + `type Locale` from `../i18n/locales`.)
+(Import `redirect` from `@tanstack/react-router`, and `locales` + `type Locale` from `../i18n/locales`.) Re-append the query string and fragment so a deep link like `/pricing?plan=pro#faq` keeps both through the redirect — `searchStr` already carries its leading `?`, `hash` comes without its `#`.
 
 This ensures `Route.useRouteContext().locale` always matches the URL segment, so components like the language switcher highlight the correct locale even when the cookie is stale.
 
@@ -612,7 +621,8 @@ import { setLocale } from '../server/locale'
 export function LanguageSwitcher() {
   const currentLocale = useLocale()
   const location = useLocation()
-  const hrefFor = (loc: Locale) => switchLocalePath(location.pathname, loc)
+  // Keep the query string; `searchStr` already carries its leading `?`.
+  const hrefFor = (loc: Locale) => `${switchLocalePath(location.pathname, loc)}${location.searchStr}`
 
   return (
     <nav style={{ display: 'flex', gap: '0.5rem' }}>
@@ -625,7 +635,7 @@ export function LanguageSwitcher() {
           onClick={async (e) => {
             e.preventDefault()
             await setLocale({ data: loc })
-            window.location.href = hrefFor(loc)
+            window.location.href = hrefFor(loc) + window.location.hash
           }}
           style={{
             padding: '0.25rem 0.5rem',
@@ -642,7 +652,7 @@ export function LanguageSwitcher() {
 }
 ```
 
-A full browser navigation (`window.location.href = ...`) is used instead of TanStack Router's client-side `<Link>` so the next request goes back through the server and picks up the updated cookie + catalog on the server side. This avoids a brief flash where the URL is in the new locale but the HTML is still in the old one. A plain `<a>` is also required here because `switchLocalePath` returns a string — the target route type is not statically known.
+A full browser navigation (`window.location.href = ...`) is used instead of TanStack Router's client-side `<Link>` so the next request goes back through the server and picks up the updated cookie + catalog on the server side. This avoids a brief flash where the URL is in the new locale but the HTML is still in the old one. A plain `<a>` is also required here because `switchLocalePath` returns a string — the target route type is not statically known. `switchLocalePath` takes and returns a pathname only, so the query string is re-appended or switching locale on `/search?q=shoes` drops the query; the `#hash` is added at click time from `window.location` because the server never sees it, and putting it in the rendered `href` would mismatch on hydration.
 
 `switchLocalePath` encodes the chosen strategy, so this component is identical under Strategy 1 and Strategy 2.
 

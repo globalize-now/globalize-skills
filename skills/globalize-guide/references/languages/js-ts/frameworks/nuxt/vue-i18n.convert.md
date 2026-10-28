@@ -84,24 +84,35 @@ Server routes run in Nitro's h3 handler context, outside Nuxt's Vue runtime. The
 
 ## Locale-aware internal links
 
-`@nuxtjs/i18n` rewrites `<NuxtLink :to="...">` based on the active locale and the configured `strategy`. When wrapping text inside a `<NuxtLink>`, **only wrap the visible label text**:
+`@nuxtjs/i18n` does **not** localize a plain `<NuxtLink>`. `<NuxtLink to="/about">` renders `href="/about"` on `/de` too, and the click drops the user into the default locale. Every internal link goes through the module's routing helpers:
+
+- `<NuxtLinkLocale to="about">` — `<NuxtLink>` with `localePath()` applied to `to`. The default for template links.
+- `<NuxtLink :to="localePath('about')">`, with `const localePath = useLocalePath()` (or `$localePath` in templates) — when you need the resolved path as a value.
+
+**Use named routes, not path strings.** A page's route name is its file path under `pages/` with the extension dropped and `/` turned into `-`: `pages/index.vue` → `index`, `pages/about.vue` → `about`, `pages/blog/[slug].vue` → `blog-slug` (pass `{ name: 'blog-slug', params: { slug } }`). A `definePageMeta({ name })` in the page overrides that. Path strings still resolve at runtime, but they depend on `strategy` and custom route paths, so a path that works today can silently stop matching when routing config changes. If you can't determine the name with confidence, keep the path string — `<NuxtLinkLocale to="/about">` is still localized.
+
+When wrapping text inside an internal link, **only wrap the visible label text**, and convert the tag in the same edit:
 
 ```vue
 <!-- Before -->
 <NuxtLink to="/about">About us</NuxtLink>
+<a href="/contact">Contact</a>
 
 <!-- After -->
-<NuxtLink to="/about">{{ t('Navigation.about') }}</NuxtLink>
+<NuxtLinkLocale to="about">{{ t('Navigation.about') }}</NuxtLinkLocale>
+<NuxtLinkLocale to="contact">{{ t('Navigation.contact') }}</NuxtLinkLocale>
 ```
 
-**Never rewrite the `to` prop.** Raw string paths like `/about` are intentional — the module resolves them to the right locale-prefixed URL at render time. The only exception is if you see a raw `<a href="/about">` inside the template: replace the `<a>` tag with `<NuxtLink to="...">` so the locale prefix actually applies. Flag that as a warning, don't auto-rewrite — changing tags affects styling and event handlers.
+Carry every other attribute (`class`, `target`, `aria-*`, …) over unchanged — `<NuxtLinkLocale>` renders an `<a>`, so selectors that target `a` keep matching. If a converted raw `<a>` had an event handler (`@click`), list it in the conversion summary so the user can confirm it still fires.
+
+Leave alone: links already going through `localePath()` / `$localePath()` / `switchLocalePath()` or already `<NuxtLinkLocale>`; external URLs, `mailto:` / `tel:`, same-page `#anchor` links, and files served from `public/`.
 
 For programmatic navigation:
 
 ```ts
 const localePath = useLocalePath()
 const router = useRouter()
-router.push(localePath('/settings'))
+router.push(localePath('settings'))
 ```
 
 If you find `router.push('/…')` with a raw string during conversion, flag it for manual review — this is a routing bug under locale prefixing, not a string-wrapping concern.

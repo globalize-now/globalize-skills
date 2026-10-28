@@ -775,7 +775,7 @@ This pass catches strings that looked fine in the source but appear ambiguous in
 
 Surface these items to the user at the end of the run. They're out of scope for automatic conversion but commonly needed after a wrap pass:
 
-- **Locale-aware navigation**: audit remaining `<a href="/...">` tags and convert to `<router-link>` (vue-router) or `<NuxtLink>` (Nuxt). Pair with the project's locale-prefix strategy — `@nuxtjs/i18n` exposes `$localePath()` / `localePath()` for composing locale-aware hrefs; in plain Vue, prepend the active locale from `useI18n().locale.value` when building the `to` prop. Plain `<a>` bypasses the locale prefix and sends users to the source-locale URL, dropping them out of their active locale on click.
+- **Locale-aware navigation**: audit remaining `<a href="/...">` tags and convert to `<router-link>` (vue-router) or `<NuxtLinkLocale>` (Nuxt — a plain `<NuxtLink>` is not localized; `$localePath()` / `localePath()` compose locale-aware hrefs when you need the value). Pair with the project's locale-prefix strategy; in plain Vue, prepend the active locale from `useI18n().locale.value` when building the `to` prop. Plain `<a>` bypasses the locale prefix and sends users to the source-locale URL, dropping them out of their active locale on click.
 - **Manual follow-up list**: Options-API SFCs and `server/api/*` files that subagents skipped (collected in Step 2 / Step 7). Surface them so the user knows which files still need hand-conversion.
 - **Any other items** you noticed during the run (ambiguous JSON keys deferred from Step 9, component tests that need an `i18n` plugin installed in the mount options) — list them here so the user knows what's left.
 
