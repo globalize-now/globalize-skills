@@ -2,10 +2,10 @@ name: Skill checks
 
 on:
   pull_request:
-    paths: [skills/**, evals/verify-skill-size.sh, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, .github/workflows/skill-checks.yml]
   push:
     branches: [main]
-    paths: [skills/**, evals/verify-skill-size.sh, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, .github/workflows/skill-checks.yml]
 
 jobs:
   skill-size:
@@ -17,3 +17,8 @@ jobs:
       # rules leave its first 5 KB, or when an orchestrator reference is missing or unreachable.
       - name: SKILL.md size budget
         run: ./evals/verify-skill-size.sh
+
+      # The Globalize connect hand-off: sibling skills load from disk, globalize-guide and
+      # lovable-i18n end by starting the first translation, project setup reuses the only project.
+      - name: Globalize connect hand-off
+        run: ./evals/verify-globalize-connect.sh
