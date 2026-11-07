@@ -15,4 +15,4 @@ For each file: identify translatable strings, wrap with the correct macro, add t
 
 **Edit hygiene.** Change only what wrapping and formatting require: no unused imports left behind (remove an import the rewrite made dead, add only the macros you use), no reformatting, re-indenting or reordering of code you did not otherwise touch. A diff reviewer should see i18n changes and nothing else.
 
-Ambiguity protocol and progress schema as in Phase 2 (`setup-subagent.md`; schema in `plan-format.md`).
+Ambiguity protocol and progress schema as in Phase 2 (`setup-subagent.md`; schema in `plan-format.md`). Your `plan` and `completed` lists hold file paths. **Do not write `.globalize/plan.md`:** workers run in parallel, so the orchestrator ticks your files from `completed` (`checklist.md`). In single-agent mode you are the orchestrator, so tick each file as you finish it.

@@ -69,4 +69,14 @@ echo ""
 echo "============================================"
 echo "  VERIFICATION: globalize-guide / $FIXTURE (headless)"
 echo "============================================"
-"$SCRIPT_DIR/verify-lingui-conversion.sh" "$WORKDIR" "$FIXTURE" "$WORKDIR/.eval-agent-output.txt"
+CONVERSION_EXIT=0
+"$SCRIPT_DIR/verify-lingui-conversion.sh" "$WORKDIR" "$FIXTURE" "$WORKDIR/.eval-agent-output.txt" || CONVERSION_EXIT=$?
+
+echo ""
+echo "============================================"
+echo "  CHECKLIST: globalize-guide / $FIXTURE (headless)"
+echo "============================================"
+CHECKLIST_EXIT=0
+"$SCRIPT_DIR/verify-plan-tracking.sh" "$WORKDIR" || CHECKLIST_EXIT=$?
+
+exit $(( CONVERSION_EXIT + CHECKLIST_EXIT ))
