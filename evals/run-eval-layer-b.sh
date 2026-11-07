@@ -138,19 +138,30 @@ if [ -f "$EXPECTATIONS" ]; then
   "$SCRIPT_DIR/verify-string-wrapping.sh" "$WORKDIR" "$FIXTURE" || STRING_EXIT=$?
 fi
 
+# 12. Run checklist verification
+echo ""
+echo "============================================"
+echo "  CHECKLIST: globalize-guide / $FIXTURE"
+echo "============================================"
+echo ""
+
+CHECKLIST_EXIT=0
+"$SCRIPT_DIR/verify-plan-tracking.sh" "$WORKDIR" || CHECKLIST_EXIT=$?
+
 # Summary
 echo ""
 echo "============================================"
 echo "  SUMMARY: globalize-guide / $FIXTURE"
 echo "============================================"
-if [ $VERIFY_EXIT -eq 0 ] && [ $BEHAVIOR_EXIT -eq 0 ] && [ $STRING_EXIT -eq 0 ]; then
+if [ $VERIFY_EXIT -eq 0 ] && [ $BEHAVIOR_EXIT -eq 0 ] && [ $STRING_EXIT -eq 0 ] && [ $CHECKLIST_EXIT -eq 0 ]; then
   echo "  RESULT: PASS"
 else
   echo "  RESULT: FAIL"
   [ $VERIFY_EXIT -ne 0 ]   && echo "  - Verification checks failed"
   [ $BEHAVIOR_EXIT -ne 0 ] && echo "  - Behavior checks failed"
   [ $STRING_EXIT -ne 0 ]   && echo "  - String wrapping checks failed"
+  [ $CHECKLIST_EXIT -ne 0 ] && echo "  - Checklist checks failed"
 fi
 echo "============================================"
 
-exit $(( VERIFY_EXIT + BEHAVIOR_EXIT + STRING_EXIT ))
+exit $(( VERIFY_EXIT + BEHAVIOR_EXIT + STRING_EXIT + CHECKLIST_EXIT ))

@@ -4,6 +4,8 @@ Loaded by SKILL.md §3.5. This is the verify worker's prompt — dispatched as a
 
 You are verifying the convert phase. Read `.globalize/decisions.md` for catalog format and locales. Read manifest snapshot for library.
 
+**Keep the checklist.** Read `references/orchestrator/checklist.md`. Before running anything, expand the `### verify` steps in `.globalize/plan.md` into one item per gate this section names for the stack, including each sub-check of a numbered step, then tick them as they pass. A scan step (`recall_self_check`, `format_violations_check`) is done once it has run and its findings are in `result`: acting on them is the cleanup loop's job. Report `succeeded` only when the section has no open items; on `needs_cleanup`, stop with the remaining steps open and the orchestrator takes over.
+
 Plan steps depend on the library's catalog model:
 - **Compile-time extraction (Lingui)** and **runtime-catalog (next-intl/vue-i18n)**: extract_clean, compile, build_check, comment_review_pass.
 - **Compile-from-catalog (Paraglide)**: paraglide_compile, build_check. There is **no extract step** (keys are authored by hand, not extracted). On the **default PO** format `.po` carries `#.` comments, so a comment_review_pass over the base `.po` **does** apply, plus an ICU plural-render sanity check (see below). On the **ICU-JSON** format (`catalogFormat === "json"`) there is **no comment_review_pass** (the inlang/ICU JSON model has no translator-comment field).

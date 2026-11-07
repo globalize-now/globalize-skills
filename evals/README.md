@@ -71,13 +71,13 @@ Layer 1 needs `jsonschema` (`pip install jsonschema`); without it that layer war
 2. Copy the fixture's **prefill** into `.globalize/` so the skill skips Phase 1.
 3. `npm install` the fixture's baseline deps.
 4. Run `claude -p` with a "resume" prompt → the skill runs Phase 2 to completion.
-5. Verify: `verify-setup.sh` (dispatches to the per-library checker), `check-behavior.sh`, and `verify-string-wrapping.sh` (if an expectations file exists).
+5. Verify: `verify-setup.sh` (dispatches to the per-library checker), `check-behavior.sh`, `verify-string-wrapping.sh` (if an expectations file exists), and `verify-plan-tracking.sh` (every box in `.globalize/plan.md` ticked, Phase 2 expanded into detail items).
 
 **Headless** (`run-eval-headless.sh`):
 1. Prepare the fixture, `npm ci`, and commit it as a git baseline.
 2. Install the skill into every directory in `SKILL_DIRS` (default `.claude/skills`).
 3. Run `AGENT_CMD` (default `claude -p`) with the fixture's `headlessPrompt` — every Phase 1 answer, including "upgrade Vite if the version gate fires".
-4. Verify with `verify-lingui-conversion.sh` against `expectations/conversion/<fixture>.json`: Vite ≥ 6.3, one `@lingui/*` version, no `@lingui/macro`, runtime packages in `dependencies`, no invalid peers and no `--legacy-peer-deps` in the transcript; a macro transform wired; no `require(`, `'use client'`, effect-based activation or path-locale detection; `.po` catalogs with no `#~`; every placeholder named and no literal `${…}` in a msgid; the expected msgids (ICU plural, `<strong>` inside its sentence, attributes with their values); data modules kept as `msg` descriptors, never unrolled; no `=== 1 ?` ternaries, literal attributes, `en-US`, locale-less `toLocale*String()`, `toFixed()` or symbol concatenation; untouched lines left verbatim; a passing build with no macro stub and no `require(` in `dist/`; and, when Chrome is installed, the app rendering in the target locale.
+4. Verify the checklist with `verify-plan-tracking.sh`, and the project with `verify-lingui-conversion.sh` against `expectations/conversion/<fixture>.json`: Vite ≥ 6.3, one `@lingui/*` version, no `@lingui/macro`, runtime packages in `dependencies`, no invalid peers and no `--legacy-peer-deps` in the transcript; a macro transform wired; no `require(`, `'use client'`, effect-based activation or path-locale detection; `.po` catalogs with no `#~`; every placeholder named and no literal `${…}` in a msgid; the expected msgids (ICU plural, `<strong>` inside its sentence, attributes with their values); data modules kept as `msg` descriptors, never unrolled; no `=== 1 ?` ternaries, literal attributes, `en-US`, locale-less `toLocale*String()`, `toFixed()` or symbol concatenation; untouched lines left verbatim; a passing build with no macro stub and no `require(` in `dist/`; and, when Chrome is installed, the app rendering in the target locale.
 
 The verifier was checked against a hand-converted solution of `vite5-react18-brewline` (all checks pass) and against the unconverted fixture, a bare-`lingui()` build, and a `require()` catalog loader (each fails on the expected checks).
 

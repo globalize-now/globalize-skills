@@ -4,7 +4,9 @@ Loaded by SKILL.md §1.11 (writing `plan.md` / `decisions.md`) and by every work
 
 ### `plan.md`
 
-Markdown with YAML frontmatter for metadata. Body uses strict checklist syntax (`- [ ] step_id`) so the orchestrator can parse it.
+Markdown with YAML frontmatter for metadata. Body uses strict checklist syntax (`- [ ] step_id`) so the orchestrator can parse it. This file is the run's live checklist: `checklist.md` says who ticks what and how workers expand steps into detail items.
+
+**Write a concrete plan, not a copy of the skeleton.** Resolve each `{placeholder}`, keep only the steps and verify arm that apply to this stack and scope, and drop every HTML comment: the end-of-run check greps for open boxes, so a `- [ ]` left inside a comment would read as unfinished work.
 
 Skeleton:
 ```markdown
@@ -25,6 +27,10 @@ Branch: {decision summary}
 ## Phase 1.5 — Globalize account
 Orchestrator-owned steps (main thread, delegated to `globalize-now-account-setup`):
 - [ ] delegate_account_setup
+  - [ ] install the Globalize CLI
+  - [ ] sign in
+  - [ ] verify auth
+  - [ ] record the org in decisions.md
 
 ## Phase 2 — Setup
 Subagent: `setup`
@@ -101,12 +107,19 @@ Partitions: {N} wrap subagents covering {file count} files
      Never omit it and never report it as null. -->
 - [ ] format_violations_check
 
+### wrap-up
+Orchestrator-owned steps (§3.6; on `needs_cleanup`, first append `### wrap-cleanup-{round}` sections per `cleanup-loop.md`):
+- [ ] report_phase3_summary   <!-- cost estimate, plus every residual and format violation with file + line -->
+
 <!-- Include the Phase 4 section only when decisions.scope.globalize === true -->
 ## Phase 4 — Globalize project
 Orchestrator-owned steps (main thread; the last two delegated to `globalize-now-project-setup`):
 - [ ] assemble_globalize_inputs
 - [ ] push_setup   <!-- §4.2: the converted catalogs must be on the remote before Globalize can translate them -->
 - [ ] delegate_project_setup
+  - [ ] connect the git provider
+  - [ ] reuse the only project or create one
+  - [ ] connect the repo and set catalog patterns
 - [ ] start_first_translation   <!-- done when the project skill reports the first translation started (pull request delivery) -->
 ```
 

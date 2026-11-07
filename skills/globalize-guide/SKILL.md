@@ -42,6 +42,10 @@ Stages 1.5 and 4 run only when Globalize stays in scope (default-on; §1.6). Acc
 2. **Stack-specific files come from `manifest.json`.** Its `stacks[]` entries each carry `match` (the §1.3 predicate), `packages` (`runtime` / `dev`, pinned) and `references`: `setup` (array, read in order), `convert` (array, read in order), `rulesTemplate`, optional `optional.*`. All paths are relative to this skill's directory. After §1.11, read `.globalize/manifest-snapshot.json` (the frozen chosen entry) instead of the live manifest.
 3. **Read before you edit.** Every reference a step names is read **in full, before the first project file is edited for that step**. If a tool truncates or pages output, keep reading by offset / line range until the end of the file — never act on a partial file. Ordering and ownership rules for multi-file arrays: `references/orchestrator/reading-references.md`.
 
+### Track the run in `plan.md`
+
+`.globalize/plan.md` is the run's checklist, written at §1.11 and kept current to the end. Workers add a detailed item per action and check before their first edit; everyone ticks as they go; after compaction or a resume, the first open box is the next thing to do. No phase is done while its boxes are open. Rules: `references/orchestrator/checklist.md` — read it before §1.11. Phase 1 stays out of the file (a hard stop must leave no plan): use your harness's todo tool for §1.1–1.12 if it has one.
+
 ### Execution mode
 
 **Default — subagents.** The orchestrator asks the Phase 1 questions, writes the plan, dispatches workers, polls, and surfaces results; all project-file edits, build commands and reference reading for Phases 2–3 happen inside workers. Phase 1.1 inspect runs as a foreground subagent; Phase 2 setup, Phase 3 wrap (all partitions in **one** tool-use message, so they run in parallel) and verify run in the background, and the orchestrator polls `.globalize/progress/*.json`. Each worker's full prompt is its `references/orchestrator/*-subagent.md` / `inspect.md` file — pass the worker that file's path plus the paths it lists, not a paraphrase.
@@ -75,7 +79,7 @@ Created in the **target project root**. Every artifact the orchestrator and work
 .globalize/
   detection.json              # Phase 1.1 output
   decisions.md                # frozen user choices from Phase 1
-  plan.md                     # executable plan for phases 1.5/2/3/4
+  plan.md                     # the plan and live checklist for phases 1.5/2/3/4
   manifest-snapshot.json      # frozen copy of the chosen manifest entry
   rules-values.json           # resolved template values (Phase 2 generate_coding_rules)
   format-module.json          # formatters module record (Phase 2 generate_format_helpers)
@@ -87,7 +91,7 @@ Created in the **target project root**. Every artifact the orchestrator and work
 
 **First run.** If `.globalize/` is absent, create it and append `/.globalize/` to the project's `.gitignore` (create the file if missing; if it already has rules, show the diff first). Tell the user: "Created `.globalize/` in your project root and added it to `.gitignore`. It holds local progress files, decisions, and plans so we can resume mid-run and you can audit what was decided. It stays out of git." The project's **own** generated i18n artifacts (compiled catalogs) are ignored later by Phase 2's `gitignore_artifacts` step, never here.
 
-**Resume.** If `.globalize/` exists, read `plan.md` and `progress/*.json`. If a plan is in flight: "Found an in-progress i18n setup at `.globalize/`. Last completed step: `<step>`. Want me to resume from there, or start over with a fresh plan?" Globalize auth lives in `~/.globalize/config.json` / `GLOBALIZE_API_KEY`, never in `.globalize/` — on resume, just re-delegate; both Globalize skills are idempotent (the account skill self-skips when `auth status` is valid; in orchestrated mode the project skill reuses the organisation's project when it is the only one, and a repository already connected to it). That is why Phase 4 has no progress file.
+**Resume.** If `.globalize/` exists, read `plan.md` and `progress/*.json`; completed phases' progress files are archived, so the boxes in `plan.md` are the record, and an open box is re-checked even if a progress file lists it as completed. If a plan is in flight: "Found an in-progress i18n setup at `.globalize/`. Last completed step: `<last ticked step>`. Want me to resume from there, or start over with a fresh plan?" Globalize auth lives in `~/.globalize/config.json` / `GLOBALIZE_API_KEY`, never in `.globalize/` — on resume, just re-delegate; both Globalize skills are idempotent (the account skill self-skips when `auth status` is valid; in orchestrated mode the project skill reuses the organisation's project when it is the only one, and a repository already connected to it). That is why Phase 4 has no progress file.
 
 ---
 
@@ -162,7 +166,7 @@ Multi-select: ESLint plugin, CI/CD integration (extract+compile in build), test 
 
 ### 1.11 Write `plan.md`, `decisions.md`, `manifest-snapshot.json`
 
-"Got everything I need. Writing your plan to `.globalize/plan.md` and your choices to `.globalize/decisions.md` so this run is auditable and resumable." Formats: `references/orchestrator/plan-format.md`. Copy the chosen manifest entry verbatim to `manifest-snapshot.json`.
+"Got everything I need. Writing your plan to `.globalize/plan.md` and your choices to `.globalize/decisions.md` so this run is auditable and resumable." Formats: `references/orchestrator/plan-format.md`; tracking rules: `references/orchestrator/checklist.md`. Copy the chosen manifest entry verbatim to `manifest-snapshot.json`.
 
 ### 1.12 Final go
 
@@ -193,7 +197,7 @@ One setup worker. The orchestrator installs packages on the main thread first (l
 3. **Never `--legacy-peer-deps` / `--force`.** An `ERESOLVE` is a version gate the plan missed: stop and surface it — do not retry with a flag.
 4. Lingui v6 needs **Node ≥ 22.19 or ≥ 24** (ESM-only). Check `node -v` / `.nvmrc` / `engines` first; older → tell the user and pause.
 
-Both lists are empty by design for Rails (gems install inside the worker, `bundle install`), Android and Swift (platform built-ins) — 2.0 is a no-op there, not an error. **Angular** runs `ng_add_localize` here instead: `npx ng add '@angular/localize@^<major>' --skip-confirmation --use-at-runtime --project <decisions.setup.angularProject>` (`<major>` = detection `version` major; `pnpm exec` / `yarn` / `bunx` for other managers). Install failure → stop the run with the error.
+Both lists are empty by design for Rails (gems install inside the worker, `bundle install`), Android and Swift (platform built-ins) — 2.0 is a no-op there, not an error. **Angular** runs `ng_add_localize` here instead: `npx ng add '@angular/localize@^<major>' --skip-confirmation --use-at-runtime --project <decisions.setup.angularProject>` (`<major>` = detection `version` major; `pnpm exec` / `yarn` / `bunx` for other managers). Install failure → stop the run with the error. Tick each of these steps in `plan.md` as it finishes.
 
 ### 2.1 Pre-create `progress/setup.json`
 
@@ -205,11 +209,11 @@ Dispatch in the background with `references/orchestrator/setup-subagent.md` as t
 
 ### 2.3 Poll
 
-Every 30–60 s read `progress/setup.json`, update one todo per `plan` step, surface `currentDetail`.
+Every 30–60 s read `progress/setup.json` and the Phase 2 section of `plan.md`, mirror the steps into your todo tool if you have one, surface `currentDetail`. The worker owns `plan.md` while it runs; do not write to it.
 
 ### 2.4 On completion
 
-- `succeeded` → archive to `progress/archive/<timestamp>/`, summarize files created / modified / verification. "Setup verified — {stack's verification summary, from `messages.md`}. Files created: {N}, modified: {M}. Moving on to Phase 3."
+- `succeeded` → check Phase 2 of `plan.md` for open boxes (`checklist.md`, "Before reporting done"); if any remain, the phase is not finished. Otherwise archive to `progress/archive/<timestamp>/`, summarize files created / modified / verification. "Setup verified — {stack's verification summary, from `messages.md`}. Files created: {N}, modified: {M}. Moving on to Phase 3."
 - `failed` → archive, show the error: "Setup hit an error during `{step}`: {summary}. Want me to retry, edit the plan, or stop here?"
 - `needs_decision` → ask, append the answer to `decisions.md`, re-dispatch (it resumes from `completed`). "The setup worker paused — it needs you to decide on `{question}`."
 
@@ -231,7 +235,7 @@ Each partition gets `references/orchestrator/wrap-subagent.md` as its prompt, wi
 
 ### 3.3 Poll / 3.4 wait
 
-Every 30–60 s read all `wrap-N.json` ("wrap-1: 3/8 files, wrap-2: 4/4 ✓"). `needs_decision` → ask and re-dispatch as in Phase 2. `failed` → surface it; verify still runs over what succeeded unless the failure is catastrophic.
+Every 30–60 s read all `wrap-N.json` ("wrap-1: 3/8 files, wrap-2: 4/4 ✓") and tick their completed files in `plan.md`. Wrap workers never write that file, so tick the final state before dispatching verify. `needs_decision` → ask and re-dispatch as in Phase 2. `failed` → surface it; verify still runs over what succeeded unless the failure is catastrophic.
 
 ### 3.5 Run the verify worker
 
@@ -245,7 +249,7 @@ On `status: "needs_cleanup"`, follow `references/orchestrator/cleanup-loop.md`: 
 
 Parse the source catalog for a word count (`result.catalogPath`: the extracted `.po` on Lingui; the source XLIFF's `<source>` text on Angular; the source YAML on Rails; `res/values/strings.xml` on Android; `_locales/{sourceLocale}/messages.json` on a native extension): "Phase 3 complete. Catalog: **{totalMessages}** messages, ~**{wordCount}** words. Translating into **{N}** target locales (`{targets}`) would cost roughly **~${estimate}** on Globalize.now." Prepend the self-heal summary when `stringsWrappedInCleanup > 0`. When `result.formatViolations` is non-empty, append every entry **with file + line** — never a bare count, never omitted because the catalog gate passed.
 
-Globalize in scope → "Moving on to Phase 4 — pushing this setup, creating your Globalize project, connecting the repo and starting the first translation. You're already signed in, so this is mostly automated (one quick browser approval for the GitHub/GitLab app)." Otherwise → "Skipping the translation-platform step. Re-run `globalize-guide` with `connect translation platform` checked when you're ready."
+Globalize in scope → "Moving on to Phase 4 — pushing this setup, creating your Globalize project, connecting the repo and starting the first translation. You're already signed in, so this is mostly automated (one quick browser approval for the GitHub/GitLab app)." Otherwise → "Skipping the translation-platform step. Re-run `globalize-guide` with `connect translation platform` checked when you're ready." Tick `report_phase3_summary` once this message is out.
 
 ### Phase 3 collapse-cases
 
@@ -275,13 +279,15 @@ Write `firstTranslationBranch` into `globalize-inputs.json`: the pushed branch, 
 
 ### 4.3 Re-check auth
 
-Delegate a quick `auth status` check; not authenticated → invoke `globalize-now-account-setup` first.
+Delegate a quick `auth status` check; not authenticated → invoke `globalize-now-account-setup` first, then tick `delegate_account_setup` if it is still open.
 
 ### 4.4 Delegate to `globalize-now-project-setup` (main thread)
 
 Invoke it via the Skill tool (from disk if the Skill tool can't load it — Execution mode): "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect the git provider (one browser approval if the GitHub App / GitLab OAuth isn't installed yet), reuse the organisation's project if it is the only one or create one, connect the repo, set the catalog patterns from the supplied `localePathPattern` + `fileFormat`, and start the first translation of `firstTranslationBranch` as a pull request." The skill owns the whole CLI surface. Mark `delegate_project_setup` done, and `start_first_translation` once its summary reports the translation started.
 
 ### 4.5 Finish
+
+Run the end-of-run check in `checklist.md` first. A run that ends before Phase 4 runs it at its last phase instead. Open boxes → list them and why instead of the messages below. A first translation that was not started is `[x] start_first_translation — skipped: <why>`, not an open box.
 
 Translation started → "All set. Project: **{projectUrl}**. Repo connected, catalog patterns wired, and the first translation of `{branch}` has started — Globalize opens a pull request with the translated catalogs when it's done; merge it to ship them. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI) for ongoing translation work — tracking status, requesting new languages."
 

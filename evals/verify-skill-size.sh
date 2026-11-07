@@ -17,6 +17,8 @@ set -uo pipefail
 #   3. globalize-guide: every `references/...` path named in SKILL.md or in
 #      references/orchestrator/*.md exists, and every orchestrator file is reachable
 #      (named by SKILL.md or by another orchestrator file).
+#   4. globalize-guide: every worker prompt points at the checklist rules. A worker that
+#      never reads them leaves plan.md stale, and a stale checklist misleads a resume.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -59,7 +61,7 @@ SKILL="$GUIDE/SKILL.md"
 echo ""
 echo "--- 2. globalize-guide: essentials in the first $HEAD_LIMIT bytes ---"
 HEAD_TEXT="$(head -c "$HEAD_LIMIT" "$SKILL")"
-for marker in "### Phase map" "### How to load references" "manifest.json" "### Execution mode" "Single-agent fallback" "Read before you edit"; do
+for marker in "### Phase map" "### How to load references" "manifest.json" "### Track the run in" "### Execution mode" "Single-agent fallback" "Read before you edit"; do
   if printf '%s' "$HEAD_TEXT" | grep -qF -- "$marker"; then
     pass "'$marker' is within the first $HEAD_LIMIT bytes"
   else
@@ -88,6 +90,16 @@ for f in "$ORCH"/*.md; do
     pass "orchestrator/$base is referenced"
   else
     fail "orchestrator/$base is never referenced — nothing will load it"
+  fi
+done
+
+echo ""
+echo "--- 4. globalize-guide: worker prompts point at the checklist rules ---"
+for worker in setup-subagent.md wrap-subagent.md verify-subagent.md cleanup-loop.md; do
+  if grep -qF "checklist.md" "$ORCH/$worker"; then
+    pass "orchestrator/$worker names checklist.md"
+  else
+    fail "orchestrator/$worker does not name checklist.md — that worker will not keep plan.md current"
   fi
 done
 

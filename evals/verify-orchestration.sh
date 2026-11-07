@@ -118,6 +118,19 @@ else
   else
     pass "plan.md exists"
 
+    # The run's end check greps for open boxes, so the plan must be concrete: a checkbox
+    # inside a leftover skeleton comment, or an unresolved placeholder, reads as open work.
+    if grep -qF '<!--' "$PLAN_MD"; then
+      fail "plan.md still contains skeleton HTML comments (plan-format.md: drop them)"
+    else
+      pass "plan.md has no skeleton comments"
+    fi
+    if grep -qE '^[[:space:]]*- \[[ x]\] \{' "$PLAN_MD"; then
+      fail "plan.md has an unresolved {placeholder} step"
+    else
+      pass "plan.md has no unresolved placeholder steps"
+    fi
+
     EXPECTED_VARIANT=$(jq -r '.variant // empty' "$EXPECTED_PLAN_FILE")
     EXPECTED_LIBRARY=$(jq -r '.library // empty' "$EXPECTED_PLAN_FILE")
 

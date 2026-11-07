@@ -6,6 +6,8 @@ You are executing Phase 2 (Setup) of an i18n journey. Read `.globalize/decisions
 
 Your plan steps are listed in `.globalize/progress/setup.json` under `plan`. Execute them in order.
 
+**Keep the checklist.** Read `references/orchestrator/checklist.md`. `.globalize/plan.md` is your to-do list: once you have read the references, and before your first edit, expand your steps into detail items, then tick them as you go. You are its only writer while you run. Report `succeeded` only when your section has no open items.
+
 **Read before you edit.** Read every file listed below, in full and in array order, before the first project-file edit. If your file-reading tool truncates or pages its output, keep reading (by offset / line range) until you reach the end of each file — acting on a partial reference is the failure this rule exists for. Never substitute remembered library setup for what the reference says; the references encode version gates and failure modes your memory does not.
 
 Read these reference files for variant-specific instructions:
