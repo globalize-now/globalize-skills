@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import Table from "cli-table3";
+import { ApiError } from "./client.js";
 
 export interface OutputOptions {
   json?: boolean;
@@ -32,9 +33,25 @@ export function warnDeprecated(message: string): void {
   process.stderr.write(chalk.yellow(`Deprecated: ${message}`) + "\n");
 }
 
-export function outputError(message: string, opts: OutputOptions): void {
+/**
+ * Prints a failure and sets a non-zero exit code. Takes a message or what a
+ * command caught: an `ApiError` also carries its status, code and details into
+ * JSON output, so an agent can act on a refusal (`details` names the Project
+ * holding a repository, the Gates needing an admin, …) without parsing text.
+ */
+export function outputError(failure: unknown, opts: OutputOptions): void {
+  const message = typeof failure === "string" ? failure : failure instanceof Error ? failure.message : String(failure);
   if (isJsonMode(opts)) {
-    process.stdout.write(JSON.stringify({ error: message }) + "\n");
+    const body =
+      failure instanceof ApiError
+        ? {
+            error: message,
+            status: failure.status,
+            ...(failure.code === undefined ? {} : { code: failure.code }),
+            ...(failure.details === undefined ? {} : { details: failure.details }),
+          }
+        : { error: message };
+    process.stdout.write(JSON.stringify(body) + "\n");
   } else {
     process.stderr.write(chalk.red(`Error: ${message}`) + "\n");
   }

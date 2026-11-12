@@ -16,8 +16,9 @@
     "generate": "openapi-typescript ${GLOBALIZE_API_URL:-https://api.globalize.now}/api/docs/json -o src/api-types.ts",
     "build": "npm run generate && tsc",
     "dev": "tsc --watch",
-    "lint": "eslint src/ && prettier --check src/ && tsc --noEmit",
-    "format": "eslint --fix src/ && prettier --write src/"
+    "test": "vitest run",
+    "lint": "eslint src/ test/ && prettier --check src/ test/ && tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "format": "eslint --fix src/ test/ && prettier --write src/ test/"
   },
   "engines": {
     "node": ">=18"
@@ -41,6 +42,7 @@
     "openapi-typescript": "^7.6.0",
     "prettier": "^3.8.1",
     "typescript": "^5.8.0",
-    "typescript-eslint": "^8.58.0"
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^5.1.0"
   }
 }

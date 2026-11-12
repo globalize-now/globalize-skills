@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 
 type ClientFactory = () => Promise<ApiClient>;
@@ -9,7 +9,7 @@ export async function listProjectLanguages(client: ApiClient, projectId: string)
   const { data, error, response } = await client.GET("/api/projects/{id}/languages", {
     params: { path: { id: projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -24,7 +24,7 @@ export async function addProjectLanguage(
     params: { path: { id: projectId } },
     body: { name, locale, languageId },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -32,7 +32,7 @@ export async function removeProjectLanguage(client: ApiClient, projectId: string
   const { data, error, response } = await client.DELETE("/api/projects/{id}/languages/{languageId}", {
     params: { path: { id: projectId, languageId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { removed: true };
 }
 
@@ -47,7 +47,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listProjectLanguages(client, cmdOpts.projectId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -67,7 +67,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           opts,
         );
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -82,7 +82,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await removeProjectLanguage(client, cmdOpts.projectId, cmdOpts.languageId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

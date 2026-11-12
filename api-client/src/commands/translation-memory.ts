@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, warnDeprecated, type OutputOptions } from "../format.js";
 import {
   clearTranslationMemory,
@@ -52,7 +52,7 @@ async function resolveProjectMemory(client: ApiClient, projectId: string): Promi
   const { data, error, response } = await client.GET("/api/projects/{id}", {
     params: { path: { id: projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   const project = data!;
 
   const localeByProjectLanguageId = new Map<string, string>();
@@ -160,7 +160,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.cursor !== undefined) query.cursor = cmdOpts.cursor;
         output(await listTranslationMemory(client, cmdOpts.projectId, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -176,7 +176,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteTranslationMemoryEntry(client, cmdOpts.projectId, cmdOpts.entryId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -194,7 +194,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.targetLanguageId !== undefined) query.targetProjectLanguageId = cmdOpts.targetLanguageId;
         output(await countTranslationMemory(client, cmdOpts.projectId, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -211,7 +211,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const query: FreshCountQuery = { targetProjectLanguageId: cmdOpts.targetLanguageId };
         output(await freshCountTranslationMemory(client, cmdOpts.projectId, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

@@ -1,6 +1,6 @@
 import { Command, Option } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
@@ -10,7 +10,7 @@ type ClientFactory = () => Promise<ApiClient>;
 
 export async function getBalance(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/billing/balance");
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -18,7 +18,7 @@ export async function getLedger(client: ApiClient, query: LedgerQuery) {
   const { data, error, response } = await client.GET("/api/billing/ledger", {
     params: { query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -32,7 +32,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getBalance(client), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -64,7 +64,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.cursor !== undefined) query.cursor = cmdOpts.cursor;
         output(await getLedger(client, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

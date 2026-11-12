@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { openInBrowser } from "../device-auth.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 
@@ -9,7 +9,7 @@ type ClientFactory = () => Promise<ApiClient>;
 
 export async function startGitlabInstall(client: ApiClient) {
   const { data, error, response } = await client.POST("/api/gitlab/cli-install");
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -17,13 +17,13 @@ export async function pollGitlabInstallStatus(client: ApiClient, nonce: string) 
   const { data, error, response } = await client.GET("/api/gitlab/cli-install/status", {
     params: { query: { nonce } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
 export async function listGitlabConnections(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/gitlab/connections");
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -31,7 +31,7 @@ export async function deleteGitlabConnection(client: ApiClient, id: string) {
   const { data, error, response } = await client.DELETE("/api/gitlab/connections/{id}", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -39,7 +39,7 @@ export async function listGitlabProjects(client: ApiClient, connectionId: string
   const { data, error, response } = await client.GET("/api/gitlab/connections/{id}/projects", {
     params: { path: { id: connectionId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -47,7 +47,7 @@ export async function listGitlabProjectBranches(client: ApiClient, connectionId:
   const { data, error, response } = await client.GET("/api/gitlab/connections/{id}/projects/{projectId}/branches", {
     params: { path: { id: connectionId, projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -56,7 +56,7 @@ export async function detectGitlabProject(client: ApiClient, connectionId: strin
     params: { path: { id: connectionId, projectId } },
     body: {},
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -104,7 +104,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           }
         }
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -119,7 +119,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const status = await pollGitlabInstallStatus(client, cmdOpts.nonce);
         output(status, opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -132,7 +132,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listGitlabConnections(client), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -146,7 +146,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteGitlabConnection(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -160,7 +160,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listGitlabProjects(client, cmdOpts.connectionId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -175,7 +175,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listGitlabProjectBranches(client, cmdOpts.connectionId, Number(cmdOpts.projectId)), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -190,7 +190,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await detectGitlabProject(client, cmdOpts.connectionId, Number(cmdOpts.projectId)), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

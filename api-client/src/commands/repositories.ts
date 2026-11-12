@@ -1,6 +1,6 @@
 import { Command, Option } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { FileFormat } from "../file-formats.js";
 
@@ -10,7 +10,7 @@ export async function listRepositories(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/repositories", {
     params: { query: { projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -58,7 +58,7 @@ export async function createRepository(
       detectedFramework: options.detectedFramework,
     },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -80,7 +80,7 @@ export async function updateRepository(
     params: { path: { id } },
     body: updates,
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -88,7 +88,7 @@ export async function deleteRepository(client: ApiClient, id: string) {
   const { data, error, response } = await client.DELETE("/api/repositories/{id}", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -96,7 +96,7 @@ export async function detectRepository(client: ApiClient, id: string) {
   const { data, error, response } = await client.POST("/api/repositories/{id}/detect", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -104,7 +104,7 @@ export async function listRepositoryBranches(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/repositories/{id}/branches", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -112,7 +112,7 @@ export async function discoverRepository(client: ApiClient, id: string) {
   const { data, error, response } = await client.POST("/api/repositories/{id}/discover", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -128,7 +128,7 @@ export async function translateRepository(
     params: { path: { id } },
     body: { branch: options.branch, deliveryMode: options.deliveryMode },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -143,7 +143,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listRepositories(client, cmdOpts.projectId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -182,7 +182,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           opts,
         );
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -213,7 +213,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.importScope !== undefined) updates.importScope = cmdOpts.importScope;
         output(await updateRepository(client, cmdOpts.id, updates), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -227,7 +227,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteRepository(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -241,7 +241,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await detectRepository(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -255,7 +255,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listRepositoryBranches(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -269,7 +269,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await discoverRepository(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -291,7 +291,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           opts,
         );
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

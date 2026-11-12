@@ -1,6 +1,6 @@
 import { Command, Option } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import { FILE_FORMATS, type FileFormat } from "../file-formats.js";
 
@@ -10,7 +10,7 @@ export async function listPatterns(client: ApiClient, repositoryId: string) {
   const { data, error, response } = await client.GET("/api/repositories/{id}/patterns", {
     params: { path: { id: repositoryId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -25,7 +25,7 @@ export async function createPattern(
     params: { path: { id: repositoryId } },
     body: { pattern, fileFormat, position },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -42,7 +42,7 @@ export async function updatePattern(
     params: { path: { repoId, patternId } },
     body: updates,
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -50,7 +50,7 @@ export async function deletePattern(client: ApiClient, repoId: string, patternId
   const { data, error, response } = await client.DELETE("/api/repositories/{repoId}/patterns/{patternId}", {
     params: { path: { repoId, patternId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -59,7 +59,7 @@ export async function reorderPattern(client: ApiClient, repositoryId: string, pa
     params: { path: { id: repositoryId } },
     body: { patternId, position },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -75,7 +75,7 @@ export async function bulkCreatePatterns(
     params: { path: { id: repositoryId } },
     body: { patterns },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -96,7 +96,7 @@ export async function setPatternPathLocale(
     params: { path: { repoId, patternId } },
     body: { projectLanguageId, pathLocale },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -111,7 +111,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listPatterns(client, cmdOpts.repositoryId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -131,7 +131,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           opts,
         );
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -151,7 +151,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.fileFormat !== undefined) updates.fileFormat = cmdOpts.fileFormat;
         output(await updatePattern(client, cmdOpts.repositoryId, cmdOpts.patternId, updates), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -166,7 +166,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deletePattern(client, cmdOpts.repositoryId, cmdOpts.patternId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -182,7 +182,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await reorderPattern(client, cmdOpts.repositoryId, cmdOpts.patternId, cmdOpts.position), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -203,7 +203,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         }
         output(await bulkCreatePatterns(client, cmdOpts.repositoryId, patterns), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -228,7 +228,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           opts,
         );
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

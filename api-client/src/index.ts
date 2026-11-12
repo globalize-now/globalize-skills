@@ -1,5 +1,5 @@
 // Client and auth
-export { createApiClient, type ApiClient } from "./client.js";
+export { createApiClient, extractError, ApiError, USER_AGENT, type ApiClient } from "./client.js";
 export { resolveAuth, readConfigFile, writeConfigFile, deleteConfigFile, type AuthConfig } from "./auth.js";
 
 // Orgs
@@ -90,6 +90,26 @@ export {
   listJobFiles,
   redeliverJob,
 } from "./commands/jobs.js";
+
+// Workflows
+export {
+  previewWorkflowSetup,
+  setUpWorkflow,
+  listWorkflows,
+  getWorkflow,
+  getWorkflowVersion,
+  setWorkflowLanguages,
+  startWorkflowRun,
+  getWorkflowRun,
+  listWorkflowRuns,
+  summariseWorkflowRun,
+  type WorkflowSetupBody,
+  type WorkflowSetupPattern,
+  type WorkflowImportMode,
+  type StartWorkflowRunBody,
+  type RunDelivery,
+  type WorkflowRun,
+} from "./commands/workflows.js";
 
 // Namespaces
 export { listNamespaces, updateNamespace, deleteNamespace } from "./commands/namespaces.js";
