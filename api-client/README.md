@@ -54,6 +54,8 @@ Global options:
 | **style-guides** | `list`, `upsert`, `delete` | Set translation style instructions |
 | **api-keys** | `list`, `create`, `revoke` | Manage API keys |
 | **members** | `list`, `invite`, `remove` | Manage organisation members |
+| **workflows** | `preview-setup`, `setup`, `list`, `get`, `languages` | Set up a GitHub Workflow and change its target languages |
+| **workflows runs** | `start`, `list`, `get` | Start a Workflow run and follow it |
 
 ### Examples
 
@@ -70,6 +72,48 @@ globalise-now-cli repositories create <project-id> https://github.com/org/repo g
 # Add a glossary entry
 globalise-now-cli glossary create <project-id> "Sign up" "S'inscrire" <source-lang-id> <target-lang-id>
 ```
+
+### Workflows
+
+Setting up a Workflow for a GitHub repository takes two calls. `preview-setup` writes nothing: it detects the repository's locale files and answers one of
+
+- `ready: true` with the definition it would publish, the file groups it left out as unlikely (`excludedGroups`) and a `previewHash`;
+- `ready: false` with `needs`, each naming what was found and the option to pass (a language is never guessed);
+- `ready: false` with `alreadySetUp`, naming the Workflow that holds the repository.
+
+`setup` takes the same options plus `--preview-hash` and publishes version 1. It is refused with `WORKFLOW_PREVIEW_STALE` when anything changed since the preview, and with `WORKFLOW_REPOSITORY_CLAIMED` when a Workflow already holds the repository, so a retry never creates a second one. Neither call starts a run.
+
+```bash
+# Installation id from `github installations`
+globalise-now-cli workflows preview-setup --installation-id 12345 --repository acme/web
+
+# Apply what the user asked for: any of --branches, --patterns, --source-language,
+# --target-languages, --name, --translation-memory-id, --import ignore|reviewed|translated
+globalise-now-cli workflows preview-setup --installation-id 12345 --repository acme/web \
+  --source-language en --target-languages fr,de \
+  --patterns '[{"pattern":"_locales/{locale}/messages.json","format":"chrome-messages","pathLocales":{"pt-BR":"pt_BR"}}]'
+
+# Publish what the preview proposed: the same options plus its previewHash
+globalise-now-cli workflows setup --installation-id 12345 --repository acme/web \
+  --source-language en --target-languages fr,de --patterns '[...]' --preview-hash <hash>
+
+# Replace the target languages (refused with WORKFLOW_BASE_VERSION_STALE if another version was published since)
+globalise-now-cli workflows languages --id <workflow-id> --target-languages fr,de,ja
+
+# Start a run (spends credits). A GitHub Workflow delivers by pull request unless --delivery push
+globalise-now-cli workflows runs start --workflow-id <workflow-id>
+
+# Poll it: status, failure, per-language progress, each Output's outcome and the pull request
+globalise-now-cli workflows runs get --id <run-id>
+```
+
+A `completed` run has finished translating; it does not mean the translations were delivered. Check each Output's `outcome` (null until it has run, then `delivered`, `failed` or `skipped`). `runs get --full` prints the whole run.
+
+### Errors
+
+A failed command exits 1. In JSON mode (`--json`, or whenever stdout isn't a terminal) it prints `{ "error": "<message>", "status": <http status>, "code": "<API code>", "details": … }`, with `code` and `details` as the API answered them; for example a 409 `REPOSITORY_HELD_BY_PROJECT` names the Project in `details`. A 401 reads "Authentication failed"; a 403 that isn't about authentication (`FEATURE_REQUIRED`, `WORKFLOW_GATE_ADMIN_REQUIRED`, …) keeps its code and message.
+
+Every request sends `User-Agent: globalize-cli-client/<version>`.
 
 ## Library Usage
 
@@ -108,6 +152,7 @@ const project = await createProject(client, "My App", "en", ["fr", "de"]);
 | Style Guides | `listStyleGuides`, `upsertStyleGuide`, `deleteStyleGuide` |
 | API Keys | `listApiKeys`, `createApiKey`, `revokeApiKey` |
 | Members | `listMembers`, `inviteMember`, `removeMember` |
+| Workflows | `previewWorkflowSetup`, `setUpWorkflow`, `listWorkflows`, `getWorkflow`, `getWorkflowVersion`, `setWorkflowLanguages`, `startWorkflowRun`, `getWorkflowRun`, `listWorkflowRuns`, `summariseWorkflowRun` |
 
 ## Development
 
@@ -118,6 +163,7 @@ cd api-client
 npm install
 npm run build    # Generate API types from OpenAPI spec + compile TypeScript
 npm run dev      # Watch mode (TypeScript only)
+npm test         # Command tests against a mocked API
 npm run lint     # ESLint + Prettier + type check
 npm run format   # Auto-fix lint and formatting
 ```

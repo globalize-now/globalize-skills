@@ -1,6 +1,6 @@
 import { Option, type Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
@@ -11,7 +11,7 @@ type ClientFactory = () => Promise<ApiClient>;
 
 export async function listProjects(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/projects");
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -26,7 +26,7 @@ export async function createProject(
   const { data, error, response } = await client.POST("/api/projects", {
     body: { name, sourceLanguage, targetLanguages, config, translationMemoryId },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -34,7 +34,7 @@ export async function getProject(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -43,7 +43,7 @@ export async function updateProject(client: ApiClient, id: string, updates: Proj
     params: { path: { id } },
     body: updates,
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -51,7 +51,7 @@ export async function deleteProject(client: ApiClient, id: string) {
   const { data, error, response } = await client.DELETE("/api/projects/{id}", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -59,7 +59,7 @@ export async function getProjectRefs(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/refs", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -67,7 +67,7 @@ export async function listProjectScorecards(client: ApiClient, limit?: number) {
   const { data, error, response } = await client.GET("/api/projects/scorecards", {
     params: { query: limit !== undefined ? { limit } : {} },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -75,7 +75,7 @@ export async function getProjectBudget(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/budget", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -83,7 +83,7 @@ export async function rotateWebhookSecret(client: ApiClient, id: string) {
   const { data, error, response } = await client.POST("/api/projects/{id}/webhook-secret/rotate", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -97,7 +97,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listProjects(client), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -144,7 +144,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           opts,
         );
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -199,7 +199,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         }
         output(await updateProject(client, cmdOpts.id, updates), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -213,7 +213,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getProject(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -227,7 +227,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteProject(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -241,7 +241,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getProjectRefs(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -255,7 +255,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listProjectScorecards(client, cmdOpts.limit), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -269,7 +269,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getProjectBudget(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -283,7 +283,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await rotateWebhookSecret(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

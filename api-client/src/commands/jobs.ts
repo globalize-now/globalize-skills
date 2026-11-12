@@ -1,6 +1,6 @@
 import { Command, Option } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
@@ -23,7 +23,7 @@ export async function listJobs(client: ApiClient, query: ListJobsQuery) {
   const { data, error, response } = await client.GET("/api/jobs", {
     params: { query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -31,7 +31,7 @@ export async function getJob(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/jobs/{id}", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -39,7 +39,7 @@ export async function startJob(client: ApiClient, id: string) {
   const { data, error, response } = await client.POST("/api/jobs/{id}/start", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -47,7 +47,7 @@ export async function retryJob(client: ApiClient, id: string) {
   const { data, error, response } = await client.POST("/api/jobs/{id}/retry", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -55,7 +55,7 @@ export async function getJobStats(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/jobs/{id}/stats", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -63,7 +63,7 @@ export async function getQaReport(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/jobs/{id}/qa-report", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -72,7 +72,7 @@ export async function dismissQa(client: ApiClient, id: string, body: QaDismissBo
     params: { path: { id } },
     body,
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -81,7 +81,7 @@ export async function undismissQa(client: ApiClient, id: string, body: QaUnDismi
     params: { path: { id } },
     body,
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -89,7 +89,7 @@ export async function exportJob(client: ApiClient, id: string, query: ExportQuer
   const { data, error, response } = await client.GET("/api/jobs/{id}/export", {
     params: { path: { id }, query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { exported: true };
 }
 
@@ -97,7 +97,7 @@ export async function exportJobManifest(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/jobs/{id}/export/manifest", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -105,7 +105,7 @@ export async function listJobUnits(client: ApiClient, jobId: string, query: List
   const { data, error, response } = await client.GET("/api/jobs/{jobId}/units", {
     params: { path: { jobId }, query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -113,7 +113,7 @@ export async function getJobUnit(client: ApiClient, jobId: string, unitId: strin
   const { data, error, response } = await client.GET("/api/jobs/{jobId}/units/{unitId}", {
     params: { path: { jobId, unitId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -121,7 +121,7 @@ export async function listJobFiles(client: ApiClient, id: string, query: ListFil
   const { data, error, response } = await client.GET("/api/jobs/{id}/files", {
     params: { path: { id }, query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -129,7 +129,7 @@ export async function redeliverJob(client: ApiClient, id: string) {
   const { data, error, response } = await client.POST("/api/jobs/{id}/redeliver", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -152,7 +152,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.offset !== undefined) query.offset = cmdOpts.offset;
         output(await listJobs(client, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -166,7 +166,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getJob(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -180,7 +180,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await startJob(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -194,7 +194,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await retryJob(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -208,7 +208,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getJobStats(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -222,7 +222,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getQaReport(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -230,7 +230,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .command("qa-dismiss")
     .description("Dismiss a QA finding")
     .requiredOption("--id <id>", "Job UUID")
-    .requiredOption("--unit-id <id>", "Translation unit UUID")
+    .requiredOption("--source-group-id <id>", "Source group id of the QA finding")
     .requiredOption("--check-type <type>", "QA check type")
     .addOption(new Option("--reason <reason>", "Dismissal reason").choices([...QA_DISMISS_REASONS]))
     .option("--note <note>", "Optional dismissal note")
@@ -239,14 +239,14 @@ export function register(group: Command, getClient: ClientFactory): void {
       try {
         const client = await getClient();
         const body: QaDismissBody = {
-          unitId: cmdOpts.unitId,
+          sourceGroupId: cmdOpts.sourceGroupId,
           checkType: cmdOpts.checkType,
         };
         if (cmdOpts.reason !== undefined) body.reason = cmdOpts.reason as QaDismissReason;
         if (cmdOpts.note !== undefined) body.note = cmdOpts.note;
         output(await dismissQa(client, cmdOpts.id, body), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -254,19 +254,19 @@ export function register(group: Command, getClient: ClientFactory): void {
     .command("qa-undismiss")
     .description("Un-dismiss a QA finding")
     .requiredOption("--id <id>", "Job UUID")
-    .requiredOption("--unit-id <id>", "Translation unit UUID")
+    .requiredOption("--source-group-id <id>", "Source group id of the QA finding")
     .requiredOption("--check-type <type>", "QA check type")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         const body: QaUnDismissBody = {
-          unitId: cmdOpts.unitId,
+          sourceGroupId: cmdOpts.sourceGroupId,
           checkType: cmdOpts.checkType,
         };
         output(await undismissQa(client, cmdOpts.id, body), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -283,7 +283,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.targetLang !== undefined) query.targetLang = cmdOpts.targetLang;
         output(await exportJob(client, cmdOpts.id, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -297,7 +297,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await exportJobManifest(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -323,7 +323,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.cursor !== undefined) query.cursor = cmdOpts.cursor;
         output(await listJobUnits(client, cmdOpts.jobId, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -331,14 +331,14 @@ export function register(group: Command, getClient: ClientFactory): void {
     .command("unit-get")
     .description("Get a single translation unit")
     .requiredOption("--job-id <id>", "Job UUID")
-    .requiredOption("--unit-id <id>", "Translation unit UUID")
+    .requiredOption("--source-group-id <id>", "Source group id of the QA finding")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         output(await getJobUnit(client, cmdOpts.jobId, cmdOpts.unitId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -357,7 +357,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.cursor !== undefined) query.cursor = cmdOpts.cursor;
         output(await listJobFiles(client, cmdOpts.id, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -371,7 +371,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await redeliverJob(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
@@ -13,7 +13,7 @@ export async function listNamespaces(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/namespaces", {
     params: { path: { id: projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -23,7 +23,7 @@ export async function updateNamespace(client: ApiClient, projectId: string, name
     params: { path: { id: projectId, namespaceId } },
     body: updates,
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -31,7 +31,7 @@ export async function deleteNamespace(client: ApiClient, projectId: string, name
   const { data, error, response } = await client.DELETE("/api/projects/{id}/namespaces/{namespaceId}", {
     params: { path: { id: projectId, namespaceId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -46,7 +46,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listNamespaces(client, cmdOpts.projectId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -62,7 +62,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await updateNamespace(client, cmdOpts.projectId, cmdOpts.namespaceId, cmdOpts.name), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -77,7 +77,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteNamespace(client, cmdOpts.projectId, cmdOpts.namespaceId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

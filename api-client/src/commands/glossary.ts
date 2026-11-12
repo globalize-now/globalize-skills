@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
@@ -15,7 +15,7 @@ export async function listGlossary(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/glossary", {
     params: { path: { id: projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -32,7 +32,7 @@ export async function createGlossaryEntry(
     params: { path: { id: projectId } },
     body: { sourceTerm, targetTerm, sourceProjectLanguageId, targetProjectLanguageId, doNotTranslate },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -41,7 +41,7 @@ export async function bulkCreateGlossaryEntries(client: ApiClient, projectId: st
     params: { path: { id: projectId } },
     body: { entries },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -50,7 +50,7 @@ export async function previewGlossaryImport(client: ApiClient, projectId: string
     params: { path: { id: projectId } },
     body: { keys },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -58,7 +58,7 @@ export async function deleteGlossaryEntry(client: ApiClient, projectId: string, 
   const { data, error, response } = await client.DELETE("/api/projects/{id}/glossary/{entryId}", {
     params: { path: { id: projectId, entryId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -73,7 +73,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listGlossary(client, cmdOpts.projectId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -103,7 +103,7 @@ export function register(group: Command, getClient: ClientFactory): void {
           opts,
         );
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -127,7 +127,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         }
         output(await bulkCreateGlossaryEntries(client, cmdOpts.projectId, entries), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -151,7 +151,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         }
         output(await previewGlossaryImport(client, cmdOpts.projectId, keys), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -166,7 +166,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteGlossaryEntry(client, cmdOpts.projectId, cmdOpts.entryId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

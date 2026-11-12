@@ -23,6 +23,7 @@ import { register as registerTranslationMemory } from "./commands/translation-me
 import { register as registerTranslationMemories } from "./commands/translation-memories.js";
 import { register as registerBilling } from "./commands/billing.js";
 import { register as registerAuth } from "./commands/auth.js";
+import { register as registerWorkflows } from "./commands/workflows.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
@@ -69,6 +70,11 @@ const groups = [
   { name: "gitlab", description: "GitLab connection and repositories", register: registerGitlab },
   { name: "patterns", description: "Manage repository locale path patterns", register: registerPatterns },
   { name: "jobs", description: "Manage translation jobs", register: registerJobs },
+  {
+    name: "workflows",
+    description: "Set up GitHub Workflows, change their languages, and start and follow their runs",
+    register: registerWorkflows,
+  },
   { name: "namespaces", description: "Manage project namespaces", register: registerNamespaces },
   {
     name: "translation-memories",

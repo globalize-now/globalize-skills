@@ -131,7 +131,7 @@ export function registerJobTools(server: McpServer, client: ApiClient) {
       description: "Dismiss a QA finding on a translation unit",
       inputSchema: {
         id: z.string().uuid().describe("Job UUID"),
-        unitId: z.string().uuid().describe("Translation unit UUID"),
+        sourceGroupId: z.string().min(1).describe("Source group id of the QA finding"),
         checkType: z.string().describe("QA check type"),
         reason: z
           .enum(["script-density", "intentional", "false-positive", "other"])
@@ -140,9 +140,9 @@ export function registerJobTools(server: McpServer, client: ApiClient) {
         note: z.string().optional().describe("Optional dismissal note"),
       },
     },
-    async ({ id, unitId, checkType, reason, note }) => {
+    async ({ id, sourceGroupId, checkType, reason, note }) => {
       try {
-        return formatSuccess(await dismissQa(client, id, { unitId, checkType, reason, note }));
+        return formatSuccess(await dismissQa(client, id, { sourceGroupId, checkType, reason, note }));
       } catch (e) {
         return formatError(e);
       }
@@ -155,13 +155,13 @@ export function registerJobTools(server: McpServer, client: ApiClient) {
       description: "Un-dismiss a previously dismissed QA finding",
       inputSchema: {
         id: z.string().uuid().describe("Job UUID"),
-        unitId: z.string().uuid().describe("Translation unit UUID"),
+        sourceGroupId: z.string().min(1).describe("Source group id of the QA finding"),
         checkType: z.string().describe("QA check type"),
       },
     },
-    async ({ id, unitId, checkType }) => {
+    async ({ id, sourceGroupId, checkType }) => {
       try {
-        return formatSuccess(await undismissQa(client, id, { unitId, checkType }));
+        return formatSuccess(await undismissQa(client, id, { sourceGroupId, checkType }));
       } catch (e) {
         return formatError(e);
       }

@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 
 type ClientFactory = () => Promise<ApiClient>;
@@ -9,7 +9,7 @@ export async function listStyleGuides(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/style-guides", {
     params: { path: { id: projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -18,7 +18,7 @@ export async function upsertStyleGuide(client: ApiClient, projectId: string, lan
     params: { path: { id: projectId, projectLanguageId: languageId } },
     body: { instructions },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -26,7 +26,7 @@ export async function deleteStyleGuide(client: ApiClient, projectId: string, lan
   const { data, error, response } = await client.DELETE("/api/projects/{id}/style-guides/{projectLanguageId}", {
     params: { path: { id: projectId, projectLanguageId: languageId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -35,7 +35,7 @@ export async function generateStyleGuide(client: ApiClient, projectId: string, l
     params: { path: { id: projectId, projectLanguageId: languageId } },
     body: {},
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -54,7 +54,7 @@ export async function applyStyleGuide(
     params: { path: { id: projectId, projectLanguageId: languageId } },
     body,
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -62,7 +62,7 @@ export async function getStyleGuideQuota(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/style-guides/quota", {
     params: { path: { id: projectId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -77,7 +77,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listStyleGuides(client, cmdOpts.projectId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -93,7 +93,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await upsertStyleGuide(client, cmdOpts.projectId, cmdOpts.languageId, cmdOpts.instructions), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -108,7 +108,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteStyleGuide(client, cmdOpts.projectId, cmdOpts.languageId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -123,7 +123,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await generateStyleGuide(client, cmdOpts.projectId, cmdOpts.languageId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -153,7 +153,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.invalidateTm !== undefined) body.invalidateTm = cmdOpts.invalidateTm;
         output(await applyStyleGuide(client, cmdOpts.projectId, cmdOpts.languageId, body), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -167,7 +167,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getStyleGuideQuota(client, cmdOpts.projectId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

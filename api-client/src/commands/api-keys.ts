@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 
 type ClientFactory = () => Promise<ApiClient>;
@@ -9,7 +9,7 @@ export async function listApiKeys(client: ApiClient, orgId: string) {
   const { data, error, response } = await client.GET("/api/orgs/{orgId}/api-keys", {
     params: { path: { orgId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -18,7 +18,7 @@ export async function createApiKey(client: ApiClient, orgId: string, name: strin
     params: { path: { orgId } },
     body: { name },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -26,7 +26,7 @@ export async function revokeApiKey(client: ApiClient, orgId: string, keyId: stri
   const { data, error, response } = await client.DELETE("/api/orgs/{orgId}/api-keys/{keyId}", {
     params: { path: { orgId, keyId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { revoked: true };
 }
 
@@ -41,7 +41,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listApiKeys(client, cmdOpts.orgId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -56,7 +56,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await createApiKey(client, cmdOpts.orgId, cmdOpts.name), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -71,7 +71,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await revokeApiKey(client, cmdOpts.orgId, cmdOpts.keyId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

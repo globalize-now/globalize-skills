@@ -1,0 +1,25 @@
+name: API client checks
+
+on:
+  pull_request:
+    paths: [api-client/**, .github/workflows/api-client-checks.yml]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api-client
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      # Against the committed api-types.ts; publishing regenerates it from production.
+      - run: npm run lint
+
+      - run: npm test

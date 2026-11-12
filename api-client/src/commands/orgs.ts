@@ -1,13 +1,13 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 
 type ClientFactory = () => Promise<ApiClient>;
 
 export async function listOrgs(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/orgs");
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -15,7 +15,7 @@ export async function deleteOrg(client: ApiClient, orgId: string) {
   const { data, error, response } = await client.DELETE("/api/orgs/{orgId}", {
     params: { path: { orgId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -29,7 +29,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listOrgs(client), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -43,7 +43,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteOrg(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }

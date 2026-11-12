@@ -22,6 +22,8 @@ export const FILE_FORMATS = [
   "android-strings",
   "chrome-messages",
   "wxt-i18n",
+  "html",
+  "markdown",
 ] as const satisfies readonly FileFormat[];
 
 // Compile-time drift guard. `satisfies` above rejects an INVALID entry; this

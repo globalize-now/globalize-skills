@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../client.js";
-import { extractError } from "../client.js";
+import { apiError } from "../client.js";
 import { output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
@@ -13,7 +13,7 @@ type ClientFactory = () => Promise<ApiClient>;
 
 export async function listTranslationMemories(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/translation-memories");
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -21,7 +21,7 @@ export async function createTranslationMemory(client: ApiClient, name: string) {
   const { data, error, response } = await client.POST("/api/translation-memories", {
     body: { name },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -29,7 +29,7 @@ export async function getTranslationMemory(client: ApiClient, id: string) {
   const { data, error, response } = await client.GET("/api/translation-memories/{id}", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -38,7 +38,7 @@ export async function renameTranslationMemory(client: ApiClient, id: string, nam
     params: { path: { id } },
     body: { name },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -46,7 +46,7 @@ export async function deleteTranslationMemory(client: ApiClient, id: string) {
   const { data, error, response } = await client.DELETE("/api/translation-memories/{id}", {
     params: { path: { id } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -54,7 +54,7 @@ export async function listTranslationMemoryEntries(client: ApiClient, id: string
   const { data, error, response } = await client.GET("/api/translation-memories/{id}/entries", {
     params: { path: { id }, query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -62,7 +62,7 @@ export async function deleteTranslationMemoryEntryById(client: ApiClient, id: st
   const { data, error, response } = await client.DELETE("/api/translation-memories/{id}/entries/{entryId}", {
     params: { path: { id, entryId } },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data ?? { deleted: true };
 }
 
@@ -70,7 +70,7 @@ export async function clearTranslationMemory(client: ApiClient, id: string, quer
   const { data, error, response } = await client.DELETE("/api/translation-memories/{id}/entries", {
     params: { path: { id }, query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -78,7 +78,7 @@ export async function countTranslationMemoryEntries(client: ApiClient, id: strin
   const { data, error, response } = await client.GET("/api/translation-memories/{id}/entries/count", {
     params: { path: { id }, query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -86,7 +86,7 @@ export async function freshCountTranslationMemoryEntries(client: ApiClient, id: 
   const { data, error, response } = await client.GET("/api/translation-memories/{id}/entries/fresh-count", {
     params: { path: { id }, query },
   });
-  if (error) throw new Error(extractError(response, error));
+  if (error) throw apiError(response, error);
   return data!;
 }
 
@@ -100,7 +100,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await listTranslationMemories(client), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -114,7 +114,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await createTranslationMemory(client, cmdOpts.name), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -128,7 +128,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await getTranslationMemory(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -143,7 +143,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await renameTranslationMemory(client, cmdOpts.id, cmdOpts.name), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -157,7 +157,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteTranslationMemory(client, cmdOpts.id), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -186,7 +186,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.cursor !== undefined) query.cursor = cmdOpts.cursor;
         output(await listTranslationMemoryEntries(client, cmdOpts.id, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -201,7 +201,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const client = await getClient();
         output(await deleteTranslationMemoryEntryById(client, cmdOpts.id, cmdOpts.entryId), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -218,7 +218,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.targetLocale !== undefined) query.targetLocale = cmdOpts.targetLocale;
         output(await clearTranslationMemory(client, cmdOpts.id, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -235,7 +235,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         if (cmdOpts.targetLocale !== undefined) query.targetLocale = cmdOpts.targetLocale;
         output(await countTranslationMemoryEntries(client, cmdOpts.id, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 
@@ -251,7 +251,7 @@ export function register(group: Command, getClient: ClientFactory): void {
         const query: FreshCountQuery = { targetLocale: cmdOpts.targetLocale };
         output(await freshCountTranslationMemoryEntries(client, cmdOpts.id, query), opts);
       } catch (e) {
-        outputError((e as Error).message, opts);
+        outputError(e, opts);
       }
     });
 }
