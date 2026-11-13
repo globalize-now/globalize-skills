@@ -1,8 +1,7 @@
-import chalk from "chalk";
 import { Option, type Command } from "commander";
 import type { ApiClient } from "../client.js";
 import { apiError } from "../client.js";
-import { output, outputError, type OutputOptions } from "../format.js";
+import { notice, output, outputError, type OutputOptions } from "../format.js";
 import type { paths } from "../api-types.js";
 
 type ProjectCreateBody = paths["/api/projects"]["post"]["requestBody"]["content"]["application/json"];
@@ -123,7 +122,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .option("--translation-memory-id <id>", "Attach to an existing translation memory (permanent)")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
-      process.stderr.write(chalk.yellow(PROJECT_CREATE_NOTICE) + "\n");
+      notice(PROJECT_CREATE_NOTICE);
       try {
         const client = await getClient();
         const targetLanguages: string[] = Array.isArray(cmdOpts.targetLanguages)
