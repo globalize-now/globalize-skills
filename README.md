@@ -30,7 +30,7 @@ The skill will be available next time you start a Claude Code conversation.
 
 ### Lovable
 
-`lovable-i18n` targets the [Lovable](https://lovable.dev) platform agent rather than Claude Code. It now lives in its own repo — [globalize-now/lovable-i18n](https://github.com/globalize-now/lovable-i18n) — which is the maintained source; import from there. The copy under this repo's `skills/lovable-i18n` is kept for backwards compatibility and is no longer updated.
+`lovable-i18n` targets the [Lovable](https://lovable.dev) platform agent rather than Claude Code. Lovable imports a skill reliably only from a repository root, so import it from [globalize-now/lovable-i18n](https://github.com/globalize-now/lovable-i18n). The copy under this repo's `skills/lovable-i18n` is canonical: edit it here, and every merge to `main` that changes its `SKILL.md` is mirrored automatically to that repo's root (`.github/workflows/mirror-lovable-i18n.yml`). `globalize-now/lovable-i18n` takes no direct edits — the mirror overwrites its `SKILL.md` every time.
 
 ## Available skills
 
@@ -41,7 +41,7 @@ The skill will be available next time you start a Claude Code conversation.
 | `globalize-now-project-setup` | Create a translation project, connect a GitHub or GitLab repository, and set catalog file patterns. Driven by `globalize-guide`, it reuses the organisation's only project and starts the first translation as a pull request. Assumes the CLI is installed and authenticated. |
 | `globalize-now-cli-use` | Set up a Workflow for a GitHub repository and start its translation, then manage Workflows, runs, glossaries, style guides, translation memories, team members and API keys. Covers a repository a Project already translates. |
 | `css-i18n` | Audit and convert CSS to logical properties for RTL/bidirectional layout support. Library-agnostic — works with Tailwind, CSS Modules, vanilla CSS, CSS-in-JS. |
-| `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental — now maintained at [globalize-now/lovable-i18n](https://github.com/globalize-now/lovable-i18n); this copy is kept for backwards compatibility (see the Lovable install note in the Installation section above). |
+| `lovable-i18n` | Single-file i18n skill for the [Lovable](https://lovable.dev) agent (not Claude Code): Lingui + PO setup for both Lovable stacks (Vite SPA and TanStack Start), string wrapping, coding rules in `AGENTS.md`, a GitHub Actions extraction workflow, and Globalize.now connect. Experimental. This copy is canonical, mirrored automatically to [globalize-now/lovable-i18n](https://github.com/globalize-now/lovable-i18n) for import, which takes no direct edits (see the Lovable install note above). |
 
 ## MCP server
 

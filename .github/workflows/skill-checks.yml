@@ -2,10 +2,10 @@ name: Skill checks
 
 on:
   pull_request:
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
   push:
     branches: [main]
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
 
 jobs:
   skill-size:
@@ -28,3 +28,9 @@ jobs:
       # in references/ behind the REPOSITORY_HELD_BY_PROJECT pointer.
       - name: CLI skill leads with Workflows
         run: ./evals/verify-cli-use.sh
+
+      # The lovable-i18n mirror: push to main on skills/lovable-i18n/SKILL.md only, a token
+      # scoped to globalize-now/lovable-i18n, overwrite + commit-if-changed, can't loop; and
+      # README.md says the monorepo copy is canonical and mirrored.
+      - name: lovable-i18n mirror workflow
+        run: ./evals/verify-lovable-mirror.sh
