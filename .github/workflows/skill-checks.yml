@@ -2,10 +2,10 @@ name: Skill checks
 
 on:
   pull_request:
-    paths: [skills/**, api-client/src/commands/repositories.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
   push:
     branches: [main]
-    paths: [skills/**, api-client/src/commands/repositories.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
 
 jobs:
   skill-size:
@@ -19,6 +19,19 @@ jobs:
         run: ./evals/verify-skill-size.sh
 
       # The Globalize connect hand-off: sibling skills load from disk, globalize-guide and
-      # lovable-i18n end by starting the first translation, project setup reuses the only project.
+      # lovable-i18n end by starting the first translation, project setup sets up a Workflow
+      # (or continues on the Project that holds the repo) with commands and flags the CLI has.
       - name: Globalize connect hand-off
         run: ./evals/verify-globalize-connect.sh
+
+      # globalize-now-cli-use leads with Workflow setup: Step 2 names the workflows commands,
+      # every workflows command and flag it names exists in the CLI, and the Project steps sit
+      # in references/ behind the REPOSITORY_HELD_BY_PROJECT pointer.
+      - name: CLI skill leads with Workflows
+        run: ./evals/verify-cli-use.sh
+
+      # The lovable-i18n mirror: push to main on skills/lovable-i18n/SKILL.md only, a token
+      # scoped to globalize-now/lovable-i18n, overwrite + commit-if-changed, can't loop; and
+      # README.md says the monorepo copy is canonical and mirrored.
+      - name: lovable-i18n mirror workflow
+        run: ./evals/verify-lovable-mirror.sh

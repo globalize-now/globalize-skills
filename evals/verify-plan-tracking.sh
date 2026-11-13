@@ -9,7 +9,8 @@ set -uo pipefail
 #
 # Checks:
 #   1. plan.md exists and holds no skeleton HTML comments.
-#   2. At least one box is ticked, and no box is still open.
+#   2. At least one box is ticked, and no box is still open, except Phase 4's boxes left
+#      "— blocked: no GitHub remote" by the no-remote stop (SKILL.md §4.2).
 #   3. Phase 2 was expanded: at least MIN_DETAIL_ITEMS nested detail items.
 
 WORKDIR="${1:?Usage: verify-plan-tracking.sh <workdir>}"
@@ -52,12 +53,27 @@ else
   fail "no box is ticked: the checklist was never updated"
 fi
 
-OPEN=$(grep -nE '^[[:space:]]*- \[ \]' "$PLAN_MD" || true)
+# One open state is a finished run: with no GitHub remote, §4.2 stops and leaves Phase 4's
+# open boxes "— blocked: no GitHub remote", so a rerun resumes there once a remote exists.
+# Exactly that, in Phase 4 only; any other open box is unfinished work.
+# Prints "held<TAB>line" for each such box and "open<TAB>NR:line" for every other open box.
+BOXES=$(awk -v blocked=' — blocked: no GitHub remote' '
+  /^## / { phase4 = ($0 ~ /^## Phase 4/) }
+  /^[[:space:]]*- \[ \]/ {
+    held = phase4 && substr($0, length($0) - length(blocked) + 1) == blocked
+    print (held ? "held" : "open") "\t" NR ":" $0
+  }
+' "$PLAN_MD")
+OPEN=$(printf '%s\n' "$BOXES" | sed -n 's/^open	//p')
+HELD=$(printf '%s\n' "$BOXES" | grep -c '^held	' || true)
 if [ -z "$OPEN" ]; then
   pass "no open boxes"
 else
   fail "open boxes remain:"
   printf '%s\n' "$OPEN" | sed 's/^/        /'
+fi
+if [ "$HELD" -gt 0 ]; then
+  pass "Phase 4 waits for a GitHub remote ($HELD boxes '— blocked: no GitHub remote'; a rerun resumes there)"
 fi
 
 DETAIL=$(awk '/^## Phase 2/{f=1;next} /^## /{f=0} f && /^[[:space:]]+- \[[ x]\]/{n++} END{print n+0}' "$PLAN_MD")

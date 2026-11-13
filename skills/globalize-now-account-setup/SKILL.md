@@ -5,17 +5,17 @@ description: >-
   skill when the user asks to set up Globalize, install the Globalize CLI, sign in
   or authenticate with Globalize, or connect their Globalize account. Also use when
   the user mentions @globalize-now/cli-client or globalise-now-cli and needs to get
-  signed in. This skill handles installation and authentication only — to create a
-  translation project and connect a repository, use globalize-now-project-setup. For
-  managing existing projects (glossaries, style guides, team members), use
+  signed in. This skill handles installation and authentication only — to set up a
+  Workflow that translates a repository, use globalize-now-project-setup. For
+  managing existing Workflows, glossaries, style guides and team members, use
   globalize-now-cli-use.
 ---
 
 # Globalize Account Setup
 
-The Globalize CLI (`@globalize-now/cli-client`) lets AI agents manage translation projects, languages, glossaries, style guides, and repository connections on the [Globalize](https://globalize.now) platform.
+The Globalize CLI (`@globalize-now/cli-client`) lets AI agents manage Workflows, languages, glossaries, style guides, and repository connections on the [Globalize](https://globalize.now) platform.
 
-This skill gets the CLI installed and your account authenticated. Once you're signed in, run `globalize-now-project-setup` to create a translation project and connect your repository.
+This skill gets the CLI installed and your account authenticated. Once you're signed in, run `globalize-now-project-setup` to set up a Workflow that translates your GitHub repository.
 
 Follow these steps in order.
 
@@ -50,7 +50,7 @@ After Step 1 (detection) completes without blockers, ask the user:
 - [x] Step 4: Verify — {org name}
 
 ### Next steps
-- Run `globalize-now-project-setup` to create a translation project and connect this repo.
+- Run `globalize-now-project-setup` to set up a Workflow that translates this repo.
 ```
 
 ---
@@ -183,4 +183,4 @@ This should return the user's organisations. If it fails with an auth error, rev
 
 ## Next step
 
-CLI installed and signed in. To create a translation project, connect this repo, and set catalog file patterns, run the **`globalize-now-project-setup`** skill.
+CLI installed and signed in. To set up a Workflow that translates this repo and start its first translation, run the **`globalize-now-project-setup`** skill.
