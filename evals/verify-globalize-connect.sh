@@ -135,6 +135,33 @@ else
   else
     fail "Phase 4's 'gh repo create' is not conditioned on the user confirming"
   fi
+  # §4.1 builds globalize-inputs.json from Phase 1's git.remote, which is null on a project
+  # that had no remote. After `gh repo create`, or on a resume once the user added a remote
+  # by hand, §4.2 must refresh it and rebuild the inputs, or Workflow setup gets no repo.
+  S42="$(section "$GUIDE" '### 4.2 Push the setup')"
+  REFRESH="$(printf '%s\n' "$S42" | grep -F 'git.remote' | grep -F 'globalize-inputs.json' || true)"
+  if [ -n "$REFRESH" ] && has "$REFRESH" 'gh repo create' && printf '%s' "$REFRESH" | grep -qi 'resume'; then
+    pass "§4.2 refreshes git.remote and rebuilds globalize-inputs.json after 'gh repo create' and on a resume"
+  else
+    fail "§4.2 has no line refreshing git.remote and rebuilding globalize-inputs.json after 'gh repo create' and on a resume"
+  fi
+  # Declining the gh offer skips sign-in for good (Phase 1.5), while Phase 4 stays open for a rerun.
+  if has "$PHASE4" '[x] delegate_account_setup — skipped'; then
+    pass "the no-remote stop marks Phase 1.5 '[x] delegate_account_setup — skipped'"
+  else
+    fail "the no-remote stop does not mark Phase 1.5 '[x] delegate_account_setup — skipped'"
+  fi
+fi
+if grep -qF '`globalize` CLI' "$GUIDE"; then
+  fail "SKILL.md names a '\`globalize\` CLI'; the bin is globalise-now-cli"
+else
+  pass "SKILL.md names no '\`globalize\` CLI'"
+fi
+META_DESC="$(sed -nE 's/^[[:space:]]*"description":[[:space:]]*"(.*)",?[[:space:]]*$/\1/p' "$(dirname "$GUIDE")/metadata.json")"
+if has "$META_DESC" 'Workflow' && ! has "$META_DESC" 'project + repo'; then
+  pass "metadata.json's description ends on a Workflow"
+else
+  fail "metadata.json's description does not end on a Workflow: $META_DESC"
 fi
 for step in push_setup start_first_translation; do
   if grep -qE "^- \[ \] ${step}\b" "$ORCH/plan-format.md"; then
@@ -208,6 +235,27 @@ else
   else
     fail "MCP path does not call list_workflow_runs before start_workflow_run"
   fi
+  # The first run starts without a second question: the Ask phase already told the user that
+  # connecting starts it and spends credits.
+  BEFORE_START="${PRIMARY%%delivery: \"pr\"*}"
+  LISTS="$(printf '%s' "$BEFORE_START" | grep -oF 'list_workflow_runs' | wc -l | tr -d ' ')"
+  if [ "$LISTS" = "1" ]; then
+    pass "MCP path lists the runs once, then starts one"
+  else
+    fail "MCP path calls list_workflow_runs $LISTS times before start_workflow_run (a pause to ask, then a re-list)"
+  fi
+  ASK="$(printf '%s\n' "$PHASE6" | grep -iE 'shall I start|whether to start' || true)"
+  if [ -z "$ASK" ]; then
+    pass "Phase 6 starts the first translation without asking again"
+  else
+    fail "Phase 6 asks before starting the first translation: $ASK"
+  fi
+  ASK_ITEM="$(grep -F '**Connect Globalize.now**' "$LOVABLE" | head -n 1)"
+  if has "$ASK_ITEM" 'first translation' && has "$ASK_ITEM" 'credits'; then
+    pass "the Ask phase says connecting starts the first translation, which spends credits"
+  else
+    fail "the Ask phase does not say connecting starts the first translation and spends credits"
+  fi
   for gone in 'create_project' 'connect_repository' 'projects create' 'repositories create'; do
     if has "$PHASE6" "$gone"; then fail "Phase 6 still creates a Project ('$gone')"; else pass "Phase 6 does not name '$gone'"; fi
   done
@@ -266,6 +314,14 @@ else
     if grep -qF -- "$marker" "$PROJECT_PATH"; then pass "project-path.md names '$marker'"; else fail "project-path.md does not name '$marker'"; fi
   done
   check_translate_cli "$PROJECT_PATH"
+  # The CLI's `projects create` always prints a Workflow-setup notice, including on this
+  # path's intentional gitlab.com Project; the agent must carry on.
+  NOTICE="$(grep -F 'projects create' "$PROJECT_PATH" | grep -i 'notice' | grep -i 'expected' || true)"
+  if [ -n "$NOTICE" ]; then
+    pass "project-path.md says the 'projects create' notice is expected here"
+  else
+    fail "project-path.md does not say the 'projects create' notice is expected on this path"
+  fi
 fi
 
 STOPS="$(section "$PROJECT" '## No-remote and unsupported host stops')"

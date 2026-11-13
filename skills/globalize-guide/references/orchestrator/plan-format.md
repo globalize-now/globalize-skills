@@ -26,7 +26,7 @@ Branch: {decision summary}
 <!-- Include the Phase 1.5 section only when decisions.scope.globalize === true -->
 ## Phase 1.5 — Globalize account
 Orchestrator-owned steps (main thread, delegated to `globalize-now-account-setup`):
-- [ ] delegate_account_setup
+- [ ] delegate_account_setup   <!-- No GitHub or GitLab remote → stays open until §4.2: signed in after `gh repo create`, or, at §4.2's stop, `[x] — skipped: no GitHub remote` with its sub-items -->
   - [ ] install the Globalize CLI
   - [ ] sign in
   - [ ] verify auth
@@ -115,7 +115,7 @@ Orchestrator-owned steps (§3.6; on `needs_cleanup`, first append `### wrap-clea
 ## Phase 4 — Globalize Workflow
 Orchestrator-owned steps (main thread; the last two delegated to `globalize-now-project-setup`):
 - [ ] assemble_globalize_inputs
-- [ ] push_setup   <!-- §4.2: the converted catalogs must be on the remote before Globalize can translate them. No remote or another host → stays open, `— blocked: no GitHub remote`, so a rerun resumes here -->
+- [ ] push_setup   <!-- §4.2: the converted catalogs must be on the remote before Globalize can translate them. No remote or another host → this box and every open Phase 4 box below stay open, `— blocked: no GitHub remote`, so a rerun resumes here -->
 - [ ] delegate_project_setup
   - [ ] connect GitHub
   - [ ] set up the Workflow (or continue on the Project that holds the repository)

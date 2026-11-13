@@ -117,6 +117,12 @@ if [ -f "$PROJECT_REF" ]; then
   for marker in 'projects create' 'repositories create' 'project-languages add' 'patterns create' 'projects update' 'repositories translate' 'gitlab connections'; do
     if grep -qF -- "$marker" "$PROJECT_REF"; then pass "$PROJECT_REF_NAME covers '$marker'"; else fail "$PROJECT_REF_NAME does not cover '$marker'"; fi
   done
+  # `projects create` always prints a Workflow-setup notice, here too; the agent carries on.
+  if grep -F 'projects create' "$PROJECT_REF" | grep -i 'notice' | grep -qi 'expected'; then
+    pass "$PROJECT_REF_NAME says the 'projects create' notice is expected here"
+  else
+    fail "$PROJECT_REF_NAME does not say the 'projects create' notice is expected on this path"
+  fi
 else
   fail "$PROJECT_REF_NAME does not exist"
 fi

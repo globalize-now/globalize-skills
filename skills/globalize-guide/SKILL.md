@@ -176,7 +176,7 @@ Show `plan.md` as a checklist: "Here's the plan. Ready to execute? (**yes** / **
 
 ## Phase 1.5 — Globalize account (upfront, interactive)
 
-Gate: `decisions.scope.globalize === true`; otherwise skip 1.5 **and** 4. Runs only when `detection.json` `git.remote` is on `github.com` or `gitlab.com`. With no remote, or one on another host, leave `delegate_account_setup` open (`— blocked: no GitHub remote yet`) and go to Phase 2: nobody signs in until §4.2's `gh repo create` gives the project a GitHub remote.
+Gate: `decisions.scope.globalize === true`; otherwise skip 1.5 **and** 4. Runs only when `detection.json` `git.remote` is on `github.com` or `gitlab.com`. With no remote, or one on another host, leave `delegate_account_setup` open (`— blocked: no GitHub remote yet`) and go to Phase 2: nobody signs in until §4.2's `gh repo create` gives the project a GitHub remote, and §4.2's stop marks it skipped when none comes.
 
 "Before we touch your code, let's get you signed in to Globalize so it's ready when your catalogs are done. A browser window may open for device-flow sign-in. (Near the very end, when we connect your repo, you'll do one quick browser approval for Globalize's GitHub/GitLab app — I'll remind you.)"
 
@@ -272,8 +272,10 @@ Follow `references/orchestrator/globalize-inputs.md` (the catalog pattern with i
 Globalize translates the branch **on the remote**, never this working copy: until the converted catalogs are pushed, the first translation finds nothing to translate. Read `git remote get-url origin` first:
 
 - **`github.com` or `gitlab.com`** → steps 1–3 below.
-- **No remote** → "Globalize translates from a GitHub repository, and this project has none. Your i18n setup is done and kept locally." When `gh auth status` succeeds and the project is a git repository with at least one commit, offer: "I can create a private GitHub repository **{directory name}** with `gh`, push `{branch}` to it, and finish connecting Globalize. Create it? (**yes** / **no**)". Run `gh repo create <name> --private --source=. --remote=origin --push` only once the user confirms; then sign in (Phase 1.5) if `delegate_account_setup` is open, and continue at step 1. **no**, no signed-in `gh`, or not a git repository → the **stop**: leave the open Phase 4 boxes `— blocked: no GitHub remote` and go to §4.5. **Headless**: never offer or run `gh`; stop the same way.
+- **No remote** → "Globalize translates from a GitHub repository, and this project has none. Your i18n setup is done and kept locally." When `gh auth status` succeeds and the project is a git repository with at least one commit, offer: "I can create a private GitHub repository **{directory name}** with `gh`, push `{branch}` to it, and finish connecting Globalize. Create it? (**yes** / **no**)". Run `gh repo create <name> --private --source=. --remote=origin --push` only once the user confirms; then sign in (Phase 1.5) if `delegate_account_setup` is open, and continue at step 1. **no**, no signed-in `gh`, or not a git repository → the **stop**: an open `delegate_account_setup` becomes `[x] delegate_account_setup — skipped: no GitHub remote` (its sub-items too); the open Phase 4 boxes stay open as `— blocked: no GitHub remote`, so a rerun resumes here; go to §4.5. **Headless**: never offer or run `gh`; stop the same way.
 - **Any other host** (Bitbucket, self-hosted GitLab, …) → "Globalize translates from a GitHub repository, and this project's remote is on {host}. Your i18n setup is done and kept locally." The same stop, with no `gh` offer.
+
+**A remote Phase 1 didn't see.** §4.1 built `globalize-inputs.json` from `detection.json` `git.remote` as Phase 1 read it. When `origin` differs — after `gh repo create`, or on a resume once the user added a remote by hand — write `origin` into `detection.json` `git.remote` and rebuild `globalize-inputs.json` (§4.1) before step 1, so Workflow setup gets the new repository.
 
 1. Read `git branch --show-current`, `git status --porcelain` and `git log @{u}..HEAD --oneline` (fails when the branch has no upstream — that counts as unpushed).
 2. Nothing uncommitted and nothing unpushed → this branch is already on the remote.
@@ -291,9 +293,9 @@ Invoke it via the Skill tool (from disk if the Skill tool can't load it — Exec
 
 ### 4.5 Finish
 
-Run the end-of-run check in `checklist.md` first. A run that ends before Phase 4 runs it at its last phase instead. Open boxes → list them and why instead of the messages below. A first translation that was not started is `[x] start_first_translation — skipped: <why>`, not an open box.
+Run the end-of-run check in `checklist.md` first. A run that ends before Phase 4 runs it at its last phase instead. Open boxes → list them and why instead of the messages below. A first translation that was not started is `[x] start_first_translation — skipped: <why>`, not an open box; only the no-remote stop leaves Phase 4's boxes open (§4.2).
 
-Run started → "All set. Workflow: **{workflowName}** ({workflow page}). Globalize is translating `{branch}` and opens a pull request with the translated catalogs when it's done; merge it to ship them. From here on, use the `globalize-now-cli-use` skill (or the `globalize` CLI) for ongoing translation work — following runs, changing languages."
+Run started → "All set. Workflow: **{workflowName}** ({workflow page}). Globalize is translating `{branch}` and opens a pull request with the translated catalogs when it's done; merge it to ship them. From here on, use the `globalize-now-cli-use` skill (or the Globalize CLI, `globalise-now-cli`) for ongoing translation work — following runs, changing languages."
 
 Pull request into the default branch → "All set. Workflow: **{workflowName}** ({workflow page}). Pull request {url} brings this setup into `{default branch}`; Globalize translates it and adds the translations to it, so you review and merge them together." The user opens it themselves → the same, naming the branch to open it from.
 
