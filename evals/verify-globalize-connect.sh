@@ -14,8 +14,11 @@ set -uo pipefail
 #   2. globalize-guide ends by starting the first translation: Phase 4 pushes the setup,
 #      the plan carries the step, and globalize-now-project-setup runs
 #      `repositories translate --delivery-mode pr` — with flags the CLI really has.
-#   3. lovable-i18n's Phase 6 ends by calling the hosted `translate_repository` tool as a
-#      pull request, and its no-MCP fallback starts the translation too.
+#   3. lovable-i18n's Phase 6 sets up a Workflow and ends by starting its first run as a
+#      pull request (`start_workflow_run`, only after `list_workflow_runs` finds none), reports
+#      the pull request only once `get_workflow_run` says it was delivered, continues a
+#      Project-held repository with `translate_repository`, creates no Project, and its no-MCP
+#      fallback opens the Workflow builder or runs `workflows runs start --delivery pr`.
 #   4. globalize-now-project-setup reuses the organisation's only project in orchestrated
 #      mode, and the repository already connected to it.
 
@@ -114,20 +117,44 @@ else
 fi
 
 echo ""
-echo "--- 3. lovable-i18n: Phase 6 ends by starting the first translation ---"
+echo "--- 3. lovable-i18n: Phase 6 sets up a Workflow and starts its first run ---"
 PHASE6="$(section "$LOVABLE" '## Phase 6: Connect Globalize.now')"
 PRIMARY="$(section "$LOVABLE" '### Primary path — the Globalize MCP connector')"
 FALLBACK="$(section "$LOVABLE" '### Fallback path — no MCP (dashboard or local CLI)')"
+# Line of the first occurrence of $2 in $1 (0 when absent).
+line_of() { printf '%s\n' "$1" | grep -nF -- "$2" | head -1 | cut -d: -f1 | grep . || echo 0; }
 if [ -z "$PHASE6" ] || [ -z "$PRIMARY" ] || [ -z "$FALLBACK" ]; then
   fail "lovable-i18n Phase 6, its primary path or its fallback path heading is missing"
 else
-  for marker in 'translate_repository' 'deliveryMode: "pr"' 'idempotencyKey'; do
+  for marker in 'preview_workflow_setup' 'set_up_workflow' 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"' 'get_workflow_run' 'delivered' 'REPOSITORY_HELD_BY_PROJECT' 'translate_repository'; do
     if has "$PRIMARY" "$marker"; then pass "MCP path names '$marker'"; else fail "MCP path does not name '$marker'"; fi
   done
-  if has "$FALLBACK" 'repositories translate' && has "$FALLBACK" '--delivery-mode pr'; then
-    pass "CLI fallback starts the first translation as a pull request"
+  LIST_AT="$(line_of "$PRIMARY" 'list_workflow_runs')"
+  START_AT="$(line_of "$PRIMARY" 'start_workflow_run')"
+  if [ "$LIST_AT" -gt 0 ] && [ "$START_AT" -gt "$LIST_AT" ]; then
+    pass "MCP path lists the Workflow's runs before it starts one"
   else
-    fail "CLI fallback does not run 'repositories translate --delivery-mode pr'"
+    fail "MCP path does not call list_workflow_runs before start_workflow_run"
+  fi
+  for gone in 'create_project' 'connect_repository' 'projects create' 'repositories create'; do
+    if has "$PHASE6" "$gone"; then fail "Phase 6 still creates a Project ('$gone')"; else pass "Phase 6 does not name '$gone'"; fi
+  done
+  if has "$FALLBACK" '/workflows/new'; then
+    pass "dashboard fallback opens the Workflow builder"
+  else
+    fail "dashboard fallback does not open the Workflow builder (/workflows/new)"
+  fi
+  if has "$FALLBACK" 'workflows runs start' && has "$FALLBACK" '--delivery pr'; then
+    pass "CLI fallback starts the first run as a pull request"
+  else
+    fail "CLI fallback does not run 'workflows runs start --delivery pr'"
+  fi
+  RUNS_LIST_AT="$(line_of "$FALLBACK" 'workflows runs list')"
+  RUNS_START_AT="$(line_of "$FALLBACK" 'workflows runs start')"
+  if [ "$RUNS_LIST_AT" -gt 0 ] && [ "$RUNS_START_AT" -gt "$RUNS_LIST_AT" ]; then
+    pass "CLI fallback lists the Workflow's runs before it starts one"
+  else
+    fail "CLI fallback does not run 'workflows runs list' before 'workflows runs start'"
   fi
 fi
 
