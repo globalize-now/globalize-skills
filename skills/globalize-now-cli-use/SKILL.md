@@ -1,19 +1,21 @@
 ---
 name: globalize-now-cli-use
 description: >-
-  Manage Globalize translation resources using the CLI. Use this skill when the user asks
-  to create a translation project, add or remove languages, connect a GitHub or GitLab repository,
-  manage glossaries or style guides, invite team members, manage API keys, or perform any
-  Globalize platform operation. Also use when the user mentions managing translations,
-  translation workflow, or wants to "set up translations for this repo." This skill assumes
-  the CLI is already installed and authenticated — run globalize-now-account-setup first if not.
+  Set up and manage Globalize translation for a repository using the CLI. Use this skill when
+  the user asks to set up translations for a GitHub repository, start or check a translation run,
+  manage Workflows or their languages, manage glossaries, style guides or translation memories,
+  invite team members, manage API keys, or perform any Globalize platform operation. Also covers
+  a repository a Globalize Project already translates. This skill assumes the CLI is already
+  installed and authenticated — run globalize-now-account-setup first if not.
 ---
 
 # Globalize CLI Usage
 
-This skill guides you through managing translation resources on the [Globalize](https://globalize.now) platform using the CLI (`globalise-now-cli`).
+This skill guides you through managing translation on the [Globalize](https://globalize.now) platform using the CLI (`globalise-now-cli`). A GitHub repository is translated by a **Workflow**: Step 2 sets one up and starts its first translation.
 
-**Always use `--json`** when running commands programmatically. Parse JSON output to extract IDs for subsequent commands. Many operations require UUIDs returned from prior steps.
+**A repository a Project already translates** (the older setup) follows `references/project-held-repository.md` instead of Step 2. Read it when Workflow setup refuses with `REPOSITORY_HELD_BY_PROJECT`, when the user names a Project, or when the remote is on gitlab.com.
+
+**Always use `--json`** when running commands programmatically. A success prints `{"data": …}` on stdout. A failure exits 1 and prints `{"error": …, "status": …, "code": …, "details": …}` on stdout: branch on `code`, and read `details` for the ids it carries.
 
 All examples use `npx @globalize-now/cli-client`. If the CLI is installed globally, replace with `globalise-now-cli`.
 
@@ -31,425 +33,181 @@ If this fails or reports no credentials, run the `globalize-now-account-setup` s
 
 ---
 
-## Step 2: Common Workflow — Create a Project and Connect a Repository
+## Step 2: Set up a Workflow and start a translation
 
-This is the most common end-to-end workflow. Follow these sub-steps in order:
+A Workflow watches a GitHub repository's branches, reads its locale files, and delivers translations as a pull request. Setup is two calls: `workflows preview-setup` proposes the Workflow and writes nothing; `workflows setup` publishes exactly what the preview proposed. Neither starts a run.
 
-### 2a. Fetch and match available languages
-
-Projects must be created using **language IDs** returned from the languages API. Before creating a project, fetch the catalog and match the user's desired languages against it.
-
-1. **Fetch the language catalog:**
-
-```bash
-npx @globalize-now/cli-client languages list --json
-```
-
-This returns an array of language objects, each with `id` (UUID), `name`, and `locale` (BCP 47 code).
-
-2. **Match desired languages against the catalog.** Compare the user's source and target locale codes (e.g., `en`, `fr`, `de`, `ja`) against the `locale` field in the returned list. Extract the corresponding `id` for each match.
-
-3. **Report unsupported languages.** If any of the user's desired languages do not appear in the catalog, inform the user which languages are unsupported and cannot be added to the project. Do not silently skip them — the user must acknowledge the gap before proceeding. Only continue with languages that have a matching catalog entry.
-
-### 2b. Create a project
-
-Use the **language IDs** (UUIDs) matched in step 2a — not bare locale codes:
-
-```bash
-npx @globalize-now/cli-client projects create \
-  --name "My App" \
-  --source-language <SOURCE_LANGUAGE_ID> \
-  --target-languages <TARGET_LANGUAGE_ID_1> <TARGET_LANGUAGE_ID_2> \
-  --json
-```
-
-`--target-languages` accepts space-separated or comma-separated values.
-
-Parse the returned JSON to extract the **project ID**.
-
-### 2c. Connect the repository
-
-Globalize uses a GitHub App or GitLab OAuth connection to access repository contents. Follow these sub-steps in order.
-
-**1. Get the git remote URL:**
+### 2a. Identify the repository
 
 ```bash
 git remote get-url origin
 ```
 
-If the command fails (no remote named `origin`), **STOP.** Tell the user: "No git remote `origin` found. Please add a remote (`git remote add origin <URL>`) and try again, or provide the git URL manually." If the user provides a URL manually, use that URL and continue.
+Parse `<OWNER>/<REPO>` from `https://github.com/<OWNER>/<REPO>.git` or `git@github.com:<OWNER>/<REPO>.git`.
 
-**2. Parse the URL — extract owner and repo/project:**
+- **github.com** → continue.
+- **gitlab.com** → read `references/project-held-repository.md` and follow it: Workflow setup reads GitHub only.
+- **Any other host, or no remote** → stop. Tell the user Workflow setup needs a GitHub repository, and ask for its `owner/repo`.
 
-- GitHub HTTPS: `https://github.com/<OWNER>/<REPO>.git`
-- GitHub SSH: `git@github.com:<OWNER>/<REPO>.git`
-- GitLab HTTPS: `https://gitlab.com/<OWNER>/<PROJECT>.git`
-- GitLab SSH: `git@gitlab.com:<OWNER>/<PROJECT>.git`
+Confirm `<OWNER>/<REPO>` with the user before calling Globalize, and wait for the answer.
 
-Store the URL as `<GIT_URL>`. **Important:** The CLI only accepts HTTPS URLs for `--git-url`. If the remote is an SSH URL, convert it to HTTPS format.
-
-- If the URL contains `github.com`: proceed with the **GitHub flow** (sub-step 3 onward).
-- If the URL contains `gitlab.com`: proceed with the **GitLab flow** (below).
-- Otherwise: **STOP.** Tell the user: "Globalize supports GitHub and GitLab repositories. The detected remote URL (`<URL>`) does not appear to be either." Do NOT proceed.
-
-**3. CONSENT GATE — Confirm repository details with the user. You MUST complete this step before proceeding.**
-
-Present the detection result and ask the user to confirm:
-
-> I detected the following repository:
-> - **Git URL:** `<GIT_URL>`
-> - **Owner:** `<OWNER>`
-> - **Repo:** `<REPO>`
->
-> I'll connect this repository to your Globalize project using the GitHub App (or GitLab OAuth). This may open a browser window for you to approve the installation. **Is this correct?**
-
-Wait for the user's response before proceeding.
-
-- **User confirms** → continue to sub-step 4 (GitHub) or the GitLab flow.
-- **User corrects the URL** → re-parse the corrected URL from sub-step 2.
-
----
-
-#### GitHub Flow
-
-**4. Set up the GitHub App and connect the repository:**
-
-**4a. Check for existing GitHub App installations:**
+### 2b. Find the GitHub App installation
 
 ```bash
 npx @globalize-now/cli-client github installations --json
 ```
 
-This returns an array of installations. Each has `id` (a **UUID** — Globalize's internal installation record), `installationId` (the **numeric** GitHub installation ID, e.g. `122432012`), `accountLogin` (the GitHub org or user name), and `accountType`.
+Each installation has `id` (a UUID) and `installationId` (GitHub's **numeric** id, e.g. `122432012`). Find the one whose `accountLogin` matches `<OWNER>` (case-insensitive) and keep its numeric `installationId` as `<INSTALLATION_ID>`: Workflow setup takes the number.
 
-**4b. Match installation to repo owner:**
-
-Look for an installation whose `accountLogin` matches `<OWNER>` (case-insensitive). Capture **both** IDs: the numeric `installationId` as `<GITHUB_INSTALLATION_ID>` (for `github repos/branches/detect --installation-id`) and the UUID `id` as `<INSTALLATION_UUID>` (for `repositories create --github-installation-id`).
-
-- **Match found** → capture both IDs, skip to sub-step 4d.
-- **No match** → proceed to sub-step 4c.
-
-**4c. Install the GitHub App (requires user interaction):**
+**No match** → install the GitHub App:
 
 ```bash
 npx @globalize-now/cli-client github install --no-wait --json
 ```
 
-This returns `{ "installUrl": "...", "nonce": "..." }` immediately. Present the `installUrl` to the user and ask them to open it in their browser, select the correct GitHub account/org, and approve the installation.
-
-After the user confirms they have completed the browser flow, check the status:
+Show the user the returned `installUrl` and ask them to approve the installation for `<OWNER>` in the browser. Once they confirm, check it with the returned `nonce`:
 
 ```bash
 npx @globalize-now/cli-client github install-status --nonce <NONCE> --json
 ```
 
-This returns `{ "status": "completed", "installationId": "...", "accountLogin": "..." }` when done, `{ "status": "pending" }` if the user hasn't finished yet, or `{ "status": "expired" }` if the nonce expired. Check `status === "completed"`. If not completed, ask the user to confirm they finished and retry.
+`status` is `completed`, `pending` (ask the user to finish, then check again) or `expired` (start the install again). After `completed`, run `github installations --json` again for `<INSTALLATION_ID>`.
 
-After completion, run `github installations --json` again to find `<GITHUB_INSTALLATION_ID>` (numeric `installationId`) and `<INSTALLATION_UUID>` (UUID `id`) for the target owner.
-
-**4d. Verify repo access:**
+Then confirm the App can read the repository:
 
 ```bash
-npx @globalize-now/cli-client github repos --installation-id <GITHUB_INSTALLATION_ID> --json
+npx @globalize-now/cli-client github repos --installation-id <INSTALLATION_ID> --json
 ```
 
-Confirm that `<OWNER>/<REPO>` appears in the returned list. If not, the GitHub App may not have access to this specific repository — inform the user they need to adjust the installation's repository access settings on GitHub.
+`<OWNER>/<REPO>` must be in the list; otherwise the user grants the installation access to it on GitHub.
 
-**4e. Connect the repository:**
+### 2c. Preview the Workflow
 
 ```bash
-npx @globalize-now/cli-client repositories create \
-  --project-id <PROJECT_ID> \
-  --git-url <GIT_URL> \
-  --provider github \
-  --github-installation-id <INSTALLATION_UUID> \
+npx @globalize-now/cli-client workflows preview-setup \
+  --installation-id <INSTALLATION_ID> \
+  --repository <OWNER>/<REPO> \
   --json
 ```
 
-Optional flags: `--branches <branches...>`, `--patterns '<JSON array>'`, `--import-mode <ignore|reviewed|translated>`, `--import-scope <new_keys_only|all_keys>`.
+Detection reads the repository's default branch on GitHub, not the local working copy. Pass overrides only where the user or a `need` asks for one:
 
-Parse the returned JSON to extract the **repository ID**.
+| Flag | Value |
+|------|-------|
+| `--branches` | Watched branches, comma-separated; detection reads the first (default: the default branch) |
+| `--source-language` | Source locale, e.g. `en` |
+| `--target-languages` | Target locales, comma-separated: `de,fr,pt-BR` |
+| `--patterns` | JSON array in place of detection's: `'[{"pattern":"locales/{locale}.json","format":"json-flat","pathLocales":{"pt-BR":"pt_BR"}}]'` |
+| `--name` | Workflow name (default: `owner/repo`) |
+| `--translation-memory-id` | An existing memory from `translation-memories list` (default: setup creates one) |
+| `--import` | `ignore` (default), `reviewed` or `translated`: what the first run does with translations already in the repository |
+
+`pathLocales` maps a language to its spelling in the path, for directories like `_locales/pt_BR/`. Pattern formats: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`, `chrome-messages`, `wxt-i18n`, `html`, `markdown`.
+
+To share an existing translation memory, list the organisation's memories and pass the chosen `id`:
+
+```bash
+npx @globalize-now/cli-client translation-memories list --json
+```
+
+The preview answers one of three shapes under `data`:
+
+- **`ready: true`** → show the user what it will publish: `definition.input.config` (`branches`, `sourceLanguage`, `patterns`), `definition.targetLanguages.declared`, `excludedGroups` (locale files left out as unlikely), `newTranslationMemory`, `takeovers` (empty Projects whose repository rows it takes over) and `warnings`. Keep `previewHash`. Ask the user to confirm.
+- **`ready: false` with `needs`** → each need has a `code`, a `message`, what it `found`, and the `override` to pass: `sourceLanguage` → `--source-language`, `targetLanguages` → `--target-languages`, `patterns` → `--patterns`. Show the user each message and ask for the value; the languages come from the user. Then preview again with the overrides. `no_locale_files` means the branch has no locale files yet: set up i18n first with the `globalize-guide` skill, or pass `--patterns` when the setup sits on a branch that isn't merged yet.
+- **`ready: false` with `alreadySetUp`** → the repository already has a Workflow, `alreadySetUp.workflowId`. Skip to 2e with that id.
+
+Refusals (`code` in the failure JSON):
+
+| `code` | Meaning and next step |
+|--------|-----------------------|
+| `REPOSITORY_HELD_BY_PROJECT` | A Project already translates this repository. `details` carry `projectId`, `projectName`, `repositoryId`. Read `references/project-held-repository.md` and continue on that Project. |
+| `NOT_FOUND` (404) | The installation isn't this organisation's, or the App can't see the repository or branch. Recheck 2b. |
+| `TRANSLATION_MEMORY_NOT_FOUND` | `--translation-memory-id` names no memory of this organisation. Recheck `translation-memories list`. |
+| `VALIDATION_ERROR` | A flag value is malformed; `details` say which. |
+
+### 2d. Set up the Workflow
+
+Once the user confirms the ready preview, publish it with **the same flags** plus its hash:
+
+```bash
+npx @globalize-now/cli-client workflows setup \
+  --installation-id <INSTALLATION_ID> \
+  --repository <OWNER>/<REPO> \
+  --preview-hash <PREVIEW_HASH> \
+  --json
+```
+
+`data.id` is `<WORKFLOW_ID>`. `data.createdTranslationMemory` names the memory setup created (null when you passed one), and `data.takeovers` the Project rows it took over.
+
+| `code` | Next step |
+|--------|-----------|
+| `WORKFLOW_PREVIEW_STALE` | The repository changed since the preview. `details.preview` is a fresh one: show the user what changed, and on confirmation run `workflows setup` again with its `previewHash`. |
+| `WORKFLOW_REPOSITORY_CLAIMED` | A Workflow already holds the repository: `details.workflowId`, `details.workflowName`. Continue with that id. |
+| `REPOSITORY_HELD_BY_PROJECT` | As in 2c: read `references/project-held-repository.md`. |
+
+### 2e. Start the first translation
+
+A run spends credits: start one when the user agrees to it. First check for a run already started, so a retry never pays twice:
+
+```bash
+npx @globalize-now/cli-client workflows runs list --workflow-id <WORKFLOW_ID> --json
+```
+
+A run in the list means the first translation has started: report it and follow it in 2f, and start another only when the user asks. With no run, start one:
+
+```bash
+npx @globalize-now/cli-client workflows runs start --workflow-id <WORKFLOW_ID> --json
+```
+
+A GitHub Workflow delivers by pull request and translates its primary (first watched) branch. `--branch <branch>` picks another watched branch; `workflows runs start --delivery push` commits straight to the branch, only when the user asks for it.
+
+| `code` | Next step |
+|--------|-----------|
+| `INSUFFICIENT_CREDITS` (402) | The user adds credits on the Globalize dashboard, then you retry. |
+| `WORKFLOW_BRANCH_NOT_WATCHED` | `details.branches` lists the watched branches (primary first). Run on one of those. To translate another branch, the user opens a pull request from it: the Workflow translates pull requests too. |
+| `WORKFLOW_AWAITING_CONVERSION_MERGE` | A setup pull request is waiting: `details.pullRequest.url`. The user merges it, then you retry. |
+
+### 2f. Follow the run
+
+```bash
+npx @globalize-now/cli-client workflows runs get --id <RUN_ID> --json
+```
+
+The summary carries `status`, `failure`, per-language progress in `languages[]` (`done`/`total`/`failed`), each Output's `outcome`, and `pullRequestUrl`. `status: "completed"` means translated, not delivered: the run is delivered when an Output's `outcome.status` is `delivered`, and then `pullRequestUrl` is the pull request to review. Poll until then, or until `failure` is set, and give the user the pull request. `--full` prints the whole run.
+
+### 2g. Look up and change a Workflow
+
+```bash
+npx @globalize-now/cli-client workflows list --json
+npx @globalize-now/cli-client workflows get --id <WORKFLOW_ID> --json
+```
+
+`workflows list` includes archived Workflows. `workflows get` returns `currentVersion` with its `number` and `definition`.
+
+**Change the target languages** with the full set the Workflow should declare (it replaces, not adds):
+
+```bash
+npx @globalize-now/cli-client workflows languages \
+  --id <WORKFLOW_ID> \
+  --target-languages de,fr,ja,pt-BR \
+  --json
+```
+
+This publishes the next version with nothing else changed; the same set publishes nothing (`published: false`). `--base-version <n>` starts from version `n`, and a version published since refuses with `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`): read the Workflow again, confirm with the user, retry. `WORKFLOW_DEFINITION_INVALID` lists the problems in `details.issues`.
+
+The CLI changes a Workflow's target languages only; branches, patterns, steps and Outputs are edited in the Globalize web app's Workflow editor.
 
 ---
 
-#### GitLab Flow
+## Step 3: Glossary Management
 
-**For GitLab repositories:**
-
-**4a. Check for existing GitLab connections:**
-
-```bash
-npx @globalize-now/cli-client gitlab connections --json
-```
-
-This returns an array of connections. Each has `id` (UUID), `username`, `gitlabUserId`, `status`, and `createdAt`.
-
-**4b. Match connection to repo owner:**
-
-Look for a connection whose `username` matches the GitLab owner (case-insensitive). If found, use its `id` as `<CONNECTION_ID>`.
-
-- **Match found** → use its `id` as `<CONNECTION_ID>`, skip to sub-step 4d.
-- **No match** → proceed to sub-step 4c.
-
-**4c. Install the GitLab OAuth connection (requires user interaction):**
-
-```bash
-npx @globalize-now/cli-client gitlab install --no-wait --json
-```
-
-This returns `{ "installUrl": "...", "nonce": "..." }` immediately. Present the `installUrl` to the user and ask them to open it in their browser and authorize the GitLab connection.
-
-After the user confirms they have completed the browser flow, check the status:
-
-```bash
-npx @globalize-now/cli-client gitlab install-status --nonce <NONCE> --json
-```
-
-This returns `{ "status": "completed", "connectionId": "...", "username": "..." }` when done, `{ "status": "pending" }` if the user hasn't finished yet, or `{ "status": "expired" }` if the nonce expired. Check `status === "completed"`. If not completed, ask the user to confirm they finished and retry.
-
-Once completed, use `connectionId` as `<CONNECTION_ID>`.
-
-**4d. List GitLab projects and verify access:**
-
-```bash
-npx @globalize-now/cli-client gitlab projects --connection-id <CONNECTION_ID> --json
-```
-
-Match `pathWithNamespace` against `<OWNER>/<PROJECT>`. If not found, the GitLab connection may not have access to this project — inform the user.
-
-**4e. Connect the repository:**
-
-```bash
-npx @globalize-now/cli-client repositories create \
-  --project-id <PROJECT_ID> \
-  --git-url <GIT_URL> \
-  --provider gitlab \
-  --gitlab-connection-id <CONNECTION_ID> \
-  --json
-```
-
-Optional flags: `--branches <branches...>`, `--patterns '<JSON array>'`, `--import-mode <ignore|reviewed|translated>`, `--import-scope <new_keys_only|all_keys>`.
-
-Parse the returned JSON to extract the **repository ID**.
-
----
-
-### 2d. Detect repository configuration
-
-For **GitHub repos**, you can detect i18n structure via the GitHub App:
-
-```bash
-npx @globalize-now/cli-client github detect \
-  --installation-id <GITHUB_INSTALLATION_ID> \
-  --owner <OWNER> \
-  --repo <REPO> \
-  --json
-```
-
-For **GitLab repos**, you can detect i18n structure via the GitLab connection:
-
-```bash
-npx @globalize-now/cli-client gitlab detect \
-  --connection-id <CONNECTION_ID> \
-  --project-id <GITLAB_PROJECT_ID> \
-  --json
-```
-
-Alternatively (or additionally), auto-discover from the connected repository:
-
-```bash
-npx @globalize-now/cli-client repositories detect \
-  --id <REPO_ID> \
-  --json
-```
-
-**Note:** All detection commands run against remote code, not the local working copy. If the user has uncommitted or unpushed changes that affect locale files, detection will not reflect those changes. Inform the user if this applies.
-
----
-
-## Step 2.5: Project Configuration
-
-Projects have a typed `config` object for QA, provider, VCS, and notification settings. Use `projects update` with `--config` to set or change configuration.
-
-### Reading current config
-
-```bash
-npx @globalize-now/cli-client projects get --id <PROJECT_ID> --json
-```
-
-The returned JSON includes a `config` object with the current settings.
-
-### Updating config
-
-Pass a JSON object via `--config`. The object is **merged** — only include the keys you want to change:
-
-```bash
-npx @globalize-now/cli-client projects update \
-  --id <PROJECT_ID> \
-  --config '{"qa": {"enabledChecks": ["placeholder", "terminology"]}}' \
-  --json
-```
-
-You can also update `--name`, `--source-language`, and `--target-languages` in the same call.
-
-### Config sections
-
-| Section | Fields | Description |
-|---------|--------|-------------|
-| `qa` | `enabledChecks` (`"placeholder"`, `"length"`, `"terminology"`, `"formatting"`), `lengthRatioBounds` (object keyed by locale, each `{min, max}`), `aiReviewScope` (`"enabled"`, `"disabled"`) | Quality assurance checks and thresholds |
-| `defaultProvider` | string | Default translation provider |
-| `providerOverrides` | object keyed by locale → provider string | Per-language provider overrides |
-| `deeplFormality` | object keyed by locale → formality string | DeepL formality settings per language |
-| `github` | `prTranslations` (boolean), `ignoreDraftPrs` (boolean) | GitHub integration behaviour |
-| `gitlab` | `mrTranslations` (boolean), `ignoreDraftMrs` (boolean) | GitLab integration behaviour |
-| `notifications` | `webhookUrl` (string), `webhookSecret` (string), `emailRecipients` (string[]), `enabledEvents` (`"job_failed"`, `"qa_issues"`, `"delivery_failed"`, `"job_completed"`) | Webhook and email notification settings |
-
-### Examples
-
-**Enable QA checks:**
-```bash
-npx @globalize-now/cli-client projects update \
-  --id <PROJECT_ID> \
-  --config '{"qa": {"enabledChecks": ["placeholder", "length", "terminology", "formatting"], "aiReviewScope": "enabled"}}' \
-  --json
-```
-
-**Configure GitHub PR translations:**
-```bash
-npx @globalize-now/cli-client projects update \
-  --id <PROJECT_ID> \
-  --config '{"github": {"prTranslations": true, "ignoreDraftPrs": true}}' \
-  --json
-```
-
-**Set up webhook notifications:**
-```bash
-npx @globalize-now/cli-client projects update \
-  --id <PROJECT_ID> \
-  --config '{"notifications": {"webhookUrl": "https://example.com/webhook", "enabledEvents": ["job_failed", "job_completed"]}}' \
-  --json
-```
-
----
-
-## Step 3: Managing Project Languages
-
-After project creation, add or remove target languages as needed.
-
-**List** current project languages:
+Glossaries ensure specific terms are translated consistently across languages. The glossary commands act on a **Project** (`--project-id`, from `projects list --json`) and take its **project language UUIDs**, from:
 
 ```bash
 npx @globalize-now/cli-client project-languages list \
   --project-id <PROJECT_ID> \
   --json
 ```
-
-This returns an array of project languages, each with its own **project language ID** (different from the global language ID). You'll need these IDs for glossary and style guide operations.
-
-**Add** a language:
-
-```bash
-npx @globalize-now/cli-client project-languages add \
-  --project-id <PROJECT_ID> \
-  --name "Spanish" \
-  --locale es \
-  --json
-```
-
-Required: `--name` and `--locale` (BCP 47 code). Optional: `--language-id` to link to a specific global language.
-
-**Remove** a language:
-
-```bash
-npx @globalize-now/cli-client project-languages remove \
-  --project-id <PROJECT_ID> \
-  --language-id <PROJECT_LANGUAGE_ID> \
-  --json
-```
-
----
-
-## Step 3.5: Patterns Management
-
-Locale path patterns define where translation files live in the repository. Each pattern has a path template and a file format. Patterns are managed separately from repository create/update.
-
-**List** patterns:
-
-```bash
-npx @globalize-now/cli-client patterns list --repository-id <REPO_ID> --json
-```
-
-**Create** a pattern:
-
-```bash
-npx @globalize-now/cli-client patterns create \
-  --repository-id <REPO_ID> \
-  --pattern "locales/{locale}/*.json" \
-  --file-format json-nested \
-  --json
-```
-
-Supported file formats: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`, `chrome-messages`, `wxt-i18n`.
-
-**Single-file formats (no `{locale}` segment).** Most formats use one file per locale, so the pattern carries a `{locale}` placeholder (`locales/{locale}/*.json`). The **`xcstrings`** format (Apple String Catalog) is different: a single multi-locale file holds every locale, so the pattern is the catalog path itself with **no `{locale}` segment** — e.g.
-
-```bash
-npx @globalize-now/cli-client patterns create \
-  --repository-id <REPO_ID> \
-  --pattern "Localizable.xcstrings" \
-  --file-format xcstrings \
-  --json
-```
-
-Use `"**/*.xcstrings"` instead when the project has multiple catalog tables/directories.
-
-**Path-locale overrides (when the directory spelling differs from the language code).** `{locale}` is a literal token substitution — there is no transform. A **browser extension** keeps its catalogs at `_locales/pt_BR/messages.json` (underscore) while the platform language is `pt-BR`, so the difference has to be recorded per language:
-
-```bash
-npx @globalize-now/cli-client patterns path-locale \
-  --repository-id <REPO_ID> \
-  --pattern-id <PATTERN_ID> \
-  --language-id <PROJECT_LANGUAGE_ID> \
-  --path-locale pt_BR \
-  --json
-```
-
-`--language-id` is the **project language** UUID from `project-languages list`, not the global language id. Pass `--clear` instead of `--path-locale` to remove an override and fall back to the language's own code. Languages whose spelling already matches (`de`, `fr`, `ja`) need no entry. At repository-create time the same information goes in one shot via `repositories create --path-locales '[{"pattern": …, "locale": "pt-BR", "pathLocale": "pt_BR"}]'`.
-
-**Update** a pattern:
-
-```bash
-npx @globalize-now/cli-client patterns update \
-  --repository-id <REPO_ID> \
-  --pattern-id <PATTERN_ID> \
-  --pattern "locales/{locale}/{namespace}.json" \
-  --json
-```
-
-**Delete** a pattern:
-
-```bash
-npx @globalize-now/cli-client patterns delete \
-  --repository-id <REPO_ID> \
-  --pattern-id <PATTERN_ID> \
-  --json
-```
-
-**Reorder** a pattern:
-
-```bash
-npx @globalize-now/cli-client patterns reorder \
-  --repository-id <REPO_ID> \
-  --pattern-id <PATTERN_ID> \
-  --position 0 \
-  --json
-```
-
----
-
-## Step 4: Glossary Management
-
-Glossaries ensure specific terms are translated consistently across languages.
 
 **List** glossary entries:
 
@@ -471,7 +229,7 @@ npx @globalize-now/cli-client glossary create \
   --json
 ```
 
-`--source-language-id` and `--target-language-id` are **project language UUIDs** from `project-languages list` (Step 3), not global language IDs.
+`--source-language-id` and `--target-language-id` are **project language UUIDs** from `project-languages list`, not global language IDs.
 
 Pass `--do-not-translate` for terms that must stay verbatim in every language (brand names, product names, code identifiers). `--target-term` is still required — use the source spelling.
 
@@ -504,9 +262,9 @@ npx @globalize-now/cli-client glossary preview \
 
 ---
 
-## Step 5: Style Guide Management
+## Step 4: Style Guide Management
 
-Style guides provide translation instructions per language (e.g., "use formal register", "prefer British English spelling").
+Style guides provide translation instructions per language (e.g., "use formal register", "prefer British English spelling"). Like the glossary, they act on a Project.
 
 **List** style guides:
 
@@ -539,7 +297,7 @@ npx @globalize-now/cli-client style-guides delete \
 
 ---
 
-## Step 6: Organisation and Team Management
+## Step 5: Organisation and Team Management
 
 These commands are less commonly needed from an agent but are available when requested.
 
@@ -570,22 +328,11 @@ npx @globalize-now/cli-client api-keys create --org-id <ORG_ID> --name "CI Key" 
 npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID> --json
 ```
 
-### GitLab
-
-```bash
-npx @globalize-now/cli-client gitlab install                    # OAuth flow (opens browser)
-npx @globalize-now/cli-client gitlab install --no-wait --json   # Returns URL and nonce
-npx @globalize-now/cli-client gitlab install-status --nonce <NONCE> --json
-npx @globalize-now/cli-client gitlab connections --json
-npx @globalize-now/cli-client gitlab connection-delete --id <ID> --json
-npx @globalize-now/cli-client gitlab projects --connection-id <ID> --json
-npx @globalize-now/cli-client gitlab branches --connection-id <ID> --project-id <PROJECT_ID> --json
-npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <PROJECT_ID> --json
-```
-
 ---
 
 ## Command Reference
+
+Project, repository, pattern, job, namespace and GitLab commands are in `references/project-held-repository.md`.
 
 | Command | Required flags | Optional flags |
 |---------|---------------|----------------|
@@ -595,48 +342,24 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `auth logout` | | |
 | `orgs list` | | |
 | `orgs delete` | `--id` | |
+| `workflows preview-setup` | `--installation-id` (numeric), `--repository` | `--branches`, `--patterns` (JSON), `--source-language`, `--target-languages`, `--name`, `--translation-memory-id`, `--import` (`ignore`\|`reviewed`\|`translated`) |
+| `workflows setup` | `--installation-id` (numeric), `--repository`, `--preview-hash` | the same as `workflows preview-setup` |
+| `workflows list` | | |
+| `workflows get` | `--id` | |
+| `workflows languages` | `--id`, `--target-languages` | `--base-version` |
+| `workflows runs start` | `--workflow-id` | `--branch`, `--delivery` (`pr`\|`push`) |
+| `workflows runs list` | `--workflow-id` | `--limit`, `--cursor` |
+| `workflows runs get` | `--id` | `--full` |
 | `projects list` | | |
-| `projects create` | `--name`, `--source-language` (ID), `--target-languages` (IDs) | `--config` (JSON), `--translation-memory-id` |
-| `projects update` | `--id` | `--name`, `--source-language`, `--target-languages`, `--config` (JSON), `--cdn-public` (`true`/`false`), `--auto-discover-locales` (`true`/`false`), `--context` |
-| `projects get` | `--id` | |
-| `projects delete` | `--id` | |
-| `projects refs` | `--id` | |
-| `projects scorecards` | | `--limit` |
-| `projects budget` | `--id` | |
-| `projects rotate-webhook-secret` | `--id` | |
+| `project-languages list` | `--project-id` | |
 | `languages list` | | |
 | `languages get` | `--id` | |
-| `project-languages list` | `--project-id` | |
-| `project-languages add` | `--project-id`, `--name`, `--locale` | `--language-id` |
-| `project-languages remove` | `--project-id`, `--language-id` | |
-| `repositories list` | `--project-id` | |
-| `repositories create` | `--project-id`, `--git-url`, `--provider` | `--branches`, `--github-installation-id`, `--gitlab-connection-id`, `--patterns`, `--import-mode`, `--import-scope` |
-| `repositories update` | `--id` | `--git-url`, `--branches`, `--github-installation-id`, `--gitlab-connection-id`, `--provider`, `--detected-framework`, `--import-mode`, `--import-scope` |
-| `repositories delete` | `--id` | |
-| `repositories detect` | `--id` | |
-| `repositories branches` | `--id` | |
-| `repositories discover` | `--id` | |
-| `repositories translate` | `--id` | `--branch`, `--delivery-mode` (`push`\|`pr`) |
-| `patterns list` | `--repository-id` | |
-| `patterns create` | `--repository-id`, `--pattern`, `--file-format` | `--position` |
-| `patterns update` | `--repository-id`, `--pattern-id` | `--pattern`, `--file-format` |
-| `patterns delete` | `--repository-id`, `--pattern-id` | |
-| `patterns reorder` | `--repository-id`, `--pattern-id`, `--position` | |
-| `patterns bulk` | `--repository-id`, `--patterns` (JSON) | |
-| `patterns path-locale` | `--repository-id`, `--pattern-id`, `--language-id` | `--path-locale`, `--clear` |
 | `github install` | | `--no-wait` |
 | `github install-status` | `--nonce` | |
 | `github installations` | | |
 | `github repos` | `--installation-id` | |
 | `github branches` | `--installation-id`, `--owner`, `--repo` | |
 | `github detect` | `--installation-id`, `--owner`, `--repo` | |
-| `gitlab install` | | `--no-wait` |
-| `gitlab install-status` | `--nonce` | |
-| `gitlab connections` | | |
-| `gitlab connection-delete` | `--id` | |
-| `gitlab projects` | `--connection-id` | |
-| `gitlab branches` | `--connection-id`, `--project-id` | |
-| `gitlab detect` | `--connection-id`, `--project-id` | |
 | `glossary list` | `--project-id` | |
 | `glossary create` | `--project-id`, `--source-term`, `--target-term`, `--source-language-id`, `--target-language-id` | `--do-not-translate` |
 | `glossary delete` | `--project-id`, `--entry-id` | |
@@ -654,9 +377,6 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `members list` | `--org-id` | |
 | `members invite` | `--org-id`, `--email` | `--role` |
 | `members remove` | `--org-id`, `--membership-id` | |
-| `namespaces list` | `--project-id` | |
-| `namespaces update` | `--project-id`, `--namespace-id`, `--name` | |
-| `namespaces delete` | `--project-id`, `--namespace-id` | |
 | `translation-memories list` | | |
 | `translation-memories create` | `--name` | |
 | `translation-memories get` | `--id` | |
@@ -667,67 +387,16 @@ npx @globalize-now/cli-client gitlab detect --connection-id <ID> --project-id <P
 | `translation-memories clear` | `--id` | `--target-locale` |
 | `translation-memories count` | `--id` | `--target-locale` |
 | `translation-memories fresh-count` | `--id`, `--target-locale` | |
-| `translation-memory list` _(deprecated)_ | `--project-id` | `--query`, `--source-language-id`, `--target-language-id`, `--limit`, `--cursor` |
-| `translation-memory delete` _(deprecated)_ | `--project-id`, `--entry-id` | |
-| `translation-memory count` _(deprecated)_ | `--project-id` | `--target-language-id` |
-| `translation-memory fresh-count` _(deprecated)_ | `--project-id`, `--target-language-id` | |
-| `jobs list` | | `--project-id`, `--status`, `--limit`, `--offset` |
-| `jobs get` | `--id` | |
-| `jobs start` | `--id` | |
-| `jobs retry` | `--id` | |
-| `jobs stats` | `--id` | |
-| `jobs qa-report` | `--id` | |
-| `jobs qa-dismiss` | `--id`, `--unit-id`, `--check-type` | `--reason`, `--note` |
-| `jobs qa-undismiss` | `--id`, `--unit-id`, `--check-type` | |
-| `jobs export` | `--id` | `--target-lang` |
-| `jobs export-manifest` | `--id` | |
-| `jobs units` | `--job-id`, `--target-project-language-id` | `--filter`, `--search`, `--limit`, `--cursor` |
-| `jobs unit-get` | `--job-id`, `--unit-id` | |
-| `jobs files` | `--id` | `--limit`, `--cursor` |
-| `jobs redeliver` | `--id` | |
 | `billing balance` | | |
 | `billing ledger` | | `--type`, `--grouped`, `--limit`, `--cursor` |
 
 ---
 
-## Additional Commands: Jobs, Namespaces, Translation Memory & Billing
-
-These command groups manage translation work and account state beyond initial setup. They are less commonly needed during onboarding but available whenever requested.
-
-### Jobs
-
-Translation jobs run a project's pipeline. Inspect, start, retry, and export them:
-
-```bash
-npx @globalize-now/cli-client jobs list --project-id <PROJECT_ID> --json
-npx @globalize-now/cli-client jobs get --id <JOB_ID> --json
-npx @globalize-now/cli-client jobs start --id <JOB_ID> --json
-npx @globalize-now/cli-client jobs stats --id <JOB_ID> --json
-npx @globalize-now/cli-client jobs qa-report --id <JOB_ID> --json
-```
-
-QA findings on a job can be dismissed and restored. `--check-type` identifies the QA check (e.g. `placeholder`, `length`, `terminology`, `formatting`), and `--unit-id` the affected translation unit:
-
-```bash
-npx @globalize-now/cli-client jobs qa-dismiss --id <JOB_ID> --unit-id <UNIT_ID> --check-type <CHECK> --json
-npx @globalize-now/cli-client jobs qa-undismiss --id <JOB_ID> --unit-id <UNIT_ID> --check-type <CHECK> --json
-```
-
-### Namespaces
-
-Namespaces group keys within a project (e.g. per feature or page):
-
-```bash
-npx @globalize-now/cli-client namespaces list --project-id <PROJECT_ID> --json
-npx @globalize-now/cli-client namespaces update --project-id <PROJECT_ID> --namespace-id <NS_ID> --name "common" --json
-npx @globalize-now/cli-client namespaces delete --project-id <PROJECT_ID> --namespace-id <NS_ID> --json
-```
-
-There is no `namespaces create` command — namespaces are created automatically as keys are imported.
+## Additional Commands: Translation Memory & Billing
 
 ### Translation memory
 
-Translation memory (TM) stores prior translations for reuse. **A memory is an organisation-level resource, not a project one** — several projects can be attached to the same memory and then share its entries. Get a project's memory from `projects get` (`translationMemory.id`), or list every memory in the org:
+Translation memory (TM) stores prior translations for reuse. **A memory is an organisation-level resource**: several Workflows and Projects can use the same memory and share its entries. Workflow setup creates one unless `--translation-memory-id` names an existing one. List every memory in the org:
 
 ```bash
 npx @globalize-now/cli-client translation-memories list --json
@@ -752,11 +421,7 @@ npx @globalize-now/cli-client translation-memories clear --id <TM_ID> --target-l
 npx @globalize-now/cli-client translation-memories delete --id <TM_ID> --json
 ```
 
-Attach a new project to an existing memory at creation time with `projects create --translation-memory-id <TM_ID>`; attachment is permanent.
-
-**Destructive operations hit every attached project.** `clear`, `delete-entry` and `delete` act on the shared memory, so entries other projects contributed disappear too. Check `attachedProjectCount` (from `translation-memories list`/`get`) and confirm with the user before clearing or deleting. `translation-memories delete` only works on a memory with no attached projects.
-
-The older project-scoped commands (`translation-memory list|count|fresh-count|delete --project-id`) still work — they resolve the project's memory for you — but they are deprecated, print a warning, and return entries carrying `translationMemoryId` instead of `projectId`. Prefer the `translation-memories` commands above.
+**Destructive operations hit everything that shares the memory.** `clear`, `delete-entry` and `delete` act on the shared memory, so entries other Workflows and Projects contributed disappear too. Check `attachedProjectCount` (from `translation-memories list`/`get`) and confirm with the user before clearing or deleting. `translation-memories delete` only works on a memory with no attached projects.
 
 ### Billing
 
@@ -773,11 +438,8 @@ npx @globalize-now/cli-client billing ledger --json
 
 ## Common Gotchas
 
-- **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability.
-- **IDs are UUIDs (except `--installation-id`)**: All `--id`, `--project-id`, `--org-id`, etc. expect UUID values returned from prior create/list commands. **Two different installation ID flags exist — they take different value types.** `--installation-id` (used by `github repos`, `github branches`, `github detect`) expects the **numeric** GitHub installation ID (the `installationId` field from `github installations --json`, e.g. `122432012`). `--github-installation-id` (used by `repositories create/update`) expects the **UUID** (the `id` field from `github installations --json`). Always capture both IDs from the JSON response.
-- **Project language IDs vs global language IDs**: Glossary (`--source-language-id`, `--target-language-id`) and style guide (`--language-id`) commands use _project language_ UUIDs — the ID of a language within a specific project. Get these from `project-languages list`, not `languages list`. The `translation-memories` commands are the exception: they take plain locales (`--source-locale`, `--target-locale`) because a memory is shared across projects.
-- **GitHub App required for GitHub repos**: When connecting a GitHub repository, use the GitHub App flow (`github installations` / `github install`) to obtain an installation ID and pass it via `--github-installation-id` on `repositories create`. Without this, Globalize cannot access repo contents. Use `github install --no-wait --json` to get the install URL without blocking, present it to the user, then check completion with `github install-status --nonce <NONCE> --json`.
-- **Patterns are managed separately**: After creating a repository, manage locale path patterns via `patterns list/create/update/delete/reorder`. The `--patterns` flag on `repositories create` is only for initial setup. Pattern changes after creation require the pattern CRUD commands.
-- **GitLab uses connections, not installations**: For GitLab repos, use `gitlab connections` (not `github installations`) and pass `--gitlab-connection-id` (not `--github-installation-id`) on `repositories create`. GitLab project IDs are **numeric** (not UUIDs).
-- **Validate languages before project creation**: Always fetch `languages list --json` and match the user's desired locales against the catalog. Use the returned UUIDs for `--source-language` and `--target-languages` — do not pass raw locale codes. Inform the user about any unsupported languages that have no catalog match.
+- **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability. Failures print their JSON on stdout too, with exit code 1.
+- **`--installation-id` is GitHub's numeric id**: `workflows preview-setup`, `workflows setup` and the `github repos/branches/detect` commands take the `installationId` field from `github installations --json` (e.g. `122432012`), not its UUID `id`. Every other id is a UUID from a prior command.
+- **Workflows take locale codes**: `--source-language` and `--target-languages` on `workflows` commands are locales (`en`, `pt-BR`). Glossary and style guide commands take _project language_ UUIDs from `project-languages list`; `translation-memories` commands take plain locales (`--source-locale`, `--target-locale`).
+- **A completed run is not a delivered run**: check each Output's `outcome.status` for `delivered` before reporting the pull request.
 - **Auth in non-interactive contexts**: The CLI does not fall back to interactive login when there's no TTY. Ensure `GLOBALIZE_API_KEY` is set or `~/.globalize/config.json` exists.
