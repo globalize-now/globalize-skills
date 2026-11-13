@@ -121,17 +121,19 @@ echo "--- 3. lovable-i18n: Phase 6 sets up a Workflow and starts its first run -
 PHASE6="$(section "$LOVABLE" '## Phase 6: Connect Globalize.now')"
 PRIMARY="$(section "$LOVABLE" '### Primary path — the Globalize MCP connector')"
 FALLBACK="$(section "$LOVABLE" '### Fallback path — no MCP (dashboard or local CLI)')"
-# Line of the first occurrence of $2 in $1 (0 when absent).
-line_of() { printf '%s\n' "$1" | grep -nF -- "$2" | head -1 | cut -d: -f1 | grep . || echo 0; }
+# True when, in $1 before the first $4, $2 occurs and $3 follows it: the start ($3 … $4)
+# is preceded by the runs list ($2).
+listed_before_start() {
+  local before="${1%%"$4"*}"
+  [ "$before" != "$1" ] && has "$before" "$2" && has "${before#*"$2"}" "$3"
+}
 if [ -z "$PHASE6" ] || [ -z "$PRIMARY" ] || [ -z "$FALLBACK" ]; then
   fail "lovable-i18n Phase 6, its primary path or its fallback path heading is missing"
 else
   for marker in 'preview_workflow_setup' 'set_up_workflow' 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"' 'get_workflow_run' 'delivered' 'REPOSITORY_HELD_BY_PROJECT' 'translate_repository'; do
     if has "$PRIMARY" "$marker"; then pass "MCP path names '$marker'"; else fail "MCP path does not name '$marker'"; fi
   done
-  LIST_AT="$(line_of "$PRIMARY" 'list_workflow_runs')"
-  START_AT="$(line_of "$PRIMARY" 'start_workflow_run')"
-  if [ "$LIST_AT" -gt 0 ] && [ "$START_AT" -gt "$LIST_AT" ]; then
+  if listed_before_start "$PRIMARY" 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"'; then
     pass "MCP path lists the Workflow's runs before it starts one"
   else
     fail "MCP path does not call list_workflow_runs before start_workflow_run"
@@ -149,9 +151,7 @@ else
   else
     fail "CLI fallback does not run 'workflows runs start --delivery pr'"
   fi
-  RUNS_LIST_AT="$(line_of "$FALLBACK" 'workflows runs list')"
-  RUNS_START_AT="$(line_of "$FALLBACK" 'workflows runs start')"
-  if [ "$RUNS_LIST_AT" -gt 0 ] && [ "$RUNS_START_AT" -gt "$RUNS_LIST_AT" ]; then
+  if listed_before_start "$FALLBACK" 'workflows runs list' 'workflows runs start' '--delivery pr'; then
     pass "CLI fallback lists the Workflow's runs before it starts one"
   else
     fail "CLI fallback does not run 'workflows runs list' before 'workflows runs start'"
