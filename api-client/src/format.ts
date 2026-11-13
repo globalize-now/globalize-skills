@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import chalk, { chalkStderr } from "chalk";
 import Table from "cli-table3";
 import { ApiError } from "./client.js";
 
@@ -26,11 +26,17 @@ export function output(data: unknown, opts: OutputOptions): void {
 }
 
 /**
- * Deprecation notices go to stderr so they reach a human without polluting the
- * JSON on stdout that agents and scripts parse.
+ * Notices go to stderr so they reach a human without polluting the JSON on
+ * stdout that agents and scripts parse. Their colour follows stderr's own
+ * terminal detection (`chalkStderr`; `chalk` keys off stdout), so a piped
+ * stderr carries no ANSI codes.
  */
+export function notice(message: string): void {
+  process.stderr.write(chalkStderr.yellow(message) + "\n");
+}
+
 export function warnDeprecated(message: string): void {
-  process.stderr.write(chalk.yellow(`Deprecated: ${message}`) + "\n");
+  notice(`Deprecated: ${message}`);
 }
 
 /**
@@ -53,7 +59,7 @@ export function outputError(failure: unknown, opts: OutputOptions): void {
         : { error: message };
     process.stdout.write(JSON.stringify(body) + "\n");
   } else {
-    process.stderr.write(chalk.red(`Error: ${message}`) + "\n");
+    process.stderr.write(chalkStderr.red(`Error: ${message}`) + "\n");
   }
   process.exitCode = 1;
 }

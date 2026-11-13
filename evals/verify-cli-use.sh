@@ -47,13 +47,19 @@ section() {
 
 has() { printf '%s' "$1" | grep -qF -- "$2"; }
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+# shellcheck source=lib/workflows-cli.sh
+. "$SCRIPT_DIR/lib/workflows-cli.sh"
 
 echo "--- 1. description: repository translation and Workflows, not a translation project ---"
-DESC="$(awk '/^---$/ { n++; next } n == 1' "$SKILL" | awk '/^description:/ { f = 1; next } f && /^[a-z]+:/ { exit } f' | tr '\n' ' ')"
+# The description's text, whether it sits on the `description:` line itself or in a
+# folded block (`>-`, `|`) under it.
+DESC="$(awk '/^---$/ { n++; next } n == 1' "$SKILL" \
+  | awk '/^description:/ { f = 1; sub(/^description:[[:space:]]*([>|][-+]?)?[[:space:]]*/, ""); print; next } f && /^[a-z]+:/ { exit } f' \
+  | tr '\n' ' ' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
 DESC_LC="$(printf '%s' "$DESC" | tr '[:upper:]' '[:lower:]')"
-if printf '%s' "$DESC_LC" | grep -qE 'translation project|create a (translation )?project'; then
+if [ -z "$DESC" ]; then
+  fail "SKILL.md frontmatter has no description text"
+elif printf '%s' "$DESC_LC" | grep -qE 'translation project|create a (translation )?project'; then
   fail "description still triggers on creating a translation project"
 else
   pass "description no longer triggers on creating a translation project"
@@ -97,82 +103,7 @@ done <<< "$REQUIRED_CMDS"
 
 echo ""
 echo "--- 3. every workflows command and flag the skill names exists in the CLI ---"
-# The CLI's commands and their flags, one "command<TAB>flag" line per flag (and one
-# "command<TAB>" line per command). Setup options are shared by preview-setup and setup.
-awk '
-  /^function withSetupOptions/ { insetup = 1 }
-  insetup && /^}/ { insetup = 0 }
-  insetup { s = $0; while (match(s, /"--[a-z][a-z-]*/)) { setup[substr(s, RSTART + 1, RLENGTH - 1)] = 1; s = substr(s, RSTART + RLENGTH) } next }
-  /const runs = / { inruns = 1 }
-  match($0, /\.command\("[a-z-]+"\)/) {
-    name = substr($0, RSTART + 10, RLENGTH - 12)
-    if (name == "runs") { cmd = ""; next }
-    cmd = inruns ? "runs " name : name
-    print cmd "\t"
-    if (cmd == "preview-setup" || cmd == "setup") for (f in setup) print cmd "\t" f
-  }
-  cmd != "" { s = $0; while (match(s, /"--[a-z][a-z-]*/)) { print cmd "\t" substr(s, RSTART + 1, RLENGTH - 1); s = substr(s, RSTART + RLENGTH) } }
-' "$CLI_WORKFLOWS" | sort -u > "$TMP/cli"
-if [ ! -s "$TMP/cli" ]; then
-  fail "no workflows commands parsed from $CLI_WORKFLOWS"
-fi
-
-# Every `workflows …` invocation the skill names: shell lines in code fences (backslash
-# continuations joined), Command Reference rows, and inline code spans. One record per
-# invocation: "file:line<TAB>command<TAB>flags".
-extract() {
-  awk -v file="${1#"$SKILL_DIR"/}" '
-    function parse(text, where,   rest, n, w, cmd, flags, s) {
-      if (!match(text, /(^|[ \t`])workflows [a-z]/)) return
-      rest = substr(text, RSTART + RLENGTH - 1)
-      n = split(rest, w, /[ \t`|]+/)
-      cmd = w[1]
-      if (cmd == "runs") cmd = "runs " w[2]
-      flags = ""; s = text
-      while (match(s, /--[a-z][a-z-]*/)) { flags = flags " " substr(s, RSTART, RLENGTH); s = substr(s, RSTART + RLENGTH) }
-      print where "\t" cmd "\t" flags
-    }
-    /^```/ { fence = !fence; buf = ""; next }
-    fence {
-      line = (buf == "" ? $0 : buf " " $0)
-      if (line ~ /\\$/) { sub(/\\$/, "", line); buf = line; start = start ? start : NR; next }
-      parse(line, file ":" (start ? start : NR)); buf = ""; start = 0; next
-    }
-    /^\|/ { if (match($0, /^\| `workflows [^`]*`/)) parse($0, file ":" NR); next }
-    {
-      s = $0
-      while (match(s, /`[^`]+`/)) {
-        span = substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH)
-        if (span ~ /^workflows [a-z]/ || span ~ /(cli-client|globalise-now-cli) workflows [a-z]/) parse(span, file ":" NR)
-      }
-    }
-  ' "$1"
-}
-: > "$TMP/named"
-for f in "$SKILL" "$SKILL_DIR"/references/*.md; do
-  [ -f "$f" ] && extract "$f" >> "$TMP/named"
-done
-if [ ! -s "$TMP/named" ]; then
-  fail "the skill names no 'workflows' command"
-fi
-BAD=0
-while IFS=$'\t' read -r where cmd flags; do
-  if ! grep -qxF -- "$cmd	" "$TMP/cli"; then
-    fail "$where names 'workflows $cmd', which the CLI does not define"
-    BAD=$((BAD + 1))
-    continue
-  fi
-  for flag in $flags; do
-    [ "$flag" = "--json" ] && continue   # global output option
-    if ! grep -qxF -- "$cmd	$flag" "$TMP/cli"; then
-      fail "$where passes $flag to 'workflows $cmd', which the CLI does not define"
-      BAD=$((BAD + 1))
-    fi
-  done
-done < "$TMP/named"
-if [ -s "$TMP/named" ] && [ "$BAD" -eq 0 ]; then
-  pass "all $(wc -l < "$TMP/named" | tr -d ' ') 'workflows' invocations use commands and flags the CLI defines"
-fi
+check_workflows_cli "$CLI_WORKFLOWS" "$SKILL" "$SKILL_DIR"/references/*.md
 
 echo ""
 echo "--- 4. the Project steps live behind a pointer ---"
@@ -186,6 +117,12 @@ if [ -f "$PROJECT_REF" ]; then
   for marker in 'projects create' 'repositories create' 'project-languages add' 'patterns create' 'projects update' 'repositories translate' 'gitlab connections'; do
     if grep -qF -- "$marker" "$PROJECT_REF"; then pass "$PROJECT_REF_NAME covers '$marker'"; else fail "$PROJECT_REF_NAME does not cover '$marker'"; fi
   done
+  # `projects create` always prints a Workflow-setup notice, here too; the agent carries on.
+  if grep -F 'projects create' "$PROJECT_REF" | grep -i 'notice' | grep -qi 'expected'; then
+    pass "$PROJECT_REF_NAME says the 'projects create' notice is expected here"
+  else
+    fail "$PROJECT_REF_NAME does not say the 'projects create' notice is expected on this path"
+  fi
 else
   fail "$PROJECT_REF_NAME does not exist"
 fi

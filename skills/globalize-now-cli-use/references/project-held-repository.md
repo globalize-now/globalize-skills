@@ -70,7 +70,7 @@ npx @globalize-now/cli-client projects create \
 
 `--target-languages` accepts space-separated or comma-separated values.
 
-Parse the returned JSON to extract the **project ID**.
+Parse the returned JSON to extract the **project ID**. `projects create` always prints a notice on stderr steering a GitHub repository to Workflow setup; on this path (a gitlab.com repository, or a Project the user asked for) that notice is expected, so carry on with the Project and leave the skills as they are.
 
 ### P2c. Connect the repository
 

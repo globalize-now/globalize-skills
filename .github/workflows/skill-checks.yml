@@ -2,10 +2,10 @@ name: Skill checks
 
 on:
   pull_request:
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
   push:
     branches: [main]
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
 
 jobs:
   skill-size:

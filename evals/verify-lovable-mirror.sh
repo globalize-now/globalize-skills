@@ -58,11 +58,30 @@ q() {
     steps = jobs.values.flat_map { |j| j["steps"] || [] }
     r = eval(ARGV[1])
     puts(r.is_a?(String) ? r : r.to_json)
-  ' "$WF" "$1" 2>/dev/null
+  ' "$WF" "$1"
 }
+
+# Every check below reads the parsed workflow, and several are negations ("no force push"),
+# which an empty parse would pass. So no Ruby, a workflow that doesn't parse, or one with no
+# run: steps stops the check here, loudly.
+if ! command -v ruby > /dev/null; then
+  fail "ruby is not installed (this check parses the workflow with Ruby's stdlib YAML)"
+  echo "Results: $PASS passed, $FAIL failed"
+  exit 1
+fi
+if ! PARSE_ERR="$(q 'w.class' 2>&1 > /dev/null)" || [ -n "$PARSE_ERR" ]; then
+  fail "${WF#"$REPO_ROOT"/} does not parse: ${PARSE_ERR%%$'\n'*}"
+  echo "Results: $PASS passed, $FAIL failed"
+  exit 1
+fi
 
 # All run: scripts, joined.
 RUNS="$(q 'steps.map { |s| s["run"] }.compact.join("\n")')"
+if [ -z "$RUNS" ]; then
+  fail "${WF#"$REPO_ROOT"/} has no run: steps to check"
+  echo "Results: $PASS passed, $FAIL failed"
+  exit 1
+fi
 
 echo "--- 1. triggers: push to main on $SRC_PATH, plus workflow_dispatch ---"
 check "triggers are exactly push and workflow_dispatch" \
@@ -112,8 +131,17 @@ check "copies $SRC_PATH over lovable-i18n/SKILL.md" \
   'printf "%s" "$RUNS" | grep -qE "^\s*cp $SRC_PATH lovable-i18n/SKILL.md\s*$"'
 check "copies nothing else into lovable-i18n/" \
   '[ "$(printf "%s" "$RUNS" | grep -cE "(cp|rsync|mv) .*lovable-i18n/")" = "1" ]'
-check "commits only when SKILL.md changed" \
-  'printf "%s" "$RUNS" | grep -qE "git diff --quiet( --)? SKILL.md"'
+# `git diff --quiet` compares tracked files only, so on the first mirror (no SKILL.md in
+# lovable-i18n yet) it reports nothing to commit. The change test must see an untracked file:
+# stage SKILL.md, then `git diff --cached --quiet`, or read `git status --porcelain`.
+check "commits only when SKILL.md changed, a first (untracked) SKILL.md included" \
+  'printf "%s\n" "$RUNS" | awk "
+     /git add( --)? SKILL.md/ { added = 1 }
+     /git diff --cached --quiet( --)? SKILL.md/ && added { ok = 1 }
+     /git status --porcelain( --)? SKILL.md/ { ok = 1 }
+     END { exit !ok }"'
+check "never tests for a change with a working-tree-only git diff" \
+  '! printf "%s" "$RUNS" | grep -qE "git diff --quiet"'
 check "stages only SKILL.md" \
   '[ "$(printf "%s" "$RUNS" | grep -oE "git add [^;&|]*" | sort -u)" = "git add SKILL.md" ]'
 check "pushes without force" \

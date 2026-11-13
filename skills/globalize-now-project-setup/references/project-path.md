@@ -103,7 +103,7 @@ npx @globalize-now/cli-client projects create \
   --json
 ```
 
-Take the **project ID** from the result.
+Take the **project ID** from the result. `projects create` always prints a notice on stderr steering a GitHub repository to Workflow setup; on this gitlab.com path that notice is expected, so carry on with the Project and leave the skills as they are.
 
 ### G3. Connect the repository
 

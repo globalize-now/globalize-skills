@@ -61,90 +61,30 @@ has() { printf '%s' "$1" | grep -qF -- "$2"; }
 # Line number of the first line of $1 containing $2 (empty when absent).
 line_of() { printf '%s\n' "$1" | grep -nF -- "$2" | head -n 1 | cut -d: -f1; }
 
-# The CLI's definition of a `workflows` subcommand ("preview-setup", "runs start", …): the
-# lines from its `.command("…")` up to the next `.command(`. preview-setup and setup also
-# take every option withSetupOptions adds. Empty when the CLI registers no such command.
-workflows_cmd() {
-  local scope=group name="$1"
-  case "$1" in "runs "*) scope=runs; name="${1#runs }" ;; esac
-  awk -v scope="$scope" -v name="$name" '
-    /group\.command\("runs"\)/ { inruns = 1 }
-    f && /\.command\(/ { exit }
-    ((scope == "runs") == (inruns == 1)) && index($0, ".command(\"" name "\")") { f = 1 }
-    f { print }
-  ' "$CLI_WORKFLOWS"
-  case "$1" in
-    preview-setup|setup)
-      awk '/^function withSetupOptions/ { f = 1 } f { print } f && /^}/ { exit }' "$CLI_WORKFLOWS" ;;
-  esac
-}
-
-# Every invocation of the command $1 (an ERE such as 'workflows [a-z]') in the files given —
-# fenced lines (shell continuations joined) and inline code spans — each printed from the
-# command on.
-invocations() {
-  local cmd="$1" file
-  shift
-  for file in "$@"; do
-    awk '
-      function spans(s) { while (match(s, /`[^`]*`/)) { print substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH) } }
-      /^[[:space:]]*```/ { fence = !fence; buf = ""; next }
-      fence && index($0, "`") { spans($0); next }   # a fenced template quoting commands inline
-      fence {
-        line = $0
-        if (sub(/\\[[:space:]]*$/, " ", line)) { buf = buf line; next }
-        print buf line; buf = ""; next
-      }
-      { spans($0) }
-    ' "$file"
-  done | grep -oE "(^|[[:space:]])$cmd.*" | sed -E 's/^[[:space:]]+//' | sort -u
-}
-
-# Each `workflows` invocation in the files given names a subcommand the CLI registers, and
-# passes only flags that subcommand defines.
-check_workflows_cli() {
-  local inv sub def flag found=0
-  while IFS= read -r inv; do
-    found=1
-    sub="$(printf '%s' "$inv" | awk '{ if ($2 == "runs") print $2 " " $3; else print $2 }')"
-    def="$(workflows_cmd "$sub")"
-    if [ -z "$def" ]; then
-      fail "names 'workflows $sub', which the CLI does not register: $inv"
-      continue
-    fi
-    while IFS= read -r flag; do
-      [ -z "$flag" ] && continue
-      [ "$flag" = "--json" ] && continue   # global output option
-      if has "$def" "\"$flag " || has "$def" "\"$flag\"" || has "$def" "\"$flag <"; then
-        pass "CLI 'workflows $sub' accepts $flag"
-      else
-        fail "passes $flag to 'workflows $sub', which the CLI does not define: $inv"
-      fi
-    done < <(printf '%s' "$inv" | grep -oE -- '--[a-z][a-z-]+' | sort -u)
-  done < <(invocations 'workflows [a-z]' "$@")
-  [ "$found" -eq 1 ] || fail "globalize-now-project-setup names no 'workflows' command"
-}
+# shellcheck source=lib/workflows-cli.sh
+. "$SCRIPT_DIR/lib/workflows-cli.sh"
 
 # Each `repositories translate` invocation in the files given passes only flags the CLI's
 # `repositories translate` command defines, and at least one passes --delivery-mode pr.
 check_translate_cli() {
-  local translate_cmd inv flag found=0
+  local translate_cmd where inv flag found=0
   translate_cmd="$(awk '/\.command\("translate"\)/ { f = 1 } f { print } f && /^    }\);/ { exit }' "$CLI_REPOS")"
   if [ -z "$translate_cmd" ]; then
     fail "api-client has no 'repositories translate' command in $CLI_REPOS"
     return
   fi
-  while IFS= read -r inv; do
+  while IFS=$'\t' read -r where inv; do
+    [ -z "$inv" ] && continue
     has "$inv" '--delivery-mode pr' && found=1
     while IFS= read -r flag; do
       [ "$flag" = "--json" ] && continue   # global output option
       if has "$translate_cmd" "\"$flag " || has "$translate_cmd" "\"$flag <"; then
         pass "CLI 'repositories translate' accepts $flag"
       else
-        fail "passes $flag to 'repositories translate', which the CLI does not define: $inv"
+        fail "$where passes $flag to 'repositories translate', which the CLI does not define: $inv"
       fi
     done < <(printf '%s' "$inv" | grep -oE -- '--[a-z][a-z-]+' | sort -u)
-  done < <(invocations 'repositories translate' "$@")
+  done < <(cli_invocations 'repositories translate' "$@")
   if [ "$found" -eq 1 ]; then
     pass "'repositories translate' runs with --delivery-mode pr"
   else
@@ -195,6 +135,33 @@ else
   else
     fail "Phase 4's 'gh repo create' is not conditioned on the user confirming"
   fi
+  # §4.1 builds globalize-inputs.json from Phase 1's git.remote, which is null on a project
+  # that had no remote. After `gh repo create`, or on a resume once the user added a remote
+  # by hand, §4.2 must refresh it and rebuild the inputs, or Workflow setup gets no repo.
+  S42="$(section "$GUIDE" '### 4.2 Push the setup')"
+  REFRESH="$(printf '%s\n' "$S42" | grep -F 'git.remote' | grep -F 'globalize-inputs.json' || true)"
+  if [ -n "$REFRESH" ] && has "$REFRESH" 'gh repo create' && printf '%s' "$REFRESH" | grep -qi 'resume'; then
+    pass "§4.2 refreshes git.remote and rebuilds globalize-inputs.json after 'gh repo create' and on a resume"
+  else
+    fail "§4.2 has no line refreshing git.remote and rebuilding globalize-inputs.json after 'gh repo create' and on a resume"
+  fi
+  # Declining the gh offer skips sign-in for good (Phase 1.5), while Phase 4 stays open for a rerun.
+  if has "$PHASE4" '[x] delegate_account_setup — skipped'; then
+    pass "the no-remote stop marks Phase 1.5 '[x] delegate_account_setup — skipped'"
+  else
+    fail "the no-remote stop does not mark Phase 1.5 '[x] delegate_account_setup — skipped'"
+  fi
+fi
+if grep -qF '`globalize` CLI' "$GUIDE"; then
+  fail "SKILL.md names a '\`globalize\` CLI'; the bin is globalise-now-cli"
+else
+  pass "SKILL.md names no '\`globalize\` CLI'"
+fi
+META_DESC="$(sed -nE 's/^[[:space:]]*"description":[[:space:]]*"(.*)",?[[:space:]]*$/\1/p' "$(dirname "$GUIDE")/metadata.json")"
+if has "$META_DESC" 'Workflow' && ! has "$META_DESC" 'project + repo'; then
+  pass "metadata.json's description ends on a Workflow"
+else
+  fail "metadata.json's description does not end on a Workflow: $META_DESC"
 fi
 for step in push_setup start_first_translation; do
   if grep -qE "^- \[ \] ${step}\b" "$ORCH/plan-format.md"; then
@@ -244,7 +211,7 @@ else
   fi
 fi
 # Every `workflows` command the project skill names must exist on the CLI, with its flags.
-check_workflows_cli "$PROJECT" "$(dirname "$PROJECT")"/references/*.md
+check_workflows_cli "$CLI_WORKFLOWS" "$PROJECT" "$(dirname "$PROJECT")"/references/*.md
 
 echo ""
 echo "--- 3. lovable-i18n: Phase 6 sets up a Workflow and starts its first run ---"
@@ -267,6 +234,27 @@ else
     pass "MCP path lists the Workflow's runs before it starts one"
   else
     fail "MCP path does not call list_workflow_runs before start_workflow_run"
+  fi
+  # The first run starts without a second question: the Ask phase already told the user that
+  # connecting starts it and spends credits.
+  BEFORE_START="${PRIMARY%%delivery: \"pr\"*}"
+  LISTS="$(printf '%s' "$BEFORE_START" | grep -oF 'list_workflow_runs' | wc -l | tr -d ' ')"
+  if [ "$LISTS" = "1" ]; then
+    pass "MCP path lists the runs once, then starts one"
+  else
+    fail "MCP path calls list_workflow_runs $LISTS times before start_workflow_run (a pause to ask, then a re-list)"
+  fi
+  ASK="$(printf '%s\n' "$PHASE6" | grep -iE 'shall I start|whether to start' || true)"
+  if [ -z "$ASK" ]; then
+    pass "Phase 6 starts the first translation without asking again"
+  else
+    fail "Phase 6 asks before starting the first translation: $ASK"
+  fi
+  ASK_ITEM="$(grep -F '**Connect Globalize.now**' "$LOVABLE" | head -n 1)"
+  if has "$ASK_ITEM" 'first translation' && has "$ASK_ITEM" 'credits'; then
+    pass "the Ask phase says connecting starts the first translation, which spends credits"
+  else
+    fail "the Ask phase does not say connecting starts the first translation and spends credits"
   fi
   for gone in 'create_project' 'connect_repository' 'projects create' 'repositories create'; do
     if has "$PHASE6" "$gone"; then fail "Phase 6 still creates a Project ('$gone')"; else pass "Phase 6 does not name '$gone'"; fi
@@ -291,12 +279,21 @@ fi
 echo ""
 echo "--- 4. globalize-now-project-setup: a Workflow, or the Project the refusal names ---"
 # An Idle Project is never picked up: no rule reuses a Project because it is the only one.
-REUSE="$(grep -niE 'exactly one[^.]*reuse|reuse[^.]*only (one|project)' \
-  "$PROJECT" "$(dirname "$PROJECT")"/references/*.md "$GUIDE" "$ORCH/plan-format.md" 2>/dev/null || true)"
-if [ -z "$REUSE" ]; then
-  pass "no rule reuses the organisation's only Project"
+# The scan proves nothing about a file it can't read, so every file it names must exist.
+REUSE_FILES=("$PROJECT" "$PROJECT_PATH" "$GUIDE" "$ORCH/plan-format.md" "$(dirname "$PROJECT")"/references/*.md)
+REUSE_MISSING=""
+for f in "${REUSE_FILES[@]}"; do
+  [ -f "$f" ] || REUSE_MISSING="$REUSE_MISSING ${f#"$REPO_ROOT"/}"
+done
+if [ -n "$REUSE_MISSING" ]; then
+  fail "can't scan for a reuse-the-only-Project rule, missing:$REUSE_MISSING"
 else
-  fail "a rule still reuses the organisation's only Project: $REUSE"
+  REUSE="$(grep -niE 'exactly one[^.]*reuse|reuse[^.]*only (one|project)' "${REUSE_FILES[@]}")"
+  if [ -z "$REUSE" ]; then
+    pass "no rule reuses the organisation's only Project"
+  else
+    fail "a rule still reuses the organisation's only Project: $REUSE"
+  fi
 fi
 
 for marker in 'workflows preview-setup' 'workflows setup' '--preview-hash' 'alreadySetUp' '`needs`' \
@@ -317,6 +314,14 @@ else
     if grep -qF -- "$marker" "$PROJECT_PATH"; then pass "project-path.md names '$marker'"; else fail "project-path.md does not name '$marker'"; fi
   done
   check_translate_cli "$PROJECT_PATH"
+  # The CLI's `projects create` always prints a Workflow-setup notice, including on this
+  # path's intentional gitlab.com Project; the agent must carry on.
+  NOTICE="$(grep -F 'projects create' "$PROJECT_PATH" | grep -i 'notice' | grep -i 'expected' || true)"
+  if [ -n "$NOTICE" ]; then
+    pass "project-path.md says the 'projects create' notice is expected here"
+  else
+    fail "project-path.md does not say the 'projects create' notice is expected on this path"
+  fi
 fi
 
 STOPS="$(section "$PROJECT" '## No-remote and unsupported host stops')"

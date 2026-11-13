@@ -4,8 +4,8 @@ Loaded by SKILL.md §4.1. The orchestrator owns this one piece of Globalize know
 
 Build the inputs bundle the project skill consumes, from data already on hand — no re-detection. The project skill passes these values to Workflow setup's preview, so they settle what Globalize's own detection could not: the setup may sit on a branch the default branch hasn't merged yet.
 
-- **workflowName**, **provider**, **sourceLocale**, **targetLocales** ← `decisions.md` (collected in 1.7 / 1.9). An older `decisions.md` that records a project name supplies `workflowName`.
-- **owner**, **repo**, **gitUrl** ← `detection.json` `git.remote` (parse owner/repo; convert SSH → HTTPS).
+- **workflowName**, **sourceLocale**, **targetLocales** ← `decisions.md` (collected in 1.7 / 1.9). An older `decisions.md` that records a project name supplies `workflowName`.
+- **provider**, **owner**, **repo**, **gitUrl** ← `detection.json` `git.remote` (host `github.com` → `github`, `gitlab.com` → `gitlab`; parse owner/repo; convert SSH → HTTPS). SKILL.md §4.2 refreshes `git.remote` and rebuilds this file when the project gets its remote after Phase 1.
 - **catalogPath** ← Phase 3 verify `result.catalogPath`.
 - **patterns** ← one entry, `{ "pattern": …, "format": …, "pathLocales"?: {…} }`, derived from the library (the one piece of Globalize knowledge the orchestrator still owns, because it depends on the just-converted catalog):
   - **Lingui** → `po`, e.g. `src/locales/{locale}/messages.po`.
