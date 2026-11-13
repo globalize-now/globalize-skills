@@ -19,7 +19,8 @@ jobs:
         run: ./evals/verify-skill-size.sh
 
       # The Globalize connect hand-off: sibling skills load from disk, globalize-guide and
-      # lovable-i18n end by starting the first translation, project setup reuses the only project.
+      # lovable-i18n end by starting the first translation, project setup sets up a Workflow
+      # (or continues on the Project that holds the repo) with commands and flags the CLI has.
       - name: Globalize connect hand-off
         run: ./evals/verify-globalize-connect.sh
 
