@@ -41,16 +41,19 @@ With `KEEP_WORKDIR=1` the temp dir survives, so you can re-run a verifier agains
 
 ## Static verifiers (no model, no network)
 
-Four scripts run standalone against a checkout and need neither `claude` nor a fixture:
+Five scripts run standalone against a checkout and need neither `claude` nor a fixture:
 
 ```bash
 ./evals/verify-manifest.sh          # manifest.json: schema, path resolution, cross-file invariants
 ./evals/verify-rules-template.sh    # rules templates: frontmatter, marker grammar, budgets
 ./evals/verify-skill-size.sh        # SKILL.md ≤ 40 KB; globalize-guide's map in its first 5 KB; orchestrator refs resolve (runs in CI)
 ./evals/verify-globalize-connect.sh # Globalize hand-off: disk fallback, first translation, only-project reuse (runs in CI)
+./evals/verify-cli-use.sh           # globalize-now-cli-use: Workflow setup first, CLI flags exist, Project path behind a pointer (runs in CI)
 ```
 
 `verify-globalize-connect.sh` is a tripwire for the prose that gets an agent from "repo connected" to a started translation. It fails when `globalize-guide` answers a sibling skill the Skill tool can't load with a reinstall prompt instead of reading its `SKILL.md` from `.claude/skills/` or `.agents/skills/` (a skill installed mid-session is on disk but not registered); when Phase 4 stops pushing the setup or starting the first translation; when `globalize-now-project-setup`'s Step 5 passes a flag the CLI's `repositories translate` (`api-client/src/commands/repositories.ts`) doesn't define, or drops `--delivery-mode pr`; when `lovable-i18n`'s Phase 6 stops calling the hosted `translate_repository` as a pull request; or when orchestrated project setup stops reusing the organisation's only project (and its already-connected repository).
+
+`verify-cli-use.sh` keeps `globalize-now-cli-use` on Workflows. It fails when the description still triggers on creating a translation project; when Step 2 is not "Set up a Workflow and start a translation" or stops naming a `workflows` command it needs (`preview-setup`, `setup`, `list`, `get`, `languages`, `runs start|list|get`, plus `translation-memories list`), or the Command Reference loses a row for one; when any `workflows` command or `--flag` the skill names — in code blocks, Command Reference rows or inline code, in SKILL.md or `references/` — is missing from `api-client/src/commands/workflows.ts`; when the Project steps (`projects create`, `repositories create`, patterns, languages, config, jobs, GitLab) leave `references/project-held-repository.md` or creep back into SKILL.md; when SKILL.md stops pointing at that file on a `REPOSITORY_HELD_BY_PROJECT` refusal or when the user names a Project; or when the glossary and style guide commands leave SKILL.md.
 
 `verify-skill-size.sh` exists because harnesses truncate the Skill tool's output: a headless opencode run cut globalize-guide's old 159 KB SKILL.md at ~50 KB, and the agent improvised the whole Lingui setup from memory. It fails when any SKILL.md exceeds 40 KB (exemptions are listed in the script with a reason — currently only the platform-bundled `lovable-i18n`), when the phase map, reference-loading rules or single-agent fallback leave the first 5 KB of globalize-guide's SKILL.md, or when a `references/` path named by SKILL.md or `references/orchestrator/` is missing or an orchestrator file is unreachable. `.github/workflows/skill-checks.yml` runs it on every PR that touches `skills/`.
 
