@@ -1,0 +1,73 @@
+# Mirror skills/lovable-i18n/SKILL.md to the root of globalize-now/lovable-i18n.
+#
+# Lovable imports a skill reliably only from a repository root, so the standalone repo
+# exists to hold this one file there. The copy in this repo is canonical. Every run
+# overwrites lovable-i18n's SKILL.md, so a direct edit there is lost on the next mirror.
+# The run commits only when the file changed, and pushes to that repo alone: it never
+# writes here, so it can't trigger itself.
+#
+# Run it by hand (Actions -> Mirror lovable-i18n -> Run workflow, on main) to backfill.
+#
+# Credential: a GitHub App installed on globalize-now with access to lovable-i18n only,
+# repository permission Contents: read and write, nothing else. Each run mints a
+# short-lived installation token narrowed to that repository and contents: write.
+#   vars.LOVABLE_I18N_MIRROR_APP_CLIENT_ID      the App's Client ID (repository variable)
+#   secrets.LOVABLE_I18N_MIRROR_APP_PRIVATE_KEY the App's private key, PEM (repository secret)
+
+name: Mirror lovable-i18n
+
+on:
+  push:
+    branches: [main]
+    paths: [skills/lovable-i18n/SKILL.md]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-lovable-i18n
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'globalize-now/globalize-skills' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: skills/lovable-i18n/SKILL.md
+          sparse-checkout-cone-mode: false
+
+      - id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.LOVABLE_I18N_MIRROR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.LOVABLE_I18N_MIRROR_APP_PRIVATE_KEY }}
+          owner: globalize-now
+          repositories: lovable-i18n
+          permission-contents: write
+
+      # No ref: the default branch.
+      - uses: actions/checkout@v6
+        with:
+          repository: globalize-now/lovable-i18n
+          token: ${{ steps.app-token.outputs.token }}
+          path: lovable-i18n
+
+      - name: Overwrite SKILL.md
+        run: cp skills/lovable-i18n/SKILL.md lovable-i18n/SKILL.md
+
+      - name: Commit and push if changed
+        working-directory: lovable-i18n
+        run: |
+          if git diff --quiet -- SKILL.md; then
+            echo "SKILL.md already matches globalize-skills@${GITHUB_SHA}; nothing to mirror."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add SKILL.md
+          git commit -m "chore: mirror SKILL.md from globalize-now/globalize-skills@${GITHUB_SHA}"
+          git push origin HEAD
