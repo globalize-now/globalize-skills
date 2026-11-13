@@ -1,7 +1,7 @@
 {
   "name": "globalize-now-cli-use",
   "version": "1.0.0",
-  "description": "Manage Globalize translation resources via CLI: languages, glossaries, style guides, repositories, team members, API keys.",
+  "description": "Set up and manage Globalize translation via CLI: Workflow setup and runs, glossaries, style guides, translation memories, team members, API keys.",
   "tags": ["globalize", "translations", "cli"],
   "supportedAgents": ["claude-code"]
 }
