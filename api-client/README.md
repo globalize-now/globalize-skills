@@ -109,6 +109,8 @@ globalise-now-cli workflows runs get --id <run-id>
 
 A `completed` run has finished translating; it does not mean the translations were delivered. Check each Output's `outcome` (null until it has run, then `delivered`, `failed` or `skipped`). `runs get --full` prints the whole run.
 
+`projects create` prints a notice on stderr: a GitHub repository with no Project is set up with `workflows preview-setup` and `workflows setup`, and installed Globalize skills are updated with `npx skills update`. It still creates the Project, and stdout is unchanged, so `--json` output parses as before. Other `projects` commands print no notice.
+
 ### Errors
 
 A failed command exits 1. In JSON mode (`--json`, or whenever stdout isn't a terminal) it prints `{ "error": "<message>", "status": <http status>, "code": "<API code>", "details": … }`, with `code` and `details` as the API answered them; for example a 409 `REPOSITORY_HELD_BY_PROJECT` names the Project in `details`. A 401 reads "Authentication failed"; a 403 that isn't about authentication (`FEATURE_REQUIRED`, `WORKFLOW_GATE_ADMIN_REQUIRED`, …) keeps its code and message.

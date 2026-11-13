@@ -1,3 +1,4 @@
+import chalk from "chalk";
 import { Option, type Command } from "commander";
 import type { ApiClient } from "../client.js";
 import { apiError } from "../client.js";
@@ -8,6 +9,17 @@ type ProjectCreateBody = paths["/api/projects"]["post"]["requestBody"]["content"
 type ProjectUpdateBody = paths["/api/projects/{id}"]["patch"]["requestBody"]["content"]["application/json"];
 
 type ClientFactory = () => Promise<ApiClient>;
+
+/**
+ * `projects create` steers a new GitHub repository to Workflow setup. It goes to
+ * stderr, so stdout in JSON mode (`--json`, or stdout not a terminal) stays
+ * exactly what scripts and agents parse, and the Project is still created.
+ */
+const PROJECT_CREATE_NOTICE =
+  "Notice: for a GitHub repository with no Project, set up a Workflow instead: " +
+  "`globalise-now-cli workflows preview-setup`, then `workflows setup`. " +
+  "Projects stay for repositories a Project already translates. " +
+  "Using the Globalize skills? Run `npx skills update` to get the Workflow steps.";
 
 export async function listProjects(client: ApiClient) {
   const { data, error, response } = await client.GET("/api/projects");
@@ -111,6 +123,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     .option("--translation-memory-id <id>", "Attach to an existing translation memory (permanent)")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
+      process.stderr.write(chalk.yellow(PROJECT_CREATE_NOTICE) + "\n");
       try {
         const client = await getClient();
         const targetLanguages: string[] = Array.isArray(cmdOpts.targetLanguages)
