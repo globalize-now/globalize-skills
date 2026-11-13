@@ -18,8 +18,11 @@ shopt -s nullglob   # a skill with no references/ globs to nothing
 #      lists the Workflow's runs before `workflows runs start --delivery pr`, or offers a pull
 #      request into the default branch only after the user confirms. Every `workflows`
 #      command the project skill names is one the CLI registers, with flags it defines.
-#   3. lovable-i18n's Phase 6 ends by calling the hosted `translate_repository` tool as a
-#      pull request, and its no-MCP fallback starts the translation too.
+#   3. lovable-i18n's Phase 6 sets up a Workflow and ends by starting its first run as a
+#      pull request (`start_workflow_run`, only after `list_workflow_runs` finds none), reports
+#      the pull request only once `get_workflow_run` says it was delivered, continues a
+#      Project-held repository with `translate_repository`, creates no Project, and its no-MCP
+#      fallback opens the Workflow builder or runs `workflows runs start --delivery pr`.
 #   4. globalize-now-project-setup never picks up a Project it wasn't pointed at: no "exactly
 #      one … reuse it" rule is left, a Project-held repository (REPOSITORY_HELD_BY_PROJECT)
 #      routes to references/project-path.md, which translates that Project's repository with
@@ -244,20 +247,44 @@ fi
 check_workflows_cli "$PROJECT" "$(dirname "$PROJECT")"/references/*.md
 
 echo ""
-echo "--- 3. lovable-i18n: Phase 6 ends by starting the first translation ---"
+echo "--- 3. lovable-i18n: Phase 6 sets up a Workflow and starts its first run ---"
 PHASE6="$(section "$LOVABLE" '## Phase 6: Connect Globalize.now')"
 PRIMARY="$(section "$LOVABLE" '### Primary path — the Globalize MCP connector')"
 FALLBACK="$(section "$LOVABLE" '### Fallback path — no MCP (dashboard or local CLI)')"
+# True when, in $1 before the first $4, $2 occurs and $3 follows it: the start ($3 … $4)
+# is preceded by the runs list ($2).
+listed_before_start() {
+  local before="${1%%"$4"*}"
+  [ "$before" != "$1" ] && has "$before" "$2" && has "${before#*"$2"}" "$3"
+}
 if [ -z "$PHASE6" ] || [ -z "$PRIMARY" ] || [ -z "$FALLBACK" ]; then
   fail "lovable-i18n Phase 6, its primary path or its fallback path heading is missing"
 else
-  for marker in 'translate_repository' 'deliveryMode: "pr"' 'idempotencyKey'; do
+  for marker in 'preview_workflow_setup' 'set_up_workflow' 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"' 'get_workflow_run' 'delivered' 'REPOSITORY_HELD_BY_PROJECT' 'translate_repository'; do
     if has "$PRIMARY" "$marker"; then pass "MCP path names '$marker'"; else fail "MCP path does not name '$marker'"; fi
   done
-  if has "$FALLBACK" 'repositories translate' && has "$FALLBACK" '--delivery-mode pr'; then
-    pass "CLI fallback starts the first translation as a pull request"
+  if listed_before_start "$PRIMARY" 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"'; then
+    pass "MCP path lists the Workflow's runs before it starts one"
   else
-    fail "CLI fallback does not run 'repositories translate --delivery-mode pr'"
+    fail "MCP path does not call list_workflow_runs before start_workflow_run"
+  fi
+  for gone in 'create_project' 'connect_repository' 'projects create' 'repositories create'; do
+    if has "$PHASE6" "$gone"; then fail "Phase 6 still creates a Project ('$gone')"; else pass "Phase 6 does not name '$gone'"; fi
+  done
+  if has "$FALLBACK" '/workflows/new'; then
+    pass "dashboard fallback opens the Workflow builder"
+  else
+    fail "dashboard fallback does not open the Workflow builder (/workflows/new)"
+  fi
+  if has "$FALLBACK" 'workflows runs start' && has "$FALLBACK" '--delivery pr'; then
+    pass "CLI fallback starts the first run as a pull request"
+  else
+    fail "CLI fallback does not run 'workflows runs start --delivery pr'"
+  fi
+  if listed_before_start "$FALLBACK" 'workflows runs list' 'workflows runs start' '--delivery pr'; then
+    pass "CLI fallback lists the Workflow's runs before it starts one"
+  else
+    fail "CLI fallback does not run 'workflows runs list' before 'workflows runs start'"
   fi
 fi
 
