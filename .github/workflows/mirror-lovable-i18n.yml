@@ -62,12 +62,14 @@ jobs:
       - name: Commit and push if changed
         working-directory: lovable-i18n
         run: |
-          if git diff --quiet -- SKILL.md; then
+          # Stage first: a first mirror's SKILL.md is untracked, which a plain
+          # `git diff` never reports.
+          git add SKILL.md
+          if git diff --cached --quiet -- SKILL.md; then
             echo "SKILL.md already matches globalize-skills@${GITHUB_SHA}; nothing to mirror."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add SKILL.md
           git commit -m "chore: mirror SKILL.md from globalize-now/globalize-skills@${GITHUB_SHA}"
           git push origin HEAD
