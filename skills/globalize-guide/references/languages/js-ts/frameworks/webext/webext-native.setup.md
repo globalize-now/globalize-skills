@@ -1050,8 +1050,9 @@ file. It always runs too, and is likewise not a §1.10 selection.
   an empty or absent `messages.json` before a store upload rejects them — though not a dangling `__MSG_` reference, which the convert-phase verify owns) and a store-listing locale checklist.
 - **RTL layout** — if any target locale is RTL (`ar`, `he`, `fa`), run the separate **`css-i18n`** skill to
   convert physical CSS properties to logical ones.
-- **Connect a translation service** — with `<localesRoot>/<sourceLocale>/messages.json` populated, connect via
-  the `globalize-now-project-setup` skill (sign in first via `globalize-now-account-setup`). The format is
-  **`chrome-messages`**, the pattern is `_locales/{locale}/messages.json`, and every target locale whose code
-  carries a region or script subtag needs a `pathLocales` override mapping the BCP-47 code to the underscored
-  directory spelling (`pt-BR` → `pt_BR`, `zh-CN` → `zh_CN`, `es-419` → `es_419`).
+- **Connect a translation service** — with `<localesRoot>/<sourceLocale>/messages.json` populated and pushed to
+  GitHub, set up a Globalize Workflow for the repository with the `globalize-now-project-setup` skill (sign in
+  first via `globalize-now-account-setup`). The format is **`chrome-messages`**, the pattern is
+  `_locales/{locale}/messages.json`, and every target locale whose code carries a region or script subtag needs
+  a `pathLocales` entry on the pattern mapping the BCP-47 code to the underscored directory spelling
+  (`"pt-BR": "pt_BR"`, `"zh-CN": "zh_CN"`, `"es-419": "es_419"`).

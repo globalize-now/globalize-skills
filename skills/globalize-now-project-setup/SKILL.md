@@ -1,33 +1,57 @@
 ---
 name: globalize-now-project-setup
 description: >-
-  Create a Globalize translation project, connect a GitHub or GitLab repository, and
-  set catalog file patterns. Use this skill when the user asks to create a Globalize
-  project, connect their repo to Globalize, or wire their translation catalogs to the
-  Globalize platform. Assumes the Globalize CLI is already installed and authenticated —
-  if not, run globalize-now-account-setup first. For managing existing projects
-  (glossaries, style guides, team members), use globalize-now-cli-use.
+  Set up Globalize translation for a repository: publish a Workflow that translates a
+  GitHub repository's catalogs and start its first translation, or continue on the
+  Project that already translates it. Use this skill when the user asks to connect their
+  repo to Globalize, set up a Globalize Workflow, or wire their translation catalogs to
+  the Globalize platform. Assumes the Globalize CLI is already installed and
+  authenticated — if not, run globalize-now-account-setup first. For managing existing
+  Workflows, glossaries, style guides and team members, use globalize-now-cli-use.
 ---
 
 # Globalize Project Setup
 
-The Globalize CLI (`@globalize-now/cli-client`) lets AI agents manage translation projects, languages, glossaries, style guides, and repository connections on the [Globalize](https://globalize.now) platform.
+This skill sets up a Globalize **Workflow** for a GitHub repository: Globalize previews what it finds in the repository (catalog patterns, source and target languages), you confirm, it publishes the Workflow, and — in orchestrated mode — the skill starts the first translation, delivered as a pull request. The Workflow watches the repository's default branch.
 
-This skill creates a translation project, connects your git repository, and sets the catalog file patterns — and, in orchestrated mode, starts the first translation. It assumes you are already signed in.
+Every command is `npx @globalize-now/cli-client <command> --json`. A failed command exits 1 and prints `{"error", "status", "code"?, "details"?}` on stdout; branch on `code`.
 
 Follow these steps in order.
 
 ---
 
-## Auth precheck
+## Choose the path
 
-Before anything else, confirm the CLI is installed and authenticated:
+Read the remote first, before any Globalize call: the supplied inputs' `provider` / `owner` / `repo` in orchestrated mode, otherwise `git rev-parse --is-inside-work-tree` and `git remote get-url origin`.
+
+| `origin` | Path |
+|---|---|
+| `github.com` | **Workflow path**: the auth precheck, then Steps 1–5 below. |
+| `gitlab.com` | **Project path**: the auth precheck, then read `references/project-path.md` in full and follow its "gitlab.com" section in place of Steps 2–5. |
+| None, or not a git repository | **No-remote stop** (next section). |
+| Any other host (Bitbucket, self-hosted GitLab, …) | **Unsupported host stop** (next section). |
+
+Extract `<OWNER>/<REPO>` from HTTPS (`https://github.com/OWNER/REPO.git`) or SSH (`git@github.com:OWNER/REPO.git`). A GitHub repository that a Project already translates is found by Workflow setup's refusal in Step 3, so the Workflow path never lists Projects.
+
+---
+
+## No-remote and unsupported host stops
+
+These run before sign-in: no auth precheck, no Globalize call, and the local i18n setup stays exactly as it is. In orchestrated runs `globalize-guide` owns them (its Phase 4.2) and calls this skill only with a GitHub or GitLab remote.
+
+- **No remote** (no `origin`): "Globalize translates from a GitHub repository, and this project has none. Your local i18n setup is done and kept." Then check `gh auth status`. It succeeds and this is a git repository with at least one commit → offer: "I can create a private GitHub repository **{directory name}** with `gh` and push `{current branch}` to it, then carry on setting up Globalize. Create it? (**yes** / **no**)". Run `gh repo create <name> --private --source=. --remote=origin --push` only once the user confirms, then continue with the auth precheck and the Workflow path. **no**, or no signed-in `gh` → stop with: "Once this project is on GitHub, run this skill again." **Headless**: never offer or run `gh`; stop with the message.
+- **Not a git repository**: the same message and stop, without the `gh` offer.
+- **Unsupported host** (Bitbucket, self-hosted GitLab, any host other than `github.com` / `gitlab.com`): "Globalize translates from a GitHub repository, and this project's remote is on {host}. Your local i18n setup is done and kept." Stop. No `gh` offer.
+
+---
+
+## Auth precheck
 
 ```bash
 npx @globalize-now/cli-client auth status --json
 ```
 
-If this returns a valid `source` and `key`, continue. If it fails or reports no credentials, **STOP**:
+A valid `source` and `key` → continue. Otherwise **STOP**:
 
 > "You're not signed in to Globalize yet. Run the `globalize-now-account-setup` skill first to install the CLI and authenticate, then re-run this skill."
 
@@ -35,495 +59,206 @@ If this returns a valid `source` and `key`, continue. If it fails or reports no 
 
 ## Supplied inputs (orchestrated mode)
 
-This skill can be driven by another skill (e.g. the `globalize-guide` orchestrator) that has already collected the project details and just-converted catalog paths.
+Another skill (e.g. the `globalize-guide` orchestrator) can drive this one with the just-converted catalog's details.
 
-**If `.globalize/globalize-inputs.json` exists in the project root** (or the invoking prompt supplies these values directly), read it and treat its fields as authoritative: skip the **detection** in Step 1 and the **Setup Mode** prompt below, run **unguided**, and proceed straight to Step 2 (provider connection) → Step 3 (reuse or create the project) → Step 4 (connect repo) → Step 5 (first translation). Do **not** re-detect or re-prompt for anything the file provides.
-
-Expected shape:
+**If `.globalize/globalize-inputs.json` exists in the project root** (or the invoking prompt supplies these values), treat its fields as authoritative: skip Step 1's detection and the Setup Mode prompt, run **unguided**, and go Step 2 → Step 3 → Step 4 → Step 5. Re-detect or re-prompt for nothing the file provides.
 
 ```json
 {
-  "projectName": "my-app",
+  "workflowName": "my-app",
   "sourceLocale": "en",
-  "targetLocales": ["de", "fr", "es"],
+  "targetLocales": ["de", "fr", "pt-BR"],
   "provider": "github",
   "owner": "acme",
   "repo": "my-app",
   "gitUrl": "https://github.com/acme/my-app.git",
   "catalogPath": "src/locales/{locale}/messages.po",
-  "localePathPattern": "src/locales/{locale}/messages.po",
-  "fileFormat": "po",
-  "pathLocales": [],
-  "importMode": "ignore",
-  "importScope": "new_keys_only",
+  "patterns": [{ "pattern": "src/locales/{locale}/messages.po", "format": "po" }],
+  "import": "ignore",
   "mode": "orchestrated",
   "firstTranslationBranch": "chore/i18n-setup"
 }
 ```
 
-`localePathPattern` + `fileFormat` are the values to pass to `repositories create --patterns` (skip the server-side `github detect` / `gitlab detect` step — patterns are already known).
+They map onto Step 3's flags: `patterns` → `--patterns` (verbatim JSON; a pattern may carry `"pathLocales": {"pt-BR": "pt_BR"}` for a layout that spells a locale differently), `sourceLocale` → `--source-language`, `targetLocales` → `--target-languages` (comma-separated), `workflowName` → `--name`, `import` → `--import`. An older inputs file is read the same way: `projectName` for `workflowName`, `importMode` for `import`, and `localePathPattern` + `fileFormat` (+ a `pathLocales` array of `{pattern, locale, pathLocale}`) as the one pattern; `importScope` is ignored.
 
-Still run the interactive provider connection in Step 2 (GitHub App install / GitLab OAuth) if no installation/connection exists yet — that browser approval is unavoidable.
+`firstTranslationBranch` names the branch the caller pushed the setup to; Step 5 translates it. `null` or absent → skip Step 5.
 
-`firstTranslationBranch` names the branch the caller has pushed the catalogs to; Step 5 translates it. `null` or absent → skip Step 5.
-
-`pathLocales` is **optional** and usually absent or `[]`. When present it carries per-language on-disk spellings for the pattern's `{locale}` segment — see "Path-locale overrides" in Step 4b. Pass it straight through to `repositories create --path-locales`.
-
-**Otherwise** (no inputs file, standalone use), detect and prompt as described below.
+**Otherwise** (no inputs file, standalone use), detect and prompt as below.
 
 ---
 
 ## Setup Mode
 
-After Step 1 (detection) completes without blockers, ask the user:
+After Step 1 completes without blockers, ask:
 
 > **How would you like to proceed?**
 > 1. **Guided** — I'll explain each step before and after.
 > 2. **Unguided** — I'll run all steps without pausing and show a full summary at the end.
 
-### Guided mode rules
+**Guided**: before each step, explain what will happen and why; after it, say what changed.
 
-- **Before each step**: briefly explain what will happen and why.
-- **After each step**: summarize what changed (project created, repo connected, patterns set).
-
-### Unguided mode rules
-
-- Execute all steps without pausing for per-step explanations.
-- Hard stops (e.g., source language not in the Globalize catalog) still halt execution — these are never skipped.
-- At the end, produce a summary:
+**Unguided**: run every step without per-step explanations. Hard stops and the preview's `needs` still halt — a language always comes from the user or the repository, never a guess. At the end, produce:
 
 ```
-## Project Setup Complete
+## Globalize Setup Complete
 
 ### What was done
-- [x] Step 1: Detect Environment — {detected signals summary}
-- [x] Step 2: Connect Git Provider — {GitHub|GitLab} ({owner/repo}) or "skipped — no git remote"
-- [x] Step 3: Create Project — "{name}" (source: {source}, targets: {targets}, config: {config summary or "none"})
-- [x] Step 4: Connect Repository — {owner/repo} connected, patterns: {count configured or "none"}, import mode: {mode}
-- [x] Step 5: First Translation — started on {branch}, delivered as a pull request (orchestrated mode only; or "skipped — {reason}")
+- [x] Step 1: Detect Environment — {signals}
+- [x] Step 2: Connect GitHub — {owner/repo}, installation {accountLogin}
+- [x] Step 3: Preview — {ready | already set up as "{workflowName}" | held by Project "{projectName}", continued there}
+- [x] Step 4: Set up the Workflow — "{name}" (source: {source}, targets: {targets}, patterns: {patterns}, import: {mode}) — {workflow page}
+- [x] Step 5: First translation — {run #{number} started, pull request delivery | pull request {url} into {default branch} | skipped — {reason}}
 
 ### Warnings (if any)
-- {e.g., Uncommitted changes detected — i18n detection used remote code only}
-- {e.g., Language "xyz" not found in Globalize catalog — skipped}
+- {e.g. Uncommitted changes — Globalize reads the remote only}
 
 ### Next steps
-- {recommendations — e.g. pull translations, manage glossaries via globalize-now-cli-use}
+- {e.g. start the first translation: `workflows runs start --workflow-id <id> --delivery pr`; follow it with `workflows runs get --id <runId>`}
 ```
 
-#### Required choices in unguided mode
-
-**Auto-detect first, ask only if detection fails.** No choices are collected upfront. The skill detects everything it can from the environment and existing i18n config, and only prompts the user when a value cannot be determined.
-
-- **Project name**: derived from the repo name (parsed from the git remote URL, e.g. `github.com/acme/my-app` → `my-app`) or the current directory name. Never ask.
-- **Source language**: detected from existing i18n config (`sourceLocale`, `defaultLocale`, `lng`). If not detected, default to `en`.
-- **Target languages**: detected from existing i18n config (remaining locales after excluding source). If not detected, ask the user.
-- **Locale path patterns**: detected from i18n config or directory structure. Falls back to server-side detection via `github detect` or `gitlab detect` in Step 4. Never ask the user.
-- **Import mode**: `ignore` by default. Never ask.
-- **Import scope**: `new_keys_only` by default. Never ask.
-
-If no localization setup is detected at all (non-localized project), ask the user for source and target languages before proceeding to Step 3.
+The Workflow page is `https://app.globalize.now/workflows/<WORKFLOW_ID>` when `auth status` reports `api` as `https://api.globalize.now`; against any other API, give the Workflow's name and id instead.
 
 ---
 
-## Step 1: Detect the Environment
+## Step 1: Detect the environment
 
-> In orchestrated mode (a `.globalize/globalize-inputs.json` file is present), skip this detection entirely and use the supplied values.
-
-Check the following before proceeding:
+> Orchestrated mode: skip this step and use the supplied values.
 
 | Signal | How to detect |
 |--------|--------------|
-| **Package manager** | `package-lock.json` → npm. `yarn.lock` → yarn. `pnpm-lock.yaml` → pnpm. `bun.lock` → bun. |
-| **Git repository** | `git rev-parse --is-inside-work-tree` exits 0. |
-| **Git remote URL** | `git remote get-url origin` — record the URL. If no remote named `origin`, record as absent. |
-| **Git provider** | Parse the remote URL. If it contains `github.com`, record provider as `github` and extract `<OWNER>/<REPO>` from HTTPS (`https://github.com/OWNER/REPO.git`) or SSH (`git@github.com:OWNER/REPO.git`) format. If it contains `gitlab.com`, record provider as `gitlab` and extract `<OWNER>/<PROJECT>` from HTTPS (`https://gitlab.com/OWNER/PROJECT.git`) or SSH (`git@gitlab.com:OWNER/PROJECT.git`) format. **Important:** The CLI only accepts HTTPS URLs for `--git-url`. If the remote is SSH, convert to HTTPS: `https://github.com/<OWNER>/<REPO>.git` or `https://gitlab.com/<OWNER>/<PROJECT>.git`. |
-| **Uncommitted changes** | `git status --porcelain` — non-empty output means uncommitted changes exist. |
-| **Unpushed commits** | `git log @{u}..HEAD --oneline 2>/dev/null` — non-empty output means unpushed commits. Fails gracefully if no upstream is set. |
+| **Uncommitted changes** | `git status --porcelain` is non-empty. |
+| **Unpushed commits** | `git log @{u}..HEAD --oneline 2>/dev/null` is non-empty (no upstream counts as unpushed). |
 
-### Existing localization setup
+Globalize reads the repository on GitHub, never this working copy: uncommitted or unpushed changes → warn the user, and in the summary, that the preview reflects the remote only.
 
-Scan for known i18n config files to auto-detect source and target languages. Use the first match found — the project likely has one primary i18n setup.
-
-| Signal | How to detect | What to extract |
-|--------|--------------|-----------------|
-| **LinguiJS** | `lingui.config.ts` or `lingui.config.js` exists | `sourceLocale` → source language, `locales` array → all languages |
-| **next-intl** | `src/i18n/routing.ts` or `i18n/routing.ts` exists | `defaultLocale` → source language, `locales` array → all languages |
-| **Paraglide** | `project.inlang/settings.json` exists (and/or `@inlang/paraglide-js` in `package.json` deps) | `baseLocale` → source language, `locales` array → all languages |
-| **i18next** | `i18next` in `package.json` deps + config file (`i18n.ts`, `i18n.js`, `i18next.config.*`) | `lng` or `fallbackLng` → source language, `supportedLngs` → all languages |
-| **react-intl** | `react-intl` or `@formatjs/intl` in `package.json` deps | Check for `defaultLocale` in config; scan `lang/` or `translations/` directories |
-| **Angular** (`@angular/localize`) | `angular.json` has `projects.<p>.i18n.sourceLocale` and `@angular/localize` is in `package.json` | `i18n.sourceLocale` → source language; target languages from `src/locale/messages.<code>.xlf` file names (or `extract-i18n.options.outputPath`) minus the source |
-| **Locale directories** | Directories named `locales/`, `messages/`, `translations/`, `lang/` | Subdirectory names or JSON file names (e.g., `en.json`, `fr.json`) indicate available locales |
-| **Rails** | `config/locales/` directory exists with locale-named `.yml` files (e.g. `en.yml`, `pt-BR.yml`). Optionally, parse `config/application.rb` for `config.i18n.default_locale`. | `config.i18n.default_locale` (or `en` if absent) → source language; all other locale codes in `config/locales/*.yml` filenames → target languages. Locale codes may be hyphenated (`pt-BR`, `zh-TW`) — pass through verbatim. |
-| **Android** | `res/values/strings.xml` exists (the locale-less default, typically under `app/src/main/res`), with per-locale `res/values-<qualifier>/strings.xml` overlays. | `res/values/strings.xml` → source language (the app default; report as `en` unless otherwise known). Each `res/values-<qualifier>/` dir → a target language: parse the qualifier and normalize **both** the legacy form (`values-pt-rBR` → `pt-BR`, `values-es` → `es`) and the BCP47 `b+` form (`values-b+sr+Latn` → `sr-Latn`) to BCP47. |
-| **Locale files** | `*.po`, `*.pot`, `*.xliff`, `*.xlf`, `*.json` files in locale-like paths | File/directory names map to locale codes |
-
-**Detection priority**: Config files (explicit locale lists) take precedence over directory/file scanning (inferred locales).
-
-**Source vs target**: The source language is the `sourceLocale` / `defaultLocale` / `lng` from config. All other locales in the list are target languages. **Always exclude the source locale from the target list.**
-
-If none of the above signals are found, record "no localization setup detected."
-
-### Locale path pattern
-
-During detection, also determine the **locale file path pattern** — a path template showing where locale files live. Supported placeholders and wildcards:
-
-- `{locale}` — locale code. Required for **per-locale file layouts** (one file per language, where the locale appears in the file or directory **name**). **Omitted** for formats where the locale lives outside a filename token: a **single multi-locale file** such as an Apple String Catalog (`xcstrings`) holds every locale, so the pattern is the file path itself with no `{locale}` segment; and **`android-strings`** carries the locale in a resource **directory qualifier** (`res/values-<qualifier>/`), so its pattern points at the source `res/values/strings.xml` and the handler discovers target locales from the `values-*` dirs. Do not synthesize a `{locale}` segment for these formats (see their pattern rows below).
-- `{namespace}` — namespace name (optional, for multi-namespace setups)
-- `*` and `**` — wildcards for matching multiple files/directories
-
-| Source | How to derive the pattern |
-|--------|--------------------------|
-| **LinguiJS** (single catalog) | Read `catalogs[0].path` from config. Strip `<rootDir>/` prefix. Append `.po`. Example: `src/locales/{locale}/messages.po` |
-| **LinguiJS** (per-page catalogs) | Read `catalogs[0].path`. Replace `{entryDir}`/`{entryName}` with `**/*` wildcards, keep `{locale}`. Example: `src/app/{locale}/**/*.po` |
-| **next-intl** | Check `messages/` directory. Flat JSON files per locale → `messages/{locale}.json`. Subdirectories with multiple namespace files → `messages/{locale}/{namespace}.json` |
-| **Paraglide** | Flat message catalog per locale. `messages/{locale}.po` for the PO format (the globalize-guide default — a `plugin.globalizeNow.po` key in `project.inlang/settings.json`, or `messages/*.po` files present); `messages/{locale}.json` for the ICU-JSON format (`plugin.inlang.icu-messageformat-1`, or `messages/*.json`) |
-| **i18next** | Read `backend.loadPath` from config. Replace `{{lng}}` → `{locale}`, `{{ns}}` → `{namespace}`. Example: `locales/{locale}/{namespace}.json` |
-| **react-intl** | No standard config key. Derive from directory scanning below. |
-| **Rails** | Pattern is always `config/locales/{locale}.yml`. Note in detection output that Rails projects may also have split files (e.g. `config/locales/devise.en.yml`) or subdirectories — the pattern targets the primary per-locale files. |
-| **Apple String Catalog** (`.xcstrings`) | A **single multi-locale file** holds every locale, so there is **no `{locale}` segment**. The pattern is the catalog path itself: `Localizable.xcstrings` (the default table), or `**/*.xcstrings` when there are multiple tables/directories (e.g. `InfoPlist.xcstrings`, a per-storyboard `Main.xcstrings`). `fileFormat: xcstrings`; the source language is the catalog's `sourceLanguage` / Info.plist `CFBundleDevelopmentRegion`. The `{locale}` "required" rule above does not apply to this format. |
-| **Android** | **No `{locale}` segment** — the locale lives in the directory qualifier (`res/values-<qualifier>/strings.xml`), so point the pattern at the source file `**/res/values/strings.xml` (or the module-specific `app/src/main/res/values/strings.xml`). The `android-strings` handler discovers the target `res/values-*/strings.xml` overlays and normalizes their qualifiers ⇄ BCP47 on its own. If the active CLI form cannot express a directory-qualifier (no-`{locale}`) source, fall back to Step 4 server-side detection (`github detect` / `gitlab detect`) for the pattern rather than forcing a `{locale}` token. |
-| **Browser extension** (`_locales`) | `_locales/{locale}/messages.json`. The `{locale}` segment **is** used, but Chrome spells locale directories with an **underscore** (`pt_BR`, `zh_CN`, `es_419`) while the platform's languages are BCP-47 (`pt-BR`). Set a **path-locale override** per affected language — see "Path-locale overrides" below. `fileFormat: chrome-messages`. |
-| **WXT** (`@wxt-dev/i18n`) | The authoring source, not the generated `_locales` output: `<srcDir>/locales/{locale}.yml` (also `.json`/`.json5`/`.toml`). `fileFormat: wxt-i18n`. Never point a pattern at the `_locales/` build output as well — it would re-import generated files as source. |
-| **Angular** | `<outputPath>/messages.{locale}.xlf` from `angular.json` `extract-i18n.options` — `src/locale/messages.{locale}.xlf` in a globalize-guide setup. The source file matches the same pattern **only when `outFile` is `messages.<sourceLocale>.xlf`** (what globalize-guide sets). With no `outFile`, Angular writes the source as `messages.xlf`, which `messages.{locale}.xlf` does not match — set `outFile: "messages.<sourceLocale>.xlf"` and re-run `ng extract-i18n` before connecting, or the source catalog is never imported. |
-| **Locale directories/files** | Examine the discovered files. Replace the locale code segment with `{locale}`. If multiple files per locale follow a namespace pattern (e.g., `locales/en/common.json` + `locales/en/auth.json`), use `{namespace}` for the varying filename: `locales/{locale}/{namespace}.json`. If the structure doesn't suggest named namespaces, use wildcards: `locales/{locale}/*.json`. Single file per locale: `locales/{locale}.json`. |
-
-If no pattern can be determined locally, record as absent — Step 4 will attempt server-side detection.
-
-### File format
-
-When a locale path pattern is determined, also determine the **file format**. The `fileFormat` value must be one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`, `chrome-messages`, `wxt-i18n`.
-
-| Source | fileFormat value |
-|--------|----------------|
-| **LinguiJS** | `po` |
-| **next-intl** | `json-nested` (next-intl uses nested key structure) |
-| **Paraglide** | `po` if `messages/*.po` are present (the globalize-guide default — PO format via `@globalize-now/paraglidejs-po-format`, carries `#.` translator comments). `json-flat` for `messages/*.json` (ICU-JSON; flat key → ICU string, no translator comments) |
-| **i18next** | `json-nested` by default. If `keySeparator: false` in config, use `json-flat`. |
-| **react-intl** | Inspect file content (see JSON detection below) |
-| **Angular** | `xliff-2` when `extract-i18n.options.format` is `xlf2`/`xliff2`; `xliff-1` when it is `xlf`/`xlif`/`xliff`/absent |
-| **`.po` / `.pot` files** | `po` |
-| **`.xliff` / `.xlf` files** | `xliff-1` — if you can inspect the file, check the `version` attribute: `2.0` → `xliff-2`, `1.x` → `xliff-1` |
-| **`.yaml` / `.yml` files** | `yaml-rails` (Rails-style locale-rooted YAML) |
-| **`.arb` files** | `arb` (Flutter Application Resource Bundle) |
-| **`.xcstrings` files** | `xcstrings` (Apple String Catalog) |
-| **`strings.xml` files** | `android-strings` (Android string resources) |
-| **`_locales/<code>/messages.json`** | `chrome-messages` (browser-extension message catalog — `{key: {message, description, placeholders}}`). Do **not** classify these as `json-nested`: that would treat `description` and `placeholders.*.content` as translatable leaves and corrupt the catalog. |
-| **`locales/<code>.yml` beside a `wxt.config.*`** | `wxt-i18n` (the `@wxt-dev/i18n` authoring format, which compiles to `_locales/`) |
-| **`.json` files** | Inspect content: if all top-level values are strings (`{"greeting": "Hello", "bye": "Goodbye"}`), use `json-flat`. If top-level values contain objects (`{"home": {"greeting": "Hello"}}`), use `json-nested`. |
-
-If the file format cannot be determined locally, record as absent — Step 4 server-side detection may provide it.
-
-### Detection outcomes
-
-If no git repo or no git remote is detected, Step 3 (project creation) still runs; Step 2 and Step 4 (provider connection + repo connection) are skipped.
-
-If no blockers were found, proceed to the **Setup Mode** prompt before continuing to Step 2.
+Globalize detects the catalog patterns and languages itself in Step 3, so standalone mode passes only what that detection leaves open. When the preview answers `needs`, read `references/local-detection.md` for this working copy's languages and patterns to suggest.
 
 ---
 
-## Step 2: Connect the Git provider
+## Step 2: Connect GitHub
 
-Establishing the provider connection (GitHub App install / GitLab OAuth) is the one step that may require a browser approval, so do it **before** project creation — that way the single interactive handoff happens up front rather than mid-flow.
+The GitHub App install is the one step that may need a browser approval, so it comes first.
 
-### Prerequisites
-
-- If no git repository was detected in Step 1: **SKIP** Steps 2 and 4. The project is still created in Step 3; repo connection can be added later. In guided mode, explain why. In unguided mode, note in summary: "Repo connection skipped — not a git repository."
-- If no git remote `origin` was detected: **SKIP** Steps 2 and 4. Note: "Repo connection skipped — no git remote configured."
-- If the remote is neither `github.com` nor `gitlab.com`: **SKIP** Steps 2 and 4. Note: "Repo connection skipped — Globalize supports GitHub and GitLab repositories only."
-
-### Confirm repository details
-
-- **Guided**: present the detected git URL, owner, and repo. Ask the user to confirm before proceeding.
-- **Unguided / orchestrated**: use the detected (or supplied) values without asking.
-
-### 2a. GitHub App
-
-Check for existing installations:
+**Guided**: present the detected owner and repository and ask the user to confirm. **Unguided / orchestrated**: use them as detected or supplied.
 
 ```bash
 npx @globalize-now/cli-client github installations --json
 ```
 
-Each installation has `id` (a **UUID** — Globalize's internal installation record), `installationId` (the **numeric** GitHub installation ID, e.g. `122432012`), `accountLogin` (the GitHub org or user name), and `accountType`. Match `accountLogin` against `<OWNER>` (case-insensitive). Capture **both** IDs: use the numeric `installationId` as `<GITHUB_INSTALLATION_ID>` (for `github repos/branches/detect --installation-id`) and the UUID `id` as `<INSTALLATION_UUID>` (for `repositories create --github-installation-id`).
+Each installation has `id` (Globalize's UUID), `installationId` (GitHub's **numeric** installation ID, e.g. `122432012`), `accountLogin` and `accountType`. Match `accountLogin` against `<OWNER>` (case-insensitive) and record the numeric `installationId` as `<INSTALLATION_ID>` — Workflow setup takes the numeric one.
 
-If no matching installation, start the install flow:
+No matching installation → start the install flow:
 
 ```bash
 npx @globalize-now/cli-client github install --no-wait --json
 ```
 
-This returns `{ "installUrl": "...", "nonce": "..." }`.
-
-**Browser interaction required.** This pauses in both guided and unguided modes — it is an external authorization step (same pattern as `auth login`), not an explanation or consent gate. Present the URL to the user and ask them to:
-
-1. Open the URL in their browser
-2. Select the correct GitHub account/organisation
-3. Approve the GitHub App installation
-4. Confirm completion
-
-After the user confirms, verify:
+It returns `{ "installUrl": "...", "nonce": "..." }`. **Browser interaction required** in every mode — an external authorization, like `auth login`. Ask the user to open the URL, select the right GitHub account or organisation, approve the GitHub App, and confirm. Then:
 
 ```bash
 npx @globalize-now/cli-client github install-status --nonce <NONCE> --json
 ```
 
-This returns `{ "status": "completed", "installationId": "...", "accountLogin": "..." }` when done, `{ "status": "pending" }` if the user hasn't finished yet, or `{ "status": "expired" }` if the nonce expired. Check `status === "completed"`. If not completed, ask the user to try again. Once completed, re-run `github installations --json` to get `<GITHUB_INSTALLATION_ID>` (numeric `installationId`) and `<INSTALLATION_UUID>` (UUID `id`) for the target owner.
+`{ "status": "completed", ... }` → re-run `github installations --json` for `<INSTALLATION_ID>`. `pending` → ask the user to finish. `expired` → start again.
 
-Then verify repository access:
-
-```bash
-npx @globalize-now/cli-client github repos --installation-id <GITHUB_INSTALLATION_ID> --json
-```
-
-Confirm that `<OWNER>/<REPO>` appears in the returned list. If not:
-- The GitHub App does not have access to this specific repository.
-- Inform the user they need to update the installation's repository access settings on GitHub.
-- In unguided mode, note in summary and skip the connection (Step 4).
-
-### 2b. GitLab connection
-
-Check for existing connections:
+Confirm the App can read the repository:
 
 ```bash
-npx @globalize-now/cli-client gitlab connections --json
+npx @globalize-now/cli-client github repos --installation-id <INSTALLATION_ID> --json
 ```
 
-Each connection has `id` (UUID), `username`, `gitlabUserId`, `status`, and `createdAt`. If a connection's `username` matches the GitLab project owner (case-insensitive), use its `id` as `<CONNECTION_ID>`.
-
-If no matching connection, start the OAuth flow:
-
-```bash
-npx @globalize-now/cli-client gitlab install --no-wait --json
-```
-
-This returns `{ "installUrl": "...", "nonce": "...", "expiresIn": ... }`.
-
-**Browser interaction required.** Present the URL to the user and ask them to:
-
-1. Open the URL in their browser
-2. Authorize the GitLab OAuth application
-3. Confirm completion
-
-After the user confirms, verify:
-
-```bash
-npx @globalize-now/cli-client gitlab install-status --nonce <NONCE> --json
-```
-
-This returns `{ "status": "completed", "connectionId": "...", "username": "..." }` when done, `{ "status": "pending" }` if not finished, or `{ "status": "expired" }` if the nonce expired. Once completed, use `connectionId` as `<CONNECTION_ID>`.
-
-Then verify project access:
-
-```bash
-npx @globalize-now/cli-client gitlab projects --connection-id <CONNECTION_ID> --json
-```
-
-Confirm that the target project appears in the list by matching `pathWithNamespace` against `<OWNER>/<PROJECT>`. Record the numeric `id` as `<GITLAB_PROJECT_ID>`.
+`<OWNER>/<REPO>` missing from the list → the App has no access to it: ask the user to add it in the installation's repository settings on GitHub, then check again. Unguided runs that can't get access stop here and say why in the summary.
 
 ---
 
-## Step 3: Create Project
-
-### 3a. Check for existing projects
+## Step 3: Preview the Workflow
 
 ```bash
-npx @globalize-now/cli-client projects list --json
-```
-
-If projects already exist:
-- **Orchestrated** (inputs supplied): when the list holds **exactly one** project, **reuse it** — never create a second. The organisation's only project is the one this setup belongs to, often left by an earlier attempt or another setup route. Record its ID, then:
-  - its `sourceLanguage.locale` differs from the supplied `sourceLocale` → don't reuse it; create a new project (3b–3e) and note why in the summary;
-  - otherwise add each supplied target locale missing from its `targetLanguages` (`project-languages add --project-id <PROJECT_ID> --name "<NAME>" --locale <LOCALE> --language-id <LANGUAGE_UUID> --json`, name and UUID from `languages list`), leave its existing languages alone, and skip to Step 4. Report "Reused project {name}" in the summary.
-
-  Two or more projects → create a new one, as unguided.
-- **Guided**: present the list (names and IDs) and ask if the user wants to reuse an existing project or create a new one. If reusing, record the project ID and skip to Step 4.
-- **Unguided**: create a new project. If a project with the same name already exists, note it in the summary but proceed.
-
-### 3b. Determine project name
-
-Use the repo name parsed from the git remote URL (e.g., `github.com/acme/my-app` → `my-app`). If no git remote was detected, use the current directory name. Do not ask the user.
-
-### 3c. Determine languages
-
-Use the locales detected in Step 1:
-
-- **i18n config found** (LinguiJS, next-intl, i18next, react-intl): use the detected source locale and target locales.
-  - Guided: confirm the detected languages with the user before proceeding.
-  - Unguided: proceed with detected values.
-- **Locale directories/files found but no config**: infer locales from directory or file names. Default the source language to `en` if present in the list. Remove the source locale from the target list.
-  - Guided: confirm with the user.
-  - Unguided: proceed with inferred values.
-- **Nothing detected** (non-localized project):
-  - Guided: ask the user for source and target languages.
-  - Unguided: default source to `en`, ask the user for target languages. This is the one required prompt in unguided mode.
-
-### 3d. Fetch and match languages
-
-```bash
-npx @globalize-now/cli-client languages list --json
-```
-
-Match the detected or provided locale codes against the `locale` field in the returned list. Extract the UUID `id` for each match.
-
-- **Source locale in target list**: if the source locale appears in the target list, remove it. The source language must never be added as a target language.
-- If the **source language** has no match in the catalog: **HARD STOP** in both modes. The project cannot be created without a valid source language.
-- If a **target language** has no match: guided mode informs the user and asks how to proceed; unguided mode skips that language and notes it in the summary.
-
-### 3e. Create the project
-
-Build the `--config` flag based on the git provider detected in Step 1:
-
-- **GitHub** (`github.com` remote): `{"github": {"prTranslations": true, "ignoreDraftPrs": true}}`
-- **GitLab** (`gitlab.com` remote): `{"gitlab": {"mrTranslations": true, "ignoreDraftMrs": true}}`
-- **No git remote / unsupported provider**: omit `--config`
-
-```bash
-npx @globalize-now/cli-client projects create \
-  --name "<PROJECT_NAME>" \
-  --source-language <SOURCE_LANGUAGE_UUID> \
-  --target-languages <TARGET_UUID_1> <TARGET_UUID_2> \
-  --config '<CONFIG_JSON>' \
+npx @globalize-now/cli-client workflows preview-setup \
+  --installation-id <INSTALLATION_ID> \
+  --repository <OWNER>/<REPO> \
+  --patterns '<PATTERNS_JSON>' \
+  --source-language <SOURCE> \
+  --target-languages <TARGET_1>,<TARGET_2> \
+  --name "<WORKFLOW_NAME>" \
+  --import <IMPORT_MODE> \
   --json
 ```
 
-Parse the returned JSON to extract the **project ID**.
+Orchestrated mode passes every flag the inputs supply. Standalone mode starts with only `--installation-id` and `--repository`, then adds the flags that answer `needs`. Never pass `--branches`: the Workflow watches the repository's default branch. The preview writes nothing and starts nothing. Handle its answer:
 
-In guided mode: show the project ID and the applied config, and confirm creation succeeded.
+- **`alreadySetUp: {workflowId, workflowName}`** — a Workflow already holds this repository (an earlier run, or someone else's setup). Use it: skip Step 4, tell the user "Already set up as **{workflowName}**", and go to Step 5. This is how a rerun resumes.
+- **409 `REPOSITORY_HELD_BY_PROJECT`** — a Project already translates this repository; `details` carry its `projectId`, `projectName` and `repositoryId`. Read `references/project-path.md` in full and follow "Continue on the Project that holds the repository" in place of Steps 4–5. Tell the user migrating it to a Workflow is optional, done by an organisation admin in the web app.
+- **`ready: false` with `needs`** — each need has a `code`, the `override` that answers it, what it `found`, and a `message`. Answer every need, then preview again with the answers added:
+  - `no_source_language`, `unsupported_source_language` → ask the user for the source language (`--source-language`).
+  - `no_target_languages` → ask the user for the target languages (`--target-languages`); `found` lists codes the catalog doesn't know.
+  - `no_confident_group` → `found` lists the groups detection rated unlikely: offer each with its `presetName`, `evidence` and `patterns`, and pass the one the user picks as `--patterns`.
+  - `no_locale_patterns` → `found` lists the catalog files no pattern covers: propose patterns for them (`references/local-detection.md`), confirm with the user, pass `--patterns`.
+  - `no_locale_files` → the repository has no catalogs yet. **Stop**: "Set up i18n first with the `globalize-guide` skill, push it, then run this skill again."
 
-**Note:** Project configuration (QA checks, provider settings, GitHub/GitLab behaviour, notifications) can be customised after creation via `projects update --id <PROJECT_ID> --config '<JSON>'`. See the `globalize-now-cli-use` skill (Step 2.5) for details.
+  Ask in every mode, unguided included: each language comes from the user or a repository value the user confirmed. **Headless**: stop and report each need's `message` verbatim.
+- **`ready: true`** — the proposal: `name`, `definition` (its `input.config` holds `sourceLanguage`, `patterns` and the watched `branches`; `targetLanguages.declared` the targets), `excludedGroups`, `takeovers` (empty Projects whose rows the Workflow takes over), `warnings`, `newTranslationMemory`, and `previewHash`. **Guided**: show the proposal, each excluded group with its evidence, and ask to confirm or change it. **Unguided / orchestrated**: go on.
+
+Any other error (404 for an installation or repository Globalize can't see, 400 `VALIDATION_ERROR`) → report it verbatim and stop.
 
 ---
 
-## Step 4: Connect Repository
+## Step 4: Set up the Workflow
 
-This step wires the git repository (provider connection established in Step 2) to the project created in Step 3. If Step 2 was skipped (no git repo / remote / unsupported provider), **SKIP** this step too.
-
-### 4a. Detect locale path patterns (if not already known)
-
-If Step 1 (or the supplied inputs) already determined a `localePathPattern` + `fileFormat`, skip this sub-step.
-
-Otherwise, detect server-side using the provider connection from Step 2.
-
-**GitHub:**
+Confirm with exactly the flags of the preview that answered `ready: true`, plus its hash:
 
 ```bash
-npx @globalize-now/cli-client github detect \
-  --installation-id <GITHUB_INSTALLATION_ID> \
-  --owner <OWNER> \
-  --repo <REPO> \
+npx @globalize-now/cli-client workflows setup \
+  --installation-id <INSTALLATION_ID> \
+  --repository <OWNER>/<REPO> \
+  --patterns '<PATTERNS_JSON>' \
+  --source-language <SOURCE> \
+  --target-languages <TARGET_1>,<TARGET_2> \
+  --name "<WORKFLOW_NAME>" \
+  --import <IMPORT_MODE> \
+  --preview-hash <PREVIEW_HASH> \
   --json
 ```
 
-**GitLab:**
+It publishes the Workflow's first version, creates a translation memory unless one was named, and starts no run. Record its `id` as `<WORKFLOW_ID>` and its `name`.
 
-```bash
-npx @globalize-now/cli-client gitlab detect \
-  --connection-id <CONNECTION_ID> \
-  --project-id <GITLAB_PROJECT_ID> \
-  --json
-```
-
-The response includes `scoredPresets` (ranked i18n preset matches with confidence levels), `preset` (best match or null), `sourceLanguage`, `targetLanguages`, `localePathPattern` (string or null), `fileFormat` (string or null), `discoveredFiles` (array of `{path, language}`), `namespaces` (array of `{name, filePattern}`), and `framework` (string or null). Use `localePathPattern` and `fileFormat` if present to construct patterns for the repository create command.
-
-### 4b. Connect the repository
-
-**Reused project (Step 3a):** first run `repositories list --project-id <PROJECT_ID> --json`. If one already points at this repository (its `gitUrl` names the same `<OWNER>/<REPO>`, case-insensitive), reuse its `id` as the repository ID instead of creating a second — `patterns list --repository-id <REPO_ID> --json`, and `patterns create --repository-id <REPO_ID> --pattern <LOCALE_PATH_PATTERN> --file-format <FORMAT> --json` when the supplied pattern is missing — then go to 4c.
-
-**For GitHub:**
-
-```bash
-npx @globalize-now/cli-client repositories create \
-  --project-id <PROJECT_ID> \
-  --git-url <GIT_URL> \
-  --provider github \
-  --github-installation-id <INSTALLATION_UUID> \
-  --patterns '[{"pattern": "<LOCALE_PATH_PATTERN>", "fileFormat": "<FORMAT>"}]' \
-  --json
-```
-
-**For GitLab:**
-
-```bash
-npx @globalize-now/cli-client repositories create \
-  --project-id <PROJECT_ID> \
-  --git-url <GIT_URL> \
-  --provider gitlab \
-  --gitlab-connection-id <CONNECTION_ID> \
-  --patterns '[{"pattern": "<LOCALE_PATH_PATTERN>", "fileFormat": "<FORMAT>"}]' \
-  --json
-```
-
-`<FORMAT>` must be exactly one of: `json-flat`, `json-nested`, `po`, `xliff-1`, `xliff-2`, `yaml-rails`, `arb`, `xcstrings`, `android-strings`, `chrome-messages`, `wxt-i18n`. Do not use other values (e.g. `json`, `xliff`, or `yaml` alone are invalid). Refer to the "File format" table in Step 1 for how to determine the correct value.
-
-#### Path-locale overrides
-
-Most layouts spell a locale directory exactly as the language code, so `{locale}` substitutes literally and nothing more is needed. Some do not: a **browser extension** keeps its catalogs in `_locales/pt_BR/messages.json` — an underscore — while the platform language is `pt-BR`. `{locale}` is a literal token substitution with no transform, so the pattern alone cannot bridge that.
-
-Pass the spellings at create time:
-
-```bash
-npx @globalize-now/cli-client repositories create \
-  --project-id <PROJECT_ID> \
-  --git-url <GIT_URL> \
-  --provider github \
-  --github-installation-id <INSTALLATION_UUID> \
-  --patterns '[{"pattern": "_locales/{locale}/messages.json", "fileFormat": "chrome-messages"}]' \
-  --path-locales '[{"pattern": "_locales/{locale}/messages.json", "locale": "pt-BR", "pathLocale": "pt_BR"}]' \
-  --json
-```
-
-Each entry names the `pattern` it applies to, the platform `locale` (BCP-47), and the `pathLocale` (the on-disk spelling). Only languages whose spelling differs need an entry — a plain `de` or `fr` needs none.
-
-To change one after the fact, or to clear it:
-
-```bash
-npx @globalize-now/cli-client patterns path-locale \
-  --repository-id <REPO_ID> --pattern-id <PATTERN_ID> \
-  --language-id <PROJECT_LANGUAGE_UUID> --path-locale pt_BR --json
-
-npx @globalize-now/cli-client patterns path-locale \
-  --repository-id <REPO_ID> --pattern-id <PATTERN_ID> \
-  --language-id <PROJECT_LANGUAGE_UUID> --clear --json
-```
-
-`--language-id` is the **project language** UUID (`project-languages list`), not the global language id.
-
-If no patterns were detected (neither in Step 1/supplied inputs nor in 4a), omit the `--patterns` flag. The `--import-mode` and `--import-scope` flags are optional (default to `ignore` and `new_keys_only`).
-
-In guided mode: if patterns were detected, show them to the user and ask for confirmation before proceeding.
-
-Parse the returned JSON to extract the **repository ID**.
-
-### 4c. Detect i18n configuration
-
-After connecting, run detection to discover i18n patterns in the repository:
-
-```bash
-npx @globalize-now/cli-client repositories detect --id <REPO_ID> --json
-```
-
-Report findings. In guided mode, explain what was detected. In unguided mode, include in the summary.
-
-If uncommitted or unpushed changes were detected in Step 1, add a note: "i18n detection runs against remote code — uncommitted or unpushed local changes are not reflected in the detection results."
+- **409 `WORKFLOW_PREVIEW_STALE`** — the repository changed since the preview. Preview once more (Step 3), then confirm with the new `previewHash`. Stale a second time → report it and stop.
+- **409 `WORKFLOW_REPOSITORY_CLAIMED`** — another setup claimed the repository first. Preview again: it answers `alreadySetUp`, and that Workflow is the one to use.
+- **409 `REPOSITORY_HELD_BY_PROJECT`** → as in Step 3.
 
 ---
 
 ## Step 5: Start the first translation (orchestrated mode)
 
-Runs only when the supplied inputs carry a `firstTranslationBranch` **and** Step 4 connected (or reused) a repository. Otherwise skip it and give the reason in the summary ("no repository connected", "setup not pushed"). Standalone runs skip it too — "Next steps" names the command.
+Runs when the supplied inputs carry a `firstTranslationBranch` and Step 3 or 4 gave a Workflow. Otherwise skip it and give the reason in the summary ("setup not pushed"). Standalone runs skip it too — "Next steps" names `workflows runs start --workflow-id <WORKFLOW_ID> --delivery pr`.
 
-```bash
-npx @globalize-now/cli-client repositories translate \
-  --id <REPO_ID> \
-  --branch <FIRST_TRANSLATION_BRANCH> \
-  --delivery-mode pr \
-  --json
-```
+1. **Look for a run first**, so a rerun spends no credits twice:
 
-Always pass `--delivery-mode pr`: the first translation arrives as a pull request onto that branch, never as a push over it. The call returns `{"accepted": true, "branch": "…"}` as soon as the translation is queued — don't wait for it to finish. An error (no locale path patterns, the branch handled by a Workflow) → report it verbatim in the summary as "First translation not started — {error}"; don't retry. The out-of-credits check happens after the call returns, so a translation refused for credits shows up as a failed job on the dashboard, not here.
+   ```bash
+   npx @globalize-now/cli-client workflows runs list --workflow-id <WORKFLOW_ID> --limit 1 --json
+   ```
+
+   A run exists → report it (`number`, `status`, and `pullRequestUrl` once delivered) and start nothing.
+
+2. **Find the primary watched branch**: `branches[0]` of the Workflow definition's `input.config` — the ready preview's `definition`, or after `alreadySetUp`, `currentVersion.definition` from `workflows get --id <WORKFLOW_ID> --json`. It is the repository's default branch.
+
+3. **`firstTranslationBranch` is the primary branch** → start a manual run, delivered as a pull request:
+
+   ```bash
+   npx @globalize-now/cli-client workflows runs start --workflow-id <WORKFLOW_ID> --delivery pr --json
+   ```
+
+   It returns the run at once: report its `number` and `status` and move on. `status: "completed"` means translated, not delivered — the pull request is the `pullRequestUrl` that `workflows runs get --id <RUN_ID>` reports once delivered. **402 `INSUFFICIENT_CREDITS`** → report "Out of credits — add credits in Globalize, then run `workflows runs start --workflow-id <WORKFLOW_ID> --delivery pr`"; never retry. Any other refusal (409 `WORKFLOW_AWAITING_CONVERSION_MERGE` names a pull request to merge first) → report it verbatim as "First translation not started — {error}".
+
+4. **`firstTranslationBranch` is another branch** → the setup reaches the Workflow as a pull request into the primary branch: Globalize translates that pull request and delivers the translations onto it, so the user reviews the setup and its translations together.
+   - When `gh auth status` succeeds, check for an open pull request from that branch first (`gh pr view <BRANCH> --json url,state,baseRefName,isDraft`). One exists → report it, and say Globalize translates it on its next push, since it was opened before the Workflow existed (a draft once it is marked ready for review).
+   - No pull request yet and `gh` signed in → ask: "Open a pull request from `{branch}` into `{primary}`? Globalize translates it and adds the translations to it. (**yes** / **no**)". Run `gh pr create --base <PRIMARY> --head <BRANCH> --title "Set up i18n" --body "Sets up i18n. Globalize adds the translations to this pull request."` only once the user confirms — as a ready pull request, since Globalize skips drafts. Report its URL.
+   - No signed-in `gh`, or the user says no → tell the user to open a pull request from `{branch}` into `{primary}`, and that Globalize translates it once opened.
+   - **Headless**: never open one. Report "First translation skipped — open a pull request from `{branch}` into `{primary}` and Globalize translates it."
 
 ---
 
 ## Next step
 
-Project created and repo connected (and, in orchestrated mode, the first translation started). Standalone: start a translation with `repositories translate --id <REPO_ID> --delivery-mode pr`. From here, use the **`globalize-now-cli-use`** skill (or the `globalize` CLI directly) for ongoing translation work — pulling translations, tracking status, managing languages, glossaries, and style guides.
+The Workflow is published (and, in orchestrated mode, its first translation started or its pull request opened). From here, use the **`globalize-now-cli-use`** skill (or the CLI directly) for ongoing work: following runs, changing languages, glossaries and style guides.

@@ -684,7 +684,7 @@ This setup phase scaffolded the infrastructure but did **not** convert existing 
 
 ### Connect a translation service
 
-With `config/locales/{locale}.yml` populated, connect to Globalize using the `globalize-now-project-setup` skill (sign in first via `globalize-now-account-setup`). The Phase-4 pattern is `config/locales/{locale}.yml` with `fileFormat: yaml-rails` and your `default_locale` as source.
+With `config/locales/{locale}.yml` populated and pushed to GitHub, set up a Globalize Workflow for the repository with the `globalize-now-project-setup` skill (sign in first via `globalize-now-account-setup`). The Phase-4 pattern is `config/locales/{locale}.yml` with `format: yaml-rails` and your `default_locale` as source.
 
 ### Add a non-English locale
 

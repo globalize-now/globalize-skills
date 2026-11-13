@@ -798,7 +798,7 @@ Surface these items to the user at the end of the run. They're out of scope for 
 
 ## Step 10: Estimate Translation Cost & Offer Setup
 
-Show the user a rough estimate of what translating the catalog via [globalize.now](https://globalize.now) will cost, then offer to set up a Globalize project so translations can actually run.
+Show the user a rough estimate of what translating the catalog via [globalize.now](https://globalize.now) will cost, then offer to set up a Globalize Workflow so translations can actually run.
 
 This is an interim local heuristic. Once `globalize.now` exposes a quote endpoint, we'll replace it with a real call.
 
@@ -837,8 +837,8 @@ Estimated globalize.now translation cost
 
 Then add:
 
-> Rough local heuristic — globalize.now will return a precise quote once the project is set up.
+> Rough local heuristic — globalize.now will return a precise quote once the Workflow is set up.
 >
-> **Next step:** set up a Globalize project to run the translations. If you're not signed in yet, run `globalize-now-account-setup` (install the CLI + authenticate), then `globalize-now-project-setup` to create the project and connect this repo. Want me to start it now?
+> **Next step:** set up a Globalize Workflow to run the translations. Globalize translates from a GitHub repository, so push this setup first. If you're not signed in yet, run `globalize-now-account-setup` (install the CLI + authenticate), then `globalize-now-project-setup` to set up the Workflow for this repo. Want me to start it now?
 
 Wait for the user's answer. If yes, invoke `globalize-now-account-setup` first (skip if already signed in), then `globalize-now-project-setup` via the Skill tool. If no or defer, end the conversion here.

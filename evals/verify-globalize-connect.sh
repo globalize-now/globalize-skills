@@ -84,13 +84,15 @@ invocations() {
   shift
   for file in "$@"; do
     awk '
-      /^```/ { fence = !fence; buf = ""; next }
+      function spans(s) { while (match(s, /`[^`]*`/)) { print substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH) } }
+      /^[[:space:]]*```/ { fence = !fence; buf = ""; next }
+      fence && index($0, "`") { spans($0); next }   # a fenced template quoting commands inline
       fence {
         line = $0
         if (sub(/\\[[:space:]]*$/, " ", line)) { buf = buf line; next }
         print buf line; buf = ""; next
       }
-      { s = $0; while (match(s, /`[^`]*`/)) { print substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH) } }
+      { spans($0) }
     ' "$file"
   done | grep -oE "(^|[[:space:]])$cmd.*" | sed -E 's/^[[:space:]]+//' | sort -u
 }
@@ -224,8 +226,8 @@ else
     'INSUFFICIENT_CREDITS' 'gh pr create' 'Headless'; do
     if has "$STEP5" "$marker"; then pass "project-setup Step 5 names '$marker'"; else fail "project-setup Step 5 does not name '$marker'"; fi
   done
-  LIST_AT="$(line_of "$STEP5" 'workflows runs list')"
-  START_AT="$(line_of "$STEP5" 'workflows runs start')"
+  LIST_AT="$(line_of "$STEP5" 'cli-client workflows runs list')"
+  START_AT="$(line_of "$STEP5" 'cli-client workflows runs start')"
   if [ -n "$LIST_AT" ] && [ -n "$START_AT" ] && [ "$LIST_AT" -lt "$START_AT" ]; then
     pass "Step 5 lists the Workflow's runs before starting one"
   else
