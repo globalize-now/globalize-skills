@@ -2989,6 +2989,7 @@ export interface paths {
                             overdraftLimitEur: string;
                             defaultTranslationModel: string | null;
                             defaultReviewModel: string | null;
+                            defaultCheckModel: string | null;
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -4367,7 +4368,7 @@ export interface paths {
                                         severity: "error" | "warning";
                                         file: string;
                                         /** @enum {string} */
-                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                         message: string;
                                         header?: string;
                                         rowNumber?: number;
@@ -4376,6 +4377,10 @@ export interface paths {
                                         rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                         limit?: number;
                                         glossaryName?: string;
+                                        variant?: string;
+                                        /** @enum {string} */
+                                        variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                        otherTerm?: string;
                                     }[];
                                     omittedFindings: number;
                                     exportRequestUrl: string | null;
@@ -4395,7 +4400,7 @@ export interface paths {
                                         severity: "error" | "warning";
                                         file: string;
                                         /** @enum {string} */
-                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                         message: string;
                                         header?: string;
                                         rowNumber?: number;
@@ -4404,6 +4409,10 @@ export interface paths {
                                         rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                         limit?: number;
                                         glossaryName?: string;
+                                        variant?: string;
+                                        /** @enum {string} */
+                                        variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                        otherTerm?: string;
                                     }[];
                                     omittedFindings: number;
                                     exportRequestUrl: string | null;
@@ -4909,7 +4918,7 @@ export interface paths {
                                         severity: "error" | "warning";
                                         file: string;
                                         /** @enum {string} */
-                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                         message: string;
                                         header?: string;
                                         rowNumber?: number;
@@ -4918,6 +4927,10 @@ export interface paths {
                                         rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                         limit?: number;
                                         glossaryName?: string;
+                                        variant?: string;
+                                        /** @enum {string} */
+                                        variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                        otherTerm?: string;
                                     }[];
                                     omittedFindings: number;
                                     exportRequestUrl: string | null;
@@ -4937,7 +4950,7 @@ export interface paths {
                                         severity: "error" | "warning";
                                         file: string;
                                         /** @enum {string} */
-                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                         message: string;
                                         header?: string;
                                         rowNumber?: number;
@@ -4946,6 +4959,10 @@ export interface paths {
                                         rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                         limit?: number;
                                         glossaryName?: string;
+                                        variant?: string;
+                                        /** @enum {string} */
+                                        variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                        otherTerm?: string;
                                     }[];
                                     omittedFindings: number;
                                     exportRequestUrl: string | null;
@@ -5446,7 +5463,7 @@ export interface paths {
                                         severity: "error" | "warning";
                                         file: string;
                                         /** @enum {string} */
-                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                         message: string;
                                         header?: string;
                                         rowNumber?: number;
@@ -5455,6 +5472,10 @@ export interface paths {
                                         rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                         limit?: number;
                                         glossaryName?: string;
+                                        variant?: string;
+                                        /** @enum {string} */
+                                        variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                        otherTerm?: string;
                                     }[];
                                     omittedFindings: number;
                                     exportRequestUrl: string | null;
@@ -5474,7 +5495,7 @@ export interface paths {
                                         severity: "error" | "warning";
                                         file: string;
                                         /** @enum {string} */
-                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                        code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                         message: string;
                                         header?: string;
                                         rowNumber?: number;
@@ -5483,6 +5504,10 @@ export interface paths {
                                         rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                         limit?: number;
                                         glossaryName?: string;
+                                        variant?: string;
+                                        /** @enum {string} */
+                                        variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                        otherTerm?: string;
                                     }[];
                                     omittedFindings: number;
                                     exportRequestUrl: string | null;
@@ -5986,7 +6011,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List glossary entries */
+        /**
+         * List glossary entries
+         * @description Each entry is one source→target pair between two of the project's languages. A do-not-translate term covers every language: it is listed as an identity pair (its target term the source term) into each of the project's languages other than its source, and a language added later gets one too.
+         */
         get: {
             parameters: {
                 query?: {
@@ -6175,7 +6203,7 @@ export interface paths {
         put?: never;
         /**
          * Create glossary entry
-         * @description Both terms are trimmed of leading and trailing whitespace before they are checked, stored or looked up, as the glossary import and repository glossary files do. A source term empty once trimmed is refused with a 400, and so is an empty target term unless the entry is do-not-translate. The length limit applies to the trimmed term. The `Glossary-Sharing` response header carries, as percent-encoded JSON, the attached glossary as the list endpoint's `glossary` reports it: what else shares it and whether a repository manages it.
+         * @description Both terms are trimmed of leading and trailing whitespace before they are checked, stored or looked up, as the glossary import and repository glossary files do. A source term empty once trimmed is refused with a 400, and so is an empty target term unless the entry is do-not-translate. The length limit applies to the trimmed term. Each entry is one source→target pair between two of the project's languages. A do-not-translate term covers every language: it is listed as an identity pair (its target term the source term) into each of the project's languages other than its source, and a language added later gets one too. Do-not-translate is set on the term, not the pair: rows of one term that are all do-not-translate make it do-not-translate in every language. A translation for a do-not-translate term clears the flag, keeping its other identity pairs as plain translations. A term the glossary has no entry for yet that another entry forbids as a variant is refused with GLOSSARY_SPELLING_TAKEN naming that entry. The `Glossary-Sharing` response header carries, as percent-encoded JSON, the attached glossary as the list endpoint's `glossary` reports it: what else shares it and whether a repository manages it.
          */
         post: {
             parameters: {
@@ -6357,7 +6385,7 @@ export interface paths {
         put?: never;
         /**
          * Bulk create glossary entries
-         * @description Upserts arbitrary glossary rows — each with its own source and target term and its own language pair — in a single transaction. Capped at 10000 rows. Terms are trimmed of leading and trailing whitespace as on create (a source term empty once trimmed is refused); rows whose keys are equal once trimmed collapse to the last one. The `Glossary-Sharing` response header carries, as percent-encoded JSON, the attached glossary as the list endpoint's `glossary` reports it: what else shares it and whether a repository manages it.
+         * @description Upserts arbitrary glossary rows — each with its own source and target term and its own language pair — in a single transaction. Capped at 10000 rows. Terms are trimmed of leading and trailing whitespace as on create (a source term empty once trimmed is refused); rows whose keys are equal once trimmed collapse to the last one. Each entry is one source→target pair between two of the project's languages. A do-not-translate term covers every language: it is listed as an identity pair (its target term the source term) into each of the project's languages other than its source, and a language added later gets one too. Do-not-translate is set on the term, not the pair: rows of one term that are all do-not-translate make it do-not-translate in every language. A translation for a do-not-translate term clears the flag, keeping its other identity pairs as plain translations. A row bringing in a term the glossary has no entry for yet that another entry forbids as a variant refuses the whole request with GLOSSARY_SPELLING_TAKEN, naming that entry and the row (`details.index`). The `Glossary-Sharing` response header carries, as percent-encoded JSON, the attached glossary as the list endpoint's `glossary` reports it: what else shares it and whether a repository manages it.
          */
         post: {
             parameters: {
@@ -6709,7 +6737,7 @@ export interface paths {
         post?: never;
         /**
          * Delete glossary entry
-         * @description An entry the project doesn't see — unknown, or of a locale it lacks — deletes nothing. The `Glossary-Sharing` response header carries, as percent-encoded JSON, the attached glossary as the list endpoint's `glossary` reports it: what else shares it and whether a repository manages it.
+         * @description Deletes one pair: that translation, keeping the term's others. A do-not-translate term covers every language, so deleting one of its identity pairs deletes the entry, in every language. An entry the project doesn't see — unknown, or of a locale it lacks — deletes nothing. The `Glossary-Sharing` response header carries, as percent-encoded JSON, the attached glossary as the list endpoint's `glossary` reports it: what else shares it and whether a repository manages it.
          */
         delete: {
             parameters: {
@@ -11010,6 +11038,168 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/glossaries/{id}/edit-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview who an edit to a glossary’s terminology reaches
+         * @description The non-archived Workflows whose Terminology check reads the glossary, by name, and whether that Check holds its Step (`blocking`). An edit to the preferred term, forbidden variants or description of an entry that holds, or comes to hold, a description or forbidden variant — or adding or deleting such an entry — has each Workflow translating from that entry’s source locale judge all its strings again on its next run; nothing else does. Advisory: the entry routes don’t ask for it. Open with or without `source_checks`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only the Workflows translating from this locale, matched case-insensitively, as a run matches an entry’s source locale */
+                    sourceLocale?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            workflows: {
+                                id: string;
+                                name: string;
+                                blocking: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/glossaries/{id}/entries": {
         parameters: {
             query?: never;
@@ -11017,13 +11207,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search glossary terms */
+        /** Search glossary entries */
         get: {
             parameters: {
                 query?: {
-                    /** @description Case-insensitive substring matched against the source or target term */
+                    /** @description Case-insensitive substring matched against the preferred term, a forbidden variant or a target term */
                     q?: string;
+                    /** @description Entries whose preferred term or a forbidden variant is exactly this */
+                    spelling?: string;
                     sourceLocale?: string;
+                    /** @description Entries with a target term in this locale, and every do-not-translate entry of another source locale */
                     targetLocale?: string;
                     limit?: number;
                     cursor?: string;
@@ -11046,19 +11239,23 @@ export interface paths {
                             data: {
                                 id: string;
                                 glossaryId: string;
-                                sourceTerm: string;
-                                targetTerm: string;
                                 sourceLanguage: {
                                     id: string | null;
                                     locale: string;
                                     name: string;
                                 };
-                                targetLanguage: {
-                                    id: string | null;
-                                    locale: string;
-                                    name: string;
-                                };
+                                sourceTerm: string;
+                                description: string | null;
+                                forbiddenVariants: string[];
                                 doNotTranslate: boolean;
+                                targets: {
+                                    targetLanguage: {
+                                        id: string | null;
+                                        locale: string;
+                                        name: string;
+                                    };
+                                    targetTerm: string;
+                                }[];
                                 /** Format: date-time */
                                 createdAt: string;
                                 /** Format: date-time */
@@ -11189,8 +11386,8 @@ export interface paths {
         };
         put?: never;
         /**
-         * Add a term
-         * @description Adds one source term with its translation into one or more target locales, or as do-not-translate, replacing the translation of an existing term.
+         * Add an entry
+         * @description Adds one preferred term in one source locale, with an optional description, its forbidden variants and its target terms — or as do-not-translate, kept as written in every language. A term the glossary already holds in that source locale is refused with GLOSSARY_ENTRY_EXISTS naming its entry, to patch instead; a term or variant another entry claims, with GLOSSARY_SPELLING_TAKEN naming it.
          */
         post: {
             parameters: {
@@ -11206,11 +11403,14 @@ export interface paths {
                     "application/json": {
                         sourceTerm: string;
                         sourceLocale: string;
+                        description?: string;
+                        /** @description Spellings ruled out in source text in favour of the preferred term, compared exactly. None may be the preferred term, be listed twice, or be a preferred term or forbidden variant of another entry in that source locale (GLOSSARY_SPELLING_TAKEN). */
+                        forbiddenVariants?: string[];
                         doNotTranslate?: boolean;
-                        targets: {
-                            targetLocale: string;
-                            targetTerm?: string;
-                        }[];
+                        /** @description Target locale → target term. None for a do-not-translate entry. */
+                        targets?: {
+                            [key: string]: string;
+                        };
                     };
                 };
             };
@@ -11224,24 +11424,28 @@ export interface paths {
                         "application/json": {
                             id: string;
                             glossaryId: string;
-                            sourceTerm: string;
-                            targetTerm: string;
                             sourceLanguage: {
                                 id: string | null;
                                 locale: string;
                                 name: string;
                             };
-                            targetLanguage: {
-                                id: string | null;
-                                locale: string;
-                                name: string;
-                            };
+                            sourceTerm: string;
+                            description: string | null;
+                            forbiddenVariants: string[];
                             doNotTranslate: boolean;
+                            targets: {
+                                targetLanguage: {
+                                    id: string | null;
+                                    locale: string;
+                                    name: string;
+                                };
+                                targetTerm: string;
+                            }[];
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
-                        }[];
+                        };
                     };
                 };
                 /** @description Default Response */
@@ -11374,7 +11578,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a term */
+        /**
+         * Delete an entry
+         * @description Deletes the entry with all of its target terms.
+         */
         delete: {
             parameters: {
                 query?: never;
@@ -11510,7 +11717,10 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Edit a term's translation */
+        /**
+         * Edit an entry
+         * @description Every field is optional: rename the preferred term, set or clear (`null`) the description, replace the forbidden variants, toggle do-not-translate, and set or remove target terms by locale. A term or variant another entry claims is refused with GLOSSARY_SPELLING_TAKEN naming it.
+         */
         patch: {
             parameters: {
                 query?: never;
@@ -11524,8 +11734,16 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        targetTerm?: string;
+                        sourceTerm?: string;
+                        description?: string | null;
+                        /** @description Replaces the set. */
+                        forbiddenVariants?: string[];
+                        /** @description `true` removes every target term; it cannot be sent with `targets`. */
                         doNotTranslate?: boolean;
+                        /** @description Target locale → target term to set, or `null` to remove it. Locales not named are untouched. */
+                        targets?: {
+                            [key: string]: string | null;
+                        };
                     };
                 };
             };
@@ -11539,19 +11757,23 @@ export interface paths {
                         "application/json": {
                             id: string;
                             glossaryId: string;
-                            sourceTerm: string;
-                            targetTerm: string;
                             sourceLanguage: {
                                 id: string | null;
                                 locale: string;
                                 name: string;
                             };
-                            targetLanguage: {
-                                id: string | null;
-                                locale: string;
-                                name: string;
-                            };
+                            sourceTerm: string;
+                            description: string | null;
+                            forbiddenVariants: string[];
                             doNotTranslate: boolean;
+                            targets: {
+                                targetLanguage: {
+                                    id: string | null;
+                                    locale: string;
+                                    name: string;
+                                };
+                                targetTerm: string;
+                            }[];
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -13525,6 +13747,17 @@ export interface paths {
                                 id: string;
                                 name: string;
                             }[];
+                            /** @description What edits to it passed without judging (ADR 0035), newest first: one per Check of a Workflow */
+                            existingStringPasses: {
+                                workflowId: string;
+                                workflowName: string;
+                                /** @description The id of the Workflow’s AI check */
+                                checkId: string;
+                                strings: number;
+                                passedBy: string | null;
+                                /** Format: date-time */
+                                passedAt: string;
+                            }[];
                         };
                     };
                 };
@@ -13954,7 +14187,7 @@ export interface paths {
         };
         /**
          * Preview who an edit to a Check Asset’s criterion reaches
-         * @description The non-archived Workflows linking it, each of which judges all its strings again on its next run after such an edit, and whether any of a Workflow’s Linked Checks of it blocks. Advisory: `PUT /api/check-assets/:id/criterion` doesn’t ask for it. Open with or without `source_checks`.
+         * @description The non-archived Workflows linking it, each of which judges all its strings again on its next run after such an edit, whether any of a Workflow’s Linked Checks of it blocks, and in `existing` the existing strings it could record as passed instead (`passExistingStrings` on the edit): those its Linked Checks of it passed. Advisory: `PUT /api/check-assets/:id/criterion` doesn’t ask for it. Open with or without `source_checks`.
          */
         get: {
             parameters: {
@@ -13978,6 +14211,25 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 blocking: boolean;
+                                /** @description The existing strings: those of the latest run of each watched branch */
+                                existing: {
+                                    /** @enum {boolean} */
+                                    available: false;
+                                    /**
+                                     * @description `no_run`: no run on a watched branch has read Source strings yet; `contentful`: a Contentful Workflow can’t pass them
+                                     * @enum {string}
+                                     */
+                                    reason: "no_run" | "contentful";
+                                } | {
+                                    /** @enum {boolean} */
+                                    available: true;
+                                    /** @description The watched branches they were read on */
+                                    branches: string[];
+                                    /** @description How many existing strings it would judge */
+                                    strings: number;
+                                    /** @description How many of those it would pass: all of them, or for a changed Check only those its previous version passed */
+                                    passable: number;
+                                };
                             }[];
                         };
                     };
@@ -14280,7 +14532,7 @@ export interface paths {
         get?: never;
         /**
          * Edit a Check Asset’s criterion: its rule, examples and References
-         * @description Replaces the rule and both lists of examples (an example list left out is empty) and, when given, the References (`referenceIds`): left out, they stay as they are; `[]` removes them. `baseCheckVersion` is the `checkVersion` the edit started from: when it is no longer the current one — the criterion, or the text of a Reference it attaches, changed — 409 `CHECK_ASSET_STALE` names the current version in `details.currentCheckVersion` and nothing is written. A Reference the organisation has none by is refused with 404 `REFERENCE_NOT_FOUND`, and a changed list over 60,000 characters together with 400 `BAD_REQUEST`; the list it holds already is never refused for text that grew since. A save that changes nothing succeeds and moves nothing. Refused with 403 `FEATURE_REQUIRED` without `source_checks`.
+         * @description Replaces the rule and both lists of examples (an example list left out is empty) and, when given, the References (`referenceIds`): left out, they stay as they are; `[]` removes them. `baseCheckVersion` is the `checkVersion` the edit started from: when it is no longer the current one — the criterion, or the text of a Reference it attaches, changed — 409 `CHECK_ASSET_STALE` names the current version in `details.currentCheckVersion` and nothing is written. A Reference the organisation has none by is refused with 404 `REFERENCE_NOT_FOUND`, and a changed list over 60,000 characters together with 400 `BAD_REQUEST`; the list it holds already is never refused for text that grew since. A save that changes nothing succeeds and moves nothing. `passExistingStrings` names Workflows linking it whose existing strings its previous version passed are recorded as passed under the new one, unjudged (ADR 0035). Refused with 403 `FEATURE_REQUIRED` without `source_checks`.
          */
         put: {
             parameters: {
@@ -14301,6 +14553,8 @@ export interface paths {
                         failExamples?: string[];
                         referenceIds?: string[];
                         baseCheckVersion: string;
+                        /** @description The Workflows, of those the edit-impact lists, whose existing strings to record as passed without judging them again (ADR 0035): those the previous Check version passed. A save that moves no Check version passes nothing. */
+                        passExistingStrings?: string[];
                     };
                 };
             };
@@ -14870,6 +15124,17 @@ export interface paths {
                                 id: string;
                                 name: string;
                             }[];
+                            /** @description What edits to it passed without judging (ADR 0035), newest first: one per Check of a Workflow */
+                            existingStringPasses: {
+                                workflowId: string;
+                                workflowName: string;
+                                /** @description The id of the Workflow’s AI check */
+                                checkId: string;
+                                strings: number;
+                                passedBy: string | null;
+                                /** Format: date-time */
+                                passedAt: string;
+                            }[];
                         };
                     };
                 };
@@ -15141,6 +15406,17 @@ export interface paths {
                             checkAssets: {
                                 id: string;
                                 name: string;
+                            }[];
+                            /** @description What edits to it passed without judging (ADR 0035), newest first: one per Check of a Workflow */
+                            existingStringPasses: {
+                                workflowId: string;
+                                workflowName: string;
+                                /** @description The id of the Workflow’s AI check */
+                                checkId: string;
+                                strings: number;
+                                passedBy: string | null;
+                                /** Format: date-time */
+                                passedAt: string;
                             }[];
                         };
                     };
@@ -15438,6 +15714,8 @@ export interface paths {
                              */
                             path?: string[];
                         }[];
+                        /** @description With a new `text`: the Workflows, of those the edit-impact lists, whose existing strings to record as passed without judging them again (ADR 0035) — those each Check attaching it passed before. Ignored without a `text`; a text that moves no Check version passes nothing. */
+                        passExistingStrings?: string[];
                     };
                 };
             };
@@ -15572,6 +15850,17 @@ export interface paths {
                                 id: string;
                                 name: string;
                             }[];
+                            /** @description What edits to it passed without judging (ADR 0035), newest first: one per Check of a Workflow */
+                            existingStringPasses: {
+                                workflowId: string;
+                                workflowName: string;
+                                /** @description The id of the Workflow’s AI check */
+                                checkId: string;
+                                strings: number;
+                                passedBy: string | null;
+                                /** Format: date-time */
+                                passedAt: string;
+                            }[];
                         };
                     };
                 };
@@ -15700,7 +15989,7 @@ export interface paths {
         };
         /**
          * Who a change to a Reference’s text would have judge again
-         * @description The non-archived Workflows attaching it, each with whether a Check attaching it blocks: a change to its text — an edit, or a fetch that reads different text — makes each judge its strings again. Advisory; open with or without `source_checks`.
+         * @description The non-archived Workflows attaching it, each with whether a Check attaching it blocks: a change to its text — an edit, or a fetch that reads different text — makes each judge its strings again — and in `existing` the existing strings it could record as passed instead on an edit (`passExistingStrings`): those its Checks attaching it passed. Advisory; open with or without `source_checks`.
          */
         get: {
             parameters: {
@@ -15724,6 +16013,25 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 blocking: boolean;
+                                /** @description The existing strings: those of the latest run of each watched branch */
+                                existing: {
+                                    /** @enum {boolean} */
+                                    available: false;
+                                    /**
+                                     * @description `no_run`: no run on a watched branch has read Source strings yet; `contentful`: a Contentful Workflow can’t pass them
+                                     * @enum {string}
+                                     */
+                                    reason: "no_run" | "contentful";
+                                } | {
+                                    /** @enum {boolean} */
+                                    available: true;
+                                    /** @description The watched branches they were read on */
+                                    branches: string[];
+                                    /** @description How many existing strings it would judge */
+                                    strings: number;
+                                    /** @description How many of those it would pass: all of them, or for a changed Check only those its previous version passed */
+                                    passable: number;
+                                };
                             }[];
                         };
                     };
@@ -16007,6 +16315,17 @@ export interface paths {
                             checkAssets: {
                                 id: string;
                                 name: string;
+                            }[];
+                            /** @description What edits to it passed without judging (ADR 0035), newest first: one per Check of a Workflow */
+                            existingStringPasses: {
+                                workflowId: string;
+                                workflowName: string;
+                                /** @description The id of the Workflow’s AI check */
+                                checkId: string;
+                                strings: number;
+                                passedBy: string | null;
+                                /** Format: date-time */
+                                passedAt: string;
                             }[];
                         };
                     };
@@ -17339,6 +17658,38 @@ export interface paths {
                             }[];
                             /** @description Whether this caller may publish `adminRequired`: false only when it lists changes and the caller is not an admin signed in (an admin’s API key included). Publishing is then refused with 403 `WORKFLOW_GATE_ADMIN_REQUIRED`. */
                             mayPublishAdminRequired: boolean;
+                            /** @description The AI checks publishing has judge the Workflow’s existing strings again — added, or changed into a new Check version — each by its position in the definition. Send a position in the publish’s `passExistingStrings` to record its passable strings as passed instead (ADR 0035). None on create. */
+                            checksJudgingAgain: {
+                                stepIndex: number;
+                                actionIndex: number;
+                                /** @description `null` for an added Check: the publish assigns its id */
+                                actionId: string | null;
+                                name: string;
+                                blocking: boolean;
+                                /** @description Whether its criterion is a Check Asset’s */
+                                linked: boolean;
+                                /** @enum {string} */
+                                change: "added" | "changed";
+                                /** @description The existing strings: those of the latest run of each watched branch */
+                                existing: {
+                                    /** @enum {boolean} */
+                                    available: false;
+                                    /**
+                                     * @description `no_run`: no run on a watched branch has read Source strings yet; `contentful`: a Contentful Workflow can’t pass them
+                                     * @enum {string}
+                                     */
+                                    reason: "no_run" | "contentful";
+                                } | {
+                                    /** @enum {boolean} */
+                                    available: true;
+                                    /** @description The watched branches they were read on */
+                                    branches: string[];
+                                    /** @description How many existing strings it would judge */
+                                    strings: number;
+                                    /** @description How many of those it would pass: all of them, or for a changed Check only those its previous version passed */
+                                    passable: number;
+                                };
+                            }[];
                             /** @description Send it with the publish to refuse it if the claims or warnings change meanwhile */
                             previewHash: string;
                         };
@@ -17617,6 +17968,38 @@ export interface paths {
                             }[];
                             /** @description Whether this caller may publish `adminRequired`: false only when it lists changes and the caller is not an admin signed in (an admin’s API key included). Publishing is then refused with 403 `WORKFLOW_GATE_ADMIN_REQUIRED`. */
                             mayPublishAdminRequired: boolean;
+                            /** @description The AI checks publishing has judge the Workflow’s existing strings again — added, or changed into a new Check version — each by its position in the definition. Send a position in the publish’s `passExistingStrings` to record its passable strings as passed instead (ADR 0035). None on create. */
+                            checksJudgingAgain: {
+                                stepIndex: number;
+                                actionIndex: number;
+                                /** @description `null` for an added Check: the publish assigns its id */
+                                actionId: string | null;
+                                name: string;
+                                blocking: boolean;
+                                /** @description Whether its criterion is a Check Asset’s */
+                                linked: boolean;
+                                /** @enum {string} */
+                                change: "added" | "changed";
+                                /** @description The existing strings: those of the latest run of each watched branch */
+                                existing: {
+                                    /** @enum {boolean} */
+                                    available: false;
+                                    /**
+                                     * @description `no_run`: no run on a watched branch has read Source strings yet; `contentful`: a Contentful Workflow can’t pass them
+                                     * @enum {string}
+                                     */
+                                    reason: "no_run" | "contentful";
+                                } | {
+                                    /** @enum {boolean} */
+                                    available: true;
+                                    /** @description The watched branches they were read on */
+                                    branches: string[];
+                                    /** @description How many existing strings it would judge */
+                                    strings: number;
+                                    /** @description How many of those it would pass: all of them, or for a changed Check only those its previous version passed */
+                                    passable: number;
+                                };
+                            }[];
                             /** @description Send it with the publish to refuse it if the claims or warnings change meanwhile */
                             previewHash: string;
                         };
@@ -18134,7 +18517,7 @@ export interface paths {
         get?: never;
         /**
          * Validate and publish a definition as the next version
-         * @description An identical definition publishes nothing and answers with the current version (`published: false`). Re-sending an older version’s definition publishes a new version equal to it (rollback). Removing, weakening (blocking to non-blocking), re-targeting or moving a published Gate — reordering its Step among the published Steps included — takes an admin signed in with a session: anyone else, an admin’s API key included, is refused with 403 `WORKFLOW_GATE_ADMIN_REQUIRED` (`details.gates`, as the preview’s `adminRequired`). The GitHub repository is fixed after create: a definition naming another repository id is refused with 400 `WORKFLOW_DEFINITION_INVALID` (issue `repository_changed`); its installation may change, and a rename keeps the id. The Workflow holds its repository from create on, so a publish takes it again only when it holds nothing: refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when another Workflow holds it. `takeovers` lists the Project Repositories on the repository. With `previewHash` (a query parameter: the body is the definition), refused with 409 `WORKFLOW_PREVIEW_STALE` when the claims or warnings changed since that preview. A Contentful Workflow may change the environment it watches, releasing its claim on the old name. A Linked Check (an `ai_check` config of `checkAssetId`, `blocking` and an optional `responsibleRoleId`) is refused with issue `unknown_check_asset` when its Check Asset is missing or another organisation’s, a rollback to a version linking a deleted one included. An inline AI check may attach References (`referenceIds`, ordered Reference ids, each once): one missing or another organisation’s is refused with issue `unknown_reference`, a fetched one never fetched yet with `reference_never_fetched`, and a list over 60,000 characters of text together with `references_over_cap` — unless that Check already attaches the same list in the current version. Pass `baseVersion` to refuse the publish with 409 `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`) when another version was published since, even for an identical definition; without it the last write wins.
+         * @description An identical definition publishes nothing and answers with the current version (`published: false`). Re-sending an older version’s definition publishes a new version equal to it (rollback). Removing, weakening (blocking to non-blocking), re-targeting or moving a published Gate — reordering its Step among the published Steps included — takes an admin signed in with a session: anyone else, an admin’s API key included, is refused with 403 `WORKFLOW_GATE_ADMIN_REQUIRED` (`details.gates`, as the preview’s `adminRequired`). The GitHub repository is fixed after create: a definition naming another repository id is refused with 400 `WORKFLOW_DEFINITION_INVALID` (issue `repository_changed`); its installation may change, and a rename keeps the id. The Workflow holds its repository from create on, so a publish takes it again only when it holds nothing: refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when another Workflow holds it. `takeovers` lists the Project Repositories on the repository. With `previewHash` (a query parameter: the body is the definition), refused with 409 `WORKFLOW_PREVIEW_STALE` when the claims or warnings changed since that preview. A Contentful Workflow may change the environment it watches, releasing its claim on the old name. A Linked Check (an `ai_check` config of `checkAssetId`, `blocking` and an optional `responsibleRoleId` and `model`) is refused with issue `unknown_check_asset` when its Check Asset is missing or another organisation’s, a rollback to a version linking a deleted one included. A Terminology check (`terminology_check`, config `blocking` and an optional `responsibleRoleId`, its criterion the run’s glossary) is refused with issue `action_count` past the first, like an AI check with `target_check` outside a Source Step and `feature_required` without Source checks. An AI check, inline or Linked, may name its own check `model` (a catalog tier), else it judges on the organisation’s default check model, else the system default; changing it judges nothing again. An inline AI check may attach References (`referenceIds`, ordered Reference ids, each once): one missing or another organisation’s is refused with issue `unknown_reference`, a fetched one never fetched yet with `reference_never_fetched`, and a list over 60,000 characters of text together with `references_over_cap` — unless that Check already attaches the same list in the current version. Pass `baseVersion` to refuse the publish with 409 `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`) when another version was published since, even for an identical definition; without it the last write wins.
          */
         put: {
             parameters: {
@@ -18143,6 +18526,8 @@ export interface paths {
                     baseVersion?: number;
                     /** @description The `previewHash` of the publish preview being confirmed: refused with 409 `WORKFLOW_PREVIEW_STALE` (the fresh preview in `details.preview`) when the claims or warnings changed since */
                     previewHash?: string;
+                    /** @description The AI checks, by `stepIndex.actionIndex` in the definition and comma-separated, whose existing strings to record as passed without judging them (ADR 0035): as the preview’s `checksJudgingAgain` lists them. A Check that judges nothing again passes nothing. */
+                    passExistingStrings?: string;
                 };
                 header?: never;
                 path: {
@@ -18755,6 +19140,15 @@ export interface paths {
                             /** @description Clerk user id of the publisher */
                             publishedBy: string | null;
                             publishedAt: string;
+                            /** @description The existing strings its publish recorded as passed without judging them, per AI check, oldest first */
+                            existingStringPasses: {
+                                /** @description The AI check’s Action id in this version */
+                                checkId: string;
+                                strings: number;
+                                /** @description Clerk user id of who passed them */
+                                passedBy: string | null;
+                                passedAt: string;
+                            }[];
                         }[];
                     };
                 };
@@ -18930,6 +19324,15 @@ export interface paths {
                             /** @description Clerk user id of the publisher */
                             publishedBy: string | null;
                             publishedAt: string;
+                            /** @description The existing strings its publish recorded as passed without judging them, per AI check, oldest first */
+                            existingStringPasses: {
+                                /** @description The AI check’s Action id in this version */
+                                checkId: string;
+                                strings: number;
+                                /** @description Clerk user id of who passed them */
+                                passedBy: string | null;
+                                passedAt: string;
+                            }[];
                         };
                     };
                 };
@@ -19604,7 +20007,7 @@ export interface paths {
         put?: never;
         /**
          * Preview setting up a Workflow for a GitHub repository, writing nothing
-         * @description Resolves the repository through the App installation, detects its locale files on the first branch, and proposes a Workflow with the builder’s defaults (Translate → QA → GitHub Output, pull requests translated, import `ignore`, the detected targets declared and discovery off, named `owner/repo`), each override applied. Answers, in order: `alreadySetUp` when a Workflow holds the repository, whatever any Project on it does (a Project migrated to a Workflow keeps its work); `needs` when a field can’t be filled — a language is never guessed, and a repository with no locale files has nothing to translate yet (that need links the Setup Guide, where a managed Conversion writes them); otherwise `ready`, with `previewHash` to confirm with `POST /api/workflows/setup`. Creates nothing, not even a translation memory, and starts no run. Refused with 409 `REPOSITORY_HELD_BY_PROJECT` when no Workflow holds the repository and a Project with work on it (patterns, a Conversion running or with its pull request open, or translations) does: `details` names the Project and its Repository row; continue on it with the Project tools, as migrating it to a Workflow is optional (web only, admin only). A Project with no such work (an Idle Project) does not refuse: its pattern-less rows are taken over. 404 `NOT_FOUND` when the installation is not this organisation’s, or it can’t see the repository or the first branch. 404 `TRANSLATION_MEMORY_NOT_FOUND` for a `translationMemoryId` the organisation has none of. 400 `WORKFLOW_DEFINITION_INVALID` when an override makes the definition invalid (`details.issues`).
+         * @description Resolves the repository through the App installation, detects its locale files on the first branch, and proposes a Workflow with the builder’s defaults (Translate → QA → GitHub Output, pull requests translated, import `ignore`, the detected targets declared and discovery off, named `owner/repo`), each override applied. Answers, in order: `alreadySetUp` when a Workflow holds the repository, whatever any Project on it does (a Project migrated to a Workflow keeps its work); `needs` when a field can’t be filled — a language is never guessed, and a repository with no locale files has nothing to translate yet (that need names the `globalize-guide` skill, which sets up i18n, and links the Setup Guide, where a managed Conversion writes them); otherwise `ready`, with `previewHash` to confirm with `POST /api/workflows/setup`. Creates nothing, not even a translation memory, and starts no run. Refused with 409 `REPOSITORY_HELD_BY_PROJECT` when no Workflow holds the repository and a Project with work on it (patterns, a Conversion running or with its pull request open, or translations) does: `details` names the Project and its Repository row; continue on it with the Project tools, as migrating it to a Workflow is optional (web only, admin only). A Project with no such work (an Idle Project) does not refuse: its pattern-less rows are taken over. 404 `NOT_FOUND` when the installation is not this organisation’s, or it can’t see the repository or the first branch. 404 `TRANSLATION_MEMORY_NOT_FOUND` for a `translationMemoryId` the organisation has none of. 400 `WORKFLOW_DEFINITION_INVALID` when an override makes the definition invalid (`details.issues`).
          */
         post: {
             parameters: {
@@ -20807,6 +21210,8 @@ export interface paths {
                                     } | null;
                                     /** @description Source strings it judged (sent to the model) */
                                     judged: number;
+                                    /** @description While `checking`: how many Source strings its pass judges in all, those judged before a Retry included — `judged` of it is how far it has got. `null` before its judging starts, in any other state, and while a Reconciliation re-checks edited strings */
+                                    toJudge: number | null;
                                     /** @description Source strings it skipped as already passed in an earlier run (Checked strings) */
                                     skipped: number;
                                     /** @description Findings it carried, open or dismissed, from an earlier run’s verdict */
@@ -20838,6 +21243,18 @@ export interface paths {
                                         } | null;
                                         /** @description Whether its Check Asset’s rule or examples now differ from what the run judged with; `false` once deleted. An edit never releases a held run */
                                         editedSince: boolean;
+                                    };
+                                    /** @description A Terminology check’s glossary and source terms; absent from any other Check */
+                                    terminology?: {
+                                        /** @description The org glossary the run’s translate Action names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
+                                        glossary: {
+                                            /** @description The org glossary */
+                                            id: string;
+                                            /** @description Whether its entries’ preferred terms, forbidden variants or descriptions in the run’s source locale now differ from what the run judged with. An edit never releases a held run */
+                                            editedSince: boolean;
+                                        } | null;
+                                        /** @description The run had no source terms: no glossary entry of its source locale held a description or a forbidden variant, so every string passed */
+                                        noSourceTerms: boolean;
                                     };
                                     /** @description **Judged with**: each Reference its criterion attaches, in its order, as the run kept it from its start, whatever was edited or deleted since; empty when it attaches none */
                                     references: {
@@ -21093,7 +21510,7 @@ export interface paths {
                                     severity: "error" | "warning";
                                     file: string;
                                     /** @enum {string} */
-                                    code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                    code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                     message: string;
                                     header?: string;
                                     rowNumber?: number;
@@ -21102,6 +21519,10 @@ export interface paths {
                                     rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                     limit?: number;
                                     glossaryName?: string;
+                                    variant?: string;
+                                    /** @enum {string} */
+                                    variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                    otherTerm?: string;
                                 }[];
                                 /** @description How many more asset findings there were than `assetFindings` holds */
                                 assetOmittedFindings: number;
@@ -21629,6 +22050,8 @@ export interface paths {
                                 } | null;
                                 /** @description Source strings it judged (sent to the model) */
                                 judged: number;
+                                /** @description While `checking`: how many Source strings its pass judges in all, those judged before a Retry included — `judged` of it is how far it has got. `null` before its judging starts, in any other state, and while a Reconciliation re-checks edited strings */
+                                toJudge: number | null;
                                 /** @description Source strings it skipped as already passed in an earlier run (Checked strings) */
                                 skipped: number;
                                 /** @description Findings it carried, open or dismissed, from an earlier run’s verdict */
@@ -21660,6 +22083,18 @@ export interface paths {
                                     } | null;
                                     /** @description Whether its Check Asset’s rule or examples now differ from what the run judged with; `false` once deleted. An edit never releases a held run */
                                     editedSince: boolean;
+                                };
+                                /** @description A Terminology check’s glossary and source terms; absent from any other Check */
+                                terminology?: {
+                                    /** @description The org glossary the run’s translate Action names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
+                                    glossary: {
+                                        /** @description The org glossary */
+                                        id: string;
+                                        /** @description Whether its entries’ preferred terms, forbidden variants or descriptions in the run’s source locale now differ from what the run judged with. An edit never releases a held run */
+                                        editedSince: boolean;
+                                    } | null;
+                                    /** @description The run had no source terms: no glossary entry of its source locale held a description or a forbidden variant, so every string passed */
+                                    noSourceTerms: boolean;
                                 };
                                 /** @description **Judged with**: each Reference its criterion attaches, in its order, as the run kept it from its start, whatever was edited or deleted since; empty when it attaches none */
                                 references: {
@@ -21915,7 +22350,7 @@ export interface paths {
                                 severity: "error" | "warning";
                                 file: string;
                                 /** @enum {string} */
-                                code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                 message: string;
                                 header?: string;
                                 rowNumber?: number;
@@ -21924,6 +22359,10 @@ export interface paths {
                                 rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                 limit?: number;
                                 glossaryName?: string;
+                                variant?: string;
+                                /** @enum {string} */
+                                variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                otherTerm?: string;
                             }[];
                             /** @description How many more asset findings there were than `assetFindings` holds */
                             assetOmittedFindings: number;
@@ -22615,6 +23054,8 @@ export interface paths {
                                 } | null;
                                 /** @description Source strings it judged (sent to the model) */
                                 judged: number;
+                                /** @description While `checking`: how many Source strings its pass judges in all, those judged before a Retry included — `judged` of it is how far it has got. `null` before its judging starts, in any other state, and while a Reconciliation re-checks edited strings */
+                                toJudge: number | null;
                                 /** @description Source strings it skipped as already passed in an earlier run (Checked strings) */
                                 skipped: number;
                                 /** @description Findings it carried, open or dismissed, from an earlier run’s verdict */
@@ -22646,6 +23087,18 @@ export interface paths {
                                     } | null;
                                     /** @description Whether its Check Asset’s rule or examples now differ from what the run judged with; `false` once deleted. An edit never releases a held run */
                                     editedSince: boolean;
+                                };
+                                /** @description A Terminology check’s glossary and source terms; absent from any other Check */
+                                terminology?: {
+                                    /** @description The org glossary the run’s translate Action names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
+                                    glossary: {
+                                        /** @description The org glossary */
+                                        id: string;
+                                        /** @description Whether its entries’ preferred terms, forbidden variants or descriptions in the run’s source locale now differ from what the run judged with. An edit never releases a held run */
+                                        editedSince: boolean;
+                                    } | null;
+                                    /** @description The run had no source terms: no glossary entry of its source locale held a description or a forbidden variant, so every string passed */
+                                    noSourceTerms: boolean;
                                 };
                                 /** @description **Judged with**: each Reference its criterion attaches, in its order, as the run kept it from its start, whatever was edited or deleted since; empty when it attaches none */
                                 references: {
@@ -22901,7 +23354,7 @@ export interface paths {
                                 severity: "error" | "warning";
                                 file: string;
                                 /** @enum {string} */
-                                code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
                                 message: string;
                                 header?: string;
                                 rowNumber?: number;
@@ -22910,6 +23363,10 @@ export interface paths {
                                 rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
                                 limit?: number;
                                 glossaryName?: string;
+                                variant?: string;
+                                /** @enum {string} */
+                                variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                otherTerm?: string;
                             }[];
                             /** @description How many more asset findings there were than `assetFindings` holds */
                             assetOmittedFindings: number;
@@ -28313,6 +28770,8 @@ export interface paths {
                                 } | null;
                                 sourceString?: {
                                     sourceGroupId: string;
+                                    /** @description The source-language unit the run’s Source strings show it at — its first location’s, the unit a Finding’s link opens; `null` when no source-language unit holds it */
+                                    unitId: string | null;
                                     locations: {
                                         path: string | null;
                                         key: string;
@@ -28334,6 +28793,7 @@ export interface paths {
                                         reconciling: boolean;
                                     } | null;
                                 };
+                                /** @description Where the string’s Source string stands with the run’s Source checks — on a Lane’s string too, whose Source string the Checks judged. Absent when the run has none */
                                 checks?: {
                                     /** @description The run’s Findings on the string, by Check; the run (`GET /api/workflow-runs/{id}`, `sourceChecks[].findings`) has their content */
                                     findings: {
@@ -28590,6 +29050,8 @@ export interface paths {
                                 } | null;
                                 sourceString?: {
                                     sourceGroupId: string;
+                                    /** @description The source-language unit the run’s Source strings show it at — its first location’s, the unit a Finding’s link opens; `null` when no source-language unit holds it */
+                                    unitId: string | null;
                                     locations: {
                                         path: string | null;
                                         key: string;
@@ -28611,6 +29073,7 @@ export interface paths {
                                         reconciling: boolean;
                                     } | null;
                                 };
+                                /** @description Where the string’s Source string stands with the run’s Source checks — on a Lane’s string too, whose Source string the Checks judged. Absent when the run has none */
                                 checks?: {
                                     /** @description The run’s Findings on the string, by Check; the run (`GET /api/workflow-runs/{id}`, `sourceChecks[].findings`) has their content */
                                     findings: {
@@ -29060,6 +29523,8 @@ export interface paths {
                                 } | null;
                                 sourceString?: {
                                     sourceGroupId: string;
+                                    /** @description The source-language unit the run’s Source strings show it at — its first location’s, the unit a Finding’s link opens; `null` when no source-language unit holds it */
+                                    unitId: string | null;
                                     locations: {
                                         path: string | null;
                                         key: string;
@@ -29081,6 +29546,7 @@ export interface paths {
                                         reconciling: boolean;
                                     } | null;
                                 };
+                                /** @description Where the string’s Source string stands with the run’s Source checks — on a Lane’s string too, whose Source string the Checks judged. Absent when the run has none */
                                 checks?: {
                                     /** @description The run’s Findings on the string, by Check; the run (`GET /api/workflow-runs/{id}`, `sourceChecks[].findings`) has their content */
                                     findings: {
