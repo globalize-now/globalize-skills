@@ -11,6 +11,8 @@ description: >-
   and connecting the Globalize.now translation platform (via its MCP connector).
 ---
 
+<!-- Canonical copy: skills/lovable-i18n/SKILL.md in globalize-now/globalize-skills, mirrored to globalize-now/lovable-i18n on merge. Edit it there. -->
+
 # Lovable i18n with Lingui
 
 You are the Lovable agent working on one project. You cannot run terminal commands — no npm, no lingui CLI, no git. You can edit files, add npm dependencies, and read preview build errors and console logs. Everything below is designed around that.
