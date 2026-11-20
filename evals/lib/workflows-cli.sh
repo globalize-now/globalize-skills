@@ -7,12 +7,22 @@
 # api-client/src/commands/workflows.ts) registers, one "command<TAB>" line per command and
 # one "command<TAB>--flag" line per flag. In workflows.ts, commands under `runs` are
 # "runs start", "runs list", …, and preview-setup and setup also take every option
-# withSetupOptions adds.
+# withSetupOptions adds. A flag is the first argument of `.option(`, `.requiredOption(` or
+# `new Option(`, on its line or the next: a "--flag" inside a description or an error
+# message is not one.
 workflows_cli_table() {
   awk '
+    function flag(line,   f) {
+      f = ""
+      if (match(line, /(Option|\.option)\("--[a-z][a-z-]*/)) f = substr(line, RSTART, RLENGTH)
+      else if (pending && match(line, /^[[:space:]]*"--[a-z][a-z-]*/)) f = substr(line, RSTART, RLENGTH)
+      pending = line ~ /(Option|\.option)\([[:space:]]*$/
+      sub(/^[^"]*"/, "", f)
+      return f
+    }
     /^function withSetupOptions/ { insetup = 1 }
     insetup && /^}/ { insetup = 0 }
-    insetup { s = $0; while (match(s, /"--[a-z][a-z-]*/)) { setup[substr(s, RSTART + 1, RLENGTH - 1)] = 1; s = substr(s, RSTART + RLENGTH) } next }
+    insetup { f = flag($0); if (f != "") setup[f] = 1; next }
     /const runs = / { inruns = 1 }
     match($0, /\.command\("[a-z-]+"\)/) {
       name = substr($0, RSTART + 10, RLENGTH - 12)
@@ -21,7 +31,7 @@ workflows_cli_table() {
       print cmd "\t"
       if (cmd == "preview-setup" || cmd == "setup") for (f in setup) print cmd "\t" f
     }
-    cmd != "" { s = $0; while (match(s, /"--[a-z][a-z-]*/)) { print cmd "\t" substr(s, RSTART + 1, RLENGTH - 1); s = substr(s, RSTART + RLENGTH) } }
+    cmd != "" { f = flag($0); if (f != "") print cmd "\t" f }
   ' "$1" | sort -u
 }
 

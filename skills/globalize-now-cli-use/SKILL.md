@@ -203,7 +203,7 @@ The CLI changes a Workflow's target languages only; branches, patterns, steps an
 
 A glossary keeps terms consistent across languages. Glossaries belong to the organisation, and Workflows and Projects use them; the `glossaries` commands take locales (`en`, `pt-BR`) and need no Project.
 
-**Check which glossary a Workflow reads before editing one.** Read it with `workflows get --id <WORKFLOW_ID> --json`. When `currentVersion.definition.assets.source` is `repository` (what Workflow setup publishes) and its translate Action's `config` names no `glossaryId`, a run reads the glossary from the repository's `docs/glossary.tbx` or `docs/glossary.csv` at the triggering commit. A stored glossary is never read then: edit that file, keeping its format, and open a pull request. A `glossaryId` in the translate Action names the stored glossary the run reads, and the commands below edit it.
+**Check which glossary a Workflow reads before editing one.** Read it with `workflows get --id <WORKFLOW_ID> --json`. When `currentVersion.definition.assets.source` is `repository` (what Workflow setup publishes) and the definition has no `currentVersion.definition.glossaryId`, a run reads the glossary from the repository's `docs/glossary.tbx` or `docs/glossary.csv` at the triggering commit. A stored glossary is never read then: edit that file, keeping its format, and open a pull request. A `currentVersion.definition.glossaryId` names the stored glossary the run reads, whatever the asset source, and the commands below edit it.
 
 **Find** the glossary. `glossaries list` gives each one's `locales`, `termCount`, `workflowCount` and `attachedProjectCount`; `glossaries get` names the Projects and Workflows using it:
 

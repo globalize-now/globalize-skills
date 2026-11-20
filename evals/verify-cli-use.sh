@@ -204,6 +204,15 @@ done
 for text_var in STEP3 STEP4; do
   if has "${!text_var}" "assets.source"; then pass "${text_var/STEP/Step } says how to tell a Workflow reads repository assets ('assets.source')"; else fail "${text_var/STEP/Step } does not say how to tell a Workflow reads repository assets ('assets.source')"; fi
 done
+# A Workflow names its glossary in the definition's top-level `glossaryId` (globalize.now
+# core workflows/definition.ts); the translate Action's config no longer takes one.
+if has "$STEP3" "definition.glossaryId"; then pass "Step 3 reads the Workflow's glossary from 'definition.glossaryId'"; else fail "Step 3 does not read the Workflow's glossary from 'definition.glossaryId'"; fi
+ACTION_GLOSSARY="$(grep -rniE 'glossaryId' "$SKILL_DIR" | grep -iE 'translate.{0,3}action|config' || true)"
+if [ -z "$ACTION_GLOSSARY" ]; then
+  pass "no line of the skill looks for 'glossaryId' in the translate Action's config"
+else
+  fail "the skill looks for 'glossaryId' in the translate Action's config, now the definition's top level: $(printf '%s' "$ACTION_GLOSSARY" | sed "s|$SKILL_DIR/||" | cut -c1-160 | tr '\n' ';')"
+fi
 ORG_CMDS='glossaries list
 glossaries create
 glossaries get
