@@ -69,7 +69,7 @@ export async function getStyleGuideQuota(client: ApiClient, projectId: string) {
 export function register(group: Command, getClient: ClientFactory): void {
   group
     .command("list")
-    .description("List style guides")
+    .description("(deprecated: use `assets list --type style_guide`) List a Project's style guides")
     .requiredOption("--project-id <id>", "Project UUID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
@@ -83,7 +83,7 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("upsert")
-    .description("Create or update a style guide")
+    .description("(deprecated: use `assets set-text`) Create or update a Project style guide")
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption("--language-id <id>", "Project language UUID")
     .requiredOption("--instructions <text>", "Style guide instructions")
@@ -99,7 +99,7 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("delete")
-    .description("Delete a style guide")
+    .description("(deprecated: use `assets delete-text`) Delete a Project style guide")
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption("--language-id <id>", "Project language UUID")
     .action(async (cmdOpts, cmd) => {
@@ -114,7 +114,7 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("generate")
-    .description("Generate a style guide draft for a target language")
+    .description("(deprecated: use `assets`) Generate a Project style guide draft for a target language")
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption("--language-id <id>", "Project language UUID")
     .action(async (cmdOpts, cmd) => {
@@ -129,7 +129,7 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("apply")
-    .description("Apply a generated style guide draft")
+    .description("(deprecated: use `assets`) Apply a generated Project style guide draft")
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption("--language-id <id>", "Project language UUID")
     .requiredOption("--generation-id <id>", "Generation UUID from a prior generate call")
@@ -159,7 +159,7 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("quota")
-    .description("Get per-language style-guide generation quota")
+    .description("(deprecated: use `assets`) Get a Project's per-language style-guide generation quota")
     .requiredOption("--project-id <id>", "Project UUID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();

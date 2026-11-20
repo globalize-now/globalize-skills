@@ -50,8 +50,10 @@ Global options:
 | **languages** | `list`, `get` | Browse the language catalog |
 | **project-languages** | `list`, `add`, `remove` | Configure languages on a project |
 | **repositories** | `list`, `create`, `delete`, `detect` | Connect and scan git repositories |
-| **glossary** | `list`, `create`, `delete` | Manage translation glossaries |
-| **style-guides** | `list`, `upsert`, `delete` | Set translation style instructions |
+| **glossaries** | `list`, `create`, `get`, `rename`, `delete`, `entries`, `add-term`, `edit-entry`, `delete-entry` | Manage the organisation's glossaries and their entries |
+| **assets** | `list`, `create`, `get`, `rename`, `delete`, `set-text`, `delete-text` | Manage the organisation's style guides and contexts |
+| **glossary** | `list`, `create`, `bulk`, `preview`, `delete` | (deprecated: use `glossaries`) Project-scoped glossary |
+| **style-guides** | `list`, `upsert`, `delete`, `generate`, `apply`, `quota` | (deprecated: use `assets`) Project-scoped style guides |
 | **api-keys** | `list`, `create`, `revoke` | Manage API keys |
 | **members** | `list`, `invite`, `remove` | Manage organisation members |
 | **workflows** | `preview-setup`, `setup`, `list`, `get`, `languages` | Set up a GitHub Workflow and change its target languages |
@@ -69,9 +71,20 @@ globalise-now-cli projects create "My App" en fr,de
 # Connect a git repository
 globalise-now-cli repositories create <project-id> https://github.com/org/repo github
 
-# Add a glossary entry
-globalise-now-cli glossary create <project-id> "Sign up" "S'inscrire" <source-lang-id> <target-lang-id>
+# Add a glossary entry: the preferred term, a spelling to avoid, and its translations
+globalise-now-cli glossaries add-term --id <glossary-id> --source-term "Sign up" --source-locale en \
+  --forbid "Signup" --target "fr=S'inscrire" --target "de=Registrieren"
 ```
+
+### Glossaries and assets
+
+Glossaries, style guides and contexts belong to the organisation; a Project or a Workflow uses them. Find one with `glossaries list` or `assets list --type style_guide|context`, then write by locale.
+
+- A glossary entry is one preferred term in one source locale, with an optional `--description`, up to 20 forbidden variants (`--forbid`, repeated) and a target term per locale (`--target <locale>=<term>`, repeated), or `--do-not-translate`. `add-term` refuses a term the glossary already holds with `GLOSSARY_ENTRY_EXISTS`, naming the entry in `details`; edit that one with `edit-entry`. A spelling another entry claims is refused with `GLOSSARY_SPELLING_TAKEN`.
+- `edit-entry` changes only what you pass: `--forbid` replaces the variant set (`--clear-forbidden` empties it), `--clear-description`, `--do-not-translate` / `--translate`, `--target` sets a locale's term and `--remove-target <locale>` removes it.
+- `assets set-text` takes `--text` or `--file`. A per-locale Asset needs `--locale`; a global one takes none. `--invalidate-tm` marks a changed style guide's translation memory entries of that locale stale.
+- `glossaries delete` and `assets delete` are admin-only.
+- There is no bulk import for an organisation's glossary; `glossary bulk` and `glossary preview` stay Project-only.
 
 ### Workflows
 
@@ -113,7 +126,7 @@ A `completed` run has finished translating; it does not mean the translations we
 
 ### Errors
 
-A failed command exits 1. In JSON mode (`--json`, or whenever stdout isn't a terminal) it prints `{ "error": "<message>", "status": <http status>, "code": "<API code>", "details": … }`, with `code` and `details` as the API answered them; for example a 409 `REPOSITORY_HELD_BY_PROJECT` names the Project in `details`. A 401 reads "Authentication failed"; a 403 that isn't about authentication (`FEATURE_REQUIRED`, `WORKFLOW_GATE_ADMIN_REQUIRED`, …) keeps its code and message.
+A failed command exits 1. In JSON mode (`--json`, or whenever stdout isn't a terminal) it prints `{ "error": "<message>", "status": <http status>, "code": "<API code>", "details": … }`, with `code` and `details` as the API answered them; for example a 409 `REPOSITORY_HELD_BY_PROJECT` names the Project in `details`. A 401, or a 403 `ORG_ACCESS_DENIED`, reads "Authentication failed"; any other 403 keeps its code and message, for example `FORBIDDEN: Admin access required` when a member's key deletes a glossary or an Asset, `FEATURE_REQUIRED` or `WORKFLOW_GATE_ADMIN_REQUIRED`.
 
 Every request sends `User-Agent: globalize-cli-client/<version>`.
 
@@ -150,8 +163,10 @@ const project = await createProject(client, "My App", "en", ["fr", "de"]);
 | Languages | `listLanguages`, `getLanguage` |
 | Project Languages | `listProjectLanguages`, `addProjectLanguage`, `removeProjectLanguage` |
 | Repositories | `listRepositories`, `createRepository`, `deleteRepository`, `detectRepository` |
-| Glossary | `listGlossary`, `createGlossaryEntry`, `deleteGlossaryEntry` |
-| Style Guides | `listStyleGuides`, `upsertStyleGuide`, `deleteStyleGuide` |
+| Glossaries | `listGlossaries`, `createGlossary`, `getGlossary`, `renameGlossary`, `deleteGlossary`, `listGlossaryEntries`, `addGlossaryEntry`, `editGlossaryEntry`, `deleteGlossaryEntryById` |
+| Assets | `listAssets`, `createAsset`, `getAsset`, `renameAsset`, `deleteAsset`, `putAssetText`, `deleteAssetText` |
+| Glossary (deprecated) | `listGlossary`, `createGlossaryEntry`, `deleteGlossaryEntry` |
+| Style Guides (deprecated) | `listStyleGuides`, `upsertStyleGuide`, `deleteStyleGuide` |
 | API Keys | `listApiKeys`, `createApiKey`, `revokeApiKey` |
 | Members | `listMembers`, `inviteMember`, `removeMember` |
 | Workflows | `previewWorkflowSetup`, `setUpWorkflow`, `listWorkflows`, `getWorkflow`, `getWorkflowVersion`, `setWorkflowLanguages`, `startWorkflowRun`, `getWorkflowRun`, `listWorkflowRuns`, `summariseWorkflowRun` |
