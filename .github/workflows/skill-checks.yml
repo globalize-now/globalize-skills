@@ -2,10 +2,10 @@ name: Skill checks
 
 on:
   pull_request:
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, api-client/src/commands/glossaries.ts, api-client/src/commands/assets.ts, api-client/src/commands/glossary.ts, api-client/src/commands/style-guides.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
   push:
     branches: [main]
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, api-client/src/commands/glossaries.ts, api-client/src/commands/assets.ts, api-client/src/commands/glossary.ts, api-client/src/commands/style-guides.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
 
 jobs:
   skill-size:
@@ -26,7 +26,8 @@ jobs:
 
       # globalize-now-cli-use leads with Workflow setup: Step 2 names the workflows commands,
       # every workflows command and flag it names exists in the CLI, and the Project steps sit
-      # in references/ behind the REPOSITORY_HELD_BY_PROJECT pointer.
+      # in references/ behind the REPOSITORY_HELD_BY_PROJECT pointer. Glossaries and style
+      # guides lead with `glossaries` and `assets`; `glossary` and `style-guides` are deprecated.
       - name: CLI skill leads with Workflows
         run: ./evals/verify-cli-use.sh
 

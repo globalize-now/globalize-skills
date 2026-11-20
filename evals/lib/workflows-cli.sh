@@ -1,16 +1,28 @@
-# Sourced by verify-cli-use.sh and verify-globalize-connect.sh: one parser for the CLI's
-# `workflows` commands and one extractor for the CLI invocations a skill's prose names, so
-# both evals check skills against the CLI the same way. The caller defines pass() and fail().
+# Sourced by verify-cli-use.sh and verify-globalize-connect.sh: one parser for a CLI command
+# group's source file (`workflows`, `glossaries`, `assets`, …) and one extractor for the CLI
+# invocations a skill's prose names, so both evals check skills against the CLI the same way.
+# The caller defines pass() and fail().
 
-# The commands and flags api-client/src/commands/workflows.ts ($1) registers, one
-# "command<TAB>" line per command and one "command<TAB>--flag" line per flag. Commands under
-# `runs` are "runs start", "runs list", …; preview-setup and setup also take every option
-# withSetupOptions adds.
+# The commands and flags a command group's source file ($1, e.g.
+# api-client/src/commands/workflows.ts) registers, one "command<TAB>" line per command and
+# one "command<TAB>--flag" line per flag. In workflows.ts, commands under `runs` are
+# "runs start", "runs list", …, and preview-setup and setup also take every option
+# withSetupOptions adds. A flag is the first argument of `.option(`, `.requiredOption(` or
+# `new Option(`, on its line or the next: a "--flag" inside a description or an error
+# message is not one.
 workflows_cli_table() {
   awk '
+    function flag(line,   f) {
+      f = ""
+      if (match(line, /(Option|\.option)\("--[a-z][a-z-]*/)) f = substr(line, RSTART, RLENGTH)
+      else if (pending && match(line, /^[[:space:]]*"--[a-z][a-z-]*/)) f = substr(line, RSTART, RLENGTH)
+      pending = line ~ /(Option|\.option)\([[:space:]]*$/
+      sub(/^[^"]*"/, "", f)
+      return f
+    }
     /^function withSetupOptions/ { insetup = 1 }
     insetup && /^}/ { insetup = 0 }
-    insetup { s = $0; while (match(s, /"--[a-z][a-z-]*/)) { setup[substr(s, RSTART + 1, RLENGTH - 1)] = 1; s = substr(s, RSTART + RLENGTH) } next }
+    insetup { f = flag($0); if (f != "") setup[f] = 1; next }
     /const runs = / { inruns = 1 }
     match($0, /\.command\("[a-z-]+"\)/) {
       name = substr($0, RSTART + 10, RLENGTH - 12)
@@ -19,7 +31,7 @@ workflows_cli_table() {
       print cmd "\t"
       if (cmd == "preview-setup" || cmd == "setup") for (f in setup) print cmd "\t" f
     }
-    cmd != "" { s = $0; while (match(s, /"--[a-z][a-z-]*/)) { print cmd "\t" substr(s, RSTART + 1, RLENGTH - 1); s = substr(s, RSTART + RLENGTH) } }
+    cmd != "" { f = flag($0); if (f != "") print cmd "\t" f }
   ' "$1" | sort -u
 }
 
@@ -69,24 +81,24 @@ cli_invocations() {
   ' | sort -t "$(printf '\t')" -k2,2 -u
 }
 
-# Each `workflows` invocation in the files given names a command the CLI ($1, the
-# workflows.ts path) registers and passes only flags that command defines. One pass per
-# valid invocation, one fail per unknown command or flag.
-check_workflows_cli() {
-  local cli_src="$1" table invs where inv sub flag bad found=0
-  shift
+# Each `<group>` ($1) invocation in the files given names a command the CLI source file
+# ($2, e.g. api-client/src/commands/glossaries.ts) registers and passes only flags that
+# command defines. One pass per valid invocation, one fail per unknown command or flag.
+check_cli_group() {
+  local group="$1" cli_src="$2" table invs where inv sub flag bad found=0
+  shift 2
   table="$(workflows_cli_table "$cli_src")"
   if [ -z "$table" ]; then
-    fail "no workflows commands parsed from $cli_src"
+    fail "no $group commands parsed from $cli_src"
     return
   fi
-  invs="$(cli_invocations 'workflows [a-z]' "$@")"
+  invs="$(cli_invocations "$group [a-z]" "$@")"
   while IFS=$'\t' read -r where inv; do
     [ -z "$inv" ] && continue
     found=1
     sub="$(printf '%s' "$inv" | awk '{ if ($2 == "runs") print $2 " " $3; else print $2 }')"
     if ! printf '%s\n' "$table" | grep -qxF -- "$sub	"; then
-      fail "$where names 'workflows $sub', which the CLI does not register: $inv"
+      fail "$where names '$group $sub', which the CLI does not register: $inv"
       continue
     fi
     bad=0
@@ -94,11 +106,16 @@ check_workflows_cli() {
       [ -z "$flag" ] && continue
       [ "$flag" = "--json" ] && continue   # global output option
       if ! printf '%s\n' "$table" | grep -qxF -- "$sub	$flag"; then
-        fail "$where passes $flag to 'workflows $sub', which the CLI does not define: $inv"
+        fail "$where passes $flag to '$group $sub', which the CLI does not define: $inv"
         bad=1
       fi
     done < <(printf '%s' "$inv" | grep -oE -- '--[a-z][a-z-]+' | sort -u)
     [ "$bad" -eq 0 ] && pass "$where: CLI defines '$inv'"
   done <<< "$invs"
-  [ "$found" -eq 1 ] || fail "the skill names no 'workflows' command"
+  [ "$found" -eq 1 ] || fail "the skill names no '$group' command"
+}
+
+# check_cli_group for the `workflows` group; $1 is the workflows.ts path.
+check_workflows_cli() {
+  check_cli_group workflows "$@"
 }

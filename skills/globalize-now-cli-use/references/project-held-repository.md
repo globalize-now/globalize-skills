@@ -32,7 +32,7 @@ npx @globalize-now/cli-client repositories translate \
 
 `--branch <branch>` translates a branch other than the repository's primary one. Follow the job with `jobs list --project-id <PROJECT_ID> --json` and `jobs get --id <JOB_ID> --json` (P7).
 
-Languages, configuration and patterns of this Project are P4–P6. Glossary and style guides are SKILL.md Steps 3 and 4.
+Languages, configuration and patterns of this Project are P4–P6. Its glossary and style guides are SKILL.md Steps 3 and 4, and P8 has the deprecated Project-keyed commands.
 
 ---
 
@@ -349,7 +349,7 @@ npx @globalize-now/cli-client project-languages list \
   --json
 ```
 
-This returns an array of project languages, each with its own **project language ID** (different from the global language ID). You'll need these IDs for glossary and style guide operations.
+This returns an array of project languages, each with its own **project language ID** (different from the global language ID). The deprecated glossary and style guide commands (P8), `project-languages remove` and `patterns path-locale` take these IDs.
 
 **Add** a language:
 
@@ -502,6 +502,75 @@ The older project-scoped commands (`translation-memory list|count|fresh-count|de
 
 ---
 
+## P8. A Project's glossary and style guides (deprecated commands)
+
+A Project's glossary and style guides are organisation glossaries and Assets: `projects get --id <PROJECT_ID> --json` names them in `glossary.id`, `styleGuideAsset.id` and `contextAsset.id`, and the `glossaries` and `assets` commands (SKILL.md Steps 3 and 4) edit them by locale. Prefer those. The Project-keyed `glossary` and `style-guides` commands below are deprecated and still work until Projects are removed; use them for what has no org command, bulk glossary import and style guide drafting, or when the user asks for them.
+
+They take the Project's **project language UUIDs** (P5), not locales or global language ids:
+
+```bash
+npx @globalize-now/cli-client project-languages list --project-id <PROJECT_ID> --json
+```
+
+### Glossary
+
+```bash
+npx @globalize-now/cli-client glossary list --project-id <PROJECT_ID> --json
+npx @globalize-now/cli-client glossary create \
+  --project-id <PROJECT_ID> \
+  --source-term "Dashboard" \
+  --target-term "Tableau de bord" \
+  --source-language-id <SOURCE_PROJECT_LANGUAGE_ID> \
+  --target-language-id <TARGET_PROJECT_LANGUAGE_ID> \
+  --json
+npx @globalize-now/cli-client glossary delete --project-id <PROJECT_ID> --entry-id <ENTRY_ID> --json
+```
+
+`--do-not-translate` on `glossary create` keeps a term verbatim; `--target-term` is still required, so pass the source spelling. Entry ids from `glossary list` are term pairs, not entries: the `glossaries` entry commands answer 404 for them, so find the entry with `glossaries entries` instead.
+
+**Bulk import** a whole glossary in one transaction (max 10 000 entries, each with its own language pair). An entry with the same key is updated rather than duplicated. `glossary preview` with the same keys reports how many would be created and updated, and writes nothing:
+
+```bash
+npx @globalize-now/cli-client glossary bulk \
+  --project-id <PROJECT_ID> \
+  --entries '[{"sourceTerm":"Dashboard","targetTerm":"Tableau de bord","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>"},{"sourceTerm":"Globalize","targetTerm":"Globalize","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>","doNotTranslate":true}]' \
+  --json
+npx @globalize-now/cli-client glossary preview \
+  --project-id <PROJECT_ID> \
+  --keys '[{"sourceTerm":"Dashboard","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>"}]' \
+  --json
+```
+
+### Style guides
+
+`--language-id` is a project language UUID:
+
+```bash
+npx @globalize-now/cli-client style-guides list --project-id <PROJECT_ID> --json
+npx @globalize-now/cli-client style-guides upsert \
+  --project-id <PROJECT_ID> \
+  --language-id <PROJECT_LANGUAGE_ID> \
+  --instructions "Use formal register. Prefer British English spelling." \
+  --json
+npx @globalize-now/cli-client style-guides delete --project-id <PROJECT_ID> --language-id <PROJECT_LANGUAGE_ID> --json
+```
+
+**Draft** a style guide: `style-guides generate` returns a draft (`generationId`, `instructions`, `context`) and the organisation's weekly draft `quota`. Show the user the draft, then apply what they approve, with `--generation-id` from the draft. `style-guides quota --project-id <PROJECT_ID>` reads the quota alone:
+
+```bash
+npx @globalize-now/cli-client style-guides generate --project-id <PROJECT_ID> --language-id <PROJECT_LANGUAGE_ID> --json
+npx @globalize-now/cli-client style-guides apply \
+  --project-id <PROJECT_ID> \
+  --language-id <PROJECT_LANGUAGE_ID> \
+  --generation-id <GENERATION_ID> \
+  --instructions "<approved instructions>" \
+  --json
+```
+
+`apply` also takes `--context <text>` and `--invalidate-tm`. A Project's context is one flag of the Project: `projects update --id <PROJECT_ID> --context <text>` (P4).
+
+---
+
 ## Project command reference
 
 | Command | Required flags | Optional flags |
@@ -547,6 +616,17 @@ The older project-scoped commands (`translation-memory list|count|fresh-count|de
 | `translation-memory delete` _(deprecated)_ | `--project-id`, `--entry-id` | |
 | `translation-memory count` _(deprecated)_ | `--project-id` | `--target-language-id` |
 | `translation-memory fresh-count` _(deprecated)_ | `--project-id`, `--target-language-id` | |
+| `glossary list` _(deprecated)_ | `--project-id` | |
+| `glossary create` _(deprecated)_ | `--project-id`, `--source-term`, `--target-term`, `--source-language-id`, `--target-language-id` | `--do-not-translate` |
+| `glossary delete` _(deprecated)_ | `--project-id`, `--entry-id` | |
+| `glossary bulk` _(deprecated)_ | `--project-id`, `--entries` (JSON) | |
+| `glossary preview` _(deprecated)_ | `--project-id`, `--keys` (JSON) | |
+| `style-guides list` _(deprecated)_ | `--project-id` | |
+| `style-guides upsert` _(deprecated)_ | `--project-id`, `--language-id`, `--instructions` | |
+| `style-guides delete` _(deprecated)_ | `--project-id`, `--language-id` | |
+| `style-guides generate` _(deprecated)_ | `--project-id`, `--language-id` | |
+| `style-guides apply` _(deprecated)_ | `--project-id`, `--language-id`, `--generation-id`, `--instructions` | `--context`, `--invalidate-tm` |
+| `style-guides quota` _(deprecated)_ | `--project-id` | |
 | `jobs list` | | `--project-id`, `--status`, `--limit`, `--offset` |
 | `jobs get` | `--id` | |
 | `jobs start` | `--id` | |
