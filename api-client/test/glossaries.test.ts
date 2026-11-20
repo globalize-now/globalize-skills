@@ -180,6 +180,26 @@ describe("glossaries add-term", () => {
     });
   });
 
+  it("refuses a target locale given twice without calling the API", async () => {
+    const requests = mockApi([]);
+    const { json, exitCode } = await glossaries(
+      "add-term",
+      "--id",
+      GLOSSARY,
+      "--source-term",
+      "sign in",
+      "--source-locale",
+      "en",
+      "--target",
+      "fr=se connecter",
+      "--target",
+      " fr=s'identifier",
+    );
+    expect(exitCode).toBe(1);
+    expect(json.error).toBe("--target names fr twice");
+    expect(requests).toHaveLength(0);
+  });
+
   it("keeps an = inside a target term", async () => {
     const requests = mockApi([{ method: "POST", path: entriesPath, status: 201, body: entry }]);
     await glossaries(
@@ -307,6 +327,22 @@ describe("glossaries edit-entry", () => {
   ])("refuses %s with its opposite without calling the API", async (...args) => {
     const requests = mockApi([]);
     await expect(edit(...args)).rejects.toThrow(/cannot be used with/);
+    expect(requests).toHaveLength(0);
+  });
+
+  it("refuses an edit naming no change without calling the API", async () => {
+    const requests = mockApi([]);
+    const { json, exitCode } = await edit();
+    expect(exitCode).toBe(1);
+    expect(json.error).toMatch(/^Nothing to change: pass at least one of --source-term, /);
+    expect(requests).toHaveLength(0);
+  });
+
+  it("refuses a target locale given twice without calling the API", async () => {
+    const requests = mockApi([]);
+    const { json, exitCode } = await edit("--target", "fr=se connecter", "--target", "fr=s'identifier");
+    expect(exitCode).toBe(1);
+    expect(json.error).toBe("--target names fr twice");
     expect(requests).toHaveLength(0);
   });
 
