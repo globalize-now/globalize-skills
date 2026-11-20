@@ -40,10 +40,12 @@ function isApiErrorBody(error: unknown): error is ApiErrorBody {
 
 /**
  * 403 codes that mean the caller can't act in this organisation at all. Every
- * other 403 (`FEATURE_REQUIRED`, `WORKFLOW_GATE_ADMIN_REQUIRED`, …) is a refusal
- * an agent can act on, so it keeps its code and message.
+ * other 403 is a refusal an agent can act on, so it keeps its code and message:
+ * `FEATURE_REQUIRED`, `WORKFLOW_GATE_ADMIN_REQUIRED`, and `FORBIDDEN`, which is
+ * the API's "Admin access required" for a member's key (deleting a glossary or
+ * an Asset). An invalid or revoked key is a 401.
  */
-const AUTH_FAILURE_CODES = new Set(["UNAUTHORIZED", "FORBIDDEN", "ORG_ACCESS_DENIED"]);
+const AUTH_FAILURE_CODES = new Set(["UNAUTHORIZED", "ORG_ACCESS_DENIED"]);
 
 const AUTH_FAILED = "Authentication failed. Check your API key or run `globalise-now-cli auth login`.";
 

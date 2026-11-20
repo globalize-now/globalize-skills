@@ -82,9 +82,29 @@ describe("error messages", () => {
     expect(json.error).toMatch(/^Authentication failed/);
   });
 
-  it.each(["FORBIDDEN", "ORG_ACCESS_DENIED"])("says Authentication failed for a 403 %s", async (code) => {
-    mockApi([{ method: "GET", path: "/api/workflows", status: 403, body: { code, message: "No", statusCode: 403 } }]);
+  it("says Authentication failed for a 403 ORG_ACCESS_DENIED", async () => {
+    mockApi([
+      {
+        method: "GET",
+        path: "/api/workflows",
+        status: 403,
+        body: { code: "ORG_ACCESS_DENIED", message: "Cannot access another organisation", statusCode: 403 },
+      },
+    ]);
     const { json } = await list();
     expect(json.error).toMatch(/^Authentication failed/);
+  });
+
+  it("prints a 403 FORBIDDEN (a member's key on an admin-only route) with its code and message", async () => {
+    mockApi([
+      {
+        method: "GET",
+        path: "/api/workflows",
+        status: 403,
+        body: { code: "FORBIDDEN", message: "Admin access required", statusCode: 403 },
+      },
+    ]);
+    const { json } = await list();
+    expect(json).toEqual({ error: "FORBIDDEN: Admin access required", status: 403, code: "FORBIDDEN" });
   });
 });
