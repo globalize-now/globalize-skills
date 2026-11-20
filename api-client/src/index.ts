@@ -48,7 +48,37 @@ export {
 } from "./commands/patterns.js";
 export { FILE_FORMATS, type FileFormat } from "./file-formats.js";
 
-// Glossary
+// Glossaries (org-level resource)
+export {
+  listGlossaries,
+  createGlossary,
+  getGlossary,
+  renameGlossary,
+  deleteGlossary,
+  listGlossaryEntries,
+  addGlossaryEntry,
+  editGlossaryEntry,
+  deleteGlossaryEntryById,
+  type AddGlossaryEntryBody,
+  type EditGlossaryEntryBody,
+} from "./commands/glossaries.js";
+
+// Style guides and contexts (org-level Assets)
+export {
+  listAssets,
+  createAsset,
+  getAsset,
+  renameAsset,
+  deleteAsset,
+  putAssetText,
+  deleteAssetText,
+  type AssetType,
+  type AssetScope,
+  type CreateAssetBody,
+  type PutAssetTextBody,
+} from "./commands/assets.js";
+
+// Glossary, project-scoped (deprecated: use the glossaries functions)
 export {
   listGlossary,
   createGlossaryEntry,
@@ -57,7 +87,7 @@ export {
   previewGlossaryImport,
 } from "./commands/glossary.js";
 
-// Style guides
+// Style guides, project-scoped (deprecated: use the Asset functions)
 export {
   listStyleGuides,
   upsertStyleGuide,

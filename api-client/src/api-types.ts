@@ -4168,7 +4168,10 @@ export interface paths {
             };
         };
         put?: never;
-        /** Create project */
+        /**
+         * Create project
+         * @description Needs an organisation that already has a Project. Any other is refused with 410 `PROJECT_CREATION_RETIRED`, whose message points to Workflow setup instead.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -4518,6 +4521,20 @@ export interface paths {
                 };
                 /** @description Default Response */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description `PROJECT_CREATION_RETIRED`: the organisation holds no Project, so it cannot create one */
+                410: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5128,7 +5145,7 @@ export interface paths {
         post?: never;
         /**
          * Delete project
-         * @description Refused with 409 `PROJECT_USED_BY_WORKFLOWS`, naming them, while an active Workflow reads its assets from the project; archive those Workflows first. The project’s translation memory is deleted with it unless another project or any Workflow, archived or not, still uses it.
+         * @description Accepted with 202 at once: from then on the project answers 404 everywhere, and its data is deleted in the background. Asking again while that runs answers 202 too. Refused with 409 `PROJECT_USED_BY_WORKFLOWS`, naming them, while an active Workflow reads its assets from the project; archive those Workflows first. The project’s translation memory is deleted with it unless another project or any Workflow, archived or not, still uses it.
          */
         delete: {
             parameters: {
@@ -5142,11 +5159,13 @@ export interface paths {
             requestBody?: never;
             responses: {
                 /** @description Default Response */
-                204: {
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": unknown;
+                    };
                 };
                 /** @description Default Response */
                 400: {
@@ -17340,7 +17359,7 @@ export interface paths {
                     "application/json": {
                         name: string;
                         description?: string | null;
-                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. */
+                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
                         definition: {
                             [key: string]: unknown;
                         };
@@ -17542,7 +17561,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. */
+                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
                         definition: {
                             [key: string]: unknown;
                         };
@@ -17851,7 +17870,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. */
+            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
             requestBody: {
                 content: {
                     "application/json": {
@@ -18327,7 +18346,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Change name, description or active (creates no version) */
+        /**
+         * Change name or description (creates no version)
+         * @description `active` is not settable: it is whether the Input’s connection is healthy, set by credential events and publishes. Reconnect an Inactive GitHub Workflow with `POST /api/workflows/:id/reconnect`.
+         */
         patch: {
             parameters: {
                 query?: never;
@@ -18342,7 +18364,6 @@ export interface paths {
                     "application/json": {
                         name?: string;
                         description?: string | null;
-                        active?: boolean;
                     };
                 };
             };
@@ -18535,7 +18556,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. */
+            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
             requestBody: {
                 content: {
                     "application/json": {
@@ -18711,6 +18732,768 @@ export interface paths {
             };
         };
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{id}/github-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check the link from a Workflow to the GitHub repository it reads
+         * @description The connection verdict of the GitHub Input of the Workflow’s current version, computed now: one `blocker` and its `degradations`, each a finding with its `reason`, `severity` and repair `action`. Tier 1, from stored rows: `installation_missing`, `installation_deleted` (no live installation of the organisation can see the repository: install the App), `installation_suspended`, `workflow_inactive` (a live installation can serve it: reconnect). Tier 2, asked of GitHub: `permissions_missing`, `repository_inaccessible`, `repository_missing` (archive: a Workflow’s repository never changes), and the degraded `branch_missing`. `status: unknown` with `provider_rate_limited`, `provider_unavailable` or `checks_unavailable` when GitHub could not be asked — that says nothing about the connection. 400 `BAD_REQUEST` for a Workflow that reads no GitHub repository.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "ok" | "action_needed" | "unknown";
+                            blocker: ({
+                                /** @enum {string} */
+                                reason: "installation_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "connect_github";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
+                                reason: "installation_deleted";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_github";
+                                evidence: {
+                                    account: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "installation_suspended";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "open_github_settings";
+                                evidence: {
+                                    account: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "workflow_inactive";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect";
+                                evidence: {
+                                    account: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "permissions_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "approve_github";
+                                evidence: {
+                                    permission: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "repository_inaccessible";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "configure_repository_access";
+                                evidence: {
+                                    repoPath: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "repository_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "archive_workflow";
+                                evidence: {
+                                    repoPath: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "branch_missing";
+                                /** @enum {string} */
+                                severity: "degraded";
+                                /** @enum {string} */
+                                action: "edit_branches";
+                                evidence: {
+                                    branch: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "provider_rate_limited";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "retry";
+                                evidence: {
+                                    /** @enum {string} */
+                                    provider: "github" | "gitlab";
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "provider_unavailable";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "retry";
+                                evidence: {
+                                    /** @enum {string} */
+                                    provider: "github" | "gitlab";
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "checks_unavailable";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "none";
+                                evidence: Record<string, never>;
+                            }) | null;
+                            degradations: ({
+                                /** @enum {string} */
+                                reason: "installation_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "connect_github";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
+                                reason: "installation_deleted";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_github";
+                                evidence: {
+                                    account: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "installation_suspended";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "open_github_settings";
+                                evidence: {
+                                    account: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "workflow_inactive";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect";
+                                evidence: {
+                                    account: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "permissions_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "approve_github";
+                                evidence: {
+                                    permission: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "repository_inaccessible";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "configure_repository_access";
+                                evidence: {
+                                    repoPath: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "repository_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "archive_workflow";
+                                evidence: {
+                                    repoPath: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "branch_missing";
+                                /** @enum {string} */
+                                severity: "degraded";
+                                /** @enum {string} */
+                                action: "edit_branches";
+                                evidence: {
+                                    branch: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "provider_rate_limited";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "retry";
+                                evidence: {
+                                    /** @enum {string} */
+                                    provider: "github" | "gitlab";
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "provider_unavailable";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "retry";
+                                evidence: {
+                                    /** @enum {string} */
+                                    provider: "github" | "gitlab";
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "checks_unavailable";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "none";
+                                evidence: Record<string, never>;
+                            })[];
+                            checkedAt: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{id}/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reconnect a GitHub Workflow, publishing a version that names a live installation
+         * @description Publishes the current version with only its installation changed — to the organisation’s live installation that can see the repository, by its GitHub id — which reactivates the Workflow. When the installation it names is already live, nothing is published (`published: false`) and the Workflow is reactivated. Any member may reconnect. 409 `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`) when `baseVersion` is no longer current; 409 `WORKFLOW_NO_INSTALLATION` when no live installation can see the repository, or the one it names is suspended; 409 `WORKFLOW_ARCHIVED`; 503 `GITHUB_UNREACHABLE` when GitHub could not be asked — retry. 400 `BAD_REQUEST` for a Workflow that reads no GitHub repository.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The version number the caller saw as current */
+                        baseVersion: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            published: boolean;
+                            workflow: {
+                                id: string;
+                                name: string;
+                                description: string | null;
+                                /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                                active: boolean;
+                                archived: boolean;
+                                archivedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                currentVersion: {
+                                    id: string;
+                                    number: number;
+                                    /** @description The published definition, with an `id` on the Input, every Action and Output. */
+                                    definition: {
+                                        [key: string]: unknown;
+                                    };
+                                    /** @description Clerk user id of the publisher */
+                                    publishedBy: string | null;
+                                    publishedAt: string;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reconnect every Inactive GitHub Workflow an installation can see
+         * @description For one of the organisation’s live GitHub App installations (GitHub’s id, as the install callback reports it), typically just installed: every unarchived Inactive Workflow whose repository the installation can see is reconnected — one version each, naming this installation. A Workflow published meanwhile, or one a publish refuses, is skipped and keeps its banner. 404 `NOT_FOUND` for an installation that is not the organisation’s or not live; 503 `GITHUB_UNREACHABLE` when GitHub could not be asked.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description GitHub’s installation id */
+                        installationId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description The Workflows it reconnected */
+                            reconnected: string[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -20165,6 +20948,15 @@ export interface paths {
                                 /** @description `target_locale_missing`: the declared language */
                                 locale?: string;
                             }[];
+                            /** @description The custom `patterns` whose wildcard matches several source folders that all get the same namespace name, over the files of the branch detection read; empty without custom `patterns`. Advisory: setup is unaffected and each folder is still its own namespace. Offer the user suggestedPattern (it changes the Workflow, so never apply it silently) */
+                            namespaceClashes: {
+                                /** @description The GitHub Input file pattern */
+                                pattern: string;
+                                /** @description The folders it gives one namespace name */
+                                folders: string[];
+                                /** @description The pattern with {namespace} in place of the varying wildcard: matches the same files, so accepting it only renames namespaces. null when there is none */
+                                suggestedPattern: string | null;
+                            }[];
                             /** @description Send it with `POST /api/workflows/setup`: refused with 409 `WORKFLOW_PREVIEW_STALE` when the definition, excluded groups, claims or warnings changed since */
                             previewHash: string;
                         };
@@ -20389,6 +21181,15 @@ export interface paths {
                                 id: string;
                                 name: string;
                             } | null;
+                            /** @description The custom `patterns` whose wildcard matches several source folders that all get the same namespace name, over the files of the branch detection read; empty without custom `patterns`. Advisory: setup is unaffected and each folder is still its own namespace. Offer the user suggestedPattern (it changes the Workflow, so never apply it silently) */
+                            namespaceClashes: {
+                                /** @description The GitHub Input file pattern */
+                                pattern: string;
+                                /** @description The folders it gives one namespace name */
+                                folders: string[];
+                                /** @description The pattern with {namespace} in place of the varying wildcard: matches the same files, so accepting it only renames namespaces. null when there is none */
+                                suggestedPattern: string | null;
+                            }[];
                         };
                     };
                 };
@@ -20521,7 +21322,7 @@ export interface paths {
         };
         /**
          * Preview migrating a Project onto Workflows
-         * @description Per Repository of the Project: the Workflow migrating would publish for it (one per GitHub repository), or why it stays on the Project. Resolves each GitHub repository on GitHub; writes nothing. 503 `GITHUB_UNREACHABLE` when GitHub could not be reached — retry.
+         * @description Per Repository of the Project: the Workflow migrating would publish for it (one per GitHub repository), or why it stays on the Project. While a Project retirement date is set, `automaticMigration` also says what automatic migration would do with the Project on that date. Resolves each GitHub repository on GitHub; writes nothing. 503 `GITHUB_UNREACHABLE` when GitHub could not be reached — retry.
          */
         get: {
             parameters: {
@@ -20631,6 +21432,33 @@ export interface paths {
                                     reason: "invalid_locale" | "invalid_value" | "invalid_path_locale";
                                 }[];
                             }[];
+                            /** @description `null` while no retirement date is set */
+                            automaticMigration: {
+                                /**
+                                 * Format: date
+                                 * @description The day every Project retires (UTC calendar date)
+                                 */
+                                retirementDate: string;
+                                /** @description What automatic migration would do with the Project on the retirement date, once running Jobs finish and parked ones are superseded. `nothing_to_migrate`: an Idle Project. `migrated`: every GitHub repository is already handled by Workflows. */
+                                forecast: {
+                                    /** @enum {string} */
+                                    outcome: "migrates";
+                                    repositoriesMigrating: number;
+                                    /** @description Repositories left on the Project: blocked, or on GitLab */
+                                    repositoriesStaying: number;
+                                } | {
+                                    /** @enum {string} */
+                                    outcome: "not_migrated";
+                                    /** @description Blocker codes, Project-level first, then each blocked repository’s, once each */
+                                    reasons: string[];
+                                } | {
+                                    /** @enum {string} */
+                                    outcome: "nothing_to_migrate";
+                                } | {
+                                    /** @enum {string} */
+                                    outcome: "migrated";
+                                };
+                            } | null;
                         };
                     };
                 };
@@ -20960,6 +21788,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/project-retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * When Projects retire
+         * @description The retirement date (the day every Project retires) and the removal date (90 days later, when Project code is removed), as UTC calendar dates. `notice` is `null` while no retirement date is set.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description `null` while no retirement date is set */
+                            notice: {
+                                /**
+                                 * Format: date
+                                 * @description The day every Project retires (UTC calendar date)
+                                 */
+                                retirementDate: string;
+                                /**
+                                 * Format: date
+                                 * @description The day Project code is removed: 90 days after the retirement date
+                                 */
+                                removalDate: string;
+                            } | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflows/{id}/runs": {
         parameters: {
             query?: never;
@@ -21078,6 +22071,8 @@ export interface paths {
                                 };
                                 /** @description The pinned commit SHA; the run reads its source only from it. `null` for a Contentful Input’s run, which reads each entry at its latest version when it starts */
                                 commit: string | null;
+                                /** @description Whether the pinned version translates. `false`: a Workflow that doesn’t translate — every Step is a Source Step, the run resolves no target language and never has a Lane */
+                                translates: boolean;
                                 /** @description The languages the run resolved, once it has started; `null` before */
                                 languages: {
                                     source: {
@@ -21562,8 +22557,8 @@ export interface paths {
                                         editedAt: string;
                                     }[];
                                 };
-                                /** @description When the run’s Source strings take an edit (`POST /api/jobs/{jobId}/units/{unitId}/edit` on a source-language unit): `held_at_source_step` while the run is held at a Source Step, before it splits into languages; `after_lanes` once every language has finished the Step that produces its text — while a Reconciliation runs too, the edit then waiting in the Edit set. `null` otherwise, and on a failed or superseded run */
-                                sourceEditing: ("held_at_source_step" | "after_lanes") | null;
+                                /** @description When the run’s Source strings take an edit (`POST /api/jobs/{jobId}/units/{unitId}/edit` on a source-language unit): `held_at_source_step` while the run is held at a Source Step, before it splits into languages; `after_lanes` once every language has finished the Step that produces its text — while a Reconciliation runs too, the edit then waiting in the Edit set; `after_source_steps` on a run of a Workflow that doesn’t translate (no language) once it has completed, while a Reconciliation runs too. `null` otherwise, and on a failed or superseded run */
+                                sourceEditing: ("held_at_source_step" | "after_lanes" | "after_source_steps") | null;
                                 /** @description A `superseded` run: how many Source strings it had edited, applied or in its Edit set. A superseded run never delivered, so those edits are lost; they are not carried over to the newer run. `0` otherwise */
                                 lostSourceEdits: number;
                                 /** @description A Contentful run’s entries that newer runs of its Workflow took over, by entry id (per-entry supersession): an unfinished run loses an entry when the newer run reads it, a finished one when the newer run completes. A superseded entry leaves the run’s Gates and is never translated or delivered by it — Redeliver included. A run that loses every entry while unfinished is `superseded`. Empty for any other run */
@@ -21918,6 +22913,8 @@ export interface paths {
                             };
                             /** @description The pinned commit SHA; the run reads its source only from it. `null` for a Contentful Input’s run, which reads each entry at its latest version when it starts */
                             commit: string | null;
+                            /** @description Whether the pinned version translates. `false`: a Workflow that doesn’t translate — every Step is a Source Step, the run resolves no target language and never has a Lane */
+                            translates: boolean;
                             /** @description The languages the run resolved, once it has started; `null` before */
                             languages: {
                                 source: {
@@ -22402,8 +23399,8 @@ export interface paths {
                                     editedAt: string;
                                 }[];
                             };
-                            /** @description When the run’s Source strings take an edit (`POST /api/jobs/{jobId}/units/{unitId}/edit` on a source-language unit): `held_at_source_step` while the run is held at a Source Step, before it splits into languages; `after_lanes` once every language has finished the Step that produces its text — while a Reconciliation runs too, the edit then waiting in the Edit set. `null` otherwise, and on a failed or superseded run */
-                            sourceEditing: ("held_at_source_step" | "after_lanes") | null;
+                            /** @description When the run’s Source strings take an edit (`POST /api/jobs/{jobId}/units/{unitId}/edit` on a source-language unit): `held_at_source_step` while the run is held at a Source Step, before it splits into languages; `after_lanes` once every language has finished the Step that produces its text — while a Reconciliation runs too, the edit then waiting in the Edit set; `after_source_steps` on a run of a Workflow that doesn’t translate (no language) once it has completed, while a Reconciliation runs too. `null` otherwise, and on a failed or superseded run */
+                            sourceEditing: ("held_at_source_step" | "after_lanes" | "after_source_steps") | null;
                             /** @description A `superseded` run: how many Source strings it had edited, applied or in its Edit set. A superseded run never delivered, so those edits are lost; they are not carried over to the newer run. `0` otherwise */
                             lostSourceEdits: number;
                             /** @description A Contentful run’s entries that newer runs of its Workflow took over, by entry id (per-entry supersession): an unfinished run loses an entry when the newer run reads it, a finished one when the newer run completes. A superseded entry leaves the run’s Gates and is never translated or delivered by it — Redeliver included. A run that loses every entry while unfinished is `superseded`. Empty for any other run */
@@ -22922,6 +23919,8 @@ export interface paths {
                             };
                             /** @description The pinned commit SHA; the run reads its source only from it. `null` for a Contentful Input’s run, which reads each entry at its latest version when it starts */
                             commit: string | null;
+                            /** @description Whether the pinned version translates. `false`: a Workflow that doesn’t translate — every Step is a Source Step, the run resolves no target language and never has a Lane */
+                            translates: boolean;
                             /** @description The languages the run resolved, once it has started; `null` before */
                             languages: {
                                 source: {
@@ -23406,8 +24405,8 @@ export interface paths {
                                     editedAt: string;
                                 }[];
                             };
-                            /** @description When the run’s Source strings take an edit (`POST /api/jobs/{jobId}/units/{unitId}/edit` on a source-language unit): `held_at_source_step` while the run is held at a Source Step, before it splits into languages; `after_lanes` once every language has finished the Step that produces its text — while a Reconciliation runs too, the edit then waiting in the Edit set. `null` otherwise, and on a failed or superseded run */
-                            sourceEditing: ("held_at_source_step" | "after_lanes") | null;
+                            /** @description When the run’s Source strings take an edit (`POST /api/jobs/{jobId}/units/{unitId}/edit` on a source-language unit): `held_at_source_step` while the run is held at a Source Step, before it splits into languages; `after_lanes` once every language has finished the Step that produces its text — while a Reconciliation runs too, the edit then waiting in the Edit set; `after_source_steps` on a run of a Workflow that doesn’t translate (no language) once it has completed, while a Reconciliation runs too. `null` otherwise, and on a failed or superseded run */
+                            sourceEditing: ("held_at_source_step" | "after_lanes" | "after_source_steps") | null;
                             /** @description A `superseded` run: how many Source strings it had edited, applied or in its Edit set. A superseded run never delivered, so those edits are lost; they are not carried over to the newer run. `0` otherwise */
                             lostSourceEdits: number;
                             /** @description A Contentful run’s entries that newer runs of its Workflow took over, by entry id (per-entry supersession): an unfinished run loses an entry when the newer run reads it, a finished one when the newer run completes. A superseded entry leaves the run’s Gates and is never translated or delivered by it — Redeliver included. A run that loses every entry while unfinished is `superseded`. Empty for any other run */
@@ -23634,6 +24633,176 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflow-runs/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed run
+         * @description Any member — signed in, or through an API key — retries a `failed` run in place: same run, pinned version and commit. A run that started translating resumes each failed Lane from the Step that failed, and Lanes that succeeded are left as they are (as `POST /api/jobs/{jobId}/retry` does). A GitHub Input’s run refused at start because the organisation was out of credit (`failure.reason` `insufficient_credits`, no `jobId`) starts again, with no new push. Refused in order: 404 `WORKFLOW_RUN_NOT_FOUND`, 409 `JOB_ARCHIVED`, 409 `JOB_NOT_RETRYABLE` (not `failed`, or failed at start for another reason — or a Contentful Input’s run, whose entries are requested again instead), 409 `WORKFLOW_RUN_OUTDATED` once a newer run of the Workflow delivers to the same pull request or branch, 402 `INSUFFICIENT_CREDITS` while the org balance is at its overdraft limit.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            retried: true;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -28803,6 +29972,8 @@ export interface paths {
                                         stepIndex: number;
                                         /** @enum {string} */
                                         state: "open" | "dismissed" | "outdated";
+                                        /** @description The Source group of the unit’s segment the Finding is on — a Lane unit’s own, in its language — so a unit of many segments says which one each Finding is about */
+                                        sourceGroupId: string;
                                     }[];
                                     /** @description The Checks that judged the run and passed the string at its current text */
                                     passed: {
@@ -29083,6 +30254,8 @@ export interface paths {
                                         stepIndex: number;
                                         /** @enum {string} */
                                         state: "open" | "dismissed" | "outdated";
+                                        /** @description The Source group of the unit’s segment the Finding is on — a Lane unit’s own, in its language — so a unit of many segments says which one each Finding is about */
+                                        sourceGroupId: string;
                                     }[];
                                     /** @description The Checks that judged the run and passed the string at its current text */
                                     passed: {
@@ -29556,6 +30729,8 @@ export interface paths {
                                         stepIndex: number;
                                         /** @enum {string} */
                                         state: "open" | "dismissed" | "outdated";
+                                        /** @description The Source group of the unit’s segment the Finding is on — a Lane unit’s own, in its language — so a unit of many segments says which one each Finding is about */
+                                        sourceGroupId: string;
                                     }[];
                                     /** @description The Checks that judged the run and passed the string at its current text */
                                     passed: {

@@ -16,7 +16,8 @@ export function registerGitlabTools(server: McpServer, client: ApiClient) {
   server.registerTool(
     "gitlab_install",
     {
-      description: "Initiate GitLab OAuth connection. Returns an installUrl to open in the browser and a nonce to poll for completion.",
+      description:
+        "Initiate GitLab OAuth connection. Returns an installUrl to open in the browser and a nonce to poll for completion.",
       inputSchema: {},
     },
     async () => {
@@ -31,7 +32,8 @@ export function registerGitlabTools(server: McpServer, client: ApiClient) {
   server.registerTool(
     "gitlab_install_status",
     {
-      description: "Poll the status of a GitLab OAuth connection. Returns status: pending, completed (with connectionId), or expired.",
+      description:
+        "Poll the status of a GitLab OAuth connection. Returns status: pending, completed (with connectionId), or expired.",
       inputSchema: {
         nonce: z.string().describe("Nonce from gitlab_install"),
       },

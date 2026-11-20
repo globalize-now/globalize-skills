@@ -11,6 +11,7 @@ type PreviewKeys =
 
 type ClientFactory = () => Promise<ApiClient>;
 
+/** @deprecated Use `listGlossaryEntries` with the project's `glossary.id`. */
 export async function listGlossary(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/glossary", {
     params: { path: { id: projectId } },
@@ -19,6 +20,7 @@ export async function listGlossary(client: ApiClient, projectId: string) {
   return data!;
 }
 
+/** @deprecated Use `addGlossaryEntry` with the project's `glossary.id`, naming languages by locale. */
 export async function createGlossaryEntry(
   client: ApiClient,
   projectId: string,
@@ -36,6 +38,7 @@ export async function createGlossaryEntry(
   return data!;
 }
 
+/** @deprecated Project-only bulk import with no org-glossary counterpart; `addGlossaryEntry` with the project's `glossary.id` adds one entry. */
 export async function bulkCreateGlossaryEntries(client: ApiClient, projectId: string, entries: BulkEntries) {
   const { data, error, response } = await client.POST("/api/projects/{id}/glossary/bulk", {
     params: { path: { id: projectId } },
@@ -45,6 +48,7 @@ export async function bulkCreateGlossaryEntries(client: ApiClient, projectId: st
   return data!;
 }
 
+/** @deprecated Project-only bulk import preview with no org-glossary counterpart; `listGlossaryEntries` with the project's `glossary.id` reads what it holds. */
 export async function previewGlossaryImport(client: ApiClient, projectId: string, keys: PreviewKeys) {
   const { data, error, response } = await client.POST("/api/projects/{id}/glossary/preview", {
     params: { path: { id: projectId } },
@@ -54,6 +58,7 @@ export async function previewGlossaryImport(client: ApiClient, projectId: string
   return data!;
 }
 
+/** @deprecated Use `deleteGlossaryEntryById` with the project's `glossary.id` and an entry id from `listGlossaryEntries` (not a pair id). */
 export async function deleteGlossaryEntry(client: ApiClient, projectId: string, entryId: string) {
   const { data, error, response } = await client.DELETE("/api/projects/{id}/glossary/{entryId}", {
     params: { path: { id: projectId, entryId } },
@@ -65,7 +70,7 @@ export async function deleteGlossaryEntry(client: ApiClient, projectId: string, 
 export function register(group: Command, getClient: ClientFactory): void {
   group
     .command("list")
-    .description("List glossary entries")
+    .description("(deprecated: use `glossaries entries`) List a Project's glossary entries")
     .requiredOption("--project-id <id>", "Project UUID")
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
@@ -79,7 +84,7 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("create")
-    .description("Create a glossary entry")
+    .description("(deprecated: use `glossaries add-term`) Create a Project glossary entry")
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption("--source-term <term>", "Source term")
     .requiredOption("--target-term <term>", "Target term")
@@ -109,7 +114,9 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("bulk")
-    .description("Bulk upsert glossary entries (max 10000, one transaction)")
+    .description(
+      "(deprecated: use `glossaries add-term`; bulk import stays Project-only) Bulk upsert glossary entries (max 10000, one transaction)",
+    )
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption(
       "--entries <json>",
@@ -133,7 +140,9 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("preview")
-    .description("Preview a bulk import: how many entries would be created vs updated (writes nothing)")
+    .description(
+      "(deprecated: use `glossaries`; bulk import stays Project-only) Preview a bulk import: how many entries would be created vs updated (writes nothing)",
+    )
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption(
       "--keys <json>",
@@ -157,7 +166,7 @@ export function register(group: Command, getClient: ClientFactory): void {
 
   group
     .command("delete")
-    .description("Delete a glossary entry")
+    .description("(deprecated: use `glossaries delete-entry`) Delete a Project glossary entry")
     .requiredOption("--project-id <id>", "Project UUID")
     .requiredOption("--entry-id <id>", "Glossary entry UUID")
     .action(async (cmdOpts, cmd) => {

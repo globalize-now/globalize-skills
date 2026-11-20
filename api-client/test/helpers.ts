@@ -15,6 +15,7 @@ type Route = { method: string; path: string; status?: number; body: unknown };
 /**
  * Stubs `fetch` with a table of canned answers, keyed by method and path, and
  * records every request. An unrouted request answers 599 so a test fails loudly.
+ * A 204 route answers no body, whatever its `body`.
  */
 export function mockApi(routes: Route[]) {
   const requests: RecordedRequest[] = [];
@@ -30,8 +31,10 @@ export function mockApi(routes: Route[]) {
     });
     const route = routes.find((r) => r.method === input.method && r.path === url.pathname);
     if (!route) return new Response(JSON.stringify({ unrouted: `${input.method} ${url.pathname}` }), { status: 599 });
-    return new Response(JSON.stringify(route.body), {
-      status: route.status ?? 200,
+    const status = route.status ?? 200;
+    // A 204 carries no body, as the API sends it.
+    return new Response(status === 204 ? null : JSON.stringify(route.body), {
+      status,
       headers: { "content-type": "application/json" },
     });
   });

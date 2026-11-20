@@ -45,20 +45,38 @@ export function registerRepositoryTools(server: McpServer, client: ApiClient) {
           .array(
             z.object({
               pattern: z.string().describe("Locale path pattern (e.g. locales/{locale}/*.json)"),
-              fileFormat: z
-                .enum(FILE_FORMATS)
-                .describe("File format"),
+              fileFormat: z.enum(FILE_FORMATS).describe("File format"),
             }),
           )
           .optional()
           .describe("Locale path patterns with file formats"),
-        githubInstallationId: z.string().uuid().optional().describe("GitHub App installation UUID (from github installations)"),
+        githubInstallationId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("GitHub App installation UUID (from github installations)"),
         gitlabConnectionId: z.string().uuid().optional().describe("GitLab connection UUID (from gitlab connections)"),
-        importMode: z.enum(["ignore", "reviewed", "translated"]).optional().describe("How to import existing translations (default: ignore)"),
-        importScope: z.enum(["new_keys_only", "all_keys"]).optional().describe("Which keys to import (default: new_keys_only)"),
+        importMode: z
+          .enum(["ignore", "reviewed", "translated"])
+          .optional()
+          .describe("How to import existing translations (default: ignore)"),
+        importScope: z
+          .enum(["new_keys_only", "all_keys"])
+          .optional()
+          .describe("Which keys to import (default: new_keys_only)"),
       },
     },
-    async ({ projectId, gitUrl, provider, branches, patterns, githubInstallationId, gitlabConnectionId, importMode, importScope }) => {
+    async ({
+      projectId,
+      gitUrl,
+      provider,
+      branches,
+      patterns,
+      githubInstallationId,
+      gitlabConnectionId,
+      importMode,
+      importScope,
+    }) => {
       try {
         return formatSuccess(
           await createRepository(client, {
