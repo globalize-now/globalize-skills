@@ -199,101 +199,86 @@ The CLI changes a Workflow's target languages only; branches, patterns, steps an
 
 ---
 
-## Step 3: Glossary Management
+## Step 3: Glossaries
 
-Glossaries ensure specific terms are translated consistently across languages. The glossary commands act on a **Project** (`--project-id`, from `projects list --json`) and take its **project language UUIDs**, from:
+A glossary keeps terms consistent across languages. Glossaries belong to the organisation, and Workflows and Projects use them; the `glossaries` commands take locales (`en`, `pt-BR`) and need no Project.
+
+**Check which glossary a Workflow reads before editing one.** Read it with `workflows get --id <WORKFLOW_ID> --json`. When `currentVersion.definition.assets.source` is `repository` (what Workflow setup publishes) and its translate Action's `config` names no `glossaryId`, a run reads the glossary from the repository's `docs/glossary.tbx` or `docs/glossary.csv` at the triggering commit. A stored glossary is never read then: edit that file, keeping its format, and open a pull request. A `glossaryId` in the translate Action names the stored glossary the run reads, and the commands below edit it.
+
+**Find** the glossary. `glossaries list` gives each one's `locales`, `termCount`, `workflowCount` and `attachedProjectCount`; `glossaries get` names the Projects and Workflows using it:
 
 ```bash
-npx @globalize-now/cli-client project-languages list \
-  --project-id <PROJECT_ID> \
-  --json
+npx @globalize-now/cli-client glossaries list --json
+npx @globalize-now/cli-client glossaries get --id <GLOSSARY_ID> --json
 ```
 
-**List** glossary entries:
+**Search** its entries (`--query` matches the preferred term, a forbidden variant or a target term; `--spelling` an exact one). The page is `data.data[]`, with `data.pagination.cursor` for `--cursor`:
 
 ```bash
-npx @globalize-now/cli-client glossary list \
-  --project-id <PROJECT_ID> \
-  --json
+npx @globalize-now/cli-client glossaries entries --id <GLOSSARY_ID> --query "dashboard" --target-locale fr --json
 ```
 
-**Create** a glossary entry:
+**Add** an entry: a preferred term in one source locale, with a target term per locale:
 
 ```bash
-npx @globalize-now/cli-client glossary create \
-  --project-id <PROJECT_ID> \
+npx @globalize-now/cli-client glossaries add-term \
+  --id <GLOSSARY_ID> \
   --source-term "Dashboard" \
-  --target-term "Tableau de bord" \
-  --source-language-id <SOURCE_PROJECT_LANGUAGE_ID> \
-  --target-language-id <TARGET_PROJECT_LANGUAGE_ID> \
+  --source-locale en \
+  --target fr="Tableau de bord" \
+  --target de="Dashboard" \
   --json
 ```
 
-`--source-language-id` and `--target-language-id` are **project language UUIDs** from `project-languages list`, not global language IDs.
+`--do-not-translate` (with no `--target`) keeps a term as written in every language: brand names, product names, code identifiers. `--description <text>` gives its meaning, and `--forbid <variant>` (repeat it) a spelling ruled out in source text. A term the glossary already holds in that locale refuses with `GLOSSARY_ENTRY_EXISTS`, and `details.entryId` is the entry to edit; `GLOSSARY_SPELLING_TAKEN` means another entry claims that spelling.
 
-Pass `--do-not-translate` for terms that must stay verbatim in every language (brand names, product names, code identifiers). `--target-term` is still required — use the source spelling.
-
-**Delete** a glossary entry:
+**Edit** or **delete** an entry. `--target <locale>=<term>` sets one target term and leaves the others; `--remove-target <locale>` removes one:
 
 ```bash
-npx @globalize-now/cli-client glossary delete \
-  --project-id <PROJECT_ID> \
-  --entry-id <ENTRY_ID> \
-  --json
+npx @globalize-now/cli-client glossaries edit-entry --id <GLOSSARY_ID> --entry-id <ENTRY_ID> --target fr="Tableau de bord" --json
+npx @globalize-now/cli-client glossaries delete-entry --id <GLOSSARY_ID> --entry-id <ENTRY_ID> --json
 ```
 
-**Bulk import** a whole glossary in one transaction (max 10 000 entries, each with its own language pair). Existing entries for the same key are updated rather than duplicated:
+A change reaches every Project and Workflow using the glossary: name them to the user from `glossaries get`. `glossaries create --name`, `rename` and `delete` manage the glossary itself; `delete` is admin-only and refused while a Project or an active Workflow uses it. There is no bulk import by glossary id.
 
-```bash
-npx @globalize-now/cli-client glossary bulk \
-  --project-id <PROJECT_ID> \
-  --entries '[{"sourceTerm":"Dashboard","targetTerm":"Tableau de bord","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>"},{"sourceTerm":"Globalize","targetTerm":"Globalize","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>","doNotTranslate":true}]' \
-  --json
-```
-
-**Preview** the same import before writing anything — it reports how many entries would be created and how many updated:
-
-```bash
-npx @globalize-now/cli-client glossary preview \
-  --project-id <PROJECT_ID> \
-  --keys '[{"sourceTerm":"Dashboard","sourceProjectLanguageId":"<SRC_PL_ID>","targetProjectLanguageId":"<TGT_PL_ID>"}]' \
-  --json
-```
+A glossary with `repositoryManaged` set is synced from a Project's asset repository: writes refuse with `PROJECT_ASSETS_REPOSITORY_MANAGED`, so edit the file on the `branch` of the `gitUrl` it names.
 
 ---
 
-## Step 4: Style Guide Management
+## Step 4: Style guides and contexts
 
-Style guides provide translation instructions per language (e.g., "use formal register", "prefer British English spelling"). Like the glossary, they act on a Project.
+A style guide gives translation instructions ("use formal register", "prefer British English spelling"), and a context describes the product. Both are organisation **Assets**, used by Workflows and Projects; the `assets` commands take locales and need no Project.
 
-**List** style guides:
+**Check what a Workflow reads before editing.** With `workflows get --id <WORKFLOW_ID> --json`, when `currentVersion.definition.assets.source` is `repository`, a run reads each language's style guide from the repository's `docs/style-guides/<locale>.md` and the context from `docs/context.md` (a non-blank `definition.context` replaces that file), at the triggering commit. Edit those files and open a pull request; the Workflow's style setup in the web app opens one with drafts for missing files. The Assets in `definition.attachedAssets` (`type`, `id`) are read in addition, and the commands below edit them. The Workflow's own `context` changes only by publishing a version in the web app's Workflow editor.
+
+**Find** the Asset. `scope` is `global` (one text) or `per_locale` (one text per locale); `assets get` adds its `texts` and the Projects and Workflows using it:
 
 ```bash
-npx @globalize-now/cli-client style-guides list \
-  --project-id <PROJECT_ID> \
+npx @globalize-now/cli-client assets list --type style_guide --json
+npx @globalize-now/cli-client assets get --id <ASSET_ID> --json
+```
+
+**Write** a text. A `per_locale` Asset takes `--locale`; a `global` one (one text for every language) takes none, and the server refuses the other way round:
+
+```bash
+npx @globalize-now/cli-client assets set-text \
+  --id <ASSET_ID> \
+  --locale fr \
+  --text "Use formal register (vous). Keep product names in English." \
   --json
 ```
 
-**Create or update** a style guide:
+`--file <path>` reads the text from a file instead of `--text`. `--invalidate-tm` marks that locale's translation memory entries stale for everything using the style guide, so later runs translate them again (a new text does so anyway): confirm it with the user first.
+
+**Delete** a text:
 
 ```bash
-npx @globalize-now/cli-client style-guides upsert \
-  --project-id <PROJECT_ID> \
-  --language-id <PROJECT_LANGUAGE_ID> \
-  --instructions "Use formal register. Prefer British English spelling." \
-  --json
+npx @globalize-now/cli-client assets delete-text --id <ASSET_ID> --locale fr --json
 ```
 
-`--language-id` is a **project language UUID** from `project-languages list` (Step 3).
+`assets create --name --type style_guide|context --scope global|per_locale` creates an Asset (the scope is fixed); `rename` and `delete` manage it, and `delete` is admin-only and refused while a Project or an active Workflow uses it. An Asset with `repositoryManaged` set refuses writes with `PROJECT_ASSETS_REPOSITORY_MANAGED`: edit the file on the `branch` of the `gitUrl` it names.
 
-**Delete** a style guide:
-
-```bash
-npx @globalize-now/cli-client style-guides delete \
-  --project-id <PROJECT_ID> \
-  --language-id <PROJECT_LANGUAGE_ID> \
-  --json
-```
+**A Project's glossary and style guides** (in a Legacy organisation, one with Projects in `projects list`) are these same glossaries and Assets: `projects get --id <PROJECT_ID> --json` names them in `glossary.id`, `styleGuideAsset.id` and `contextAsset.id`, and Steps 3 and 4 edit them. For a Legacy organisation, or when the user names a Project, read `references/project-held-repository.md` (P8): the deprecated Project-keyed `glossary` and `style-guides` commands, bulk glossary import and style guide drafting.
 
 ---
 
@@ -332,7 +317,7 @@ npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID
 
 ## Command Reference
 
-Project, repository, pattern, job, namespace and GitLab commands are in `references/project-held-repository.md`.
+Project, repository, pattern, job, namespace and GitLab commands are in `references/project-held-repository.md`, and so are `glossary` and `style-guides`: those Project-keyed commands are deprecated, so use `glossaries` and `assets`.
 
 | Command | Required flags | Optional flags |
 |---------|---------------|----------------|
@@ -360,17 +345,22 @@ Project, repository, pattern, job, namespace and GitLab commands are in `referen
 | `github repos` | `--installation-id` | |
 | `github branches` | `--installation-id`, `--owner`, `--repo` | |
 | `github detect` | `--installation-id`, `--owner`, `--repo` | |
-| `glossary list` | `--project-id` | |
-| `glossary create` | `--project-id`, `--source-term`, `--target-term`, `--source-language-id`, `--target-language-id` | `--do-not-translate` |
-| `glossary delete` | `--project-id`, `--entry-id` | |
-| `glossary bulk` | `--project-id`, `--entries` (JSON) | |
-| `glossary preview` | `--project-id`, `--keys` (JSON) | |
-| `style-guides list` | `--project-id` | |
-| `style-guides upsert` | `--project-id`, `--language-id`, `--instructions` | |
-| `style-guides delete` | `--project-id`, `--language-id` | |
-| `style-guides generate` | `--project-id`, `--language-id` | |
-| `style-guides apply` | `--project-id`, `--language-id`, `--generation-id`, `--instructions` | `--context`, `--invalidate-tm` |
-| `style-guides quota` | `--project-id` | |
+| `glossaries list` | | |
+| `glossaries create` | `--name` | |
+| `glossaries get` | `--id` | |
+| `glossaries rename` | `--id`, `--name` | |
+| `glossaries delete` | `--id` | |
+| `glossaries entries` | `--id` | `--query`, `--spelling`, `--source-locale`, `--target-locale`, `--limit`, `--cursor` |
+| `glossaries add-term` | `--id`, `--source-term`, `--source-locale` | `--target <locale>=<term>` (repeat), `--do-not-translate`, `--description`, `--forbid` (repeat) |
+| `glossaries edit-entry` | `--id`, `--entry-id` | `--source-term`, `--target <locale>=<term>` (repeat), `--remove-target` (repeat), `--do-not-translate`\|`--translate`, `--description`\|`--clear-description`, `--forbid` (repeat)\|`--clear-forbidden` |
+| `glossaries delete-entry` | `--id`, `--entry-id` | |
+| `assets list` | | `--type` (`style_guide`\|`context`) |
+| `assets create` | `--name`, `--type` (`style_guide`\|`context`), `--scope` (`global`\|`per_locale`) | |
+| `assets get` | `--id` | |
+| `assets rename` | `--id`, `--name` | |
+| `assets delete` | `--id` | |
+| `assets set-text` | `--id`, `--text` or `--file` | `--locale` (per-locale Asset only), `--invalidate-tm` |
+| `assets delete-text` | `--id` | `--locale` (per-locale Asset only) |
 | `api-keys list` | `--org-id` | |
 | `api-keys create` | `--org-id`, `--name` | |
 | `api-keys revoke` | `--org-id`, `--key-id` | |
@@ -440,6 +430,7 @@ npx @globalize-now/cli-client billing ledger --json
 
 - **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability. Failures print their JSON on stdout too, with exit code 1.
 - **`--installation-id` is GitHub's numeric id**: `workflows preview-setup`, `workflows setup` and the `github repos/branches/detect` commands take the `installationId` field from `github installations --json` (e.g. `122432012`), not its UUID `id`. Every other id is a UUID from a prior command.
-- **Workflows take locale codes**: `--source-language` and `--target-languages` on `workflows` commands are locales (`en`, `pt-BR`). Glossary and style guide commands take _project language_ UUIDs from `project-languages list`; `translation-memories` commands take plain locales (`--source-locale`, `--target-locale`).
+- **Workflows take locale codes**: `--source-language` and `--target-languages` on `workflows` commands are locales (`en`, `pt-BR`). `glossaries`, `assets` and `translation-memories` commands take plain locales too (`--source-locale`, `--target-locale`, `--locale`, `--target <locale>=<term>`); only the deprecated Project-keyed commands take _project language_ UUIDs.
+- **Repository assets are edited in the repository**: a Workflow whose `definition.assets.source` is `repository` reads its glossary, style guides and context from `docs/` files at the triggering commit (Steps 3 and 4), so a stored glossary or Asset it doesn't name or attach changes nothing for it.
 - **A completed run is not a delivered run**: check each Output's `outcome.status` for `delivered` before reporting the pull request.
 - **Auth in non-interactive contexts**: The CLI does not fall back to interactive login when there's no TTY. Ensure `GLOBALIZE_API_KEY` is set or `~/.globalize/config.json` exists.
