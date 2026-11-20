@@ -16,9 +16,16 @@ set -uo pipefail
 #      exists in the CLI's api-client/src/commands/workflows.ts.
 #   4. The Project steps live in a references/ file, introduced as "for a repository a
 #      Project already translates", and SKILL.md loads it on a REPOSITORY_HELD_BY_PROJECT
-#      refusal or when the user names a Project. Glossary and style guides stay in SKILL.md.
+#      refusal or when the user names a Project.
 #   5. The CLI bin keeps its real name, `globalise-now-cli`, and every references/ path
 #      SKILL.md names exists.
+#   6. Glossaries and style guides lead with the org groups, `glossaries` and `assets`, and
+#      need no Project: Steps 3 and 4 name their commands, take locales, and say which
+#      repository file a Workflow with repository assets reads instead. The Command
+#      Reference has a row for every command of both groups and marks `glossary` and
+#      `style-guides` deprecated; their Project-keyed steps live in the Project reference,
+#      which SKILL.md loads for a Legacy organisation. Every `glossaries`, `assets`,
+#      `glossary` and `style-guides` command and flag the skill names exists in the CLI.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -28,6 +35,7 @@ SKILL="$SKILL_DIR/SKILL.md"
 PROJECT_REF_NAME="references/project-held-repository.md"
 PROJECT_REF="$SKILL_DIR/$PROJECT_REF_NAME"
 CLI_WORKFLOWS="$REPO_ROOT/api-client/src/commands/workflows.ts"
+CLI_COMMANDS="$REPO_ROOT/api-client/src/commands"
 
 PASS=0
 FAIL=0
@@ -144,9 +152,6 @@ if printf '%s' "$POINTERS" | grep -qiE 'names a Project'; then
 else
   fail "no line of SKILL.md loads $PROJECT_REF_NAME when the user names a Project"
 fi
-for marker in 'glossary create' 'style-guides upsert'; do
-  if grep -qF -- "$marker" "$SKILL"; then pass "glossary and style guides stay in SKILL.md ('$marker')"; else fail "SKILL.md no longer covers '$marker'"; fi
-done
 
 echo ""
 echo "--- 5. bin name and reference paths ---"
@@ -166,6 +171,95 @@ while IFS= read -r ref; do
   if [ ! -f "$SKILL_DIR/$ref" ]; then fail "SKILL.md names missing $ref"; MISSING=$((MISSING + 1)); fi
 done < <(grep -ohE 'references/[A-Za-z0-9_./-]+\.md' "$SKILL" | sort -u)
 [ "$MISSING" -eq 0 ] && pass "every references/… path SKILL.md names exists"
+
+echo ""
+echo "--- 6. glossaries and style guides lead with the org groups ---"
+STEP3_HEADING='## Step 3: Glossaries'
+STEP4_HEADING='## Step 4: Style guides and contexts'
+STEP3="$(section "$SKILL" "$STEP3_HEADING")"
+STEP4="$(section "$SKILL" "$STEP4_HEADING")"
+for pair in "STEP3|$STEP3_HEADING" "STEP4|$STEP4_HEADING"; do
+  var="${pair%%|*}"; heading="${pair#*|}"
+  text="${!var}"
+  if [ -z "$text" ]; then fail "SKILL.md has no '$heading'"; continue; fi
+  pass "SKILL.md has '$heading'"
+  # Org commands take locales: no Project, no project language UUIDs.
+  for marker in '--project-id' 'project-languages' '--language-id' '--source-language-id'; do
+    if has "$text" "$marker"; then fail "'$heading' still needs a Project ('$marker')"; else pass "'$heading' needs no '$marker'"; fi
+  done
+done
+for cmd in 'glossaries list' 'glossaries entries' 'glossaries add-term' 'glossaries edit-entry' 'glossaries delete-entry' 'workflows get'; do
+  if printf '%s' "$STEP3" | grep -qE -- "$cmd( |\`|\$)"; then pass "Step 3 names '$cmd'"; else fail "Step 3 does not name '$cmd'"; fi
+done
+for cmd in 'assets list' 'assets get' 'assets set-text' 'assets delete-text' 'workflows get'; do
+  if printf '%s' "$STEP4" | grep -qE -- "$cmd( |\`|\$)"; then pass "Step 4 names '$cmd'"; else fail "Step 4 does not name '$cmd'"; fi
+done
+# The reserved asset paths of globalize.now's core linguistic-assets/reserved-path.ts.
+for marker in 'docs/glossary.tbx' 'docs/glossary.csv'; do
+  if has "$STEP3" "$marker"; then pass "Step 3 names the repository file '$marker'"; else fail "Step 3 does not name the repository file '$marker'"; fi
+done
+for marker in 'docs/style-guides/<locale>.md' 'docs/context.md'; do
+  if has "$STEP4" "$marker"; then pass "Step 4 names the repository file '$marker'"; else fail "Step 4 does not name the repository file '$marker'"; fi
+done
+for text_var in STEP3 STEP4; do
+  if has "${!text_var}" "assets.source"; then pass "${text_var/STEP/Step } says how to tell a Workflow reads repository assets ('assets.source')"; else fail "${text_var/STEP/Step } does not say how to tell a Workflow reads repository assets ('assets.source')"; fi
+done
+ORG_CMDS='glossaries list
+glossaries create
+glossaries get
+glossaries rename
+glossaries delete
+glossaries entries
+glossaries add-term
+glossaries edit-entry
+glossaries delete-entry
+assets list
+assets create
+assets get
+assets rename
+assets delete
+assets set-text
+assets delete-text'
+while IFS= read -r cmd; do
+  if printf '%s\n' "$REFERENCE" | grep -qF -- "| \`$cmd\` |"; then
+    pass "Command Reference has a row for '$cmd'"
+  else
+    fail "Command Reference has no row for '$cmd'"
+  fi
+done <<< "$ORG_CMDS"
+for group in glossary style-guides; do
+  if printf '%s\n' "$REFERENCE" | grep -F -- "\`$group\`" | grep -qi 'deprecated'; then
+    pass "Command Reference marks '$group' deprecated"
+  else
+    fail "Command Reference does not mark '$group' deprecated"
+  fi
+done
+# The Project-keyed commands: only in the Project reference, every row marked deprecated.
+for group in glossary style-guides; do
+  in_skill="$(cli_invocations "$group [a-z]" "$SKILL")"
+  if [ -z "$in_skill" ]; then
+    pass "SKILL.md runs no '$group' command"
+  else
+    fail "SKILL.md still runs '$group' — it belongs in $PROJECT_REF_NAME: $(printf '%s' "$in_skill" | cut -f2 | tr '\n' ';')"
+  fi
+done
+for marker in 'glossary create' 'glossary bulk' 'style-guides upsert' 'style-guides generate'; do
+  if grep -qF -- "$marker" "$PROJECT_REF"; then pass "$PROJECT_REF_NAME covers '$marker'"; else fail "$PROJECT_REF_NAME does not cover '$marker'"; fi
+done
+UNMARKED="$(grep -E '^\| `(glossary|style-guides) ' "$PROJECT_REF" | grep -v '_(deprecated)_' || true)"
+if [ -z "$UNMARKED" ] && grep -qE '^\| `(glossary|style-guides) ' "$PROJECT_REF"; then
+  pass "$PROJECT_REF_NAME marks every glossary and style-guides row deprecated"
+else
+  fail "$PROJECT_REF_NAME has no glossary/style-guides rows, or rows not marked _(deprecated)_: $UNMARKED"
+fi
+if printf '%s' "$POINTERS" | grep -qF 'Legacy organisation'; then
+  pass "SKILL.md loads $PROJECT_REF_NAME for a Legacy organisation"
+else
+  fail "no line of SKILL.md loads $PROJECT_REF_NAME for a Legacy organisation"
+fi
+for group in glossaries assets glossary style-guides; do
+  check_cli_group "$group" "$CLI_COMMANDS/$group.ts" "$SKILL" "$SKILL_DIR"/references/*.md
+done
 
 echo ""
 echo "--- Report ---"
