@@ -5,6 +5,7 @@ import { output, outputError, type OutputOptions } from "../format.js";
 
 type ClientFactory = () => Promise<ApiClient>;
 
+/** @deprecated Use `getAsset` with the project's `styleGuideAsset.id`. */
 export async function listStyleGuides(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/style-guides", {
     params: { path: { id: projectId } },
@@ -13,6 +14,7 @@ export async function listStyleGuides(client: ApiClient, projectId: string) {
   return data!;
 }
 
+/** @deprecated Use `putAssetText` with the project's `styleGuideAsset.id` and the language's locale. */
 export async function upsertStyleGuide(client: ApiClient, projectId: string, languageId: string, instructions: string) {
   const { data, error, response } = await client.PUT("/api/projects/{id}/style-guides/{projectLanguageId}", {
     params: { path: { id: projectId, projectLanguageId: languageId } },
@@ -22,6 +24,7 @@ export async function upsertStyleGuide(client: ApiClient, projectId: string, lan
   return data!;
 }
 
+/** @deprecated Use `deleteAssetText` with the project's `styleGuideAsset.id` and the language's locale. */
 export async function deleteStyleGuide(client: ApiClient, projectId: string, languageId: string) {
   const { data, error, response } = await client.DELETE("/api/projects/{id}/style-guides/{projectLanguageId}", {
     params: { path: { id: projectId, projectLanguageId: languageId } },
@@ -30,6 +33,7 @@ export async function deleteStyleGuide(client: ApiClient, projectId: string, lan
   return data ?? { deleted: true };
 }
 
+/** @deprecated Project-only drafting; there is no Asset counterpart. */
 export async function generateStyleGuide(client: ApiClient, projectId: string, languageId: string) {
   const { data, error, response } = await client.POST("/api/projects/{id}/style-guides/{projectLanguageId}/generate", {
     params: { path: { id: projectId, projectLanguageId: languageId } },
@@ -39,6 +43,7 @@ export async function generateStyleGuide(client: ApiClient, projectId: string, l
   return data!;
 }
 
+/** @deprecated Project-only drafting; `putAssetText` with the project's `styleGuideAsset.id` writes a text. */
 export async function applyStyleGuide(
   client: ApiClient,
   projectId: string,
@@ -58,6 +63,7 @@ export async function applyStyleGuide(
   return data!;
 }
 
+/** @deprecated Project-only drafting quota; there is no Asset counterpart. */
 export async function getStyleGuideQuota(client: ApiClient, projectId: string) {
   const { data, error, response } = await client.GET("/api/projects/{id}/style-guides/quota", {
     params: { path: { id: projectId } },

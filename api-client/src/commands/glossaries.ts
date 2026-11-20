@@ -117,6 +117,8 @@ function targetsOf(values: string[]): Record<string, string> {
     if (at < 0 || locale === "" || term.trim() === "") {
       throw new Error(`--target takes <locale>=<term>, got: ${value}`);
     }
+    // The API keeps the last of a repeated locale: refuse it rather than drop one silently.
+    if (Object.hasOwn(targets, locale)) throw new Error(`--target names ${locale} twice`);
     targets[locale] = term;
   }
   return targets;
@@ -298,6 +300,12 @@ export function register(group: Command, getClient: ClientFactory): void {
             targets[locale] = null;
           }
           body.targets = targets;
+        }
+        if (Object.keys(body).length === 0) {
+          throw new Error(
+            "Nothing to change: pass at least one of --source-term, --description, --clear-description, " +
+              "--forbid, --clear-forbidden, --do-not-translate, --translate, --target or --remove-target",
+          );
         }
         const client = await getClient();
         output(await editGlossaryEntry(client, cmdOpts.id, cmdOpts.entryId, body), opts);

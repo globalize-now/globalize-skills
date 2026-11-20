@@ -126,7 +126,7 @@ A `completed` run has finished translating; it does not mean the translations we
 
 ### Errors
 
-A failed command exits 1. In JSON mode (`--json`, or whenever stdout isn't a terminal) it prints `{ "error": "<message>", "status": <http status>, "code": "<API code>", "details": … }`, with `code` and `details` as the API answered them; for example a 409 `REPOSITORY_HELD_BY_PROJECT` names the Project in `details`. A 401, or a 403 `ORG_ACCESS_DENIED`, reads "Authentication failed"; any other 403 keeps its code and message, for example `FORBIDDEN: Admin access required` when a member's key deletes a glossary or an Asset, `FEATURE_REQUIRED` or `WORKFLOW_GATE_ADMIN_REQUIRED`.
+A failed command exits 1. In JSON mode (`--json`, or whenever stdout isn't a terminal) it prints `{ "error": "<message>", "status": <http status>, "code": "<API code>", "details": … }`, with `code` and `details` as the API answered them; for example a 409 `REPOSITORY_HELD_BY_PROJECT` names the Project in `details`. A 401, or a 403 `ORG_ACCESS_DENIED`, reads "Authentication failed"; any other 403 keeps its code and message, for example `FEATURE_REQUIRED`, `WORKFLOW_GATE_ADMIN_REQUIRED`, or `FORBIDDEN`, which to an API key is a role refusal such as `FORBIDDEN: Admin access required` when a member's key deletes a glossary or an Asset (the API's non-membership `FORBIDDEN` answers session and OAuth callers only: a key is bound to its organisation).
 
 Every request sends `User-Agent: globalize-cli-client/<version>`.
 
