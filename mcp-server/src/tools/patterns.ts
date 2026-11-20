@@ -38,9 +38,7 @@ export function registerPatternTools(server: McpServer, client: ApiClient) {
       inputSchema: {
         repositoryId: z.string().uuid().describe("Repository UUID"),
         pattern: z.string().describe("Locale path pattern (e.g. locales/{locale}/*.json)"),
-        fileFormat: z
-          .enum(FILE_FORMATS)
-          .describe("File format"),
+        fileFormat: z.enum(FILE_FORMATS).describe("File format"),
         position: z.number().int().min(0).optional().describe("Position in the pattern list"),
       },
     },
@@ -61,10 +59,7 @@ export function registerPatternTools(server: McpServer, client: ApiClient) {
         repositoryId: z.string().uuid().describe("Repository UUID"),
         patternId: z.string().uuid().describe("Pattern UUID"),
         pattern: z.string().optional().describe("Locale path pattern"),
-        fileFormat: z
-          .enum(FILE_FORMATS)
-          .optional()
-          .describe("File format"),
+        fileFormat: z.enum(FILE_FORMATS).optional().describe("File format"),
       },
     },
     async ({ repositoryId, patternId, pattern, fileFormat }) => {
@@ -147,10 +142,7 @@ export function registerPatternTools(server: McpServer, client: ApiClient) {
         repositoryId: z.string().uuid().describe("Repository UUID"),
         patternId: z.string().uuid().describe("Pattern UUID"),
         projectLanguageId: z.string().uuid().describe("Project language UUID"),
-        pathLocale: z
-          .string()
-          .nullable()
-          .describe("On-disk spelling (e.g. pt_BR), or null to clear the override"),
+        pathLocale: z.string().nullable().describe("On-disk spelling (e.g. pt_BR), or null to clear the override"),
       },
     },
     async ({ repositoryId, patternId, projectLanguageId, pathLocale }) => {

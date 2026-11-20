@@ -31,8 +31,7 @@ export function registerGithubTools(server: McpServer, client: ApiClient) {
   server.registerTool(
     "github_install_status",
     {
-      description:
-        "Poll the status of a GitHub App installation. Returns status: pending, completed, or expired.",
+      description: "Poll the status of a GitHub App installation. Returns status: pending, completed, or expired.",
       inputSchema: {
         nonce: z.string().describe("Nonce from github_install"),
       },
