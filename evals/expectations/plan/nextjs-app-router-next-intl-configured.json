@@ -16,5 +16,8 @@
   "phase2StepsAbsent": [
     "create_config",
     "gitignore_artifacts"
-  ]
+  ],
+  "decisionsSections": {
+    "Existing i18n": "^\\*\\*Keep next-intl"
+  }
 }

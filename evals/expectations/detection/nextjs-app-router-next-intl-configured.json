@@ -12,10 +12,18 @@
       "configured": true,
       "providerWired": true,
       "catalogsScaffolded": true,
-      "stringsWrapped": "no"
+      "stringsWrapped": "no",
+      "present": true
     }
   },
-  "ignore": ["candidateFiles", "routeEntries", "git", "localeSignals", "sourceDir"],
+  "ignore": [
+    "candidateFiles",
+    "routeEntries",
+    "git",
+    "localeSignals",
+    "sourceDir",
+    "existing.signals"
+  ],
   "softAssert": {
     "candidateFilesMinCount": 1
   }

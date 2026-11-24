@@ -40,11 +40,24 @@ For a **js-ts** project, read the project's `package.json`, build config files (
   "routeEntries": ["src/app/**/page.tsx", ...] | null,
   "git": { "isRepo": true | false, "branch": string | null, "remote": string | null },
   "existing": {
-    "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "rails-i18n" | "android-strings" | "string-catalog" | "webext-native" | "@angular/localize" | "@jsverse/transloco" | "@ngneat/transloco" | "@ngx-translate/core" | "none",
+    "library": "lingui" | "next-intl" | "react-intl" | "i18next" | "react-i18next" | "next-translate" | "typesafe-i18n" | "vue-i18n" | "@nuxtjs/i18n" | "i18next-vue" | "@tolgee/vue" | "fluent-vue" | "paraglide" | "rails-i18n" | "android-strings" | "string-catalog" | "webext-native" | "@angular/localize" | "@jsverse/transloco" | "@ngneat/transloco" | "@ngx-translate/core" | "other" | "none",
+    "otherPackages": ["next-i18next"],
     "configured": true | false,
     "providerWired": true | false,
     "catalogsScaffolded": true | false,
-    "stringsWrapped": "yes" | "partial" | "no"
+    "stringsWrapped": "yes" | "partial" | "no",
+    "present": true | false,
+    "signals": [
+      { "kind": "dependency" | "config" | "catalogs" | "usage" | "switcher" | "routing", "evidence": "next-intl ^3.26 in dependencies" }
+    ],
+    "catalogs": {
+      "files": ["messages/en.json", "messages/de.json"],
+      "pattern": "messages/{locale}.json" | null,
+      "format": "json-flat" | "json-nested" | "po" | "xliff-1" | "xliff-2" | "yaml-rails" | "arb" | "xcstrings" | "android-strings" | "chrome-messages" | "wxt-i18n" | "unsupported" | null,
+      "sourceLocale": "en" | null,
+      "locales": ["en", "de"]
+    },
+    "localeRouting": "prefix" | "domain" | "none" | null
   },
   "candidateFiles": [
     { "path": "src/components/Navbar.tsx", "matchCount": 8 }
@@ -61,6 +74,8 @@ For a **js-ts** project, read the project's `package.json`, build config files (
 ```
 
 
+
+**`existing.present` decides whether §1.2b runs, so fill `existing.signals` before anything else under `existing`.** It is true when `signals` is non-empty. Each signal names the evidence: the file path, the dependency and its range, or the import. §1.2b quotes it back to the user, so "i18n detected" alone is useless. The per-language detection table says what counts. Look for every kind of signal even when an earlier one has already matched. A partial setup (a dependency with no config, catalogs with no library) is the case §1.2b exists for. `existing.catalogs` is filled whenever locale catalog files exist, with or without a library. Do-it-yourself JSON catalogs are the main case it covers. When there is no existing i18n, `signals` is `[]`, `catalogs` is `{ "files": [], "pattern": null, "format": null, "sourceLocale": null, "locales": [] }` and `localeRouting` is `null`.
 
 **`formatCandidateFiles` is not a subset of `candidateFiles`** — on any language. Hand-rolled formatting lives in price, date and utility modules that contain no user-visible copy at all, so the string-detection glob never opens them, and a module full of `<Trans>` may format nothing. The two lists overlap; neither contains the other. **Phase 3 partitions the union of the two lists**, and each wrap subagent is told, per file, whether that file is in scope for `strings`, `formatting`, or `both` (see §3.2). Emit both lists in full — never prune one against the other, and never emit `formatCandidateFiles` as a filtered view of `candidateFiles`.
 
@@ -81,5 +96,5 @@ Write the JSON file and exit. Do not engage in conversation.
 > For `framework === "webext"` (browser extension — `router` is "none", so omit it): "Scan done. Detected: **browser extension** (MV{manifestVersion}, **{extensionFramework}**{, compiler when non-null}{, packageManager when non-null}). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
 > For `language === "swift"` (iOS — router/compiler are not meaningful, so omit them): "Scan done. Detected: **iOS** (**{uiFramework}**, **{buildSystem}**). Existing i18n: **{existing.library}** ({existing.configured ? 'already configured' : 'not configured yet'}). Found **{candidateFiles.length}** files with hardcoded strings and **{formatCandidateFiles.length}** files formatting values by hand. Next, a few questions to shape the setup plan."
 >
-> If `existing.library !== "none"`, also surface:
-> "Heads up — you already have `{existing.library}` in your dependencies. If it's compatible, we'll continue with it; if not, I'll flag it in the next step."
+> If `existing.present`, also surface:
+> "Heads up — this project already has i18n: {existing.signals evidence, comma-separated}. Before anything else I'll ask how you want to handle it. Nothing gets overwritten without you choosing that."

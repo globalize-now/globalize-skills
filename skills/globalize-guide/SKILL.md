@@ -28,7 +28,7 @@ This file is the map. The detailed instructions for every step live in `referenc
 
 | Stage | Goal | Load before acting |
 |---|---|---|
-| 1 — Inspect and decide | Detect stack, ask all questions, write the plan | `references/orchestrator/inspect.md` + `detect.<language>.md`, then `compat.<language>.md`, `library-choice.md`, `setup-choices.md` |
+| 1 — Inspect and decide | Detect stack, ask all questions, write the plan | `references/orchestrator/inspect.md` + `detect.<language>.md`, then `compat.<language>.md`, `existing-i18n.md` (when i18n already exists), `library-choice.md`, `setup-choices.md` |
 | 1.5 — Globalize account | Sign in (GitHub or GitLab remote only), via the `globalize-now-account-setup` skill | — |
 | 2 — Setup | Install + configure the library | `references/orchestrator/setup-subagent.md` + every `references.setup` and `references.rulesTemplate` path |
 | 3 — Convert | Wrap strings, convert formatting, extract + compile | `references/orchestrator/wrap-subagent.md`, `verify-subagent.md`, `cleanup-loop.md` + every `references.convert` path |
@@ -65,6 +65,7 @@ The Globalize stages (1.5, 4) are never subagents in either mode: they delegate 
 ### Rules that hold in every phase
 
 - No library setup or wrapping from memory — only from the manifest's references and `.agents/globalize-rules.md`.
+- **A project that already has i18n is never set up from scratch unless the user chose that.** §1.2b's path (`connect` / `extend` / `replace`) binds every later phase, and workers follow its change contract (`references/orchestrator/existing-i18n.md`). Outside `replace`, no file that existed before the run is moved, renamed or deleted.
 - Never install with `--legacy-peer-deps` or `--force`. A peer conflict is a version gate: pick a compatible version the references name, or stop and ask.
 - A step the references do not cover → `needs_decision`, not a guess.
 - A passing build is not the finish line — every verify gate in `verify-subagent.md` for the stack must pass.
@@ -116,6 +117,16 @@ Read `detection.json`. **Signal stops first** (independent of `language`):
 
 Then read the language's file — `references/orchestrator/compat.js-ts.md`, `compat.ruby.md`, `compat.android.md` or `compat.swift.md` — and apply its rows top-to-bottom. Prefix every stop with `Compatibility check — found a blocker:`. A STOP ends the run before §1.3. Rows marked **Decision** (e.g. the Lingui + Vite ≥ 6.3 gate) are asked, and their answer is recorded in `decisions.md` before the plan is written.
 
+### 1.2b Existing i18n — choose the path
+
+Runs when `detection.existing.present === true`, before any library or scope question. Read `references/orchestrator/existing-i18n.md` and ask the user, with the evidence in front of them, which path to take:
+
+- **connect**: hook the existing catalogs up to Globalize, with no code changes.
+- **extend**: keep the existing library and add only what's missing.
+- **replace**: full setup, which can move and delete files.
+
+Only the paths that are available for this project are offered. `replace` is never the default, and a headless run never picks it unless the user's own prompt asked for it. Record `## Existing i18n` in `decisions.md`. That file's table then decides which of §1.4–1.10 run and how. A project without existing i18n skips this step.
+
 ### 1.3 Resolve supported stacks from manifest
 
 Filter `manifest.json` `stacks[]` to the entries whose `match` is satisfied by `detection`. The result is the §1.5 choice set.
@@ -128,17 +139,17 @@ Empty result → STOP: "Your stack is supported in principle but no manifest ent
 
 ### 1.4 Branch recommendation
 
-If `git.isRepo` AND `git.branch` ∈ {`main`, `master`, `develop`}: "You're on `{branch}`. Setup will modify several files, so I'd recommend a dedicated branch (`git checkout -b chore/i18n-setup`). Want me to create it when Phase 2 starts, stay on `{branch}`, or use a different name? (No git commands run yet.)" Record in `decisions`. No git repo → skip silently.
+Skipped on the `connect` path (no code changes). If `git.isRepo` AND `git.branch` ∈ {`main`, `master`, `develop`}: "You're on `{branch}`. Setup will modify several files, so I'd recommend a dedicated branch (`git checkout -b chore/i18n-setup`). Want me to create it when Phase 2 starts, stay on `{branch}`, or use a different name? (No git commands run yet.)" Record in `decisions`. No git repo → skip silently.
 
 ### 1.5 Library choice
 
-Read `references/orchestrator/library-choice.md` (recommendation table + confirmation wording). "Picking the i18n library. Based on **{framework}** + **{router}**, my recommendation is **{library}** — {rationale}. You can override." Multiple variants → AskUserQuestion; one → confirm. State `supportLevel: "experimental"` when it applies. After the choice, apply any `compat.<language>.md` rows that depend on it (Pages Router + Lingui stop; Lingui + Vite version gate).
+Skipped on `connect`. On `extend` the library is the existing one: confirm it, with no override offered. Otherwise read `references/orchestrator/library-choice.md` (recommendation table + confirmation wording). "Picking the i18n library. Based on **{framework}** + **{router}**, my recommendation is **{library}** — {rationale}. You can override." Multiple variants → AskUserQuestion; one → confirm. State `supportLevel: "experimental"` when it applies. After the choice, apply any `compat.<language>.md` rows that depend on it (Pages Router + Lingui stop; Lingui + Vite version gate).
 
 ### 1.6 Journey scope
 
-"Which parts do you want to run? I've pre-checked the ones that make sense given what's already in the project. Connecting **Globalize.now** is included by default — uncheck it to skip the platform." AskUserQuestion, multi-select (setup / convert / connect translation platform), defaults:
+"Which parts do you want to run? I've pre-checked the ones that make sense given what's already in the project. Connecting **Globalize.now** is included by default — uncheck it to skip the platform." AskUserQuestion, multi-select (setup / convert / connect translation platform). On `connect` the scope is the platform alone, so don't ask. Defaults:
 
-- setup — when `existing.configured === false`
+- setup — when `existing.configured === false`, or on `extend` (there it is the collapse plan, and Phase 3 wraps against its rules file)
 - convert — when (`existing.stringsWrapped !== "yes"` AND `candidateFiles.length > 0`) **or** `formatCandidateFiles.length > 0` (wrapped strings say nothing about hand-rolled prices and dates)
 - connect — **always pre-checked**; only an explicit uncheck skips 1.5 and 4
 
@@ -146,7 +157,7 @@ Record `decisions.scope` (`scope.globalize` is `true` unless unchecked).
 
 ### 1.7 Setup choices
 
-If setup is in scope: "A few setup details — locales drive which catalog folders we scaffold, routing decides how the locale shows up in URLs, and setup mode is how chatty I am during Phase 2." Read `references/orchestrator/setup-choices.md` and collect: setup mode (guided / unguided), source locale, target locales, routing strategy (with its stack-specific skips), and the stack-specific extras it lists (Paraglide catalog format, Angular project, extension locale source). Record under `decisions.setup`.
+If setup is in scope: "A few setup details — locales drive which catalog folders we scaffold, routing decides how the locale shows up in URLs, and setup mode is how chatty I am during Phase 2." Read `references/orchestrator/setup-choices.md` and collect: setup mode (guided / unguided), source locale, target locales, routing strategy (with its stack-specific skips), and the stack-specific extras it lists (Paraglide catalog format, Angular project, extension locale source). Record under `decisions.setup`. On `extend`, routing is not asked: it is recorded from `existing.localeRouting`, so nothing moves. On `connect`, only the locales are asked, with defaults from `existing.catalogs` (`existing-i18n.md`).
 
 ### 1.8 Convert choices
 
@@ -170,7 +181,7 @@ Multi-select: ESLint plugin, CI/CD integration (extract+compile in build), test 
 
 ### 1.12 Final go
 
-Show `plan.md` as a checklist: "Here's the plan. Ready to execute? (**yes** / **cancel** / **edit**) Once you say yes, I won't pause for more questions unless a worker gets stuck or a phase finishes." Cancel writes nothing further; edit re-enters the relevant 1.x step; yes → Phase 1.5 (Globalize in scope) or Phase 2.
+Show `plan.md` as a checklist, with its `Footprint:` line first: files edited, moved and deleted, from `existing-i18n.md` → "Footprint". That line is written for every run, including one with no existing i18n. "Here's the plan. Ready to execute? (**yes** / **cancel** / **edit**) Once you say yes, I won't pause for more questions unless a worker gets stuck or a phase finishes." Cancel writes nothing further; edit re-enters the relevant 1.x step; yes → Phase 1.5 (Globalize in scope) or Phase 2.
 
 ---
 
@@ -205,7 +216,7 @@ Both lists are empty by design for Rails (gems install inside the worker, `bundl
 
 ### 2.2 Run the setup worker
 
-Dispatch in the background with `references/orchestrator/setup-subagent.md` as the prompt (or, single-agent, follow it yourself). It reads `references.setup`, `references.rulesTemplate`, and the `.globalize/` inputs **before editing anything**. Already-configured projects (`existing.configured === true`) and the Paraglide ICU-JSON → PO migration use the reduced plans in `references/orchestrator/setup-collapse.md`.
+Dispatch in the background with `references/orchestrator/setup-subagent.md` as the prompt (or, single-agent, follow it yourself). It reads `references.setup`, `references.rulesTemplate`, and the `.globalize/` inputs **before editing anything**. Already-configured projects on the `extend` path (`existing.configured === true`) and the Paraglide ICU-JSON → PO migration use the reduced plans in `references/orchestrator/setup-collapse.md`. Whenever §1.2b ran, the worker also follows the change contract in `existing-i18n.md`.
 
 ### 2.3 Poll
 
@@ -265,7 +276,7 @@ Globalize in scope → "Moving on to Phase 4 — pushing this setup, setting up 
 
 ### 4.1 Assemble `.globalize/globalize-inputs.json`
 
-Follow `references/orchestrator/globalize-inputs.md` (the catalog pattern with its `format`, and `pathLocales` on it for native extensions). Mark `assemble_globalize_inputs` done.
+Follow `references/orchestrator/globalize-inputs.md` (the catalog pattern with its `format`, and `pathLocales` on it for native extensions; on `connect`, both come from `detection.existing.catalogs` instead). Mark `assemble_globalize_inputs` done.
 
 ### 4.2 Push the setup
 
@@ -276,6 +287,8 @@ Globalize translates the branch **on the remote**, never this working copy: unti
 - **Any other host** (Bitbucket, self-hosted GitLab, …) → "Globalize translates from a GitHub repository, and this project's remote is on {host}. Your i18n setup is done and kept locally." The same stop, with no `gh` offer.
 
 **A remote Phase 1 didn't see.** §4.1 built `globalize-inputs.json` from `detection.json` `git.remote` as Phase 1 read it. When `origin` differs — after `gh repo create`, or on a resume once the user added a remote by hand — write `origin` into `detection.json` `git.remote` and rebuild `globalize-inputs.json` (§4.1) before step 1, so Workflow setup gets the new repository.
+
+On `connect` this run changed no catalogs. Check only that the source catalog is tracked (`git ls-files --error-unmatch <file>`) and that the branch is pushed. Do not ask to commit the `.gitignore` line. An untracked catalog → ask the user to commit and push it themselves, or skip the first translation.
 
 1. Read `git branch --show-current`, `git status --porcelain` and `git log @{u}..HEAD --oneline` (fails when the branch has no upstream — that counts as unpushed).
 2. Nothing uncommitted and nothing unpushed → this branch is already on the remote.

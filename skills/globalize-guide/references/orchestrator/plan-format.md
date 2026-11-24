@@ -22,6 +22,8 @@ decisions: .globalize/decisions.md
 
 Stack: **{framework + router}** + **{library}** (variant: `{variant-id}`)
 Branch: {decision summary}
+Existing i18n: {connect | extend | replace | none}
+Footprint: {files edited, moved, deleted, from existing-i18n.md → "Footprint"; for a run with no existing i18n, the setup + candidate file counts and any structural moves}
 
 <!-- Include the Phase 1.5 section only when decisions.scope.globalize === true -->
 ## Phase 1.5 — Globalize account
@@ -122,6 +124,8 @@ Orchestrator-owned steps (main thread; the last two delegated to `globalize-now-
 - [ ] start_first_translation   <!-- done when the project skill reports the run started, the pull request into the default branch opened, or why neither happened -->
 ```
 
+**Connect plan** (§1.2b `connect`): omit the Phase 2 and Phase 3 sections entirely. There is no setup worker and nothing to convert. `Stack:` names the existing library and the catalog pattern (`next-intl, messages/{locale}.json`), with no variant. The plan has the Phase 1.5 section (when signed out) and the Phase 4 section only.
+
 ### `decisions.md`
 
 Markdown with YAML frontmatter, sections per category. Doubles as a project record if committed (note: `.globalize/` is gitignored by default — see Workspace section).
@@ -133,8 +137,12 @@ createdAt: <ISO>
 
 # i18n Setup Decisions
 
+## Existing i18n
+**{Connect what you have | Keep {library} and fill the gaps | Full setup}** — {signals summary: library (configured?), catalog pattern, locale count}
+<!-- Only when §1.2b ran. Workers read this section to apply the change contract in existing-i18n.md. -->
+
 ## Library
-**{library}** (recommended; user accepted | user override)
+**{library}** (recommended; user accepted | user override | existing, kept)
 
 ## Scope
 - [x] Setup

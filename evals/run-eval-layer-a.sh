@@ -74,7 +74,15 @@ fi
 echo ""
 echo "--- Building Prompt ---"
 
-if [ "$CATEGORY" = "positive" ] || [ "$CATEGORY" = "collapse" ]; then
+if [ "$CATEGORY" = "collapse" ]; then
+  # Existing, configured i18n: §1.2b asks how to treat it. Pre-answer "keep and fill the
+  # gaps" so the run reaches the collapse plan; routing is not asked on that path.
+  PROMPT="Use the globalize-guide skill on this project. Existing i18n: keep ${LIBRARY} and fill the gaps. Source locale: en. Target locales: es, fr. Stay on the current branch. Scope: setup only (not convert or globalize-now). Mode: guided. Optional add-ons: none. Run through Phase 1 fully and stop once .globalize/plan.md is generated. Do not advance to Phase 2 — do not install any packages."
+elif [ "$CATEGORY" = "existing" ]; then
+  # The user's realistic first prompt: nothing says what to do with the existing setup,
+  # so the skill must take its own non-destructive recommendation.
+  PROMPT="Use the globalize-guide skill to set up internationalization in this project. Mode: unguided. Stay on the current branch. Take your recommended option for anything I haven't answered. Run through Phase 1 fully and stop once .globalize/plan.md is generated. Do not advance past Phase 1 — do not install packages, sign in to Globalize, or edit project files."
+elif [ "$CATEGORY" = "positive" ]; then
   PROMPT="Use the globalize-guide skill on this project. Library: ${LIBRARY}. Source locale: en. Target locales: es, fr. Stay on the current branch. Scope: setup only (not convert or globalize-now). Mode: guided. Routing strategy: prefix-based. Optional add-ons: none. Run through Phase 1 fully and stop once .globalize/plan.md is generated. Do not advance to Phase 2 — do not install any packages."
 elif [ "$CATEGORY" = "hard-stop" ]; then
   PROMPT="Use the globalize-guide skill to set up internationalization in this project. Run the initial inspection and tell me what you find."
@@ -101,7 +109,7 @@ echo ""
 echo "--- Dispatching Verification ---"
 
 VERIFY_EXIT=0
-if [ "$CATEGORY" = "positive" ] || [ "$CATEGORY" = "collapse" ]; then
+if [ "$CATEGORY" = "positive" ] || [ "$CATEGORY" = "collapse" ] || [ "$CATEGORY" = "existing" ]; then
   "$SCRIPT_DIR/verify-orchestration.sh" "$WORKDIR" "$FIXTURE" || VERIFY_EXIT=$?
 elif [ "$CATEGORY" = "hard-stop" ]; then
   "$SCRIPT_DIR/verify-hard-stop.sh" "$WORKDIR" "$FIXTURE" || VERIFY_EXIT=$?

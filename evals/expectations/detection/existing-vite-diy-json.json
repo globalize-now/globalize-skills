@@ -1,0 +1,26 @@
+{
+  "match": {
+    "framework": "vite",
+    "compiler": "swc",
+    "react": true,
+    "existing": {
+      "library": "none",
+      "configured": false,
+      "present": true,
+      "catalogs": {
+        "pattern": "src/locales/{locale}.json",
+        "format": "json-flat",
+        "sourceLocale": "en"
+      }
+    }
+  },
+  "ignore": [
+    "candidateFiles",
+    "formatCandidateFiles",
+    "routeEntries",
+    "git",
+    "localeSignals",
+    "sourceDir",
+    "existing.signals"
+  ]
+}
