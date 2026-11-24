@@ -1,0 +1,30 @@
+{
+  "match": {
+    "framework": "next",
+    "router": "app",
+    "react": true,
+    "packageManager": "npm",
+    "existing": {
+      "library": "next-intl",
+      "configured": true,
+      "providerWired": true,
+      "stringsWrapped": "yes",
+      "present": true,
+      "catalogs": {
+        "pattern": "messages/{locale}.json",
+        "format": "json-nested",
+        "sourceLocale": "en"
+      },
+      "localeRouting": "none"
+    }
+  },
+  "ignore": [
+    "candidateFiles",
+    "formatCandidateFiles",
+    "routeEntries",
+    "git",
+    "localeSignals",
+    "sourceDir",
+    "existing.signals"
+  ]
+}

@@ -559,6 +559,8 @@ Client component pages (`'use client'`) do not need `setRequestLocale` — stati
 
 **CONSENT GATE: This moves existing files. Show the full plan and ask for confirmation.**
 
+**Existing i18n.** On the §1.2b `extend` path (`## Existing i18n` in `decisions.md`), this restructure **never runs**: record it as `[x] … — skipped: existing setup kept (extend)` and leave every route file where it is (`references/orchestrator/existing-i18n.md` → Change contract). On every other path, list each move in `plan.md` before the first one. Unguided mode does **not** waive this consent: stop with `needs_decision` and the list.
+
 For App Router with locale prefix routing (`localePrefix: 'as-needed'` or `'always'`), pages must live under an `app/[locale]/` dynamic segment.
 
 ### Before/after directory structure

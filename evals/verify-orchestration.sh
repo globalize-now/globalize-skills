@@ -210,6 +210,36 @@ else
       fi
     done <<< "$SECTIONS"
 
+    # planSectionsAbsent / planSectionsPresent: heading prefixes (e.g. "## Phase 2").
+    # A connect-only plan (existing i18n kept as is) must carry no setup or convert
+    # phase at all: that absence is what proves the run will not touch project code.
+    while IFS= read -r HEADING; do
+      [ -z "$HEADING" ] && continue
+      if grep -qF -- "$HEADING" <(grep -E '^#+ ' "$PLAN_MD"); then
+        fail "plan.md has a '$HEADING' section but should not"
+      else
+        pass "plan.md correctly has no '$HEADING' section"
+      fi
+    done < <(jq -r '.planSectionsAbsent // [] | .[]' "$EXPECTED_PLAN_FILE")
+    while IFS= read -r HEADING; do
+      [ -z "$HEADING" ] && continue
+      if grep -qF -- "$HEADING" <(grep -E '^#+ ' "$PLAN_MD"); then
+        pass "plan.md has a '$HEADING' section"
+      else
+        fail "plan.md has no '$HEADING' section"
+      fi
+    done < <(jq -r '.planSectionsPresent // [] | .[]' "$EXPECTED_PLAN_FILE")
+
+    # planContains: literal substrings that must appear somewhere in plan.md
+    while IFS= read -r NEEDLE; do
+      [ -z "$NEEDLE" ] && continue
+      if grep -qF -- "$NEEDLE" "$PLAN_MD"; then
+        pass "plan.md mentions '$NEEDLE'"
+      else
+        fail "plan.md does not mention '$NEEDLE'"
+      fi
+    done < <(jq -r '.planContains // [] | .[]' "$EXPECTED_PLAN_FILE")
+
     # Informational: phasesIncluded — light check that "Phase 2" or "setup" appears
     PHASES=$(jq -r '.phasesIncluded // [] | .[]' "$EXPECTED_PLAN_FILE")
     while IFS= read -r PHASE; do

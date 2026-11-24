@@ -41,7 +41,7 @@ With `KEEP_WORKDIR=1` the temp dir survives, so you can re-run a verifier agains
 
 ## Static verifiers (no model, no network)
 
-Six scripts run standalone against a checkout and need neither `claude` nor a fixture:
+Seven scripts run standalone against a checkout and need neither `claude` nor a fixture:
 
 ```bash
 ./evals/verify-manifest.sh          # manifest.json: schema, path resolution, cross-file invariants
@@ -50,6 +50,7 @@ Six scripts run standalone against a checkout and need neither `claude` nor a fi
 ./evals/verify-globalize-connect.sh # Globalize hand-off: disk fallback, Workflow setup + first translation, Project-held and no-remote routes (runs in CI)
 ./evals/verify-cli-use.sh           # globalize-now-cli-use: Workflow setup first, CLI flags exist, Project path behind a pointer (runs in CI)
 ./evals/verify-lovable-mirror.sh     # lovable-i18n mirror workflow: trigger, scoped token, overwrite-if-changed, no loop; README says canonical + mirrored (runs in CI)
+./evals/verify-existing-i18n.sh     # existing-i18n guard: §1.2b paths, change contract, gated [locale] moves (runs in CI)
 ```
 
 `verify-globalize-connect.sh` is a tripwire for the prose that gets an agent from "setup done" to a published Workflow and a started translation. It fails when `globalize-guide` answers a sibling skill the Skill tool can't load with a reinstall prompt instead of reading its `SKILL.md` from `.claude/skills/` or `.agents/skills/` (a skill installed mid-session is on disk but not registered); when Phase 1.5 signs in without a GitHub or GitLab remote; when Phase 4 (`Globalize Workflow`) stops pushing the setup, offering `gh repo create` only once the user confirms, or starting the first translation; when `globalize-now-project-setup`'s Step 5 stops listing the Workflow's runs before `workflows runs start --delivery pr`, or offers `gh pr create` without the user's confirmation; when any `workflows` command the project skill names (SKILL.md and `references/`) isn't registered in `api-client/src/commands/workflows.ts`, or passes a flag that command doesn't define; when `lovable-i18n`'s Phase 6 stops setting up a Workflow (`preview_workflow_setup`, `set_up_workflow`), starts its first run without listing the Workflow's runs first or without pull request delivery, stops waiting for `get_workflow_run` to say delivered before reporting the pull request, stops continuing a Project-held repository with `translate_repository`, creates a Project, or its fallback stops opening the Workflow builder (`/workflows/new`) or running `workflows runs list` before `workflows runs start --delivery pr`; when a rule reuses the organisation's only Project (an Idle Project must never be picked up); when the Workflow path stops handling a preview answer (`alreadySetUp`, `needs`, `WORKFLOW_PREVIEW_STALE`, `WORKFLOW_REPOSITORY_CLAIMED`); when `REPOSITORY_HELD_BY_PROJECT` stops routing to `references/project-path.md`, or that file's `repositories translate` passes a flag the CLI (`api-client/src/commands/repositories.ts`) doesn't define or drops `--delivery-mode pr`; or when the no-remote and unsupported host stops stop naming GitHub, come after the auth precheck, or run `gh repo create` without the user's confirmation.
@@ -97,7 +98,8 @@ Fixtures are defined in `evals/fixtures.json`. Local fixture projects live under
 |----------|---------|--------|
 | `positive` | A supported stack the skill should set up cleanly | A + B |
 | `hard-stop` | An incompatible stack the skill must refuse (CRA, Remix v1, non-React/Vue, Manifest V2 extensions, …) | A only |
-| `collapse` | i18n already configured — Phase 2 should reduce to verification-only steps | A (B once a collapse prefill exists) |
+| `collapse` | i18n already configured, user chose "keep and fill the gaps" — Phase 2 should reduce to verification-only steps | A (B once a collapse prefill exists) |
+| `existing` | i18n already present (a working next-intl app, or do-it-yourself JSON catalogs) and the prompt says nothing about it — the plan must be connect-only: no Phase 2 or 3, catalogs connected as they are | A only |
 
 ### Types
 

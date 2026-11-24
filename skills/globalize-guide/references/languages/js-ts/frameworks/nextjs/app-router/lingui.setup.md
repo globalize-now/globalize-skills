@@ -163,6 +163,8 @@ export function LinguiClientProvider({
 
 **Before proceeding, check for existing locale routing:**
 
+**Existing i18n.** On the §1.2b `extend` path (`## Existing i18n` in `decisions.md`), this restructure **never runs**: record it as `[x] … — skipped: existing setup kept (extend)` and leave every route file where it is (`references/orchestrator/existing-i18n.md` → Change contract). On every other path, list each move in `plan.md` before the first one. Unguided mode does **not** waive this consent: stop with `needs_decision` and the list.
+
 - Does a `[locale]/` or `[locale]/` directory already exist under `src/app/`? If yes, use the existing structure — do not restructure.
 - Does `src/middleware.ts`, `middleware.ts`, `src/proxy.ts`, or `proxy.ts` already exist? If yes, read it. Record this — the middleware section below must handle it. **`proxy.ts` is the Next.js 16+ rename of `middleware.ts`** — both are the same integration point; never create a second file alongside an existing one.
 

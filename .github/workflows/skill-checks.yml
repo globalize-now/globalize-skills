@@ -2,10 +2,10 @@ name: Skill checks
 
 on:
   pull_request:
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, api-client/src/commands/glossaries.ts, api-client/src/commands/assets.ts, api-client/src/commands/glossary.ts, api-client/src/commands/style-guides.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, api-client/src/commands/glossaries.ts, api-client/src/commands/assets.ts, api-client/src/commands/glossary.ts, api-client/src/commands/style-guides.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-existing-i18n.sh, evals/fixtures.json, evals/expectations/**, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
   push:
     branches: [main]
-    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, api-client/src/commands/glossaries.ts, api-client/src/commands/assets.ts, api-client/src/commands/glossary.ts, api-client/src/commands/style-guides.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
+    paths: [skills/**, api-client/src/commands/repositories.ts, api-client/src/commands/workflows.ts, api-client/src/commands/glossaries.ts, api-client/src/commands/assets.ts, api-client/src/commands/glossary.ts, api-client/src/commands/style-guides.ts, evals/verify-skill-size.sh, evals/verify-globalize-connect.sh, evals/verify-existing-i18n.sh, evals/fixtures.json, evals/expectations/**, evals/verify-cli-use.sh, evals/verify-lovable-mirror.sh, evals/lib/**, .github/workflows/mirror-lovable-i18n.yml, README.md, .github/workflows/skill-checks.yml]
 
 jobs:
   skill-size:
@@ -36,3 +36,8 @@ jobs:
       # README.md says the monorepo copy is canonical and mirrored.
       - name: lovable-i18n mirror workflow
         run: ./evals/verify-lovable-mirror.sh
+
+      # The existing-i18n guard (issue #24): a project that already has i18n is offered
+      # connect / extend / replace, never silently set up from scratch.
+      - name: Existing i18n guard
+        run: ./evals/verify-existing-i18n.sh

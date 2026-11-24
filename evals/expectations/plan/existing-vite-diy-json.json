@@ -1,0 +1,20 @@
+{
+  "planSectionsAbsent": [
+    "## Phase 2",
+    "## Phase 3"
+  ],
+  "planSectionsPresent": [
+    "## Phase 4"
+  ],
+  "phase2StepsContain": [
+    "assemble_globalize_inputs",
+    "delegate_project_setup"
+  ],
+  "decisionsSections": {
+    "Existing i18n": "^\\*\\*Connect what you have"
+  },
+  "planContains": [
+    "src/locales/",
+    "Footprint:"
+  ]
+}

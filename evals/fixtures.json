@@ -128,5 +128,25 @@
     "commit": "a750f776f952997b6488714cdffde4badaa6c3e6",
     "library": "lingui",
     "variant": "vite-swc-lingui"
+  },
+  "existing-next-intl-wrapped": {
+    "category": "existing",
+    "type": "derived",
+    "base": "fixtures/nextjs-app-router",
+    "overlay": "fixtures/existing/nextjs-app-router-next-intl-wrapped",
+    "library": "next-intl",
+    "variant": null,
+    "expectedDetection": "evals/expectations/detection/existing-next-intl-wrapped.json",
+    "expectedPlan": "evals/expectations/plan/existing-next-intl-wrapped.json"
+  },
+  "existing-vite-diy-json": {
+    "category": "existing",
+    "type": "derived",
+    "base": "fixtures/vite-swc",
+    "overlay": "fixtures/existing/vite-swc-diy-json",
+    "library": null,
+    "variant": null,
+    "expectedDetection": "evals/expectations/detection/existing-vite-diy-json.json",
+    "expectedPlan": "evals/expectations/plan/existing-vite-diy-json.json"
   }
 }

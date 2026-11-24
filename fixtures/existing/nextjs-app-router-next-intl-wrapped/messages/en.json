@@ -1,0 +1,18 @@
+{
+  "Metadata": {
+    "title": "My App",
+    "description": "A small app"
+  },
+  "HomePage": {
+    "title": "Welcome",
+    "description": "Get started"
+  },
+  "LocaleSwitcher": {
+    "label": "Language",
+    "locale": {
+      "en": "English",
+      "es": "Spanish",
+      "fr": "French"
+    }
+  }
+}

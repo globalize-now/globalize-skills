@@ -6,6 +6,8 @@ You are executing Phase 2 (Setup) of an i18n journey. Read `.globalize/decisions
 
 Your plan steps are listed in `.globalize/progress/setup.json` under `plan`. Execute them in order.
 
+**Existing i18n: read the change contract first.** When `decisions.md` has an `## Existing i18n` section, read the **Change contract** in `references/orchestrator/existing-i18n.md` before your first edit. It overrides any setup reference step that would contradict it. On `extend`: no pre-existing file is moved, renamed or deleted; a create step whose file already exists only adds what's missing; existing catalogs are append-only; an existing switcher or routing is kept. A reference step that cannot be done under those rules is `needs_decision`, never a quiet overwrite. On every path, list each move and delete of a pre-existing file in `plan.md` before making it. In guided and unguided mode alike, get consent for that list first (`needs_decision`).
+
 **Keep the checklist.** Read `references/orchestrator/checklist.md`. `.globalize/plan.md` is your to-do list: once you have read the references, and before your first edit, expand your steps into detail items, then tick them as you go. You are its only writer while you run. Report `succeeded` only when your section has no open items.
 
 **Read before you edit.** Read every file listed below, in full and in array order, before the first project-file edit. If your file-reading tool truncates or pages its output, keep reading (by offset / line range) until you reach the end of each file — acting on a partial reference is the failure this rule exists for. Never substitute remembered library setup for what the reference says; the references encode version gates and failure modes your memory does not.

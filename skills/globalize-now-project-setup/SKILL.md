@@ -82,6 +82,8 @@ Another skill (e.g. the `globalize-guide` orchestrator) can drive this one with 
 
 They map onto Step 3's flags: `patterns` → `--patterns` (verbatim JSON; a pattern may carry `"pathLocales": {"pt-BR": "pt_BR"}` for a layout that spells a locale differently), `sourceLocale` → `--source-language`, `targetLocales` → `--target-languages` (comma-separated), `workflowName` → `--name`, `import` → `--import`. An older inputs file is read the same way: `projectName` for `workflowName`, `importMode` for `import`, and `localePathPattern` + `fileFormat` (+ a `pathLocales` array of `{pattern, locale, pathLocale}`) as the one pattern; `importScope` is ignored.
 
+**When `patterns` is absent or empty** (the caller connected a project's existing catalogs and could not resolve their pattern or format), leave `--patterns` off the Step 3 preview so Globalize detects the catalogs itself, and answer `no_confident_group` / `no_locale_patterns` as standalone mode does (`references/local-detection.md`). The preview detects from the default branch only, so here `no_locale_files` does not mean the project has none: the catalogs may exist only on `firstTranslationBranch`. Don't stop with "Set up i18n first". Propose patterns from this working copy (`references/local-detection.md`), confirm them with the user, and preview again with `--patterns`. Headless: stop and report it. Everything else stays orchestrated. Never set up a Workflow with a guessed pattern.
+
 `firstTranslationBranch` names the branch the caller pushed the setup to; Step 5 translates it. `null` or absent → skip Step 5.
 
 **Otherwise** (no inputs file, standalone use), detect and prompt as below.
