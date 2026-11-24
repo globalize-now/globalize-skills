@@ -288,7 +288,7 @@ Globalize translates the branch **on the remote**, never this working copy: unti
 
 **A remote Phase 1 didn't see.** §4.1 built `globalize-inputs.json` from `detection.json` `git.remote` as Phase 1 read it. When `origin` differs — after `gh repo create`, or on a resume once the user added a remote by hand — write `origin` into `detection.json` `git.remote` and rebuild `globalize-inputs.json` (§4.1) before step 1, so Workflow setup gets the new repository.
 
-On `connect` this run changed no catalogs. Check only that the source catalog is tracked (`git ls-files --error-unmatch <file>`) and that the branch is pushed. Do not ask to commit the `.gitignore` line. An untracked catalog → ask the user to commit and push it themselves, or skip the first translation.
+On `connect` this run changed no catalogs. Check only that the source catalog is tracked (`git ls-files --error-unmatch <file>`), has no uncommitted changes (`git status --porcelain -- <file>` prints nothing), and that the branch is pushed. Do not ask to commit the `.gitignore` line. An untracked or uncommitted catalog → ask the user to commit and push it themselves, or skip the first translation.
 
 1. Read `git branch --show-current`, `git status --porcelain` and `git log @{u}..HEAD --oneline` (fails when the branch has no upstream — that counts as unpushed).
 2. Nothing uncommitted and nothing unpushed → this branch is already on the remote.
