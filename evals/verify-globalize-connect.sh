@@ -28,6 +28,12 @@ shopt -s nullglob   # a skill with no references/ globs to nothing
 #      routes to references/project-path.md, which translates that Project's repository with
 #      flags the CLI has, every preview answer is handled, and with no remote (or another
 #      host) it stops naming GitHub, running `gh repo create` only after the user confirms.
+#   5. A gitlab.com remote ends at a set-up Workflow, not a Project: project-setup routes it to
+#      the Workflow path, connects GitLab (`gitlab connections list|connect`, `gitlab
+#      repositories list`), previews and sets up with `--gitlab-connection`, handles the
+#      GitLab refusals, opens a merge request only after the user confirms, and every `gitlab`
+#      command it names is one the CLI registers, with flags it defines. No skill sends a
+#      gitlab.com repository to a Project any more.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -39,6 +45,8 @@ LOVABLE="$REPO_ROOT/skills/lovable-i18n/SKILL.md"
 PROJECT_PATH="$REPO_ROOT/skills/globalize-now-project-setup/references/project-path.md"
 CLI_REPOS="$REPO_ROOT/api-client/src/commands/repositories.ts"
 CLI_WORKFLOWS="$REPO_ROOT/api-client/src/commands/workflows.ts"
+CLI_GITLAB="$REPO_ROOT/api-client/src/commands/gitlab.ts"
+CLI_USE="$REPO_ROOT/skills/globalize-now-cli-use/SKILL.md"
 
 PASS=0
 FAIL=0
@@ -314,14 +322,14 @@ else
     if grep -qF -- "$marker" "$PROJECT_PATH"; then pass "project-path.md names '$marker'"; else fail "project-path.md does not name '$marker'"; fi
   done
   check_translate_cli "$PROJECT_PATH"
-  # The CLI's `projects create` always prints a Workflow-setup notice, including on this
-  # path's intentional gitlab.com Project; the agent must carry on.
-  NOTICE="$(grep -F 'projects create' "$PROJECT_PATH" | grep -i 'notice' | grep -i 'expected' || true)"
-  if [ -n "$NOTICE" ]; then
-    pass "project-path.md says the 'projects create' notice is expected here"
-  else
-    fail "project-path.md does not say the 'projects create' notice is expected on this path"
-  fi
+  # It only continues the Project a refusal names: a gitlab.com repository gets a Workflow.
+  for gone in 'projects create' 'repositories create' '## gitlab.com'; do
+    if grep -qF -- "$gone" "$PROJECT_PATH"; then
+      fail "project-path.md still creates a Project or connects a repository ('$gone')"
+    else
+      pass "project-path.md does not name '$gone'"
+    fi
+  done
 fi
 
 STOPS="$(section "$PROJECT" '## No-remote and unsupported host stops')"
@@ -345,6 +353,47 @@ else
   else
     fail "the stops do not come before '## Auth precheck'"
   fi
+fi
+
+echo ""
+echo "--- 5. a gitlab.com remote ends at a set-up Workflow ---"
+GL_ROW="$(grep -E '^\| `gitlab\.com` \|' "$PROJECT" || true)"
+if [ -n "$GL_ROW" ] && has "$GL_ROW" 'Workflow path' && ! has "$GL_ROW" 'Project path'; then
+  pass "project-setup routes a gitlab.com remote to the Workflow path"
+else
+  fail "project-setup does not route a gitlab.com remote to the Workflow path: $GL_ROW"
+fi
+GL_STEP2="$(section "$PROJECT" '### GitLab')"
+if [ -z "$GL_STEP2" ]; then
+  fail "project-setup has no '### GitLab' section in Step 2"
+else
+  for marker in 'gitlab connections list' 'gitlab connections connect --no-wait' 'gitlab install-status' \
+    'gitlab repositories list' 'pathWithNamespace' 'Maintainer' 'Browser interaction required'; do
+    if has "$GL_STEP2" "$marker"; then pass "Step 2's GitLab names '$marker'"; else fail "Step 2's GitLab does not name '$marker'"; fi
+  done
+fi
+for marker in '--gitlab-connection <CONNECTION_ID> --repository <GITLAB_PROJECT_ID>' \
+  'WORKFLOW_NO_GITLAB_CONNECTION' 'GITLAB_UNREACHABLE' 'gitlab_hook_registration_failed'; do
+  if grep -qF -- "$marker" "$PROJECT"; then pass "project-setup handles '$marker'"; else fail "project-setup does not handle '$marker'"; fi
+done
+if [ -n "$STEP5" ]; then
+  GLAB_LINE="$(printf '%s\n' "$STEP5" | grep -F 'glab mr create' || true)"
+  if [ -n "$GLAB_LINE" ] && has "$GLAB_LINE" 'confirms'; then
+    pass "Step 5 runs 'glab mr create' only once the user confirms"
+  else
+    fail "Step 5's 'glab mr create' is missing or not conditioned on the user confirming"
+  fi
+fi
+# Every `gitlab` command the Workflow-setting skills name must exist on the CLI, with its flags.
+# (cli-use's Project reference is left out: its config table has a `gitlab` row that is no command.)
+check_cli_group gitlab "$CLI_GITLAB" "$PROJECT" "$(dirname "$PROJECT")"/references/*.md "$CLI_USE"
+# No skill routes a gitlab.com repository to a Project.
+STALE="$(grep -nE 'Project path[^.]*gitlab|gitlab[^.]*Project path|reads GitHub only|Workflows read GitHub only' \
+  "$PROJECT" "$PROJECT_PATH" "$GUIDE" "$CLI_USE" "$ORCH"/*.md "$(dirname "$CLI_USE")"/references/*.md || true)"
+if [ -z "$STALE" ]; then
+  pass "no skill sends a gitlab.com repository to a Project"
+else
+  fail "a skill still sends a gitlab.com repository to a Project: $STALE"
 fi
 
 echo ""

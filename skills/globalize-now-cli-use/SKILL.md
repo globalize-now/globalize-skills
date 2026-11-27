@@ -2,7 +2,7 @@
 name: globalize-now-cli-use
 description: >-
   Set up and manage Globalize translation for a repository using the CLI. Use this skill when
-  the user asks to set up translations for a GitHub repository, start or check a translation run,
+  the user asks to set up translations for a GitHub or gitlab.com repository, start or check a translation run,
   manage Workflows or their languages, manage glossaries, style guides or translation memories,
   invite team members, manage API keys, or perform any Globalize platform operation. Also covers
   a repository a Globalize Project already translates. This skill assumes the CLI is already
@@ -11,9 +11,9 @@ description: >-
 
 # Globalize CLI Usage
 
-This skill guides you through managing translation on the [Globalize](https://globalize.now) platform using the CLI (`globalise-now-cli`). A GitHub repository is translated by a **Workflow**: Step 2 sets one up and starts its first translation.
+This skill guides you through managing translation on the [Globalize](https://globalize.now) platform using the CLI (`globalise-now-cli`). A GitHub or `gitlab.com` repository is translated by a **Workflow**: Step 2 sets one up and starts its first translation.
 
-**A repository a Project already translates** (the older setup) follows `references/project-held-repository.md` instead of Step 2. Read it when Workflow setup refuses with `REPOSITORY_HELD_BY_PROJECT`, when the user names a Project, or when the remote is on gitlab.com.
+**A repository a Project already translates** (the older setup) follows `references/project-held-repository.md` instead of Step 2. Read it when Workflow setup refuses with `REPOSITORY_HELD_BY_PROJECT`, or when the user names a Project.
 
 **Always use `--json`** when running commands programmatically. A success prints `{"data": …}` on stdout. A failure exits 1 and prints `{"error": …, "status": …, "code": …, "details": …}` on stdout: branch on `code`, and read `details` for the ids it carries.
 
@@ -35,7 +35,7 @@ If this fails or reports no credentials, run the `globalize-now-account-setup` s
 
 ## Step 2: Set up a Workflow and start a translation
 
-A Workflow watches a GitHub repository's branches, reads its locale files, and delivers translations as a pull request. Setup is two calls: `workflows preview-setup` proposes the Workflow and writes nothing; `workflows setup` publishes exactly what the preview proposed. Neither starts a run.
+A Workflow watches a GitHub or `gitlab.com` repository's branches, reads its locale files, and delivers translations as a pull request (a merge request on GitLab). Setup is two calls: `workflows preview-setup` proposes the Workflow and writes nothing; `workflows setup` publishes exactly what the preview proposed. Neither starts a run.
 
 ### 2a. Identify the repository
 
@@ -43,11 +43,11 @@ A Workflow watches a GitHub repository's branches, reads its locale files, and d
 git remote get-url origin
 ```
 
-Parse `<OWNER>/<REPO>` from `https://github.com/<OWNER>/<REPO>.git` or `git@github.com:<OWNER>/<REPO>.git`.
+Parse `<OWNER>/<REPO>` from `https://github.com/<OWNER>/<REPO>.git` or `git@github.com:<OWNER>/<REPO>.git`. On gitlab.com it is the project's whole path, nested groups included (`git@gitlab.com:group/subgroup/project.git` → `group/subgroup/project`).
 
-- **github.com** → continue.
-- **gitlab.com** → read `references/project-held-repository.md` and follow it: Workflow setup reads GitHub only.
-- **Any other host, or no remote** → stop. Tell the user Workflow setup needs a GitHub repository, and ask for its `owner/repo`.
+- **github.com** → continue with 2b.
+- **gitlab.com** → continue with 2b-GitLab in place of 2b.
+- **Any other host (self-hosted GitLab included), or no remote** → stop. Tell the user Workflow setup needs a GitHub or gitlab.com repository, and ask for its `owner/repo`.
 
 Confirm `<OWNER>/<REPO>` with the user before calling Globalize, and wait for the answer.
 
@@ -81,6 +81,38 @@ npx @globalize-now/cli-client github repos --installation-id <INSTALLATION_ID> -
 
 `<OWNER>/<REPO>` must be in the list; otherwise the user grants the installation access to it on GitHub.
 
+### 2b-GitLab. Find the GitLab connection
+
+Globalize reaches a gitlab.com repository through a person's GitLab connection (OAuth). Setup registers a webhook on the repository through it, which takes the **Maintainer** role.
+
+```bash
+npx @globalize-now/cli-client gitlab connections list --json
+```
+
+Each connection has `id` (a UUID), `username` and `status`. For each `active` one, look the repository up by its last path segment:
+
+```bash
+npx @globalize-now/cli-client gitlab repositories list --connection-id <CONNECTION_ID> --search <PROJECT> --json
+```
+
+The entry whose `pathWithNamespace` equals `<OWNER>/<REPO>` (case-insensitive) is the repository: keep its numeric `id` as `<GITLAB_PROJECT_ID>` and the connection's `id` as `<CONNECTION_ID>`. Several connections reach it → ask the user which, naming each `username`.
+
+**None reaches it** → connect one:
+
+```bash
+npx @globalize-now/cli-client gitlab connections connect --no-wait --json
+```
+
+Show the user the returned `installUrl` and ask them to authorize Globalize in the browser, signed in to GitLab as a Maintainer of `<OWNER>/<REPO>`. Once they confirm, check it with the returned `nonce`:
+
+```bash
+npx @globalize-now/cli-client gitlab install-status --nonce <NONCE> --json
+```
+
+`status` is `completed` (with `connectionId`), `pending` (ask the user to finish, then check again) or `expired` (connect again). After `completed`, look the repository up through `connectionId` as above; still missing → that GitLab account isn't a member of the repository.
+
+In 2c and 2d, pass `--gitlab-connection <CONNECTION_ID> --repository <GITLAB_PROJECT_ID>` in place of `--installation-id <INSTALLATION_ID> --repository <OWNER>/<REPO>`. Everything else is the same.
+
 ### 2c. Preview the Workflow
 
 ```bash
@@ -90,7 +122,7 @@ npx @globalize-now/cli-client workflows preview-setup \
   --json
 ```
 
-Detection reads the repository's default branch on GitHub, not the local working copy. Pass overrides only where the user or a `need` asks for one:
+Detection reads the repository's default branch on GitHub or GitLab, not the local working copy. Pass overrides only where the user or a `need` asks for one:
 
 | Flag | Value |
 |------|-------|
@@ -121,7 +153,9 @@ Refusals (`code` in the failure JSON):
 | `code` | Meaning and next step |
 |--------|-----------------------|
 | `REPOSITORY_HELD_BY_PROJECT` | A Project already translates this repository. `details` carry `projectId`, `projectName`, `repositoryId`. Read `references/project-held-repository.md` and continue on that Project. |
-| `NOT_FOUND` (404) | The installation isn't this organisation's, or the App can't see the repository or branch. Recheck 2b. |
+| `NOT_FOUND` (404) | The installation or GitLab connection isn't this organisation's, or it can't see the repository or branch. Recheck 2b. |
+| `WORKFLOW_NO_GITLAB_CONNECTION` | The GitLab connection needs authorising again. The user runs `gitlab connections connect` as the same GitLab user (2b-GitLab), then you preview again. |
+| `GITLAB_UNREACHABLE` (503) | GitLab could not be asked. Retry once; then report it. |
 | `TRANSLATION_MEMORY_NOT_FOUND` | `--translation-memory-id` names no memory of this organisation. Recheck `translation-memories list`. |
 | `VALIDATION_ERROR` | A flag value is malformed; `details` say which. |
 
@@ -144,6 +178,7 @@ npx @globalize-now/cli-client workflows setup \
 | `WORKFLOW_PREVIEW_STALE` | The repository changed since the preview. `details.preview` is a fresh one: show the user what changed, and on confirmation run `workflows setup` again with its `previewHash`. |
 | `WORKFLOW_REPOSITORY_CLAIMED` | A Workflow already holds the repository: `details.workflowId`, `details.workflowName`. Continue with that id. |
 | `REPOSITORY_HELD_BY_PROJECT` | As in 2c: read `references/project-held-repository.md`. |
+| `WORKFLOW_DEFINITION_INVALID` with issue `gitlab_hook_registration_failed` | GitLab refused the repository's webhook: the connection's user isn't a Maintainer. Nothing was published. The user gives that account the Maintainer role, or connects a Maintainer's account (2b-GitLab); then preview and set up again. |
 
 ### 2e. Start the first translation
 
@@ -159,7 +194,7 @@ A run in the list means the first translation has started: report it and follow 
 npx @globalize-now/cli-client workflows runs start --workflow-id <WORKFLOW_ID> --json
 ```
 
-A GitHub Workflow delivers by pull request and translates its primary (first watched) branch. `--branch <branch>` picks another watched branch; `workflows runs start --delivery push` commits straight to the branch, only when the user asks for it.
+A GitHub or GitLab Workflow delivers by pull (merge) request and translates its primary (first watched) branch. `--branch <branch>` picks another watched branch; `workflows runs start --delivery push` commits straight to the branch, only when the user asks for it.
 
 | `code` | Next step |
 |--------|-----------|
@@ -317,7 +352,7 @@ npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID
 
 ## Command Reference
 
-Project, repository, pattern, job, namespace and GitLab commands are in `references/project-held-repository.md`, and so are `glossary` and `style-guides`: those Project-keyed commands are deprecated, so use `glossaries` and `assets`.
+Project, repository, pattern, job and namespace commands, and the GitLab commands a Project uses, are in `references/project-held-repository.md`, and so are `glossary` and `style-guides`: those Project-keyed commands are deprecated, so use `glossaries` and `assets`.
 
 | Command | Required flags | Optional flags |
 |---------|---------------|----------------|
@@ -327,8 +362,8 @@ Project, repository, pattern, job, namespace and GitLab commands are in `referen
 | `auth logout` | | |
 | `orgs list` | | |
 | `orgs delete` | `--id` | |
-| `workflows preview-setup` | `--installation-id` (numeric), `--repository` | `--branches`, `--patterns` (JSON), `--source-language`, `--target-languages`, `--name`, `--translation-memory-id`, `--import` (`ignore`\|`reviewed`\|`translated`) |
-| `workflows setup` | `--installation-id` (numeric), `--repository`, `--preview-hash` | the same as `workflows preview-setup` |
+| `workflows preview-setup` | `--installation-id` (numeric) or `--gitlab-connection`, `--repository` | `--branches`, `--patterns` (JSON), `--source-language`, `--target-languages`, `--name`, `--translation-memory-id`, `--import` (`ignore`\|`reviewed`\|`translated`) |
+| `workflows setup` | `--installation-id` (numeric) or `--gitlab-connection`, `--repository`, `--preview-hash` | the same as `workflows preview-setup` |
 | `workflows list` | | |
 | `workflows get` | `--id` | |
 | `workflows languages` | `--id`, `--target-languages` | `--base-version` |
@@ -343,6 +378,10 @@ Project, repository, pattern, job, namespace and GitLab commands are in `referen
 | `github install-status` | `--nonce` | |
 | `github installations` | | |
 | `github repos` | `--installation-id` | |
+| `gitlab connections list` | | |
+| `gitlab connections connect` | | `--no-wait` |
+| `gitlab install-status` | `--nonce` | |
+| `gitlab repositories list` | `--connection-id` | `--search` |
 | `github branches` | `--installation-id`, `--owner`, `--repo` | |
 | `github detect` | `--installation-id`, `--owner`, `--repo` | |
 | `glossaries list` | | |
@@ -429,6 +468,7 @@ npx @globalize-now/cli-client billing ledger --json
 ## Common Gotchas
 
 - **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability. Failures print their JSON on stdout too, with exit code 1.
+- **A GitLab `--repository` is the numeric project id** from `gitlab repositories list` (its `pathWithNamespace` works too); `--gitlab-connection` takes the connection's UUID `id`.
 - **`--installation-id` is GitHub's numeric id**: `workflows preview-setup`, `workflows setup` and the `github repos/branches/detect` commands take the `installationId` field from `github installations --json` (e.g. `122432012`), not its UUID `id`. Every other id is a UUID from a prior command.
 - **Workflows take locale codes**: `--source-language` and `--target-languages` on `workflows` commands are locales (`en`, `pt-BR`). `glossaries`, `assets` and `translation-memories` commands take plain locales too (`--source-locale`, `--target-locale`, `--locale`, `--target <locale>=<term>`); only the deprecated Project-keyed commands take _project language_ UUIDs.
 - **Repository assets are edited in the repository**: a Workflow whose `definition.assets.source` is `repository` reads its glossary, style guides and context from `docs/` files at the triggering commit (Steps 3 and 4), so a stored glossary or Asset it doesn't name or attach changes nothing for it.
