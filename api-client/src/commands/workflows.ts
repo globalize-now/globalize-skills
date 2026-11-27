@@ -8,6 +8,10 @@ type ClientFactory = () => Promise<ApiClient>;
 
 export type WorkflowSetupBody =
   paths["/api/workflows/setup/preview"]["post"]["requestBody"]["content"]["application/json"];
+/** A GitHub repository's body: `installationId` and `owner/repo`; `provider` is optional. */
+export type GithubWorkflowSetupBody = Exclude<WorkflowSetupBody, { provider: "gitlab" }>;
+/** A GitLab repository's body: `provider: "gitlab"`, `connectionId` and the project's id or path. */
+export type GitlabWorkflowSetupBody = Extract<WorkflowSetupBody, { provider: "gitlab" }>;
 export type WorkflowSetupPattern = NonNullable<WorkflowSetupBody["patterns"]>[number];
 export type WorkflowImportMode = NonNullable<WorkflowSetupBody["import"]>;
 export type StartWorkflowRunBody = NonNullable<
@@ -26,12 +30,20 @@ interface DefinitionFields {
   targetLanguages?: Record<string, unknown>;
 }
 
+/** The Input and Output types that read and deliver to a repository. */
+function isRepositoryType(type: string | undefined): boolean {
+  return type === "github" || type === "gitlab";
+}
+
 const IMPORT_MODES = ["ignore", "reviewed", "translated"] as const satisfies readonly WorkflowImportMode[];
 const RUN_DELIVERIES = ["pr", "push"] as const satisfies readonly RunDelivery[];
 
 // ── Workflow setup ──────────────────────────────────────────────────────────
 
-/** Proposes a Workflow for a GitHub repository. Writes nothing and starts no run. */
+/**
+ * Proposes a Workflow for a GitHub repository, or with `provider: "gitlab"` a
+ * GitLab one. Writes nothing and starts no run.
+ */
 export async function previewWorkflowSetup(client: ApiClient, body: WorkflowSetupBody) {
   const { data, error, response } = await client.POST("/api/workflows/setup/preview", { body });
   if (error) throw apiError(response, error);
@@ -106,7 +118,7 @@ export async function setWorkflowLanguages(
  * Starts a run of the current version by hand, which spends credits. Sends
  * `branch` and `delivery` as given: absent, the API translates the primary
  * branch and delivers as the Output is configured. The `workflows runs start`
- * command defaults a GitHub Workflow's delivery to `pr`.
+ * command defaults a GitHub or GitLab Workflow's delivery to `pr`.
  */
 export async function startWorkflowRun(client: ApiClient, id: string, body: StartWorkflowRunBody = {}) {
   const { data, error, response } = await client.POST("/api/workflows/{id}/runs", {
@@ -136,7 +148,8 @@ export async function listWorkflowRuns(client: ApiClient, id: string, query?: Li
 /**
  * A run as an agent polls it, as the hosted MCP's `get_workflow_run` reports
  * it: status and failure, each language's translate progress, each Output's
- * latest delivery outcome and the pull request a GitHub Output opened.
+ * latest delivery outcome and the pull request a GitHub Output opened (or the
+ * merge request a GitLab Output opened: its outcome has a GitHub one's shape).
  *
  * A `completed` run has finished translating; it does not mean the
  * translations were delivered. Check each Output's `outcome` (null until it
@@ -147,7 +160,7 @@ export function summariseWorkflowRun(run: WorkflowRun) {
   const pullRequestUrl =
     run.outputs.flatMap((o) => {
       const outcome = o.outcome as { status?: string; pullRequest?: { url?: string } } | null;
-      return o.type === "github" && outcome?.status === "delivered" && outcome.pullRequest?.url
+      return isRepositoryType(o.type) && outcome?.status === "delivered" && outcome.pullRequest?.url
         ? [outcome.pullRequest.url]
         : [];
     })[0] ?? null;
@@ -210,7 +223,8 @@ function parsePatterns(value: string): WorkflowSetupPattern[] {
 }
 
 interface SetupOptions {
-  installationId: string;
+  installationId?: string;
+  gitlabConnection?: string;
   repository: string;
   branches?: string;
   patterns?: string;
@@ -221,11 +235,29 @@ interface SetupOptions {
   import?: WorkflowImportMode;
 }
 
+/**
+ * A GitLab `--repository` is the project's numeric id or its path; a path
+ * always has a `/`, so digits alone are the id.
+ */
+function gitlabRepositoryOf(value: string): number | string {
+  return /^\d+$/.test(value) ? parsePositiveInt("--repository", value) : value;
+}
+
+function repositoryOf(o: SetupOptions): GithubWorkflowSetupBody | GitlabWorkflowSetupBody {
+  if (o.installationId !== undefined && o.gitlabConnection !== undefined) {
+    throw new Error("Pass --installation-id (GitHub) or --gitlab-connection (GitLab), not both");
+  }
+  if (o.gitlabConnection !== undefined) {
+    return { provider: "gitlab", connectionId: o.gitlabConnection, repository: gitlabRepositoryOf(o.repository) };
+  }
+  if (o.installationId === undefined) {
+    throw new Error("Pass --installation-id for a GitHub repository or --gitlab-connection for a GitLab one");
+  }
+  return { installationId: parsePositiveInt("--installation-id", o.installationId), repository: o.repository };
+}
+
 function setupBodyOf(o: SetupOptions): WorkflowSetupBody {
-  const body: WorkflowSetupBody = {
-    installationId: parsePositiveInt("--installation-id", o.installationId),
-    repository: o.repository,
-  };
+  const body = repositoryOf(o);
   if (o.branches !== undefined) body.branches = splitList(o.branches);
   if (o.patterns !== undefined) body.patterns = parsePatterns(o.patterns);
   if (o.sourceLanguage !== undefined) body.sourceLanguage = o.sourceLanguage;
@@ -238,8 +270,15 @@ function setupBodyOf(o: SetupOptions): WorkflowSetupBody {
 
 function withSetupOptions(cmd: Command): Command {
   return cmd
-    .requiredOption("--installation-id <id>", "GitHub App installation id (`github installations`)")
-    .requiredOption("--repository <owner/repo>", "The GitHub repository")
+    .option("--installation-id <id>", "GitHub: the App installation id (`github installations`)")
+    .option(
+      "--gitlab-connection <id>",
+      "GitLab: the connection id (`gitlab connections list`), in place of --installation-id",
+    )
+    .requiredOption(
+      "--repository <repository>",
+      "GitHub: owner/repo. GitLab: the project's numeric id or its path (group/subgroup/project)",
+    )
     .option(
       "--branches <list>",
       "Watched branches, comma-separated; detection reads the first (default: the default branch)",
@@ -250,7 +289,7 @@ function withSetupOptions(cmd: Command): Command {
     )
     .option("--source-language <locale>", "Source language in place of the detected one")
     .option("--target-languages <list>", "Target languages in place of the detected ones, comma-separated")
-    .option("--name <name>", "Workflow name (default: owner/repo)")
+    .option("--name <name>", "Workflow name (default: owner/repo, or the GitLab path)")
     .option("--translation-memory-id <id>", "An existing translation memory (default: create one on setup)")
     .addOption(
       new Option(
@@ -265,7 +304,7 @@ export function register(group: Command, getClient: ClientFactory): void {
     group
       .command("preview-setup")
       .description(
-        "Preview a Workflow for a GitHub repository: what it detected and would publish, or what it needs. Writes nothing",
+        "Preview a Workflow for a GitHub or GitLab repository: what it detected and would publish, or what it needs. Writes nothing",
       ),
   ).action(async (cmdOpts, cmd) => {
     const opts: OutputOptions = cmd.optsWithGlobals();
@@ -350,21 +389,23 @@ export function register(group: Command, getClient: ClientFactory): void {
   runs
     .command("start")
     .description(
-      "Start a run of a Workflow's current version, which spends credits. A GitHub Workflow delivers by pull request unless --delivery push",
+      "Start a run of a Workflow's current version, which spends credits. A GitHub or GitLab Workflow delivers by pull (merge) request unless --delivery push",
     )
     .requiredOption("--workflow-id <id>", "Workflow UUID")
-    .option("--branch <branch>", "GitHub only: a watched branch (default: the primary one)")
-    .addOption(new Option("--delivery <mode>", "GitHub only: pr (default) or push").choices([...RUN_DELIVERIES]))
+    .option("--branch <branch>", "GitHub or GitLab only: a watched branch (default: the primary one)")
+    .addOption(
+      new Option("--delivery <mode>", "GitHub or GitLab only: pr (default) or push").choices([...RUN_DELIVERIES]),
+    )
     .action(async (cmdOpts, cmd) => {
       const opts: OutputOptions = cmd.optsWithGlobals();
       try {
         const client = await getClient();
         let delivery = cmdOpts.delivery as RunDelivery | undefined;
         if (delivery === undefined) {
-          // A pull request unless told otherwise, as the hosted MCP's
+          // A pull (merge) request unless told otherwise, as the hosted MCP's
           // start_workflow_run does; a Contentful run takes no delivery.
           const workflow = await getWorkflow(client, cmdOpts.workflowId);
-          if ((workflow.currentVersion.definition as DefinitionFields).input?.type === "github") delivery = "pr";
+          if (isRepositoryType((workflow.currentVersion.definition as DefinitionFields).input?.type)) delivery = "pr";
         }
         const body: StartWorkflowRunBody = {};
         if (cmdOpts.branch !== undefined) body.branch = cmdOpts.branch;

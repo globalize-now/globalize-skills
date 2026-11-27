@@ -134,6 +134,8 @@ export {
   listWorkflowRuns,
   summariseWorkflowRun,
   type WorkflowSetupBody,
+  type GithubWorkflowSetupBody,
+  type GitlabWorkflowSetupBody,
   type WorkflowSetupPattern,
   type WorkflowImportMode,
   type StartWorkflowRunBody,

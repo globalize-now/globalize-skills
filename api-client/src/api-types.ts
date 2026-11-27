@@ -650,6 +650,165 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/github/installations/{installationId}/repos/{owner}/{repo}/glossary-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find a branch’s glossary file
+         * @description The conventional glossary file the branch holds — `docs/glossary.tbx`, else `docs/glossary.csv` — as the path to suggest for a glossary fetched from the repository; `path: null` when it holds neither (or the installation cannot see the branch). Reads only; creating the glossary checks the repository and branch itself.
+         */
+        get: {
+            parameters: {
+                query: {
+                    branch: string;
+                };
+                header?: never;
+                path: {
+                    installationId: string;
+                    owner: string;
+                    repo: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            path: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/github/installations/{installationId}/repos/{owner}/{repo}/detect": {
         parameters: {
             query?: never;
@@ -1490,7 +1649,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete GitLab connection */
+        /**
+         * Delete GitLab connection
+         * @description Deletes the connection and its tokens; GitLab is not called. Refused with 409 `GITLAB_CONNECTION_IN_USE` (`details.workflows`, each `{ id, name }`) while a non-archived Workflow’s current version names it.
+         */
         delete: {
             parameters: {
                 query?: never;
@@ -1639,10 +1801,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List GitLab projects */
+        /**
+         * List GitLab projects
+         * @description The projects the connection’s user is a Developer or more of. With `search`, at most the 100 closest matches on name, path or group path.
+         */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    search?: string;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -4022,6 +4189,8 @@ export interface paths {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @description When the Project retired: from then on it is read-only and starts no Job. `null` while it is live. */
+                            retiredAt: string | null;
                             sourceLanguage: {
                                 id: string;
                                 projectId: string;
@@ -4170,7 +4339,7 @@ export interface paths {
         put?: never;
         /**
          * Create project
-         * @description Needs an organisation that already has a Project. Any other is refused with 410 `PROJECT_CREATION_RETIRED`, whose message points to Workflow setup instead.
+         * @description Needs an organisation that already has a Project that isn't retired. Any other is refused with 410 `PROJECT_CREATION_RETIRED`, whose message points to Workflow setup instead.
          */
         post: {
             parameters: {
@@ -4293,6 +4462,8 @@ export interface paths {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @description When the Project retired: from then on it is read-only and starts no Job. `null` while it is live. */
+                            retiredAt: string | null;
                             translationMemory: {
                                 id: string;
                                 name: string;
@@ -4533,7 +4704,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description `PROJECT_CREATION_RETIRED`: the organisation holds no Project, so it cannot create one */
+                /** @description `PROJECT_CREATION_RETIRED`: the organisation holds no Project that isn't retired, so it cannot create one */
                 410: {
                     headers: {
                         [name: string]: unknown;
@@ -4857,6 +5028,8 @@ export interface paths {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @description When the Project retired: from then on it is read-only and starts no Job. `null` while it is live. */
+                            retiredAt: string | null;
                             translationMemory: {
                                 id: string;
                                 name: string;
@@ -5404,6 +5577,8 @@ export interface paths {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @description When the Project retired: from then on it is read-only and starts no Job. `null` while it is live. */
+                            retiredAt: string | null;
                             translationMemory: {
                                 id: string;
                                 name: string;
@@ -10303,6 +10478,11 @@ export interface paths {
                             id: string;
                             orgId: string;
                             name: string;
+                            /**
+                             * @description Fixed at creation: `written` in Globalize, or `fetched` from a Document connection’s data source or a repository’s glossary file, which refuses every manual write
+                             * @enum {string}
+                             */
+                            origin: "written" | "fetched";
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -10317,6 +10497,185 @@ export interface paths {
                                 gitUrl: string;
                                 branch: string;
                             } | null;
+                            /** @description A fetched glossary’s last good fetch; null until one, and for a written glossary */
+                            lastGoodFetchAt: string | null;
+                            fetched: ({
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `notion`, a data source read through a Document connection
+                                 * @enum {string}
+                                 */
+                                sourceKind: "notion";
+                                connection: {
+                                    id: string;
+                                    /** @enum {string} */
+                                    provider: "notion";
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "connected" | "needs_reconnect" | "disconnected";
+                                };
+                                /** @description What its entries are and what comes next, as a fetched Reference’s status. `needs_reconnect`: nothing is fetched until an admin reconnects. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `mapping_pending`: a changed mapping awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                    /** @enum {string} */
+                                    connectionStatus: "connected" | "needs_reconnect" | "disconnected";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "mapping_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    mappingPending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                            } | {
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `repository`, one TBX or CSV glossary file of a GitHub repository, read through any of the organisation’s GitHub App installations that can see it
+                                 * @enum {string}
+                                 */
+                                sourceKind: "repository";
+                                /** @description Kept by id, so a rename or transfer keeps it */
+                                repository: {
+                                    /** @description GitHub’s repository id, fixed at creation */
+                                    id: number;
+                                    /** @description `owner/name` as the last good fetch read it */
+                                    fullName: string;
+                                };
+                                /** @description What its entries were fetched from (or will be, before a good fetch) */
+                                branch: string;
+                                /** @description From the repository’s root; `.tbx` or `.csv` names its format */
+                                path: string;
+                                /** @description What its entries are and what comes next. `needs_reconnect`: the last fetch found no GitHub App installation of the organisation that can see the repository; Fetch now once one can — it recovers by itself. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `file_pending`: a changed branch and path await their first good fetch — under way (`fetching`), or not (Fetch now starts one); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed (`branch_missing`, `file_missing`, `unreadable`, `no_source_locale`, `no_usable_rows`, or GitHub not answering); runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "file_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    /** @description The failed fetch read the pending branch and path, which still wait */
+                                    filePending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                            }) | null;
                         }[];
                     };
                 };
@@ -10435,7 +10794,10 @@ export interface paths {
             };
         };
         put?: never;
-        /** Create a glossary */
+        /**
+         * Create a glossary
+         * @description Written: a name. Fetched from Notion (`origin: "fetched"`): a name, the Document connection and data source it fetches from, and the mapping from the data source’s properties to entry fields, checked against its live schema. Fetched from a repository (`origin: "fetched", sourceKind: "repository"`): a name, the GitHub repository (by GitHub’s id), branch and path of one TBX or CSV glossary file, and the locale of its source terms; no Workflow is needed, and a Repository claim doesn’t stop it. Either way its first fetch starts at once, in the background — read `fetched.status` back; a repository one is fetched again by each push to its branch touching its path. Origin and source (a Notion one’s connection and data source; a repository one’s repository and source locale) are fixed at creation. A Notion one is refused with 403 `FEATURE_REQUIRED` without `source_checks`, 404 `DOCUMENT_CONNECTION_NOT_FOUND`, 409 `DOCUMENT_CONNECTION_NOT_CONNECTED` while the connection isn’t connected, 404 `DOCUMENT_DATA_SOURCE_NOT_VISIBLE` for a data source it can’t see, 400 `BAD_REQUEST` for a mapping its schema doesn’t fit, and 503 `DOCUMENT_CONNECTION_UNREACHABLE` when the provider doesn’t answer. A repository one needs no Feature grant, and is refused with 400 `BAD_REQUEST` for a path not ending `.tbx` or `.csv` or an unknown locale, 404 `GLOSSARY_REPOSITORY_NOT_VISIBLE` when none of the organisation’s GitHub App installations can see the repository, 404 `GLOSSARY_BRANCH_NOT_FOUND` for a branch it lacks, and 503 `GITHUB_UNREACHABLE` / `GITHUB_RATE_LIMITED` when GitHub doesn’t answer. Whether the file is there is its first fetch’s to find (`file_missing`).
+         */
         post: {
             parameters: {
                 query?: never;
@@ -10447,6 +10809,80 @@ export interface paths {
                 content: {
                     "application/json": {
                         name: string;
+                        /** @enum {string} */
+                        origin: "fetched";
+                        /**
+                         * @description Fetched from one TBX or CSV glossary file of a GitHub repository
+                         * @enum {string}
+                         */
+                        sourceKind: "repository";
+                        /** @description GitHub’s repository id (`id` from the installation’s repository listing), fixed at creation; any of the organisation’s GitHub App installations that can see it reads it */
+                        repositoryId: number;
+                        branch: string;
+                        /** @description From the repository’s root, ending `.tbx` or `.csv`, which names its format, e.g. `docs/glossary.tbx` */
+                        path: string;
+                        /** @description The locale of the file’s source terms (its column or language section), fixed at creation; every other locale it holds is a target */
+                        sourceLocale: string;
+                    } | {
+                        name: string;
+                        /** @enum {string} */
+                        origin: "fetched";
+                        /**
+                         * @description Fetched from a Notion data source; `notion` when left out
+                         * @enum {string}
+                         */
+                        sourceKind?: "notion";
+                        /**
+                         * Format: uuid
+                         * @description The Document connection it fetches from, fixed at creation
+                         */
+                        connectionId: string;
+                        /** @description The data source (a database’s table) its entries are read from, fixed at creation */
+                        dataSourceId: string;
+                        /** @description Which of the data source’s properties, by id, each entry field reads; the `title` property is always the source term. A property feeds one field at most. */
+                        mapping: {
+                            /** @description The locale of the source terms (the `title` property) */
+                            sourceLocale: string;
+                            /**
+                             * @description A `rich_text`, `select` or `status` property
+                             * @default null
+                             */
+                            description?: string | null;
+                            /**
+                             * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                             * @default null
+                             */
+                            forbiddenVariants?: string | null;
+                            /** @default null */
+                            doNotTranslate?: ({
+                                /** @enum {string} */
+                                kind: "checkbox";
+                                property: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "options";
+                                /** @description A `select` or `status` property */
+                                property: string;
+                                /** @description The options meaning do-not-translate */
+                                readonly optionIds: string[];
+                            }) | null;
+                            /**
+                             * @description At most one property per locale, never the source locale
+                             * @default []
+                             */
+                            readonly targets?: {
+                                locale: string;
+                                /** @description A `rich_text`, `select` or `status` property */
+                                property: string;
+                            }[];
+                        };
+                    } | {
+                        name: string;
+                        /**
+                         * @description Where its entries come from, fixed at creation; `written` when left out
+                         * @enum {string}
+                         */
+                        origin?: "written";
                     };
                 };
             };
@@ -10461,8 +10897,622 @@ export interface paths {
                             id: string;
                             orgId: string;
                             name: string;
+                            /**
+                             * @description Fixed at creation: `written` in Globalize, or `fetched` from a Document connection’s data source or a repository’s glossary file, which refuses every manual write
+                             * @enum {string}
+                             */
+                            origin: "written" | "fetched";
                             /** Format: date-time */
                             createdAt: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/glossaries/{id}/fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch a fetched glossary now
+         * @description Fetches its source again — a Notion one’s data source (with a pending mapping, if it has one), a repository one’s file at its branch’s head (the pending branch and path, if it has them) — in the background: read `fetched.status` back until it is no longer `fetching`, `mapping_pending` / `file_pending` with `fetching: true`, or `first_fetch`. One fetch runs per glossary at a time; a request made while one runs gets one more after it, and requests made together share one. A repository one may be fetched while it needs reconnect: the fetch that finds an installation seeing its repository recovers it. Refused with 403 `FEATURE_REQUIRED` without `source_checks` (a Notion one: `sourceKind: "notion"`), 400 `BAD_REQUEST` for a written glossary, and 409 `DOCUMENT_CONNECTION_NOT_CONNECTED` while a Notion one’s connection isn’t connected.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            orgId: string;
+                            name: string;
+                            /**
+                             * @description Fixed at creation: `written` in Globalize, or `fetched` from a Document connection’s data source or a repository’s glossary file, which refuses every manual write
+                             * @enum {string}
+                             */
+                            origin: "written" | "fetched";
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            termCount: number;
+                            locales: string[];
+                            attachedProjectCount: number;
+                            workflowCount: number;
+                            repositoryManaged: {
+                                projectId: string;
+                                repositoryId: string;
+                                gitUrl: string;
+                                branch: string;
+                            } | null;
+                            /** @description A fetched glossary’s last good fetch; null until one, and for a written glossary */
+                            lastGoodFetchAt: string | null;
+                            fetched: ({
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `notion`, a data source read through a Document connection
+                                 * @enum {string}
+                                 */
+                                sourceKind: "notion";
+                                connection: {
+                                    id: string;
+                                    /** @enum {string} */
+                                    provider: "notion";
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "connected" | "needs_reconnect" | "disconnected";
+                                };
+                                dataSource: {
+                                    id: string;
+                                    title: string;
+                                };
+                                /** @description When the fetch its entries are from started; null until one succeeded */
+                                lastGoodFetchAt: string | null;
+                                lastAttempt: {
+                                    /** Format: date-time */
+                                    at: string;
+                                    /** @enum {string} */
+                                    outcome: "fetched" | "failed";
+                                    reason: ("item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift") | null;
+                                    property: {
+                                        id: string;
+                                        name: string;
+                                    } | null;
+                                } | null;
+                                /** @description What its entries are and what comes next, as a fetched Reference’s status. `needs_reconnect`: nothing is fetched until an admin reconnects. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `mapping_pending`: a changed mapping awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                    /** @enum {string} */
+                                    connectionStatus: "connected" | "needs_reconnect" | "disconnected";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "mapping_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    mappingPending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                                /** @description Which of the data source’s properties, by id, each entry field reads; the `title` property is always the source term. A property feeds one field at most. */
+                                mapping: {
+                                    /** @description The locale of the source terms (the `title` property) */
+                                    sourceLocale: string;
+                                    /**
+                                     * @description A `rich_text`, `select` or `status` property
+                                     * @default null
+                                     */
+                                    description: string | null;
+                                    /**
+                                     * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                                     * @default null
+                                     */
+                                    forbiddenVariants: string | null;
+                                    /** @default null */
+                                    doNotTranslate: ({
+                                        /** @enum {string} */
+                                        kind: "checkbox";
+                                        property: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "options";
+                                        /** @description A `select` or `status` property */
+                                        property: string;
+                                        /** @description The options meaning do-not-translate */
+                                        readonly optionIds: string[];
+                                    }) | null;
+                                    /**
+                                     * @description At most one property per locale, never the source locale
+                                     * @default []
+                                     */
+                                    readonly targets: {
+                                        locale: string;
+                                        /** @description A `rich_text`, `select` or `status` property */
+                                        property: string;
+                                    }[];
+                                };
+                                /** @description A changed mapping waiting on its first good fetch */
+                                pendingMapping: {
+                                    /** @description The locale of the source terms (the `title` property) */
+                                    sourceLocale: string;
+                                    /**
+                                     * @description A `rich_text`, `select` or `status` property
+                                     * @default null
+                                     */
+                                    description: string | null;
+                                    /**
+                                     * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                                     * @default null
+                                     */
+                                    forbiddenVariants: string | null;
+                                    /** @default null */
+                                    doNotTranslate: ({
+                                        /** @enum {string} */
+                                        kind: "checkbox";
+                                        property: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "options";
+                                        /** @description A `select` or `status` property */
+                                        property: string;
+                                        /** @description The options meaning do-not-translate */
+                                        readonly optionIds: string[];
+                                    }) | null;
+                                    /**
+                                     * @description At most one property per locale, never the source locale
+                                     * @default []
+                                     */
+                                    readonly targets: {
+                                        locale: string;
+                                        /** @description A `rich_text`, `select` or `status` property */
+                                        property: string;
+                                    }[];
+                                } | null;
+                                /** @description The last good fetch’s skipped and partly read rows, at most 100 */
+                                warnings: ({
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "skipped";
+                                    /** @enum {string} */
+                                    reason: "duplicate-term";
+                                    keptRow: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "skipped";
+                                    /** @enum {string} */
+                                    reason: "too-many-mentions" | "term-too-long";
+                                    property: string;
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "dnt-overrides-targets";
+                                    locales: string[];
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "description-too-long";
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "variant-skipped";
+                                    variant: string;
+                                    /** @enum {string} */
+                                    variantIssue: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                    otherTerm?: string;
+                                })[];
+                                /** @description How many more warnings there were */
+                                omittedWarnings: number;
+                                /** @description The data source’s properties as of the last good fetch (as of creation until one), naming the mapping’s property ids */
+                                readonly properties: ({
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "select" | "status";
+                                    readonly options: {
+                                        id: string;
+                                        name: string;
+                                    }[];
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "title" | "rich_text" | "multi_select" | "checkbox";
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "other";
+                                    /** @description A type no field reads, as the provider names it */
+                                    providerType: string;
+                                })[];
+                            } | {
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `repository`, one TBX or CSV glossary file of a GitHub repository, read through any of the organisation’s GitHub App installations that can see it
+                                 * @enum {string}
+                                 */
+                                sourceKind: "repository";
+                                /** @description Kept by id, so a rename or transfer keeps it */
+                                repository: {
+                                    /** @description GitHub’s repository id, fixed at creation */
+                                    id: number;
+                                    /** @description `owner/name` as the last good fetch read it */
+                                    fullName: string;
+                                };
+                                /** @description What its entries were fetched from (or will be, before a good fetch) */
+                                branch: string;
+                                /** @description From the repository’s root; `.tbx` or `.csv` names its format */
+                                path: string;
+                                /** @description A changed branch and path waiting on their first good fetch */
+                                pendingFile: {
+                                    branch: string;
+                                    path: string;
+                                } | null;
+                                /** @description The locale whose column or language section is the source terms, fixed at creation */
+                                sourceLocale: string;
+                                /** @description When the fetch its entries are from started; null until one succeeded */
+                                lastGoodFetchAt: string | null;
+                                /** @description The commit its last good fetch read the file at; null until one succeeded */
+                                lastFetchedCommitSha: string | null;
+                                lastAttempt: {
+                                    /** Format: date-time */
+                                    at: string;
+                                    /** @enum {string} */
+                                    outcome: "fetched" | "failed";
+                                    reason: ("repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows") | null;
+                                } | null;
+                                /** @description What its entries are and what comes next. `needs_reconnect`: the last fetch found no GitHub App installation of the organisation that can see the repository; Fetch now once one can — it recovers by itself. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `file_pending`: a changed branch and path await their first good fetch — under way (`fetching`), or not (Fetch now starts one); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed (`branch_missing`, `file_missing`, `unreadable`, `no_source_locale`, `no_usable_rows`, or GitHub not answering); runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "file_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    /** @description The failed fetch read the pending branch and path, which still wait */
+                                    filePending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                                /** @description The last good fetch’s skipped and partly read rows, columns and language sections, at most 100 */
+                                warnings: {
+                                    /** @enum {string} */
+                                    severity: "error" | "warning";
+                                    file: string;
+                                    /** @enum {string} */
+                                    code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                    message: string;
+                                    header?: string;
+                                    rowNumber?: number;
+                                    term?: string;
+                                    /** @enum {string} */
+                                    rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                    limit?: number;
+                                    glossaryName?: string;
+                                    variant?: string;
+                                    /** @enum {string} */
+                                    variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                    otherTerm?: string;
+                                }[];
+                                /** @description How many more warnings there were */
+                                omittedWarnings: number;
+                            }) | null;
+                            projects: {
+                                id: string;
+                                name: string;
+                                slug: string;
+                            }[];
+                            workflows: {
+                                id: string;
+                                name: string;
+                            }[];
+                            sourceLocales: {
+                                id: string | null;
+                                locale: string;
+                                name: string;
+                            }[];
+                            targetLocales: {
+                                id: string | null;
+                                locale: string;
+                                name: string;
+                            }[];
                         };
                     };
                 };
@@ -10615,6 +11665,11 @@ export interface paths {
                             id: string;
                             orgId: string;
                             name: string;
+                            /**
+                             * @description Fixed at creation: `written` in Globalize, or `fetched` from a Document connection’s data source or a repository’s glossary file, which refuses every manual write
+                             * @enum {string}
+                             */
+                            origin: "written" | "fetched";
                             /** Format: date-time */
                             createdAt: string;
                             /** Format: date-time */
@@ -10629,6 +11684,416 @@ export interface paths {
                                 gitUrl: string;
                                 branch: string;
                             } | null;
+                            /** @description A fetched glossary’s last good fetch; null until one, and for a written glossary */
+                            lastGoodFetchAt: string | null;
+                            fetched: ({
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `notion`, a data source read through a Document connection
+                                 * @enum {string}
+                                 */
+                                sourceKind: "notion";
+                                connection: {
+                                    id: string;
+                                    /** @enum {string} */
+                                    provider: "notion";
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "connected" | "needs_reconnect" | "disconnected";
+                                };
+                                dataSource: {
+                                    id: string;
+                                    title: string;
+                                };
+                                /** @description When the fetch its entries are from started; null until one succeeded */
+                                lastGoodFetchAt: string | null;
+                                lastAttempt: {
+                                    /** Format: date-time */
+                                    at: string;
+                                    /** @enum {string} */
+                                    outcome: "fetched" | "failed";
+                                    reason: ("item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift") | null;
+                                    property: {
+                                        id: string;
+                                        name: string;
+                                    } | null;
+                                } | null;
+                                /** @description What its entries are and what comes next, as a fetched Reference’s status. `needs_reconnect`: nothing is fetched until an admin reconnects. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `mapping_pending`: a changed mapping awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                    /** @enum {string} */
+                                    connectionStatus: "connected" | "needs_reconnect" | "disconnected";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "mapping_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    mappingPending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                                /** @description Which of the data source’s properties, by id, each entry field reads; the `title` property is always the source term. A property feeds one field at most. */
+                                mapping: {
+                                    /** @description The locale of the source terms (the `title` property) */
+                                    sourceLocale: string;
+                                    /**
+                                     * @description A `rich_text`, `select` or `status` property
+                                     * @default null
+                                     */
+                                    description: string | null;
+                                    /**
+                                     * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                                     * @default null
+                                     */
+                                    forbiddenVariants: string | null;
+                                    /** @default null */
+                                    doNotTranslate: ({
+                                        /** @enum {string} */
+                                        kind: "checkbox";
+                                        property: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "options";
+                                        /** @description A `select` or `status` property */
+                                        property: string;
+                                        /** @description The options meaning do-not-translate */
+                                        readonly optionIds: string[];
+                                    }) | null;
+                                    /**
+                                     * @description At most one property per locale, never the source locale
+                                     * @default []
+                                     */
+                                    readonly targets: {
+                                        locale: string;
+                                        /** @description A `rich_text`, `select` or `status` property */
+                                        property: string;
+                                    }[];
+                                };
+                                /** @description A changed mapping waiting on its first good fetch */
+                                pendingMapping: {
+                                    /** @description The locale of the source terms (the `title` property) */
+                                    sourceLocale: string;
+                                    /**
+                                     * @description A `rich_text`, `select` or `status` property
+                                     * @default null
+                                     */
+                                    description: string | null;
+                                    /**
+                                     * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                                     * @default null
+                                     */
+                                    forbiddenVariants: string | null;
+                                    /** @default null */
+                                    doNotTranslate: ({
+                                        /** @enum {string} */
+                                        kind: "checkbox";
+                                        property: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "options";
+                                        /** @description A `select` or `status` property */
+                                        property: string;
+                                        /** @description The options meaning do-not-translate */
+                                        readonly optionIds: string[];
+                                    }) | null;
+                                    /**
+                                     * @description At most one property per locale, never the source locale
+                                     * @default []
+                                     */
+                                    readonly targets: {
+                                        locale: string;
+                                        /** @description A `rich_text`, `select` or `status` property */
+                                        property: string;
+                                    }[];
+                                } | null;
+                                /** @description The last good fetch’s skipped and partly read rows, at most 100 */
+                                warnings: ({
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "skipped";
+                                    /** @enum {string} */
+                                    reason: "duplicate-term";
+                                    keptRow: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "skipped";
+                                    /** @enum {string} */
+                                    reason: "too-many-mentions" | "term-too-long";
+                                    property: string;
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "dnt-overrides-targets";
+                                    locales: string[];
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "description-too-long";
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "variant-skipped";
+                                    variant: string;
+                                    /** @enum {string} */
+                                    variantIssue: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                    otherTerm?: string;
+                                })[];
+                                /** @description How many more warnings there were */
+                                omittedWarnings: number;
+                                /** @description The data source’s properties as of the last good fetch (as of creation until one), naming the mapping’s property ids */
+                                readonly properties: ({
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "select" | "status";
+                                    readonly options: {
+                                        id: string;
+                                        name: string;
+                                    }[];
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "title" | "rich_text" | "multi_select" | "checkbox";
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "other";
+                                    /** @description A type no field reads, as the provider names it */
+                                    providerType: string;
+                                })[];
+                            } | {
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `repository`, one TBX or CSV glossary file of a GitHub repository, read through any of the organisation’s GitHub App installations that can see it
+                                 * @enum {string}
+                                 */
+                                sourceKind: "repository";
+                                /** @description Kept by id, so a rename or transfer keeps it */
+                                repository: {
+                                    /** @description GitHub’s repository id, fixed at creation */
+                                    id: number;
+                                    /** @description `owner/name` as the last good fetch read it */
+                                    fullName: string;
+                                };
+                                /** @description What its entries were fetched from (or will be, before a good fetch) */
+                                branch: string;
+                                /** @description From the repository’s root; `.tbx` or `.csv` names its format */
+                                path: string;
+                                /** @description A changed branch and path waiting on their first good fetch */
+                                pendingFile: {
+                                    branch: string;
+                                    path: string;
+                                } | null;
+                                /** @description The locale whose column or language section is the source terms, fixed at creation */
+                                sourceLocale: string;
+                                /** @description When the fetch its entries are from started; null until one succeeded */
+                                lastGoodFetchAt: string | null;
+                                /** @description The commit its last good fetch read the file at; null until one succeeded */
+                                lastFetchedCommitSha: string | null;
+                                lastAttempt: {
+                                    /** Format: date-time */
+                                    at: string;
+                                    /** @enum {string} */
+                                    outcome: "fetched" | "failed";
+                                    reason: ("repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows") | null;
+                                } | null;
+                                /** @description What its entries are and what comes next. `needs_reconnect`: the last fetch found no GitHub App installation of the organisation that can see the repository; Fetch now once one can — it recovers by itself. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `file_pending`: a changed branch and path await their first good fetch — under way (`fetching`), or not (Fetch now starts one); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed (`branch_missing`, `file_missing`, `unreadable`, `no_source_locale`, `no_usable_rows`, or GitHub not answering); runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "file_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    /** @description The failed fetch read the pending branch and path, which still wait */
+                                    filePending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                                /** @description The last good fetch’s skipped and partly read rows, columns and language sections, at most 100 */
+                                warnings: {
+                                    /** @enum {string} */
+                                    severity: "error" | "warning";
+                                    file: string;
+                                    /** @enum {string} */
+                                    code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                    message: string;
+                                    header?: string;
+                                    rowNumber?: number;
+                                    term?: string;
+                                    /** @enum {string} */
+                                    rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                    limit?: number;
+                                    glossaryName?: string;
+                                    variant?: string;
+                                    /** @enum {string} */
+                                    variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                    otherTerm?: string;
+                                }[];
+                                /** @description How many more warnings there were */
+                                omittedWarnings: number;
+                            }) | null;
                             projects: {
                                 id: string;
                                 name: string;
@@ -10906,8 +12371,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename a glossary
-         * @description Every Project and Workflow using the glossary sees the name, so a rename is logged.
+         * Rename a glossary, or change a fetched one’s mapping or file
+         * @description A new name — every Project and Workflow using the glossary sees it, so a rename is logged. For a glossary fetched from a repository, a new `file` (branch and path), checked live — an installation sees the repository, which has the branch — with the path ending `.tbx` or `.csv`: it waits as `fetched.pendingFile` while a fetch with it runs in the background, and replaces the branch and path only once one succeeds; a failed one keeps them and the entries, and says why in `fetched.status` (`filePending: true`). The current branch and path again drop a pending one and fetch nothing. Its repository and source locale are fixed: naming either is refused with 400 `BAD_REQUEST`. A file is refused with 400 `BAD_REQUEST` for a glossary not fetched from a repository or a path not ending `.tbx` or `.csv`, 404 `GLOSSARY_REPOSITORY_NOT_VISIBLE` when no installation of the organisation can see the repository, 404 `GLOSSARY_BRANCH_NOT_FOUND`, and 503 `GITHUB_UNREACHABLE` / `GITHUB_RATE_LIMITED` when GitHub doesn’t answer; it needs no Feature grant. For a Notion-fetched glossary, a new mapping, checked against its data source’s live schema: it waits as `fetched.pendingMapping` while a fetch with it runs in the background, and replaces the mapping only once one succeeds; runs keep the last good fetch’s entries meanwhile (the current mapping again drops a pending one). While its connection isn’t connected the mapping is checked against the last good fetch’s schema and waits, unfetched, until a fetch after reconnecting. The connection and data source are fixed at creation. A mapping is refused with 403 `FEATURE_REQUIRED` without `source_checks`, 400 `BAD_REQUEST` for a written glossary, one fetched from a repository (it has no mapping) or a mapping its schema doesn’t fit, 404 `DOCUMENT_DATA_SOURCE_NOT_VISIBLE` for a data source the connection can’t see, and 503 `DOCUMENT_CONNECTION_UNREACHABLE` when the provider doesn’t answer.
          */
         patch: {
             parameters: {
@@ -10921,7 +12386,58 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        name: string;
+                        name?: string;
+                        /** @description A Notion-fetched glossary’s new mapping, applied once a fetch with it succeeds */
+                        mapping?: {
+                            /** @description The locale of the source terms (the `title` property) */
+                            sourceLocale: string;
+                            /**
+                             * @description A `rich_text`, `select` or `status` property
+                             * @default null
+                             */
+                            description?: string | null;
+                            /**
+                             * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                             * @default null
+                             */
+                            forbiddenVariants?: string | null;
+                            /** @default null */
+                            doNotTranslate?: ({
+                                /** @enum {string} */
+                                kind: "checkbox";
+                                property: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "options";
+                                /** @description A `select` or `status` property */
+                                property: string;
+                                /** @description The options meaning do-not-translate */
+                                readonly optionIds: string[];
+                            }) | null;
+                            /**
+                             * @description At most one property per locale, never the source locale
+                             * @default []
+                             */
+                            readonly targets?: {
+                                locale: string;
+                                /** @description A `rich_text`, `select` or `status` property */
+                                property: string;
+                            }[];
+                        };
+                        /** @description A repository-fetched glossary’s new branch and path, applied once a fetch with them succeeds */
+                        file?: {
+                            branch: string;
+                            /** @description From the repository’s root, ending `.tbx` or `.csv`, which names its format, e.g. `docs/glossary.tbx` */
+                            path: string;
+                            /** @description Fixed at creation: refused. To read another repository, create another glossary */
+                            repositoryId?: unknown;
+                            /** @description Fixed at creation: refused. To read another locale, create another glossary */
+                            sourceLocale?: unknown;
+                        };
+                        /** @description Fixed at creation: refused. To read another repository, create another glossary */
+                        repositoryId?: unknown;
+                        /** @description Fixed at creation: refused. To read another locale, create another glossary */
+                        sourceLocale?: unknown;
                     };
                 };
             };
@@ -10936,8 +12452,454 @@ export interface paths {
                             id: string;
                             orgId: string;
                             name: string;
+                            /**
+                             * @description Fixed at creation: `written` in Globalize, or `fetched` from a Document connection’s data source or a repository’s glossary file, which refuses every manual write
+                             * @enum {string}
+                             */
+                            origin: "written" | "fetched";
                             /** Format: date-time */
                             createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            termCount: number;
+                            locales: string[];
+                            attachedProjectCount: number;
+                            workflowCount: number;
+                            repositoryManaged: {
+                                projectId: string;
+                                repositoryId: string;
+                                gitUrl: string;
+                                branch: string;
+                            } | null;
+                            /** @description A fetched glossary’s last good fetch; null until one, and for a written glossary */
+                            lastGoodFetchAt: string | null;
+                            fetched: ({
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `notion`, a data source read through a Document connection
+                                 * @enum {string}
+                                 */
+                                sourceKind: "notion";
+                                connection: {
+                                    id: string;
+                                    /** @enum {string} */
+                                    provider: "notion";
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "connected" | "needs_reconnect" | "disconnected";
+                                };
+                                dataSource: {
+                                    id: string;
+                                    title: string;
+                                };
+                                /** @description When the fetch its entries are from started; null until one succeeded */
+                                lastGoodFetchAt: string | null;
+                                lastAttempt: {
+                                    /** Format: date-time */
+                                    at: string;
+                                    /** @enum {string} */
+                                    outcome: "fetched" | "failed";
+                                    reason: ("item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift") | null;
+                                    property: {
+                                        id: string;
+                                        name: string;
+                                    } | null;
+                                } | null;
+                                /** @description What its entries are and what comes next, as a fetched Reference’s status. `needs_reconnect`: nothing is fetched until an admin reconnects. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `mapping_pending`: a changed mapping awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                    /** @enum {string} */
+                                    connectionStatus: "connected" | "needs_reconnect" | "disconnected";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "mapping_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift";
+                                        /** @description `mapping_drift`: the mapped property deleted or retyped */
+                                        property: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    mappingPending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                                /** @description Which of the data source’s properties, by id, each entry field reads; the `title` property is always the source term. A property feeds one field at most. */
+                                mapping: {
+                                    /** @description The locale of the source terms (the `title` property) */
+                                    sourceLocale: string;
+                                    /**
+                                     * @description A `rich_text`, `select` or `status` property
+                                     * @default null
+                                     */
+                                    description: string | null;
+                                    /**
+                                     * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                                     * @default null
+                                     */
+                                    forbiddenVariants: string | null;
+                                    /** @default null */
+                                    doNotTranslate: ({
+                                        /** @enum {string} */
+                                        kind: "checkbox";
+                                        property: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "options";
+                                        /** @description A `select` or `status` property */
+                                        property: string;
+                                        /** @description The options meaning do-not-translate */
+                                        readonly optionIds: string[];
+                                    }) | null;
+                                    /**
+                                     * @description At most one property per locale, never the source locale
+                                     * @default []
+                                     */
+                                    readonly targets: {
+                                        locale: string;
+                                        /** @description A `rich_text`, `select` or `status` property */
+                                        property: string;
+                                    }[];
+                                };
+                                /** @description A changed mapping waiting on its first good fetch */
+                                pendingMapping: {
+                                    /** @description The locale of the source terms (the `title` property) */
+                                    sourceLocale: string;
+                                    /**
+                                     * @description A `rich_text`, `select` or `status` property
+                                     * @default null
+                                     */
+                                    description: string | null;
+                                    /**
+                                     * @description A `multi_select`, or a `rich_text` split on `|`, `,`, `;` and newlines
+                                     * @default null
+                                     */
+                                    forbiddenVariants: string | null;
+                                    /** @default null */
+                                    doNotTranslate: ({
+                                        /** @enum {string} */
+                                        kind: "checkbox";
+                                        property: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "options";
+                                        /** @description A `select` or `status` property */
+                                        property: string;
+                                        /** @description The options meaning do-not-translate */
+                                        readonly optionIds: string[];
+                                    }) | null;
+                                    /**
+                                     * @description At most one property per locale, never the source locale
+                                     * @default []
+                                     */
+                                    readonly targets: {
+                                        locale: string;
+                                        /** @description A `rich_text`, `select` or `status` property */
+                                        property: string;
+                                    }[];
+                                } | null;
+                                /** @description The last good fetch’s skipped and partly read rows, at most 100 */
+                                warnings: ({
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "skipped";
+                                    /** @enum {string} */
+                                    reason: "duplicate-term";
+                                    keptRow: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "skipped";
+                                    /** @enum {string} */
+                                    reason: "too-many-mentions" | "term-too-long";
+                                    property: string;
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "dnt-overrides-targets";
+                                    locales: string[];
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "description-too-long";
+                                } | {
+                                    row: {
+                                        /** @description The row’s page id */
+                                        id: string;
+                                        title: string;
+                                        /** @description Where the provider opens the row; absent from a warning stored before it was kept */
+                                        url?: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    outcome: "partly-read";
+                                    /** @enum {string} */
+                                    reason: "variant-skipped";
+                                    variant: string;
+                                    /** @enum {string} */
+                                    variantIssue: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                    otherTerm?: string;
+                                })[];
+                                /** @description How many more warnings there were */
+                                omittedWarnings: number;
+                                /** @description The data source’s properties as of the last good fetch (as of creation until one), naming the mapping’s property ids */
+                                readonly properties: ({
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "select" | "status";
+                                    readonly options: {
+                                        id: string;
+                                        name: string;
+                                    }[];
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "title" | "rich_text" | "multi_select" | "checkbox";
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "other";
+                                    /** @description A type no field reads, as the provider names it */
+                                    providerType: string;
+                                })[];
+                            } | {
+                                /**
+                                 * @description Where its entries come from, fixed at creation: `repository`, one TBX or CSV glossary file of a GitHub repository, read through any of the organisation’s GitHub App installations that can see it
+                                 * @enum {string}
+                                 */
+                                sourceKind: "repository";
+                                /** @description Kept by id, so a rename or transfer keeps it */
+                                repository: {
+                                    /** @description GitHub’s repository id, fixed at creation */
+                                    id: number;
+                                    /** @description `owner/name` as the last good fetch read it */
+                                    fullName: string;
+                                };
+                                /** @description What its entries were fetched from (or will be, before a good fetch) */
+                                branch: string;
+                                /** @description From the repository’s root; `.tbx` or `.csv` names its format */
+                                path: string;
+                                /** @description A changed branch and path waiting on their first good fetch */
+                                pendingFile: {
+                                    branch: string;
+                                    path: string;
+                                } | null;
+                                /** @description The locale whose column or language section is the source terms, fixed at creation */
+                                sourceLocale: string;
+                                /** @description When the fetch its entries are from started; null until one succeeded */
+                                lastGoodFetchAt: string | null;
+                                /** @description The commit its last good fetch read the file at; null until one succeeded */
+                                lastFetchedCommitSha: string | null;
+                                lastAttempt: {
+                                    /** Format: date-time */
+                                    at: string;
+                                    /** @enum {string} */
+                                    outcome: "fetched" | "failed";
+                                    reason: ("repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows") | null;
+                                } | null;
+                                /** @description What its entries are and what comes next. `needs_reconnect`: the last fetch found no GitHub App installation of the organisation that can see the repository; Fetch now once one can — it recovers by itself. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so it has no entries. `file_pending`: a changed branch and path await their first good fetch — under way (`fetching`), or not (Fetch now starts one); runs use the last good fetch. `fetching`: a fetch is under way. `failed`: the last fetch failed (`branch_missing`, `file_missing`, `unreadable`, `no_source_locale`, `no_usable_rows`, or GitHub not answering); runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                status: {
+                                    /** @enum {string} */
+                                    state: "needs_reconnect";
+                                    fetchedAt: string | null;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "first_fetch_failed";
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    state: "file_pending";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    fetching: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "fetching";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "repository_not_visible" | "branch_missing" | "file_missing" | "unreadable" | "no_source_locale" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows";
+                                        /** @description `unreadable` / `no_source_locale`: what was wrong with the file */
+                                        finding: {
+                                            /** @enum {string} */
+                                            severity: "error" | "warning";
+                                            file: string;
+                                            /** @enum {string} */
+                                            code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                            message: string;
+                                            header?: string;
+                                            rowNumber?: number;
+                                            term?: string;
+                                            /** @enum {string} */
+                                            rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                            limit?: number;
+                                            glossaryName?: string;
+                                            variant?: string;
+                                            /** @enum {string} */
+                                            variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                            otherTerm?: string;
+                                        } | null;
+                                        /** Format: date-time */
+                                        at: string;
+                                    };
+                                    /** @description The failed fetch read the pending branch and path, which still wait */
+                                    filePending: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "current";
+                                    /** Format: date-time */
+                                    fetchedAt: string;
+                                };
+                                /** @description The last good fetch’s skipped and partly read rows, columns and language sections, at most 100 */
+                                warnings: {
+                                    /** @enum {string} */
+                                    severity: "error" | "warning";
+                                    file: string;
+                                    /** @enum {string} */
+                                    code: "no-asset-files" | "not-utf8" | "glossary-missing-source-column" | "glossary-missing-target-columns" | "glossary-row-cap-exceeded" | "glossary-column-locale-not-adopted" | "glossary-column-unrecognised" | "glossary-column-duplicate" | "glossary-row-skipped" | "glossary-files-conflict" | "glossary-tbx-malformed" | "glossary-tbx-dtd-refused" | "glossary-tbx-unsupported-structure" | "glossary-tbx-no-source-terms" | "glossary-tbx-no-target-languages" | "glossary-tbx-language-not-adopted" | "glossary-tbx-language-unrecognised" | "glossary-tbx-entry-skipped" | "glossary-tbx-extra-terms" | "glossary-tbx-synonyms-dropped" | "glossary-variant-skipped" | "glossary-description-too-long" | "style-guide-locale-not-adopted" | "style-guide-duplicate-locale" | "context-too-long" | "style-guide-too-long" | "file-too-large" | "unrecognised-file" | "glossary-file-overridden" | "export-failed" | "repository-unreadable" | "sync-failed";
+                                    message: string;
+                                    header?: string;
+                                    rowNumber?: number;
+                                    term?: string;
+                                    /** @enum {string} */
+                                    rowIssue?: "blank-source-term" | "no-translations" | "duplicate-term" | "dnt-overrides-translations" | "term-too-long";
+                                    limit?: number;
+                                    glossaryName?: string;
+                                    variant?: string;
+                                    /** @enum {string} */
+                                    variantIssue?: "too-long" | "preferred-term" | "duplicate" | "too-many" | "preferred-elsewhere" | "forbidden-elsewhere";
+                                    otherTerm?: string;
+                                }[];
+                                /** @description How many more warnings there were */
+                                omittedWarnings: number;
+                            }) | null;
+                            projects: {
+                                id: string;
+                                name: string;
+                                slug: string;
+                            }[];
+                            workflows: {
+                                id: string;
+                                name: string;
+                            }[];
+                            sourceLocales: {
+                                id: string | null;
+                                locale: string;
+                                name: string;
+                            }[];
+                            targetLocales: {
+                                id: string | null;
+                                locale: string;
+                                name: string;
+                            }[];
                         };
                     };
                 };
@@ -11066,12 +13028,12 @@ export interface paths {
         };
         /**
          * Preview who an edit to a glossary’s terminology reaches
-         * @description The non-archived Workflows whose Terminology check reads the glossary, by name, and whether that Check holds its Step (`blocking`). An edit to the preferred term, forbidden variants or description of an entry that holds, or comes to hold, a description or forbidden variant — or adding or deleting such an entry — has each Workflow translating from that entry’s source locale judge all its strings again on its next run; nothing else does. Advisory: the entry routes don’t ask for it. Open with or without `source_checks`.
+         * @description The non-archived Workflows whose Terminology check reads the glossary, by name, and whether that Check holds its Step (`blocking`). An edit to the preferred term, forbidden variants or description of an entry that holds, or comes to hold, a description or forbidden variant — or adding or deleting such an entry — has each Workflow whose source language is that entry’s source locale judge all its strings again on its next run; nothing else does. Advisory: the entry routes don’t ask for it. Open with or without `source_checks`.
          */
         get: {
             parameters: {
                 query?: {
-                    /** @description Only the Workflows translating from this locale, matched case-insensitively, as a run matches an entry’s source locale */
+                    /** @description Only the Workflows whose source language is this locale, matched case-insensitively, as a run matches an entry’s source locale */
                     sourceLocale?: string;
                 };
                 header?: never;
@@ -13065,7 +15027,7 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 /** @enum {string} */
-                                inputType: "github" | "contentful";
+                                inputType: "github" | "gitlab" | "contentful" | "chatwoot";
                                 /** @description When its newest run was created; `null` before its first */
                                 lastRunAt: string | null;
                             }[];
@@ -13074,7 +15036,7 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 /** @enum {string} */
-                                inputType: "github" | "contentful";
+                                inputType: "github" | "gitlab" | "contentful" | "chatwoot";
                                 /** @description When its newest run was created; `null` before its first */
                                 lastRunAt: string | null;
                             }[];
@@ -14408,7 +16370,7 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 /** @enum {string} */
-                                inputType: "github" | "contentful";
+                                inputType: "github" | "gitlab" | "contentful" | "chatwoot";
                                 /** @description Where its Input reads: the repository and branches, or the space and environment */
                                 location: string;
                                 /** @description Whether its current version links this Check Asset */
@@ -14777,7 +16739,7 @@ export interface paths {
                                     /** @enum {string} */
                                     status: "connected" | "needs_reconnect" | "disconnected";
                                 };
-                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection is being fetched; runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
                                 status: {
                                     /** @enum {string} */
                                     state: "needs_reconnect";
@@ -14807,6 +16769,7 @@ export interface paths {
                                     state: "selection_pending";
                                     /** Format: date-time */
                                     fetchedAt: string;
+                                    fetching: boolean;
                                 } | {
                                     /** @enum {string} */
                                     state: "fetching";
@@ -15045,7 +17008,7 @@ export interface paths {
                                     /** @enum {string} */
                                     status: "connected" | "needs_reconnect" | "disconnected";
                                 };
-                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection is being fetched; runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
                                 status: {
                                     /** @enum {string} */
                                     state: "needs_reconnect";
@@ -15075,6 +17038,7 @@ export interface paths {
                                     state: "selection_pending";
                                     /** Format: date-time */
                                     fetchedAt: string;
+                                    fetching: boolean;
                                 } | {
                                     /** @enum {string} */
                                     state: "fetching";
@@ -15328,7 +17292,7 @@ export interface paths {
                                     /** @enum {string} */
                                     status: "connected" | "needs_reconnect" | "disconnected";
                                 };
-                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection is being fetched; runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
                                 status: {
                                     /** @enum {string} */
                                     state: "needs_reconnect";
@@ -15358,6 +17322,7 @@ export interface paths {
                                     state: "selection_pending";
                                     /** Format: date-time */
                                     fetchedAt: string;
+                                    fetching: boolean;
                                 } | {
                                     /** @enum {string} */
                                     state: "fetching";
@@ -15771,7 +17736,7 @@ export interface paths {
                                     /** @enum {string} */
                                     status: "connected" | "needs_reconnect" | "disconnected";
                                 };
-                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection is being fetched; runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
                                 status: {
                                     /** @enum {string} */
                                     state: "needs_reconnect";
@@ -15801,6 +17766,7 @@ export interface paths {
                                     state: "selection_pending";
                                     /** Format: date-time */
                                     fetchedAt: string;
+                                    fetching: boolean;
                                 } | {
                                     /** @enum {string} */
                                     state: "fetching";
@@ -16188,7 +18154,7 @@ export interface paths {
         put?: never;
         /**
          * Fetch a fetched Reference now
-         * @description Fetches its selection (a pending one, if it has one) again, in the background: read `fetch.status` back until it is no longer `fetching`, `selection_pending` or `first_fetch`. One fetch runs per Reference at a time; a request made while one runs gets one more after it, and requests made together share one. Refused with 403 `FEATURE_REQUIRED` without `source_checks`, 400 `BAD_REQUEST` for a written Reference, and 409 `DOCUMENT_CONNECTION_NOT_CONNECTED` while its connection isn’t connected.
+         * @description Fetches its selection (a pending one, if it has one) again, in the background: read `fetch.status` back until it is no longer `fetching`, `selection_pending` with `fetching: true`, or `first_fetch`. One fetch runs per Reference at a time; a request made while one runs gets one more after it, and requests made together share one. Refused with 403 `FEATURE_REQUIRED` without `source_checks`, 400 `BAD_REQUEST` for a written Reference, and 409 `DOCUMENT_CONNECTION_NOT_CONNECTED` while its connection isn’t connected.
          */
         post: {
             parameters: {
@@ -16237,7 +18203,7 @@ export interface paths {
                                     /** @enum {string} */
                                     status: "connected" | "needs_reconnect" | "disconnected";
                                 };
-                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection is being fetched; runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
+                                /** @description What its Checks judge with and what comes next. `needs_reconnect`: its connection needs reconnecting, nothing is fetched until an admin does. `first_fetch` / `first_fetch_failed`: never fetched — under way, or the last attempt failed — so no Check can attach it. `selection_pending`: a changed selection awaits its first good fetch — under way (`fetching`), or waiting for one (`fetching: false`: requested while the connection wasn’t connected, so Fetch now starts it); runs use the previous one. `fetching`: a fetch is under way. `failed`: the last fetch failed; runs use the last good one (`fetchedAt`). `current`: the last fetch succeeded. */
                                 status: {
                                     /** @enum {string} */
                                     state: "needs_reconnect";
@@ -16267,6 +18233,7 @@ export interface paths {
                                     state: "selection_pending";
                                     /** Format: date-time */
                                     fetchedAt: string;
+                                    fetching: boolean;
                                 } | {
                                     /** @enum {string} */
                                     state: "fetching";
@@ -17184,7 +19151,7 @@ export interface paths {
                             id: string;
                             name: string;
                             description: string | null;
-                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                             active: boolean;
                             archived: boolean;
                             archivedAt: string | null;
@@ -17345,7 +19312,7 @@ export interface paths {
         put?: never;
         /**
          * Create a Workflow, publishing its definition as version 1
-         * @description Version 1 claims the repository it reads: refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when another Workflow holds it. A Contentful Workflow claims the environment it watches instead: refused with 409 `WORKFLOW_ENVIRONMENT_CLAIMED` when another Workflow watches that environment under any name, and with 400 `WORKFLOW_DEFINITION_INVALID` (`app_not_installed`, `source_language_mismatch`) when its live environment disagrees. `takeovers` lists the Project Repositories on the repository. With `previewHash`, refused with 409 `WORKFLOW_PREVIEW_STALE` when the claims or warnings changed since that preview.
+         * @description Version 1 claims the repository it reads: refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when another Workflow holds it. A Contentful Workflow claims the environment it watches instead: refused with 409 `WORKFLOW_ENVIRONMENT_CLAIMED` when another Workflow watches that environment under any name, and with 400 `WORKFLOW_DEFINITION_INVALID` (`app_not_installed`, `source_language_mismatch`) when its live environment disagrees. A Chatwoot Workflow claims its whole portal: refused with 409 `WORKFLOW_PORTAL_CLAIMED` when another Workflow of the organisation holds it, and with 400 `WORKFLOW_DEFINITION_INVALID` (`unknown_chatwoot_connection`, `chatwoot_connection_not_connected`, `chatwoot_connection_refused`, `unknown_chatwoot_portal`, `source_language_mismatch`) when its connection or live portal disagrees; 503 `CHATWOOT_UNREACHABLE` when Chatwoot doesn’t answer. Publishing starts no run. `takeovers` lists the Project Repositories on the repository. With `previewHash`, refused with 409 `WORKFLOW_PREVIEW_STALE` when the claims or warnings changed since that preview.
          */
         post: {
             parameters: {
@@ -17359,7 +19326,7 @@ export interface paths {
                     "application/json": {
                         name: string;
                         description?: string | null;
-                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
+                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context`, `glossaryId` and `attachedAssets`. `glossaryId` names the org glossary runs use in place of the asset source’s (an unknown one is refused with issue `unknown_glossary` at `glossaryId`); the translate Action no longer names it — a `glossaryId` in its config is refused with issue `translate_glossary_retired` at that path, even beside the top-level one, and a version stored with one is read with it lifted to the top level. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the Workflow’s `glossaryId` instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and Source checks — AI checks and the Terminology check, which reads the glossary the definition names or its asset source’s (QA is refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
                         definition: {
                             [key: string]: unknown;
                         };
@@ -17379,7 +19346,7 @@ export interface paths {
                             id: string;
                             name: string;
                             description: string | null;
-                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                             active: boolean;
                             archived: boolean;
                             archivedAt: string | null;
@@ -17561,7 +19528,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
+                        /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context`, `glossaryId` and `attachedAssets`. `glossaryId` names the org glossary runs use in place of the asset source’s (an unknown one is refused with issue `unknown_glossary` at `glossaryId`); the translate Action no longer names it — a `glossaryId` in its config is refused with issue `translate_glossary_retired` at that path, even beside the top-level one, and a version stored with one is read with it lifted to the top level. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the Workflow’s `glossaryId` instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and Source checks — AI checks and the Terminology check, which reads the glossary the definition names or its asset source’s (QA is refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
                         definition: {
                             [key: string]: unknown;
                         };
@@ -17620,7 +19587,7 @@ export interface paths {
                                     workflowName: string;
                                 } | null;
                             };
-                            /** @description What publishing would do to the Environment claim; `null` for a Workflow that reads a repository */
+                            /** @description What publishing would do to the Environment claim; `null` for a Workflow that reads a repository or a Chatwoot portal */
                             environment: {
                                 /** @description The environment name the version watches */
                                 watched: {
@@ -17639,10 +19606,25 @@ export interface paths {
                                     environmentId: string | null;
                                 } | null;
                             } | null;
-                            /** @description What publishing is allowed despite: `environment_unreported` (the App never reported the watched name, so it can’t be checked against other Workflows under other names), `existing_translations_replaced` (a published Contentful Workflow switches its existing translations to `replace`, so the next run reading an entry overwrites every value Globalize has no record of) and `target_locale_missing` (a declared language the watched environment has no locale for: runs translate it and write it nowhere, one warning per language). Covered by `previewHash`. */
+                            /** @description What publishing would do to the Portal claim; `null` for a Workflow that doesn’t read a Chatwoot portal */
+                            portal: {
+                                /** @description The Chatwoot portal the version reads, through its connection */
+                                claimed: {
+                                    connectionId: string;
+                                    portalId: number;
+                                };
+                                /** @description Whether it would claim the portal: only a Workflow not holding it now does */
+                                taken: boolean;
+                                /** @description The Workflow of the organisation holding the portal: publishing is refused with 409 `WORKFLOW_PORTAL_CLAIMED` */
+                                conflict: {
+                                    workflowId: string;
+                                    workflowName: string;
+                                } | null;
+                            } | null;
+                            /** @description What publishing is allowed despite: `environment_unreported` (the App never reported the watched name, so it can’t be checked against other Workflows under other names), `existing_translations_replaced` (a published Contentful or Chatwoot Workflow switches its existing translations to `replace`, so the next run reading an entry or article overwrites every value Globalize has no record of), `target_locale_missing` (a declared language the watched environment has no locale for, or the Chatwoot portal doesn’t allow: runs translate it and write it nowhere, one warning per language) and `terminology_check_without_glossary` (on a Terminology check whose Workflow names no glossary and has asset source `none`: it has no terms to check against and passes every string; a repository source isn’t warned about, as its glossary file may supply the terms). Covered by `previewHash`. */
                             warnings: {
                                 /** @enum {string} */
-                                code: "environment_unreported" | "existing_translations_replaced" | "target_locale_missing";
+                                code: "environment_unreported" | "existing_translations_replaced" | "target_locale_missing" | "terminology_check_without_glossary";
                                 message: string;
                                 path: (string | number)[];
                                 element?: {
@@ -17870,7 +19852,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
+            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context`, `glossaryId` and `attachedAssets`. `glossaryId` names the org glossary runs use in place of the asset source’s (an unknown one is refused with issue `unknown_glossary` at `glossaryId`); the translate Action no longer names it — a `glossaryId` in its config is refused with issue `translate_glossary_retired` at that path, even beside the top-level one, and a version stored with one is read with it lifted to the top level. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the Workflow’s `glossaryId` instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and Source checks — AI checks and the Terminology check, which reads the glossary the definition names or its asset source’s (QA is refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
             requestBody: {
                 content: {
                     "application/json": {
@@ -17930,7 +19912,7 @@ export interface paths {
                                     workflowName: string;
                                 } | null;
                             };
-                            /** @description What publishing would do to the Environment claim; `null` for a Workflow that reads a repository */
+                            /** @description What publishing would do to the Environment claim; `null` for a Workflow that reads a repository or a Chatwoot portal */
                             environment: {
                                 /** @description The environment name the version watches */
                                 watched: {
@@ -17949,10 +19931,25 @@ export interface paths {
                                     environmentId: string | null;
                                 } | null;
                             } | null;
-                            /** @description What publishing is allowed despite: `environment_unreported` (the App never reported the watched name, so it can’t be checked against other Workflows under other names), `existing_translations_replaced` (a published Contentful Workflow switches its existing translations to `replace`, so the next run reading an entry overwrites every value Globalize has no record of) and `target_locale_missing` (a declared language the watched environment has no locale for: runs translate it and write it nowhere, one warning per language). Covered by `previewHash`. */
+                            /** @description What publishing would do to the Portal claim; `null` for a Workflow that doesn’t read a Chatwoot portal */
+                            portal: {
+                                /** @description The Chatwoot portal the version reads, through its connection */
+                                claimed: {
+                                    connectionId: string;
+                                    portalId: number;
+                                };
+                                /** @description Whether it would claim the portal: only a Workflow not holding it now does */
+                                taken: boolean;
+                                /** @description The Workflow of the organisation holding the portal: publishing is refused with 409 `WORKFLOW_PORTAL_CLAIMED` */
+                                conflict: {
+                                    workflowId: string;
+                                    workflowName: string;
+                                } | null;
+                            } | null;
+                            /** @description What publishing is allowed despite: `environment_unreported` (the App never reported the watched name, so it can’t be checked against other Workflows under other names), `existing_translations_replaced` (a published Contentful or Chatwoot Workflow switches its existing translations to `replace`, so the next run reading an entry or article overwrites every value Globalize has no record of), `target_locale_missing` (a declared language the watched environment has no locale for, or the Chatwoot portal doesn’t allow: runs translate it and write it nowhere, one warning per language) and `terminology_check_without_glossary` (on a Terminology check whose Workflow names no glossary and has asset source `none`: it has no terms to check against and passes every string; a repository source isn’t warned about, as its glossary file may supply the terms). Covered by `previewHash`. */
                             warnings: {
                                 /** @enum {string} */
-                                code: "environment_unreported" | "existing_translations_replaced" | "target_locale_missing";
+                                code: "environment_unreported" | "existing_translations_replaced" | "target_locale_missing" | "terminology_check_without_glossary";
                                 message: string;
                                 path: (string | number)[];
                                 element?: {
@@ -18187,7 +20184,7 @@ export interface paths {
                             id: string;
                             name: string;
                             description: string | null;
-                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                             active: boolean;
                             archived: boolean;
                             archivedAt: string | null;
@@ -18378,7 +20375,7 @@ export interface paths {
                             id: string;
                             name: string;
                             description: string | null;
-                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                             active: boolean;
                             archived: boolean;
                             archivedAt: string | null;
@@ -18538,7 +20535,7 @@ export interface paths {
         get?: never;
         /**
          * Validate and publish a definition as the next version
-         * @description An identical definition publishes nothing and answers with the current version (`published: false`). Re-sending an older version’s definition publishes a new version equal to it (rollback). Removing, weakening (blocking to non-blocking), re-targeting or moving a published Gate — reordering its Step among the published Steps included — takes an admin signed in with a session: anyone else, an admin’s API key included, is refused with 403 `WORKFLOW_GATE_ADMIN_REQUIRED` (`details.gates`, as the preview’s `adminRequired`). The GitHub repository is fixed after create: a definition naming another repository id is refused with 400 `WORKFLOW_DEFINITION_INVALID` (issue `repository_changed`); its installation may change, and a rename keeps the id. The Workflow holds its repository from create on, so a publish takes it again only when it holds nothing: refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when another Workflow holds it. `takeovers` lists the Project Repositories on the repository. With `previewHash` (a query parameter: the body is the definition), refused with 409 `WORKFLOW_PREVIEW_STALE` when the claims or warnings changed since that preview. A Contentful Workflow may change the environment it watches, releasing its claim on the old name. A Linked Check (an `ai_check` config of `checkAssetId`, `blocking` and an optional `responsibleRoleId` and `model`) is refused with issue `unknown_check_asset` when its Check Asset is missing or another organisation’s, a rollback to a version linking a deleted one included. A Terminology check (`terminology_check`, config `blocking` and an optional `responsibleRoleId`, its criterion the run’s glossary) is refused with issue `action_count` past the first, like an AI check with `target_check` outside a Source Step and `feature_required` without Source checks. An AI check, inline or Linked, may name its own check `model` (a catalog tier), else it judges on the organisation’s default check model, else the system default; changing it judges nothing again. An inline AI check may attach References (`referenceIds`, ordered Reference ids, each once): one missing or another organisation’s is refused with issue `unknown_reference`, a fetched one never fetched yet with `reference_never_fetched`, and a list over 60,000 characters of text together with `references_over_cap` — unless that Check already attaches the same list in the current version. Pass `baseVersion` to refuse the publish with 409 `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`) when another version was published since, even for an identical definition; without it the last write wins.
+         * @description An identical definition publishes nothing and answers with the current version (`published: false`). Re-sending an older version’s definition publishes a new version equal to it (rollback). Removing, weakening (blocking to non-blocking), re-targeting or moving a published Gate — reordering its Step among the published Steps included — takes an admin signed in with a session: anyone else, an admin’s API key included, is refused with 403 `WORKFLOW_GATE_ADMIN_REQUIRED` (`details.gates`, as the preview’s `adminRequired`). The GitHub repository is fixed after create: a definition naming another repository id is refused with 400 `WORKFLOW_DEFINITION_INVALID` (issue `repository_changed`); its installation may change, and a rename keeps the id. The Workflow holds its repository from create on, so a publish takes it again only when it holds nothing: refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when another Workflow holds it. `takeovers` lists the Project Repositories on the repository. With `previewHash` (a query parameter: the body is the definition), refused with 409 `WORKFLOW_PREVIEW_STALE` when the claims or warnings changed since that preview. A Contentful Workflow may change the environment it watches, releasing its claim on the old name. A Chatwoot Workflow’s connection and portal are fixed after create: another is refused with issue `connection_changed` or `portal_changed`. A Linked Check (an `ai_check` config of `checkAssetId`, `blocking` and an optional `responsibleRoleId` and `model`) is refused with issue `unknown_check_asset` when its Check Asset is missing or another organisation’s, a rollback to a version linking a deleted one included. A Terminology check (`terminology_check`, config `blocking` and an optional `responsibleRoleId`, its criterion the run’s glossary) is refused with issue `action_count` past the first, like an AI check with `target_check` outside a Source Step and `feature_required` without Source checks. An AI check, inline or Linked, may name its own check `model` (a catalog tier), else it judges on the organisation’s default check model, else the system default; changing it judges nothing again. An inline AI check may attach References (`referenceIds`, ordered Reference ids, each once): one missing or another organisation’s is refused with issue `unknown_reference`, a fetched one never fetched yet with `reference_never_fetched`, and a list over 60,000 characters of text together with `references_over_cap` — unless that Check already attaches the same list in the current version. A fetched glossary named in `glossaryId` that has never fetched yet is refused with issue `glossary_never_fetched`, whatever the plan: one with a good fetch is accepted without Source checks. Pass `baseVersion` to refuse the publish with 409 `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`) when another version was published since, even for an identical definition; without it the last write wins.
          */
         put: {
             parameters: {
@@ -18556,7 +20553,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context` and `attachedAssets`. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the translate Action instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and AI checks (QA and the Terminology check are refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
+            /** @description A Workflow definition: `input`, `targetLanguages`, `steps`, `outputs`, `assets` and optional `context`, `glossaryId` and `attachedAssets`. `glossaryId` names the org glossary runs use in place of the asset source’s (an unknown one is refused with issue `unknown_glossary` at `glossaryId`); the translate Action no longer names it — a `glossaryId` in its config is refused with issue `translate_glossary_retired` at that path, even beside the top-level one, and a version stored with one is read with it lifted to the top level. Elements without an `id` are new; an unknown `id` is refused. `assets.source` is `repository` or `none`: `project` is refused with issue `project_assets_retired` at `assets` (a version stored with it still runs) — attach the Project’s style guide and context Assets and name its glossary in the Workflow’s `glossaryId` instead. The translate Action is optional: a Workflow without one doesn’t translate — every Step is a Source Step holding only Approval gates and Source checks — AI checks and the Terminology check, which reads the glossary the definition names or its asset source’s (QA is refused with issue `action_needs_translate`), it needs at least one Step (`no_steps`), and it declares and discovers no target language (`target_languages_without_translate`); one with it needs target languages (`no_target_languages`). */
             requestBody: {
                 content: {
                     "application/json": {
@@ -18577,7 +20574,7 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 description: string | null;
-                                /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                                /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                                 active: boolean;
                                 archived: boolean;
                                 archivedAt: string | null;
@@ -18746,8 +20743,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Check the link from a Workflow to the GitHub repository it reads
-         * @description The connection verdict of the GitHub Input of the Workflow’s current version, computed now: one `blocker` and its `degradations`, each a finding with its `reason`, `severity` and repair `action`. Tier 1, from stored rows: `installation_missing`, `installation_deleted` (no live installation of the organisation can see the repository: install the App), `installation_suspended`, `workflow_inactive` (a live installation can serve it: reconnect). Tier 2, asked of GitHub: `permissions_missing`, `repository_inaccessible`, `repository_missing` (archive: a Workflow’s repository never changes), and the degraded `branch_missing`. `status: unknown` with `provider_rate_limited`, `provider_unavailable` or `checks_unavailable` when GitHub could not be asked — that says nothing about the connection. 400 `BAD_REQUEST` for a Workflow that reads no GitHub repository.
+         * Check the link from a Workflow to the GitHub or GitLab repository it reads
+         * @description The connection verdict of the GitHub or GitLab Input of the Workflow’s current version, computed now: one `blocker` and its `degradations`, each a finding with its `reason`, `severity` and repair `action`. For GitHub — Tier 1, from stored rows: `installation_missing`, `installation_deleted` (no live installation of the organisation can see the repository: install the App), `installation_suspended`, `workflow_inactive` (a live installation can serve it: reconnect); Tier 2, asked of GitHub: `permissions_missing`, `repository_inaccessible`, `repository_missing` (archive: a Workflow’s repository never changes), and the degraded `branch_missing`. For GitLab — Tier 1: `connection_missing`, `connection_revoked`, `connection_expired` (no active connection of the organisation can read the project: connect GitLab), `workflow_inactive` (an active connection can serve it: reconnect); Tier 2, asked of GitLab through the connection: `gitlab_project_missing`, `gitlab_webhook_missing` (reconnect registers it again), and the degraded `branch_missing`. `status: unknown` with `provider_rate_limited`, `provider_unavailable` or `checks_unavailable` when the provider could not be asked — that says nothing about the connection. 400 `BAD_REQUEST` for a Workflow that reads no GitHub or GitLab repository.
          */
         get: {
             parameters: {
@@ -18799,6 +20796,30 @@ export interface paths {
                                 };
                             } | {
                                 /** @enum {string} */
+                                reason: "connection_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "connect_gitlab";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
+                                reason: "connection_revoked";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_gitlab";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
+                                reason: "connection_expired";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_gitlab";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
                                 reason: "workflow_inactive";
                                 /** @enum {string} */
                                 severity: "blocking";
@@ -18837,6 +20858,24 @@ export interface paths {
                                 evidence: {
                                     repoPath: string;
                                 };
+                            } | {
+                                /** @enum {string} */
+                                reason: "gitlab_project_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_gitlab";
+                                evidence: {
+                                    repoPath: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "gitlab_webhook_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "recreate_webhook";
+                                evidence: Record<string, never>;
                             } | {
                                 /** @enum {string} */
                                 reason: "branch_missing";
@@ -18908,6 +20947,30 @@ export interface paths {
                                 };
                             } | {
                                 /** @enum {string} */
+                                reason: "connection_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "connect_gitlab";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
+                                reason: "connection_revoked";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_gitlab";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
+                                reason: "connection_expired";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_gitlab";
+                                evidence: Record<string, never>;
+                            } | {
+                                /** @enum {string} */
                                 reason: "workflow_inactive";
                                 /** @enum {string} */
                                 severity: "blocking";
@@ -18946,6 +21009,24 @@ export interface paths {
                                 evidence: {
                                     repoPath: string;
                                 };
+                            } | {
+                                /** @enum {string} */
+                                reason: "gitlab_project_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "reconnect_gitlab";
+                                evidence: {
+                                    repoPath: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                reason: "gitlab_webhook_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                /** @enum {string} */
+                                action: "recreate_webhook";
+                                evidence: Record<string, never>;
                             } | {
                                 /** @enum {string} */
                                 reason: "branch_missing";
@@ -19137,8 +21218,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reconnect a GitHub Workflow, publishing a version that names a live installation
-         * @description Publishes the current version with only its installation changed — to the organisation’s live installation that can see the repository, by its GitHub id — which reactivates the Workflow. When the installation it names is already live, nothing is published (`published: false`) and the Workflow is reactivated. Any member may reconnect. 409 `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`) when `baseVersion` is no longer current; 409 `WORKFLOW_NO_INSTALLATION` when no live installation can see the repository, or the one it names is suspended; 409 `WORKFLOW_ARCHIVED`; 503 `GITHUB_UNREACHABLE` when GitHub could not be asked — retry. 400 `BAD_REQUEST` for a Workflow that reads no GitHub repository.
+         * Reconnect a GitHub or GitLab Workflow, publishing a version that names a live installation or connection
+         * @description Publishes the current version with only its GitHub installation, or GitLab connection, changed — to the organisation’s live installation that can see the repository, or active GitLab connection whose user can read the project, by its id — which reactivates the Workflow. When the one it names is already live, nothing is published (`published: false`) and the Workflow is reactivated; for GitLab a missing project hook is registered again. Any member may reconnect. 409 `WORKFLOW_BASE_VERSION_STALE` (`details.currentVersion`) when `baseVersion` is no longer current; 409 `WORKFLOW_NO_INSTALLATION` when no live installation can see the repository, or the one it names is suspended; 409 `WORKFLOW_NO_GITLAB_CONNECTION` when no active GitLab connection can read the project; 409 `WORKFLOW_ARCHIVED`; 503 `GITHUB_UNREACHABLE` or `GITLAB_UNREACHABLE` when the provider could not be asked — retry. 400 `BAD_REQUEST` for a Workflow that reads no GitHub or GitLab repository.
          */
         post: {
             parameters: {
@@ -19170,7 +21251,7 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 description: string | null;
-                                /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                                /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                                 active: boolean;
                                 archived: boolean;
                                 archivedAt: string | null;
@@ -19534,7 +21615,7 @@ export interface paths {
                             id: string;
                             name: string;
                             description: string | null;
-                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                             active: boolean;
                             archived: boolean;
                             archivedAt: string | null;
@@ -19728,7 +21809,7 @@ export interface paths {
                             id: string;
                             name: string;
                             description: string | null;
-                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                             active: boolean;
                             archived: boolean;
                             archivedAt: string | null;
@@ -20789,8 +22870,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Preview setting up a Workflow for a GitHub repository, writing nothing
-         * @description Resolves the repository through the App installation, detects its locale files on the first branch, and proposes a Workflow with the builder’s defaults (Translate → QA → GitHub Output, pull requests translated, import `ignore`, the detected targets declared and discovery off, named `owner/repo`), each override applied. Answers, in order: `alreadySetUp` when a Workflow holds the repository, whatever any Project on it does (a Project migrated to a Workflow keeps its work); `needs` when a field can’t be filled — a language is never guessed, and a repository with no locale files has nothing to translate yet (that need names the `globalize-guide` skill, which sets up i18n, and links the Setup Guide, where a managed Conversion writes them); otherwise `ready`, with `previewHash` to confirm with `POST /api/workflows/setup`. Creates nothing, not even a translation memory, and starts no run. Refused with 409 `REPOSITORY_HELD_BY_PROJECT` when no Workflow holds the repository and a Project with work on it (patterns, a Conversion running or with its pull request open, or translations) does: `details` names the Project and its Repository row; continue on it with the Project tools, as migrating it to a Workflow is optional (web only, admin only). A Project with no such work (an Idle Project) does not refuse: its pattern-less rows are taken over. 404 `NOT_FOUND` when the installation is not this organisation’s, or it can’t see the repository or the first branch. 404 `TRANSLATION_MEMORY_NOT_FOUND` for a `translationMemoryId` the organisation has none of. 400 `WORKFLOW_DEFINITION_INVALID` when an override makes the definition invalid (`details.issues`).
+         * Preview setting up a Workflow for a GitHub or GitLab repository, writing nothing
+         * @description The body names a GitHub repository (`installationId` and `owner/repo`), or with `provider: "gitlab"` a GitLab one (`connectionId` and the project’s id or path); a body with no `provider` is GitHub’s. Resolves the repository through the App installation or GitLab connection, detects its locale files on the first branch, and proposes a Workflow with the builder’s defaults (Translate → QA → GitHub or GitLab Output, pull or merge requests translated, import `ignore`, the detected targets declared and discovery off, named `owner/repo` or the GitLab path), each override applied. Answers, in order: `alreadySetUp` when a Workflow holds the repository, whatever any Project on it does (a Project migrated to a Workflow keeps its work); `needs` when a field can’t be filled — a language is never guessed, and a repository with no locale files has nothing to translate yet (that need names the `globalize-guide` skill, which sets up i18n, and links the Setup Guide, where a managed Conversion writes them); otherwise `ready`, with `previewHash` to confirm with `POST /api/workflows/setup`. Creates nothing, not even a translation memory, and starts no run. Refused with 409 `REPOSITORY_HELD_BY_PROJECT` when no Workflow holds the repository and a Project with work on it (patterns, a Conversion running or with its pull request open, or translations) does: `details` names the Project and its Repository row; continue on it with the Project tools, as migrating it to a Workflow is optional (web only, admin only). A Project with no such work (an Idle Project) does not refuse: its pattern-less rows are taken over. 404 `NOT_FOUND` when the installation or GitLab connection is not this organisation’s, or it can’t see the repository or the first branch. 409 `WORKFLOW_NO_GITLAB_CONNECTION` when the GitLab connection needs authorising again. 404 `TRANSLATION_MEMORY_NOT_FOUND` for a `translationMemoryId` the organisation has none of. 400 `WORKFLOW_DEFINITION_INVALID` when an override makes the definition invalid (`details.issues`). 503 `GITHUB_RATE_LIMITED` when GitHub throttled the installation: retry after `details.retryAfterSeconds`, also sent as `Retry-After`; 503 `GITLAB_UNREACHABLE` when GitLab could not be asked.
          */
         post: {
             parameters: {
@@ -20802,6 +22883,11 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /**
+                         * @description `github` (the default) or `gitlab`, which takes `connectionId` instead.
+                         * @enum {string}
+                         */
+                        provider?: "github";
                         /** @description GitHub’s numeric App installation id (`installationId` of `GET /api/github/installations`); it must be this organisation’s */
                         installationId: number;
                         /** @description `owner/repo`, any case. Its numeric id is resolved through the installation. */
@@ -20823,7 +22909,46 @@ export interface paths {
                         sourceLanguage?: string;
                         /** @description Declared targets in place of the detected ones, taken as given. */
                         targetLanguages?: string[];
-                        /** @description Default: the repository’s `owner/repo`. */
+                        /** @description Default: the repository’s `owner/repo`, or its GitLab `pathWithNamespace`. */
+                        name?: string;
+                        /**
+                         * Format: uuid
+                         * @description An existing translation memory of the organisation (404 `TRANSLATION_MEMORY_NOT_FOUND` otherwise). Absent, confirm creates one named after the Workflow.
+                         */
+                        translationMemoryId?: string;
+                        /**
+                         * @description What the first run does with translations already in the target files: `ignore` (default) translates every string afresh and writes over them; `reviewed` or `translated` imports them at that status.
+                         * @enum {string}
+                         */
+                        import?: "ignore" | "reviewed" | "translated";
+                    } | {
+                        /** @enum {string} */
+                        provider: "gitlab";
+                        /**
+                         * Format: uuid
+                         * @description A GitLab connection of the organisation (`id` of `GET /api/gitlab/connections`); it must be `active`
+                         */
+                        connectionId: string;
+                        /** @description GitLab’s numeric project id, or its `pathWithNamespace` (`group/subgroup/project`). The id published is the one GitLab answers through the connection. */
+                        repository: number | string;
+                        /** @description Watched branches, in order; detection reads the first. Default: the repository’s default branch. */
+                        branches?: string[];
+                        /** @description Patterns in place of detection’s. With them, no `patterns` need is answered: a setup may sit on a branch with no locale files yet. */
+                        patterns?: {
+                            /** @description A locale path pattern with `{locale}` */
+                            pattern: string;
+                            /** @enum {string} */
+                            format: "json-flat" | "arb" | "xcstrings" | "chrome-messages" | "wxt-i18n" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "yaml-rails" | "android-strings" | "html" | "markdown";
+                            /** @description How this pattern’s files spell a locale, where that differs (`pt-BR` → `pt_BR`) */
+                            pathLocales?: {
+                                [key: string]: string;
+                            };
+                        }[];
+                        /** @description In place of the detected source; respelled to the language catalog’s spelling. */
+                        sourceLanguage?: string;
+                        /** @description Declared targets in place of the detected ones, taken as given. */
+                        targetLanguages?: string[];
+                        /** @description Default: the repository’s `owner/repo`, or its GitLab `pathWithNamespace`. */
                         name?: string;
                         /**
                          * Format: uuid
@@ -20936,7 +23061,7 @@ export interface paths {
                             }[];
                             warnings: {
                                 /** @enum {string} */
-                                code: "environment_unreported" | "existing_translations_replaced" | "target_locale_missing";
+                                code: "environment_unreported" | "existing_translations_replaced" | "target_locale_missing" | "terminology_check_without_glossary";
                                 message: string;
                                 path: (string | number)[];
                                 element?: {
@@ -21092,8 +23217,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Set up a Workflow for a GitHub repository, as previewed
-         * @description Takes the preview’s body plus its `previewHash`, re-runs the preview, and publishes its definition as version 1, taking the Repository claim; a new translation memory is created with it, and none is left behind when the publish is refused. Starts no run. Refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when a Workflow holds the repository — a retried confirm included, so it never creates a second Workflow — and with 409 `WORKFLOW_PREVIEW_STALE` (the fresh preview in `details.preview`) when the preview now answers anything else: detection, the claims or the warnings changed, or a field now can’t be filled. Refused with 409 `REPOSITORY_HELD_BY_PROJECT` when no Workflow holds the repository and a Project with work on it (patterns, a Conversion running or with its pull request open, or translations) does: `details` names the Project and its Repository row; continue on it with the Project tools, as migrating it to a Workflow is optional (web only, admin only). A Project with no such work (an Idle Project) does not refuse: its pattern-less rows are taken over. 404 `NOT_FOUND` when the installation is not this organisation’s, or it can’t see the repository or the first branch. 404 `TRANSLATION_MEMORY_NOT_FOUND` for a `translationMemoryId` the organisation has none of. 400 `WORKFLOW_DEFINITION_INVALID` when an override makes the definition invalid (`details.issues`).
+         * Set up a Workflow for a GitHub or GitLab repository, as previewed
+         * @description Takes the preview’s body plus its `previewHash`, re-runs the preview, and publishes its definition as version 1, taking the Repository claim; a new translation memory is created with it, and none is left behind when the publish is refused. A GitLab Workflow’s project hook is registered through its connection, which takes a Maintainer: refused with 400 `WORKFLOW_DEFINITION_INVALID` (issue `gitlab_hook_registration_failed`) when GitLab refuses it. Starts no run. Refused with 409 `WORKFLOW_REPOSITORY_CLAIMED` when a Workflow holds the repository — a retried confirm included, so it never creates a second Workflow — and with 409 `WORKFLOW_PREVIEW_STALE` (the fresh preview in `details.preview`) when the preview now answers anything else: detection, the claims or the warnings changed, or a field now can’t be filled. Refused with 409 `REPOSITORY_HELD_BY_PROJECT` when no Workflow holds the repository and a Project with work on it (patterns, a Conversion running or with its pull request open, or translations) does: `details` names the Project and its Repository row; continue on it with the Project tools, as migrating it to a Workflow is optional (web only, admin only). A Project with no such work (an Idle Project) does not refuse: its pattern-less rows are taken over. 404 `NOT_FOUND` when the installation or GitLab connection is not this organisation’s, or it can’t see the repository or the first branch. 409 `WORKFLOW_NO_GITLAB_CONNECTION` when the GitLab connection needs authorising again. 404 `TRANSLATION_MEMORY_NOT_FOUND` for a `translationMemoryId` the organisation has none of. 400 `WORKFLOW_DEFINITION_INVALID` when an override makes the definition invalid (`details.issues`). 503 `GITHUB_RATE_LIMITED` when GitHub throttled the installation: retry after `details.retryAfterSeconds`, also sent as `Retry-After`; 503 `GITLAB_UNREACHABLE` when GitLab could not be asked.
          */
         post: {
             parameters: {
@@ -21105,6 +23230,11 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /**
+                         * @description `github` (the default) or `gitlab`, which takes `connectionId` instead.
+                         * @enum {string}
+                         */
+                        provider?: "github";
                         /** @description GitHub’s numeric App installation id (`installationId` of `GET /api/github/installations`); it must be this organisation’s */
                         installationId: number;
                         /** @description `owner/repo`, any case. Its numeric id is resolved through the installation. */
@@ -21126,7 +23256,48 @@ export interface paths {
                         sourceLanguage?: string;
                         /** @description Declared targets in place of the detected ones, taken as given. */
                         targetLanguages?: string[];
-                        /** @description Default: the repository’s `owner/repo`. */
+                        /** @description Default: the repository’s `owner/repo`, or its GitLab `pathWithNamespace`. */
+                        name?: string;
+                        /**
+                         * Format: uuid
+                         * @description An existing translation memory of the organisation (404 `TRANSLATION_MEMORY_NOT_FOUND` otherwise). Absent, confirm creates one named after the Workflow.
+                         */
+                        translationMemoryId?: string;
+                        /**
+                         * @description What the first run does with translations already in the target files: `ignore` (default) translates every string afresh and writes over them; `reviewed` or `translated` imports them at that status.
+                         * @enum {string}
+                         */
+                        import?: "ignore" | "reviewed" | "translated";
+                        /** @description The `previewHash` of the setup preview being confirmed */
+                        previewHash: string;
+                    } | {
+                        /** @enum {string} */
+                        provider: "gitlab";
+                        /**
+                         * Format: uuid
+                         * @description A GitLab connection of the organisation (`id` of `GET /api/gitlab/connections`); it must be `active`
+                         */
+                        connectionId: string;
+                        /** @description GitLab’s numeric project id, or its `pathWithNamespace` (`group/subgroup/project`). The id published is the one GitLab answers through the connection. */
+                        repository: number | string;
+                        /** @description Watched branches, in order; detection reads the first. Default: the repository’s default branch. */
+                        branches?: string[];
+                        /** @description Patterns in place of detection’s. With them, no `patterns` need is answered: a setup may sit on a branch with no locale files yet. */
+                        patterns?: {
+                            /** @description A locale path pattern with `{locale}` */
+                            pattern: string;
+                            /** @enum {string} */
+                            format: "json-flat" | "arb" | "xcstrings" | "chrome-messages" | "wxt-i18n" | "json-nested" | "xliff-1" | "xliff-2" | "po" | "yaml-rails" | "android-strings" | "html" | "markdown";
+                            /** @description How this pattern’s files spell a locale, where that differs (`pt-BR` → `pt_BR`) */
+                            pathLocales?: {
+                                [key: string]: string;
+                            };
+                        }[];
+                        /** @description In place of the detected source; respelled to the language catalog’s spelling. */
+                        sourceLanguage?: string;
+                        /** @description Declared targets in place of the detected ones, taken as given. */
+                        targetLanguages?: string[];
+                        /** @description Default: the repository’s `owner/repo`, or its GitLab `pathWithNamespace`. */
                         name?: string;
                         /**
                          * Format: uuid
@@ -21154,7 +23325,7 @@ export interface paths {
                             id: string;
                             name: string;
                             description: string | null;
-                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                            /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                             active: boolean;
                             archived: boolean;
                             archivedAt: string | null;
@@ -21432,7 +23603,7 @@ export interface paths {
                                     reason: "invalid_locale" | "invalid_value" | "invalid_path_locale";
                                 }[];
                             }[];
-                            /** @description `null` while no retirement date is set */
+                            /** @description `null` while no retirement date is set, and for a Retired Project */
                             automaticMigration: {
                                 /**
                                  * Format: date
@@ -21626,7 +23797,7 @@ export interface paths {
                                 id: string;
                                 name: string;
                                 description: string | null;
-                                /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, or a Contentful Input’s space linked to this organisation. An inactive Workflow starts no runs. */
+                                /** @description Whether its Input’s connection is healthy: a GitHub Input’s credentials, a Contentful Input’s space linked to this organisation, or a Chatwoot Input’s connection `connected`. An inactive Workflow starts no runs. */
                                 active: boolean;
                                 archived: boolean;
                                 archivedAt: string | null;
@@ -21997,8 +24168,55 @@ export interface paths {
                                     id: string;
                                     number: number;
                                 };
-                                /** @description What started the run. A GitHub Input’s run — by hand (`manual`), a push or a pull request — names the watched branch and the commit it pinned; a Contentful Input’s — by hand (`manual`, the whole selection), entries published or edited (`contentful_change`) or the App’s entry sidebar (`sidebar_request`) — names the space and the watched environment */
+                                /** @description What started the run. A GitHub Input’s run — by hand (`manual`), a push or a pull request — names the watched branch and the commit it pinned, and a GitLab Input’s (`provider: gitlab`) the same with a merge request (`merge_request`) for a pull request; a Contentful Input’s — by hand (`manual`, the whole selection), entries published or edited (`contentful_change`) or the App’s entry sidebar (`sidebar_request`) — names the space and the watched environment; a Chatwoot Input’s — by hand (`manual`, the whole selection) or a Portal poll that found changes (`portal_poll`, those articles and every selected category) — names the portal */
                                 trigger: {
+                                    /** @enum {string} */
+                                    provider: "gitlab";
+                                    /** @enum {string} */
+                                    kind: "manual";
+                                    branch: string;
+                                    commit: string;
+                                    /** @enum {string} */
+                                    delivery?: "pr" | "push";
+                                    requestedBy: string | null;
+                                    /** @description The repository as GitLab named it: its id, and its path at the time */
+                                    repository: {
+                                        id: number;
+                                        pathWithNamespace: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    provider: "gitlab";
+                                    /** @enum {string} */
+                                    kind: "push";
+                                    branch: string;
+                                    /** @description The pushed commit (`after`) */
+                                    commit: string;
+                                    /** @description The repository as GitLab named it: its id, and its path at the time */
+                                    repository: {
+                                        id: number;
+                                        pathWithNamespace: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    provider: "gitlab";
+                                    /** @enum {string} */
+                                    kind: "merge_request";
+                                    /** @description The merge request’s target: the watched branch */
+                                    branch: string;
+                                    /** @description The merge request’s head commit */
+                                    commit: string;
+                                    /** @description The repository as GitLab named it: its id, and its path at the time */
+                                    repository: {
+                                        id: number;
+                                        pathWithNamespace: string;
+                                    };
+                                    mergeRequest: {
+                                        iid: number;
+                                        baseBranch: string;
+                                        headBranch: string;
+                                    };
+                                } | {
                                     /** @enum {string} */
                                     kind: "manual";
                                     branch: string;
@@ -22068,7 +24286,33 @@ export interface paths {
                                     entryIds: string[];
                                     /** @description The Contentful user who asked, by id */
                                     requestedBy: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "manual";
+                                    /** @description The Chatwoot portal the run reads */
+                                    portalId: number;
+                                    requestedBy: string | null;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "portal_poll";
+                                    /** @description The Chatwoot portal the run reads */
+                                    portalId: number;
+                                    /** @description When the Portal poll looked */
+                                    checkedAt: string;
+                                    /** @description The published source articles it found changed or newly selected */
+                                    articleIds: number[];
+                                    /** @description The categories whose name or description it found changed; the run reads every selected category either way */
+                                    categoryIds: number[];
                                 };
+                                /** @description Who started a `manual` run, while they are a known user; `null` for any other Trigger, and for a run started through an API key with no user */
+                                startedBy: {
+                                    clerkUserId: string;
+                                    /** Format: email */
+                                    email: string;
+                                    firstName: string | null;
+                                    lastName: string | null;
+                                    imageUrl: string | null;
+                                } | null;
                                 /** @description The pinned commit SHA; the run reads its source only from it. `null` for a Contentful Input’s run, which reads each entry at its latest version when it starts */
                                 commit: string | null;
                                 /** @description Whether the pinned version translates. `false`: a Workflow that doesn’t translate — every Step is a Source Step, the run resolves no target language and never has a Lane */
@@ -22241,12 +24485,21 @@ export interface paths {
                                     };
                                     /** @description A Terminology check’s glossary and source terms; absent from any other Check */
                                     terminology?: {
-                                        /** @description The org glossary the run’s translate Action names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
+                                        /** @description The org glossary the run’s Workflow names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
                                         glossary: {
                                             /** @description The org glossary */
                                             id: string;
                                             /** @description Whether its entries’ preferred terms, forbidden variants or descriptions in the run’s source locale now differ from what the run judged with. An edit never releases a held run */
                                             editedSince: boolean;
+                                            /** @description A fetched glossary’s fetch as the run started, whatever was fetched since; `null` for a written glossary */
+                                            fetch: {
+                                                /** @description When the fetch whose entries the run translated and judged with started. Each run start fetches a glossary fetched from Notion its Workflow names, reusing a fetch under a minute old; never one fetched from a repository */
+                                                fetchedAt: string;
+                                                /** @description Why the run start’s own fetch failed — `timeout` when it ran past the run start’s ~30-second wait — so the run used the last good fetch, of `fetchedAt`; `null` when it didn’t fail. `unauthorized`: the connection needs reconnecting */
+                                                refreshFailure: ("item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift") | null;
+                                                /** @description The commit a glossary fetched from a repository was read at by the fetch whose entries the run translated and judged with; `null` for one fetched from Notion, or a run recorded before commits were kept */
+                                                commitSha: string | null;
+                                            } | null;
                                         } | null;
                                         /** @description The run had no source terms: no glossary entry of its source locale held a description or a forbidden variant, so every string passed */
                                         noSourceTerms: boolean;
@@ -22309,9 +24562,12 @@ export interface paths {
                                 outputs: {
                                     /** @description The Output’s id in the pinned definition */
                                     id: string;
-                                    /** @description `github` or `contentful`: the shape of `outcome` */
-                                    type: string;
-                                    /** @description What the Output’s latest delivery did: `delivered`, `failed` or `skipped` (with a `reason`); `null` until it has run. Independent of the run’s `status`. A Contentful Output’s names the environment written, the Delivery attempt (`attemptId`) and its entry `counts` (written, published, drafts, already current, skipped, failed) — or, for an attempt that failed as a whole, the `failure` instead */
+                                    /**
+                                     * @description The shape of `outcome`: a GitLab Output’s is a GitHub one’s, its merge request in `pullRequest` (`number` is its iid)
+                                     * @enum {string}
+                                     */
+                                    type: "github" | "gitlab" | "contentful" | "chatwoot";
+                                    /** @description What the Output’s latest delivery did: `delivered`, `failed` or `skipped` (with a `reason`; a GitHub Output’s `failed` names its `reason` too: `no_files`, `branch_missing`, `access_lost`, `push_rejected`, `unavailable`, `interrupted`, `unexpected`); `null` until it has run. Independent of the run’s `status`. A Contentful Output’s names the environment written, the Delivery attempt (`attemptId`) and its entry `counts` (written, published, drafts, already current, skipped, failed) — or, for an attempt that failed as a whole, the `failure` instead. A Chatwoot Output’s names the portal written, the Delivery attempt and its `counts` of article and category translations (one per item × target locale: written, already current, skipped, failed), and any `undelivered` languages the portal doesn’t allow — or the `failure` of an attempt that failed as a whole */
                                     outcome: (({
                                         /** @enum {string} */
                                         status: "delivered";
@@ -22349,7 +24605,11 @@ export interface paths {
                                         method: "pr" | "push";
                                         /** Format: date-time */
                                         recordedAt: string;
-                                        error: string;
+                                        /**
+                                         * @default unexpected
+                                         * @enum {string}
+                                         */
+                                        reason: "no_files" | "branch_missing" | "access_lost" | "push_rejected" | "unavailable" | "interrupted" | "unexpected";
                                     } | {
                                         /** @enum {string} */
                                         status: "skipped";
@@ -22442,20 +24702,103 @@ export interface paths {
                                         undelivered?: string[];
                                         /** @enum {string} */
                                         reason: "claim_released";
+                                    }) | ({
+                                        /** @enum {string} */
+                                        status: "delivered";
+                                        /** @enum {string} */
+                                        trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                        portal: {
+                                            /** Format: uuid */
+                                            connectionId: string;
+                                            portalId: number;
+                                            slug: string;
+                                            name: string;
+                                        };
+                                        attemptId: string;
+                                        /** Format: date-time */
+                                        recordedAt: string;
+                                        undelivered?: string[];
+                                        counts: {
+                                            articles: {
+                                                written: number;
+                                                current: number;
+                                                skipped: number;
+                                                failed: number;
+                                                linksUpdated: number;
+                                            };
+                                            categories: {
+                                                written: number;
+                                                current: number;
+                                                skipped: number;
+                                                failed: number;
+                                            };
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        status: "failed";
+                                        /** @enum {string} */
+                                        trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                        portal: {
+                                            /** Format: uuid */
+                                            connectionId: string;
+                                            portalId: number;
+                                            slug: string;
+                                            name: string;
+                                        };
+                                        attemptId: string;
+                                        /** Format: date-time */
+                                        recordedAt: string;
+                                        undelivered?: string[];
+                                        counts: {
+                                            articles: {
+                                                written: number;
+                                                current: number;
+                                                skipped: number;
+                                                failed: number;
+                                                linksUpdated: number;
+                                            };
+                                            categories: {
+                                                written: number;
+                                                current: number;
+                                                skipped: number;
+                                                failed: number;
+                                            };
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        status: "failed";
+                                        /** @enum {string} */
+                                        trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                        portal: {
+                                            /** Format: uuid */
+                                            connectionId: string;
+                                            portalId: number;
+                                            slug: string;
+                                            name: string;
+                                        };
+                                        attemptId: string;
+                                        /** Format: date-time */
+                                        recordedAt: string;
+                                        undelivered?: string[];
+                                        failure: {
+                                            /** @enum {string} */
+                                            reason: "connection_unusable" | "portal_missing" | "unavailable";
+                                            error: string;
+                                        };
                                     })) | null;
                                     /** @description Every Delivery attempt the Output made — its first delivery, each Redeliver and each Reconciliation’s redelivery — newest first; `outcome` mirrors the latest. `GET /api/jobs/{jobId}` (`delivery.attempts`) lists them too, alongside any of the Job’s attempts that belong to no Output */
                                     attempts: {
                                         id: string;
                                         /**
-                                         * @description `pending`: a Contentful Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`)
+                                         * @description `pending`: a Contentful or Chatwoot Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`). `failed`: a Job’s or a Workflow run’s GitHub Output’s `note` carries `failed:<reason>` — for a Job, why its Project’s delivery failed (`no_file_patterns`, `branch_missing`, `access_lost`, `push_rejected`, `unavailable`, `unexpected`); for an Output, the reason its `outcome` names
                                          * @enum {string}
                                          */
                                         status: "pending" | "success" | "failed" | "skipped";
                                         /**
-                                         * @description `contentful`: a Contentful Output’s write-back into the environment its run read
+                                         * @description `contentful`: a Contentful Output’s write-back into the environment its run read. `chatwoot`: a Chatwoot Output’s write-back into the portal its run read
                                          * @enum {string}
                                          */
-                                        deliveryType: "git-push" | "git-pr" | "file-export" | "contentful";
+                                        deliveryType: "git-push" | "git-pr" | "file-export" | "contentful" | "chatwoot";
                                         urls: {
                                             /** @enum {string} */
                                             kind: "commit" | "pr" | "download";
@@ -22464,7 +24807,6 @@ export interface paths {
                                             url: string;
                                         }[];
                                         note: string | null;
-                                        error: string | null;
                                         createdAt: string;
                                     }[];
                                 }[];
@@ -22482,16 +24824,18 @@ export interface paths {
                                 /** @description The failure record of a `failed` run; `null` otherwise. The Job’s `failureReason` mirrors `reason`. Retry failed languages (`POST /api/jobs/{jobId}/retry`) resumes the failed Lanes and clears it */
                                 failure: {
                                     /**
-                                     * @description Why: `insufficient_credits`, `retry_ceiling_exceeded` (an Action ran out of retries), `unrecoverable_failure` (an outcome retrying can’t heal), `terminal_failure` (a queue job failed for good, or the run could not start), `stalled` (no progress, even after the watchdog’s repair), `feature_required` (the version holds an approval gate and the organisation is not entitled to Roles) and `role_deleted` (an approval gate names a deleted Role) — both refused at start, naming the gate by `stepIndex` and `actionId`; `role_deleted` also fails a run whose blocking gate opens on a Role deleted since it started, naming the gate’s `locale` too
+                                     * @description Why: `insufficient_credits`, `retry_ceiling_exceeded` (an Action ran out of retries), `unrecoverable_failure` (an outcome retrying can’t heal), `terminal_failure` (a queue job failed for good, or the run could not start), `stalled` (no progress, even after the watchdog’s repair), `feature_required` (the version holds an approval gate and the organisation is not entitled to Roles) and `role_deleted` (an approval gate names a deleted Role) — both refused at start, naming the gate by `stepIndex` and `actionId`; `role_deleted` also fails a run whose blocking gate opens on a Role deleted since it started, naming the gate’s `locale` too. A Chatwoot Input’s run start refuses with `chatwoot_connection_unusable` (not connected, or Chatwoot refused its token or address), `chatwoot_version_unsupported`, `chatwoot_portal_missing`, `chatwoot_default_locale_changed` or `chatwoot_unexpected_response`
                                      * @enum {string}
                                      */
-                                    reason: "insufficient_credits" | "retry_ceiling_exceeded" | "unrecoverable_failure" | "terminal_failure" | "stalled" | "feature_required" | "role_deleted" | "contentful_app_not_installed" | "contentful_locale_missing" | "contentful_environment_overlap" | "nothing_to_translate";
+                                    reason: "insufficient_credits" | "retry_ceiling_exceeded" | "unrecoverable_failure" | "terminal_failure" | "stalled" | "feature_required" | "role_deleted" | "contentful_app_not_installed" | "contentful_locale_missing" | "contentful_environment_overlap" | "nothing_to_translate" | "chatwoot_connection_unusable" | "chatwoot_version_unsupported" | "chatwoot_portal_missing" | "chatwoot_default_locale_changed" | "chatwoot_unexpected_response";
                                     /** @description The Step that failed, by index in the pinned version (0 when the run failed before it split into Lanes) */
                                     stepIndex: number;
                                     /** @description The Action that gave up, by its id in the pinned version */
                                     actionId?: string;
-                                    /** @description The Lane — target language — the Action gave up in */
+                                    /** @description The Lane — target language — the Action gave up in; for `chatwoot_default_locale_changed`, the portal’s default locale code now */
                                     locale?: string;
+                                    /** @description The Chatwoot instance’s version, for `chatwoot_version_unsupported` and `chatwoot_unexpected_response` */
+                                    version?: string;
                                 } | null;
                                 /** @description The newer run of the Workflow that superseded a `superseded` run — it delivers to the same target — for following it; `null` otherwise, and for a run superseded before this was recorded */
                                 supersededBy: {
@@ -22582,6 +24926,35 @@ export interface paths {
                                         source: boolean;
                                     }[];
                                 }[];
+                                /** @description A Chatwoot run’s articles and categories that newer runs of its Workflow took over (per-item supersession): every newer run takes the articles it read and every category, a manual run everything an unfinished run holds. An unfinished run loses an item when the newer run reads it, a finished one when the newer run completes. A superseded item leaves the run’s Gates and is never translated or delivered by it — Redeliver included. A run that loses every item while unfinished is `superseded`. Empty for any other run */
+                                supersededItems: {
+                                    /** @enum {string} */
+                                    kind: "article" | "category";
+                                    /** @description The Chatwoot article’s or category’s id */
+                                    itemId: number;
+                                    /** @description The article’s title or the category’s name, as the newest run of the Workflow still holding the item read it; `null` once none does */
+                                    title: string | null;
+                                    /** @description The newer run that took the item; `null` once that run is deleted */
+                                    supersededBy: {
+                                        id: string;
+                                        /** @description `run #n` */
+                                        number: number;
+                                    } | null;
+                                    supersededAt: string;
+                                    /** @description The unapplied edits of the run’s Edit set discarded with the item */
+                                    discardedEdits: {
+                                        /** @description The item’s field, as `title` or `meta.tags` */
+                                        field: string;
+                                        /** @description The edited language: a Lane’s, or the source language’s */
+                                        locale: string;
+                                        /** @description A Source string edit */
+                                        source: boolean;
+                                    }[];
+                                    /** @description The fields whose Source strings a Reconciliation of the run had edited: never written to the Chatwoot source article, and not carried to the newer run */
+                                    unwrittenSourceEdits: {
+                                        field: string;
+                                    }[];
+                                }[];
                                 /** @description The run’s Reconciliations — each applying of its Edit set — newest first. At most one is `processing`; while it is, Apply is refused */
                                 reconciliations: {
                                     id: string;
@@ -22650,6 +25023,36 @@ export interface paths {
                                         [key: string]: unknown;
                                     };
                                 };
+                                /** @description A GitLab run’s `Globalize` commit status, as Globalize writes it: `held` shows `running` on GitLab; `taken_over`: a newer run on the same commit or delivery target reports there instead. `null` for a manual run and any other Input’s */
+                                gitlabStatus: ({
+                                    /** @enum {string} */
+                                    state: "pending";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "running";
+                                    /** @enum {string} */
+                                    doing: "translating" | "steps" | "delivering";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "held";
+                                    /** @description The Roles its blocking Gates wait for */
+                                    roles: string[];
+                                } | {
+                                    /** @enum {string} */
+                                    state: "success";
+                                    translated: boolean;
+                                } | {
+                                    /** @enum {string} */
+                                    state: "failed";
+                                    /** @enum {string} */
+                                    because: "run" | "qa" | "delivery";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "canceled";
+                                } | {
+                                    /** @enum {string} */
+                                    state: "taken_over";
+                                }) | null;
                                 createdAt: string;
                                 updatedAt: string;
                             }[];
@@ -22839,8 +25242,55 @@ export interface paths {
                                 id: string;
                                 number: number;
                             };
-                            /** @description What started the run. A GitHub Input’s run — by hand (`manual`), a push or a pull request — names the watched branch and the commit it pinned; a Contentful Input’s — by hand (`manual`, the whole selection), entries published or edited (`contentful_change`) or the App’s entry sidebar (`sidebar_request`) — names the space and the watched environment */
+                            /** @description What started the run. A GitHub Input’s run — by hand (`manual`), a push or a pull request — names the watched branch and the commit it pinned, and a GitLab Input’s (`provider: gitlab`) the same with a merge request (`merge_request`) for a pull request; a Contentful Input’s — by hand (`manual`, the whole selection), entries published or edited (`contentful_change`) or the App’s entry sidebar (`sidebar_request`) — names the space and the watched environment; a Chatwoot Input’s — by hand (`manual`, the whole selection) or a Portal poll that found changes (`portal_poll`, those articles and every selected category) — names the portal */
                             trigger: {
+                                /** @enum {string} */
+                                provider: "gitlab";
+                                /** @enum {string} */
+                                kind: "manual";
+                                branch: string;
+                                commit: string;
+                                /** @enum {string} */
+                                delivery?: "pr" | "push";
+                                requestedBy: string | null;
+                                /** @description The repository as GitLab named it: its id, and its path at the time */
+                                repository: {
+                                    id: number;
+                                    pathWithNamespace: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                provider: "gitlab";
+                                /** @enum {string} */
+                                kind: "push";
+                                branch: string;
+                                /** @description The pushed commit (`after`) */
+                                commit: string;
+                                /** @description The repository as GitLab named it: its id, and its path at the time */
+                                repository: {
+                                    id: number;
+                                    pathWithNamespace: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                provider: "gitlab";
+                                /** @enum {string} */
+                                kind: "merge_request";
+                                /** @description The merge request’s target: the watched branch */
+                                branch: string;
+                                /** @description The merge request’s head commit */
+                                commit: string;
+                                /** @description The repository as GitLab named it: its id, and its path at the time */
+                                repository: {
+                                    id: number;
+                                    pathWithNamespace: string;
+                                };
+                                mergeRequest: {
+                                    iid: number;
+                                    baseBranch: string;
+                                    headBranch: string;
+                                };
+                            } | {
                                 /** @enum {string} */
                                 kind: "manual";
                                 branch: string;
@@ -22910,7 +25360,33 @@ export interface paths {
                                 entryIds: string[];
                                 /** @description The Contentful user who asked, by id */
                                 requestedBy: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "manual";
+                                /** @description The Chatwoot portal the run reads */
+                                portalId: number;
+                                requestedBy: string | null;
+                            } | {
+                                /** @enum {string} */
+                                kind: "portal_poll";
+                                /** @description The Chatwoot portal the run reads */
+                                portalId: number;
+                                /** @description When the Portal poll looked */
+                                checkedAt: string;
+                                /** @description The published source articles it found changed or newly selected */
+                                articleIds: number[];
+                                /** @description The categories whose name or description it found changed; the run reads every selected category either way */
+                                categoryIds: number[];
                             };
+                            /** @description Who started a `manual` run, while they are a known user; `null` for any other Trigger, and for a run started through an API key with no user */
+                            startedBy: {
+                                clerkUserId: string;
+                                /** Format: email */
+                                email: string;
+                                firstName: string | null;
+                                lastName: string | null;
+                                imageUrl: string | null;
+                            } | null;
                             /** @description The pinned commit SHA; the run reads its source only from it. `null` for a Contentful Input’s run, which reads each entry at its latest version when it starts */
                             commit: string | null;
                             /** @description Whether the pinned version translates. `false`: a Workflow that doesn’t translate — every Step is a Source Step, the run resolves no target language and never has a Lane */
@@ -23083,12 +25559,21 @@ export interface paths {
                                 };
                                 /** @description A Terminology check’s glossary and source terms; absent from any other Check */
                                 terminology?: {
-                                    /** @description The org glossary the run’s translate Action names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
+                                    /** @description The org glossary the run’s Workflow names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
                                     glossary: {
                                         /** @description The org glossary */
                                         id: string;
                                         /** @description Whether its entries’ preferred terms, forbidden variants or descriptions in the run’s source locale now differ from what the run judged with. An edit never releases a held run */
                                         editedSince: boolean;
+                                        /** @description A fetched glossary’s fetch as the run started, whatever was fetched since; `null` for a written glossary */
+                                        fetch: {
+                                            /** @description When the fetch whose entries the run translated and judged with started. Each run start fetches a glossary fetched from Notion its Workflow names, reusing a fetch under a minute old; never one fetched from a repository */
+                                            fetchedAt: string;
+                                            /** @description Why the run start’s own fetch failed — `timeout` when it ran past the run start’s ~30-second wait — so the run used the last good fetch, of `fetchedAt`; `null` when it didn’t fail. `unauthorized`: the connection needs reconnecting */
+                                            refreshFailure: ("item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift") | null;
+                                            /** @description The commit a glossary fetched from a repository was read at by the fetch whose entries the run translated and judged with; `null` for one fetched from Notion, or a run recorded before commits were kept */
+                                            commitSha: string | null;
+                                        } | null;
                                     } | null;
                                     /** @description The run had no source terms: no glossary entry of its source locale held a description or a forbidden variant, so every string passed */
                                     noSourceTerms: boolean;
@@ -23151,9 +25636,12 @@ export interface paths {
                             outputs: {
                                 /** @description The Output’s id in the pinned definition */
                                 id: string;
-                                /** @description `github` or `contentful`: the shape of `outcome` */
-                                type: string;
-                                /** @description What the Output’s latest delivery did: `delivered`, `failed` or `skipped` (with a `reason`); `null` until it has run. Independent of the run’s `status`. A Contentful Output’s names the environment written, the Delivery attempt (`attemptId`) and its entry `counts` (written, published, drafts, already current, skipped, failed) — or, for an attempt that failed as a whole, the `failure` instead */
+                                /**
+                                 * @description The shape of `outcome`: a GitLab Output’s is a GitHub one’s, its merge request in `pullRequest` (`number` is its iid)
+                                 * @enum {string}
+                                 */
+                                type: "github" | "gitlab" | "contentful" | "chatwoot";
+                                /** @description What the Output’s latest delivery did: `delivered`, `failed` or `skipped` (with a `reason`; a GitHub Output’s `failed` names its `reason` too: `no_files`, `branch_missing`, `access_lost`, `push_rejected`, `unavailable`, `interrupted`, `unexpected`); `null` until it has run. Independent of the run’s `status`. A Contentful Output’s names the environment written, the Delivery attempt (`attemptId`) and its entry `counts` (written, published, drafts, already current, skipped, failed) — or, for an attempt that failed as a whole, the `failure` instead. A Chatwoot Output’s names the portal written, the Delivery attempt and its `counts` of article and category translations (one per item × target locale: written, already current, skipped, failed), and any `undelivered` languages the portal doesn’t allow — or the `failure` of an attempt that failed as a whole */
                                 outcome: (({
                                     /** @enum {string} */
                                     status: "delivered";
@@ -23191,7 +25679,11 @@ export interface paths {
                                     method: "pr" | "push";
                                     /** Format: date-time */
                                     recordedAt: string;
-                                    error: string;
+                                    /**
+                                     * @default unexpected
+                                     * @enum {string}
+                                     */
+                                    reason: "no_files" | "branch_missing" | "access_lost" | "push_rejected" | "unavailable" | "interrupted" | "unexpected";
                                 } | {
                                     /** @enum {string} */
                                     status: "skipped";
@@ -23284,20 +25776,103 @@ export interface paths {
                                     undelivered?: string[];
                                     /** @enum {string} */
                                     reason: "claim_released";
+                                }) | ({
+                                    /** @enum {string} */
+                                    status: "delivered";
+                                    /** @enum {string} */
+                                    trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                    portal: {
+                                        /** Format: uuid */
+                                        connectionId: string;
+                                        portalId: number;
+                                        slug: string;
+                                        name: string;
+                                    };
+                                    attemptId: string;
+                                    /** Format: date-time */
+                                    recordedAt: string;
+                                    undelivered?: string[];
+                                    counts: {
+                                        articles: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                            linksUpdated: number;
+                                        };
+                                        categories: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                        };
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    status: "failed";
+                                    /** @enum {string} */
+                                    trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                    portal: {
+                                        /** Format: uuid */
+                                        connectionId: string;
+                                        portalId: number;
+                                        slug: string;
+                                        name: string;
+                                    };
+                                    attemptId: string;
+                                    /** Format: date-time */
+                                    recordedAt: string;
+                                    undelivered?: string[];
+                                    counts: {
+                                        articles: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                            linksUpdated: number;
+                                        };
+                                        categories: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                        };
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    status: "failed";
+                                    /** @enum {string} */
+                                    trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                    portal: {
+                                        /** Format: uuid */
+                                        connectionId: string;
+                                        portalId: number;
+                                        slug: string;
+                                        name: string;
+                                    };
+                                    attemptId: string;
+                                    /** Format: date-time */
+                                    recordedAt: string;
+                                    undelivered?: string[];
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "connection_unusable" | "portal_missing" | "unavailable";
+                                        error: string;
+                                    };
                                 })) | null;
                                 /** @description Every Delivery attempt the Output made — its first delivery, each Redeliver and each Reconciliation’s redelivery — newest first; `outcome` mirrors the latest. `GET /api/jobs/{jobId}` (`delivery.attempts`) lists them too, alongside any of the Job’s attempts that belong to no Output */
                                 attempts: {
                                     id: string;
                                     /**
-                                     * @description `pending`: a Contentful Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`)
+                                     * @description `pending`: a Contentful or Chatwoot Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`). `failed`: a Job’s or a Workflow run’s GitHub Output’s `note` carries `failed:<reason>` — for a Job, why its Project’s delivery failed (`no_file_patterns`, `branch_missing`, `access_lost`, `push_rejected`, `unavailable`, `unexpected`); for an Output, the reason its `outcome` names
                                      * @enum {string}
                                      */
                                     status: "pending" | "success" | "failed" | "skipped";
                                     /**
-                                     * @description `contentful`: a Contentful Output’s write-back into the environment its run read
+                                     * @description `contentful`: a Contentful Output’s write-back into the environment its run read. `chatwoot`: a Chatwoot Output’s write-back into the portal its run read
                                      * @enum {string}
                                      */
-                                    deliveryType: "git-push" | "git-pr" | "file-export" | "contentful";
+                                    deliveryType: "git-push" | "git-pr" | "file-export" | "contentful" | "chatwoot";
                                     urls: {
                                         /** @enum {string} */
                                         kind: "commit" | "pr" | "download";
@@ -23306,7 +25881,6 @@ export interface paths {
                                         url: string;
                                     }[];
                                     note: string | null;
-                                    error: string | null;
                                     createdAt: string;
                                 }[];
                             }[];
@@ -23324,16 +25898,18 @@ export interface paths {
                             /** @description The failure record of a `failed` run; `null` otherwise. The Job’s `failureReason` mirrors `reason`. Retry failed languages (`POST /api/jobs/{jobId}/retry`) resumes the failed Lanes and clears it */
                             failure: {
                                 /**
-                                 * @description Why: `insufficient_credits`, `retry_ceiling_exceeded` (an Action ran out of retries), `unrecoverable_failure` (an outcome retrying can’t heal), `terminal_failure` (a queue job failed for good, or the run could not start), `stalled` (no progress, even after the watchdog’s repair), `feature_required` (the version holds an approval gate and the organisation is not entitled to Roles) and `role_deleted` (an approval gate names a deleted Role) — both refused at start, naming the gate by `stepIndex` and `actionId`; `role_deleted` also fails a run whose blocking gate opens on a Role deleted since it started, naming the gate’s `locale` too
+                                 * @description Why: `insufficient_credits`, `retry_ceiling_exceeded` (an Action ran out of retries), `unrecoverable_failure` (an outcome retrying can’t heal), `terminal_failure` (a queue job failed for good, or the run could not start), `stalled` (no progress, even after the watchdog’s repair), `feature_required` (the version holds an approval gate and the organisation is not entitled to Roles) and `role_deleted` (an approval gate names a deleted Role) — both refused at start, naming the gate by `stepIndex` and `actionId`; `role_deleted` also fails a run whose blocking gate opens on a Role deleted since it started, naming the gate’s `locale` too. A Chatwoot Input’s run start refuses with `chatwoot_connection_unusable` (not connected, or Chatwoot refused its token or address), `chatwoot_version_unsupported`, `chatwoot_portal_missing`, `chatwoot_default_locale_changed` or `chatwoot_unexpected_response`
                                  * @enum {string}
                                  */
-                                reason: "insufficient_credits" | "retry_ceiling_exceeded" | "unrecoverable_failure" | "terminal_failure" | "stalled" | "feature_required" | "role_deleted" | "contentful_app_not_installed" | "contentful_locale_missing" | "contentful_environment_overlap" | "nothing_to_translate";
+                                reason: "insufficient_credits" | "retry_ceiling_exceeded" | "unrecoverable_failure" | "terminal_failure" | "stalled" | "feature_required" | "role_deleted" | "contentful_app_not_installed" | "contentful_locale_missing" | "contentful_environment_overlap" | "nothing_to_translate" | "chatwoot_connection_unusable" | "chatwoot_version_unsupported" | "chatwoot_portal_missing" | "chatwoot_default_locale_changed" | "chatwoot_unexpected_response";
                                 /** @description The Step that failed, by index in the pinned version (0 when the run failed before it split into Lanes) */
                                 stepIndex: number;
                                 /** @description The Action that gave up, by its id in the pinned version */
                                 actionId?: string;
-                                /** @description The Lane — target language — the Action gave up in */
+                                /** @description The Lane — target language — the Action gave up in; for `chatwoot_default_locale_changed`, the portal’s default locale code now */
                                 locale?: string;
+                                /** @description The Chatwoot instance’s version, for `chatwoot_version_unsupported` and `chatwoot_unexpected_response` */
+                                version?: string;
                             } | null;
                             /** @description The newer run of the Workflow that superseded a `superseded` run — it delivers to the same target — for following it; `null` otherwise, and for a run superseded before this was recorded */
                             supersededBy: {
@@ -23424,6 +26000,35 @@ export interface paths {
                                     source: boolean;
                                 }[];
                             }[];
+                            /** @description A Chatwoot run’s articles and categories that newer runs of its Workflow took over (per-item supersession): every newer run takes the articles it read and every category, a manual run everything an unfinished run holds. An unfinished run loses an item when the newer run reads it, a finished one when the newer run completes. A superseded item leaves the run’s Gates and is never translated or delivered by it — Redeliver included. A run that loses every item while unfinished is `superseded`. Empty for any other run */
+                            supersededItems: {
+                                /** @enum {string} */
+                                kind: "article" | "category";
+                                /** @description The Chatwoot article’s or category’s id */
+                                itemId: number;
+                                /** @description The article’s title or the category’s name, as the newest run of the Workflow still holding the item read it; `null` once none does */
+                                title: string | null;
+                                /** @description The newer run that took the item; `null` once that run is deleted */
+                                supersededBy: {
+                                    id: string;
+                                    /** @description `run #n` */
+                                    number: number;
+                                } | null;
+                                supersededAt: string;
+                                /** @description The unapplied edits of the run’s Edit set discarded with the item */
+                                discardedEdits: {
+                                    /** @description The item’s field, as `title` or `meta.tags` */
+                                    field: string;
+                                    /** @description The edited language: a Lane’s, or the source language’s */
+                                    locale: string;
+                                    /** @description A Source string edit */
+                                    source: boolean;
+                                }[];
+                                /** @description The fields whose Source strings a Reconciliation of the run had edited: never written to the Chatwoot source article, and not carried to the newer run */
+                                unwrittenSourceEdits: {
+                                    field: string;
+                                }[];
+                            }[];
                             /** @description The run’s Reconciliations — each applying of its Edit set — newest first. At most one is `processing`; while it is, Apply is refused */
                             reconciliations: {
                                 id: string;
@@ -23492,6 +26097,36 @@ export interface paths {
                                     [key: string]: unknown;
                                 };
                             };
+                            /** @description A GitLab run’s `Globalize` commit status, as Globalize writes it: `held` shows `running` on GitLab; `taken_over`: a newer run on the same commit or delivery target reports there instead. `null` for a manual run and any other Input’s */
+                            gitlabStatus: ({
+                                /** @enum {string} */
+                                state: "pending";
+                            } | {
+                                /** @enum {string} */
+                                state: "running";
+                                /** @enum {string} */
+                                doing: "translating" | "steps" | "delivering";
+                            } | {
+                                /** @enum {string} */
+                                state: "held";
+                                /** @description The Roles its blocking Gates wait for */
+                                roles: string[];
+                            } | {
+                                /** @enum {string} */
+                                state: "success";
+                                translated: boolean;
+                            } | {
+                                /** @enum {string} */
+                                state: "failed";
+                                /** @enum {string} */
+                                because: "run" | "qa" | "delivery";
+                            } | {
+                                /** @enum {string} */
+                                state: "canceled";
+                            } | {
+                                /** @enum {string} */
+                                state: "taken_over";
+                            }) | null;
                             createdAt: string;
                             updatedAt: string;
                         };
@@ -23805,6 +26440,328 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workflow-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the latest runs across the organisation’s Workflows, newest first
+         * @description Archived Workflows’ runs included. Not paged: for the latest few, as the Dashboard shows them; a Workflow’s whole history is `GET /api/workflows/{id}/runs`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                id: string;
+                                workflowId: string;
+                                workflowName: string;
+                                number: number;
+                                /** @enum {string} */
+                                status: "pending" | "processing" | "held" | "completed" | "failed" | "superseded";
+                                createdAt: string;
+                                /** @description The languages it translates into; `null` before it has started translating, or for a Workflow that doesn’t translate */
+                                targetLanguageCount: number | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflow-runs/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count the organisation’s runs started since an instant, by status */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            pending: number;
+                            processing: number;
+                            held: number;
+                            completed: number;
+                            failed: number;
+                            superseded: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow-runs/{id}": {
         parameters: {
             query?: never;
@@ -23845,8 +26802,55 @@ export interface paths {
                                 id: string;
                                 number: number;
                             };
-                            /** @description What started the run. A GitHub Input’s run — by hand (`manual`), a push or a pull request — names the watched branch and the commit it pinned; a Contentful Input’s — by hand (`manual`, the whole selection), entries published or edited (`contentful_change`) or the App’s entry sidebar (`sidebar_request`) — names the space and the watched environment */
+                            /** @description What started the run. A GitHub Input’s run — by hand (`manual`), a push or a pull request — names the watched branch and the commit it pinned, and a GitLab Input’s (`provider: gitlab`) the same with a merge request (`merge_request`) for a pull request; a Contentful Input’s — by hand (`manual`, the whole selection), entries published or edited (`contentful_change`) or the App’s entry sidebar (`sidebar_request`) — names the space and the watched environment; a Chatwoot Input’s — by hand (`manual`, the whole selection) or a Portal poll that found changes (`portal_poll`, those articles and every selected category) — names the portal */
                             trigger: {
+                                /** @enum {string} */
+                                provider: "gitlab";
+                                /** @enum {string} */
+                                kind: "manual";
+                                branch: string;
+                                commit: string;
+                                /** @enum {string} */
+                                delivery?: "pr" | "push";
+                                requestedBy: string | null;
+                                /** @description The repository as GitLab named it: its id, and its path at the time */
+                                repository: {
+                                    id: number;
+                                    pathWithNamespace: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                provider: "gitlab";
+                                /** @enum {string} */
+                                kind: "push";
+                                branch: string;
+                                /** @description The pushed commit (`after`) */
+                                commit: string;
+                                /** @description The repository as GitLab named it: its id, and its path at the time */
+                                repository: {
+                                    id: number;
+                                    pathWithNamespace: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                provider: "gitlab";
+                                /** @enum {string} */
+                                kind: "merge_request";
+                                /** @description The merge request’s target: the watched branch */
+                                branch: string;
+                                /** @description The merge request’s head commit */
+                                commit: string;
+                                /** @description The repository as GitLab named it: its id, and its path at the time */
+                                repository: {
+                                    id: number;
+                                    pathWithNamespace: string;
+                                };
+                                mergeRequest: {
+                                    iid: number;
+                                    baseBranch: string;
+                                    headBranch: string;
+                                };
+                            } | {
                                 /** @enum {string} */
                                 kind: "manual";
                                 branch: string;
@@ -23916,7 +26920,33 @@ export interface paths {
                                 entryIds: string[];
                                 /** @description The Contentful user who asked, by id */
                                 requestedBy: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "manual";
+                                /** @description The Chatwoot portal the run reads */
+                                portalId: number;
+                                requestedBy: string | null;
+                            } | {
+                                /** @enum {string} */
+                                kind: "portal_poll";
+                                /** @description The Chatwoot portal the run reads */
+                                portalId: number;
+                                /** @description When the Portal poll looked */
+                                checkedAt: string;
+                                /** @description The published source articles it found changed or newly selected */
+                                articleIds: number[];
+                                /** @description The categories whose name or description it found changed; the run reads every selected category either way */
+                                categoryIds: number[];
                             };
+                            /** @description Who started a `manual` run, while they are a known user; `null` for any other Trigger, and for a run started through an API key with no user */
+                            startedBy: {
+                                clerkUserId: string;
+                                /** Format: email */
+                                email: string;
+                                firstName: string | null;
+                                lastName: string | null;
+                                imageUrl: string | null;
+                            } | null;
                             /** @description The pinned commit SHA; the run reads its source only from it. `null` for a Contentful Input’s run, which reads each entry at its latest version when it starts */
                             commit: string | null;
                             /** @description Whether the pinned version translates. `false`: a Workflow that doesn’t translate — every Step is a Source Step, the run resolves no target language and never has a Lane */
@@ -24089,12 +27119,21 @@ export interface paths {
                                 };
                                 /** @description A Terminology check’s glossary and source terms; absent from any other Check */
                                 terminology?: {
-                                    /** @description The org glossary the run’s translate Action names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
+                                    /** @description The org glossary the run’s Workflow names; `null` when it names none (the run’s glossary came from its Project or repository), or once the glossary is deleted */
                                     glossary: {
                                         /** @description The org glossary */
                                         id: string;
                                         /** @description Whether its entries’ preferred terms, forbidden variants or descriptions in the run’s source locale now differ from what the run judged with. An edit never releases a held run */
                                         editedSince: boolean;
+                                        /** @description A fetched glossary’s fetch as the run started, whatever was fetched since; `null` for a written glossary */
+                                        fetch: {
+                                            /** @description When the fetch whose entries the run translated and judged with started. Each run start fetches a glossary fetched from Notion its Workflow names, reusing a fetch under a minute old; never one fetched from a repository */
+                                            fetchedAt: string;
+                                            /** @description Why the run start’s own fetch failed — `timeout` when it ran past the run start’s ~30-second wait — so the run used the last good fetch, of `fetchedAt`; `null` when it didn’t fail. `unauthorized`: the connection needs reconnecting */
+                                            refreshFailure: ("item_gone" | "item_unshared" | "unauthorized" | "disconnected" | "rate_limited" | "timeout" | "provider_error" | "no_usable_rows" | "row_limit" | "mapping_drift") | null;
+                                            /** @description The commit a glossary fetched from a repository was read at by the fetch whose entries the run translated and judged with; `null` for one fetched from Notion, or a run recorded before commits were kept */
+                                            commitSha: string | null;
+                                        } | null;
                                     } | null;
                                     /** @description The run had no source terms: no glossary entry of its source locale held a description or a forbidden variant, so every string passed */
                                     noSourceTerms: boolean;
@@ -24157,9 +27196,12 @@ export interface paths {
                             outputs: {
                                 /** @description The Output’s id in the pinned definition */
                                 id: string;
-                                /** @description `github` or `contentful`: the shape of `outcome` */
-                                type: string;
-                                /** @description What the Output’s latest delivery did: `delivered`, `failed` or `skipped` (with a `reason`); `null` until it has run. Independent of the run’s `status`. A Contentful Output’s names the environment written, the Delivery attempt (`attemptId`) and its entry `counts` (written, published, drafts, already current, skipped, failed) — or, for an attempt that failed as a whole, the `failure` instead */
+                                /**
+                                 * @description The shape of `outcome`: a GitLab Output’s is a GitHub one’s, its merge request in `pullRequest` (`number` is its iid)
+                                 * @enum {string}
+                                 */
+                                type: "github" | "gitlab" | "contentful" | "chatwoot";
+                                /** @description What the Output’s latest delivery did: `delivered`, `failed` or `skipped` (with a `reason`; a GitHub Output’s `failed` names its `reason` too: `no_files`, `branch_missing`, `access_lost`, `push_rejected`, `unavailable`, `interrupted`, `unexpected`); `null` until it has run. Independent of the run’s `status`. A Contentful Output’s names the environment written, the Delivery attempt (`attemptId`) and its entry `counts` (written, published, drafts, already current, skipped, failed) — or, for an attempt that failed as a whole, the `failure` instead. A Chatwoot Output’s names the portal written, the Delivery attempt and its `counts` of article and category translations (one per item × target locale: written, already current, skipped, failed), and any `undelivered` languages the portal doesn’t allow — or the `failure` of an attempt that failed as a whole */
                                 outcome: (({
                                     /** @enum {string} */
                                     status: "delivered";
@@ -24197,7 +27239,11 @@ export interface paths {
                                     method: "pr" | "push";
                                     /** Format: date-time */
                                     recordedAt: string;
-                                    error: string;
+                                    /**
+                                     * @default unexpected
+                                     * @enum {string}
+                                     */
+                                    reason: "no_files" | "branch_missing" | "access_lost" | "push_rejected" | "unavailable" | "interrupted" | "unexpected";
                                 } | {
                                     /** @enum {string} */
                                     status: "skipped";
@@ -24290,20 +27336,103 @@ export interface paths {
                                     undelivered?: string[];
                                     /** @enum {string} */
                                     reason: "claim_released";
+                                }) | ({
+                                    /** @enum {string} */
+                                    status: "delivered";
+                                    /** @enum {string} */
+                                    trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                    portal: {
+                                        /** Format: uuid */
+                                        connectionId: string;
+                                        portalId: number;
+                                        slug: string;
+                                        name: string;
+                                    };
+                                    attemptId: string;
+                                    /** Format: date-time */
+                                    recordedAt: string;
+                                    undelivered?: string[];
+                                    counts: {
+                                        articles: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                            linksUpdated: number;
+                                        };
+                                        categories: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                        };
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    status: "failed";
+                                    /** @enum {string} */
+                                    trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                    portal: {
+                                        /** Format: uuid */
+                                        connectionId: string;
+                                        portalId: number;
+                                        slug: string;
+                                        name: string;
+                                    };
+                                    attemptId: string;
+                                    /** Format: date-time */
+                                    recordedAt: string;
+                                    undelivered?: string[];
+                                    counts: {
+                                        articles: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                            linksUpdated: number;
+                                        };
+                                        categories: {
+                                            written: number;
+                                            current: number;
+                                            skipped: number;
+                                            failed: number;
+                                        };
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    status: "failed";
+                                    /** @enum {string} */
+                                    trigger: "initial" | "manual-redeliver" | "reconciliation";
+                                    portal: {
+                                        /** Format: uuid */
+                                        connectionId: string;
+                                        portalId: number;
+                                        slug: string;
+                                        name: string;
+                                    };
+                                    attemptId: string;
+                                    /** Format: date-time */
+                                    recordedAt: string;
+                                    undelivered?: string[];
+                                    failure: {
+                                        /** @enum {string} */
+                                        reason: "connection_unusable" | "portal_missing" | "unavailable";
+                                        error: string;
+                                    };
                                 })) | null;
                                 /** @description Every Delivery attempt the Output made — its first delivery, each Redeliver and each Reconciliation’s redelivery — newest first; `outcome` mirrors the latest. `GET /api/jobs/{jobId}` (`delivery.attempts`) lists them too, alongside any of the Job’s attempts that belong to no Output */
                                 attempts: {
                                     id: string;
                                     /**
-                                     * @description `pending`: a Contentful Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`)
+                                     * @description `pending`: a Contentful or Chatwoot Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`). `failed`: a Job’s or a Workflow run’s GitHub Output’s `note` carries `failed:<reason>` — for a Job, why its Project’s delivery failed (`no_file_patterns`, `branch_missing`, `access_lost`, `push_rejected`, `unavailable`, `unexpected`); for an Output, the reason its `outcome` names
                                      * @enum {string}
                                      */
                                     status: "pending" | "success" | "failed" | "skipped";
                                     /**
-                                     * @description `contentful`: a Contentful Output’s write-back into the environment its run read
+                                     * @description `contentful`: a Contentful Output’s write-back into the environment its run read. `chatwoot`: a Chatwoot Output’s write-back into the portal its run read
                                      * @enum {string}
                                      */
-                                    deliveryType: "git-push" | "git-pr" | "file-export" | "contentful";
+                                    deliveryType: "git-push" | "git-pr" | "file-export" | "contentful" | "chatwoot";
                                     urls: {
                                         /** @enum {string} */
                                         kind: "commit" | "pr" | "download";
@@ -24312,7 +27441,6 @@ export interface paths {
                                         url: string;
                                     }[];
                                     note: string | null;
-                                    error: string | null;
                                     createdAt: string;
                                 }[];
                             }[];
@@ -24330,16 +27458,18 @@ export interface paths {
                             /** @description The failure record of a `failed` run; `null` otherwise. The Job’s `failureReason` mirrors `reason`. Retry failed languages (`POST /api/jobs/{jobId}/retry`) resumes the failed Lanes and clears it */
                             failure: {
                                 /**
-                                 * @description Why: `insufficient_credits`, `retry_ceiling_exceeded` (an Action ran out of retries), `unrecoverable_failure` (an outcome retrying can’t heal), `terminal_failure` (a queue job failed for good, or the run could not start), `stalled` (no progress, even after the watchdog’s repair), `feature_required` (the version holds an approval gate and the organisation is not entitled to Roles) and `role_deleted` (an approval gate names a deleted Role) — both refused at start, naming the gate by `stepIndex` and `actionId`; `role_deleted` also fails a run whose blocking gate opens on a Role deleted since it started, naming the gate’s `locale` too
+                                 * @description Why: `insufficient_credits`, `retry_ceiling_exceeded` (an Action ran out of retries), `unrecoverable_failure` (an outcome retrying can’t heal), `terminal_failure` (a queue job failed for good, or the run could not start), `stalled` (no progress, even after the watchdog’s repair), `feature_required` (the version holds an approval gate and the organisation is not entitled to Roles) and `role_deleted` (an approval gate names a deleted Role) — both refused at start, naming the gate by `stepIndex` and `actionId`; `role_deleted` also fails a run whose blocking gate opens on a Role deleted since it started, naming the gate’s `locale` too. A Chatwoot Input’s run start refuses with `chatwoot_connection_unusable` (not connected, or Chatwoot refused its token or address), `chatwoot_version_unsupported`, `chatwoot_portal_missing`, `chatwoot_default_locale_changed` or `chatwoot_unexpected_response`
                                  * @enum {string}
                                  */
-                                reason: "insufficient_credits" | "retry_ceiling_exceeded" | "unrecoverable_failure" | "terminal_failure" | "stalled" | "feature_required" | "role_deleted" | "contentful_app_not_installed" | "contentful_locale_missing" | "contentful_environment_overlap" | "nothing_to_translate";
+                                reason: "insufficient_credits" | "retry_ceiling_exceeded" | "unrecoverable_failure" | "terminal_failure" | "stalled" | "feature_required" | "role_deleted" | "contentful_app_not_installed" | "contentful_locale_missing" | "contentful_environment_overlap" | "nothing_to_translate" | "chatwoot_connection_unusable" | "chatwoot_version_unsupported" | "chatwoot_portal_missing" | "chatwoot_default_locale_changed" | "chatwoot_unexpected_response";
                                 /** @description The Step that failed, by index in the pinned version (0 when the run failed before it split into Lanes) */
                                 stepIndex: number;
                                 /** @description The Action that gave up, by its id in the pinned version */
                                 actionId?: string;
-                                /** @description The Lane — target language — the Action gave up in */
+                                /** @description The Lane — target language — the Action gave up in; for `chatwoot_default_locale_changed`, the portal’s default locale code now */
                                 locale?: string;
+                                /** @description The Chatwoot instance’s version, for `chatwoot_version_unsupported` and `chatwoot_unexpected_response` */
+                                version?: string;
                             } | null;
                             /** @description The newer run of the Workflow that superseded a `superseded` run — it delivers to the same target — for following it; `null` otherwise, and for a run superseded before this was recorded */
                             supersededBy: {
@@ -24430,6 +27560,35 @@ export interface paths {
                                     source: boolean;
                                 }[];
                             }[];
+                            /** @description A Chatwoot run’s articles and categories that newer runs of its Workflow took over (per-item supersession): every newer run takes the articles it read and every category, a manual run everything an unfinished run holds. An unfinished run loses an item when the newer run reads it, a finished one when the newer run completes. A superseded item leaves the run’s Gates and is never translated or delivered by it — Redeliver included. A run that loses every item while unfinished is `superseded`. Empty for any other run */
+                            supersededItems: {
+                                /** @enum {string} */
+                                kind: "article" | "category";
+                                /** @description The Chatwoot article’s or category’s id */
+                                itemId: number;
+                                /** @description The article’s title or the category’s name, as the newest run of the Workflow still holding the item read it; `null` once none does */
+                                title: string | null;
+                                /** @description The newer run that took the item; `null` once that run is deleted */
+                                supersededBy: {
+                                    id: string;
+                                    /** @description `run #n` */
+                                    number: number;
+                                } | null;
+                                supersededAt: string;
+                                /** @description The unapplied edits of the run’s Edit set discarded with the item */
+                                discardedEdits: {
+                                    /** @description The item’s field, as `title` or `meta.tags` */
+                                    field: string;
+                                    /** @description The edited language: a Lane’s, or the source language’s */
+                                    locale: string;
+                                    /** @description A Source string edit */
+                                    source: boolean;
+                                }[];
+                                /** @description The fields whose Source strings a Reconciliation of the run had edited: never written to the Chatwoot source article, and not carried to the newer run */
+                                unwrittenSourceEdits: {
+                                    field: string;
+                                }[];
+                            }[];
                             /** @description The run’s Reconciliations — each applying of its Edit set — newest first. At most one is `processing`; while it is, Apply is refused */
                             reconciliations: {
                                 id: string;
@@ -24498,6 +27657,36 @@ export interface paths {
                                     [key: string]: unknown;
                                 };
                             };
+                            /** @description A GitLab run’s `Globalize` commit status, as Globalize writes it: `held` shows `running` on GitLab; `taken_over`: a newer run on the same commit or delivery target reports there instead. `null` for a manual run and any other Input’s */
+                            gitlabStatus: ({
+                                /** @enum {string} */
+                                state: "pending";
+                            } | {
+                                /** @enum {string} */
+                                state: "running";
+                                /** @enum {string} */
+                                doing: "translating" | "steps" | "delivering";
+                            } | {
+                                /** @enum {string} */
+                                state: "held";
+                                /** @description The Roles its blocking Gates wait for */
+                                roles: string[];
+                            } | {
+                                /** @enum {string} */
+                                state: "success";
+                                translated: boolean;
+                            } | {
+                                /** @enum {string} */
+                                state: "failed";
+                                /** @enum {string} */
+                                because: "run" | "qa" | "delivery";
+                            } | {
+                                /** @enum {string} */
+                                state: "canceled";
+                            } | {
+                                /** @enum {string} */
+                                state: "taken_over";
+                            }) | null;
                             createdAt: string;
                             updatedAt: string;
                         };
@@ -24820,7 +28009,7 @@ export interface paths {
         put?: never;
         /**
          * Redeliver one Output of a completed run
-         * @description Runs the Output again, as Run finalisation did. A GitHub Output rechecks the Repository claim and that no newer run of the Workflow delivers to the same pull request or base branch (either records the outcome `skipped`, with its `reason`), and delivers by the run’s Trigger. A Contentful Output writes every entry of the run again under the same rules — an entry that already holds the text is left alone, and a field › locale a newer run wrote is kept. Its outcome replaces the Output’s previous one; the run’s status never changes. Refused with 404 `WORKFLOW_RUN_NOT_FOUND` / `WORKFLOW_OUTPUT_NOT_FOUND`, 409 `WORKFLOW_RUN_NOT_DELIVERABLE` for a run that is not `completed`, and 409 `WORKFLOW_OUTPUT_DELIVERING` while one of the Output’s Delivery attempts is still running.
+         * @description Runs the Output again, as Run finalisation did. A GitHub Output rechecks the Repository claim and that no newer run of the Workflow delivers to the same pull request or base branch (either records the outcome `skipped`, with its `reason`), and delivers by the run’s Trigger. A Contentful Output writes every entry of the run again under the same rules — an entry that already holds the text is left alone, and a field › locale a newer run wrote is kept. A Chatwoot Output writes every article and category the run holds again under the same rules, reading the portal’s allowed locales afresh: a field a human edited or staged an edit to, or a newer run wrote, is kept, and an article whose source changed since the run read it is skipped. Its outcome replaces the Output’s previous one; the run’s status never changes. Refused with 404 `WORKFLOW_RUN_NOT_FOUND` / `WORKFLOW_OUTPUT_NOT_FOUND`, 409 `WORKFLOW_RUN_NOT_DELIVERABLE` for a run that is not `completed`, and 409 `WORKFLOW_OUTPUT_DELIVERING` while one of the Output’s Delivery attempts is still running.
          */
         post: {
             parameters: {
@@ -25067,6 +28256,259 @@ export interface paths {
                             };
                             /** @description The field › locales the group’s entries kept as they were, every page */
                             fieldSkips: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflow-runs/{id}/outputs/{outputId}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Page the items of a Chatwoot Output’s latest Delivery attempt, by group
+         * @description What the Chatwoot Output’s latest Delivery attempt — the one its `outcome` mirrors — did with each article and category in each target locale (an item), one `group` at a time: `failed` (articles and categories: Chatwoot refused the write — `rejected`, with its message — or didn’t answer, or the article’s category has no target in the locale — `category_unavailable`, with the source category’s name and the run of the Workflow creating it, `null` when it is this run), `categories` (the categories written or skipped; those already current are only counted in the outcome), `kept` (written or already-current items of either kind with a field left as it was), and the articles `skipped`, `written`, `current` and `links` (written by Link repair alone, `links_updated` with how many links it re-pointed; `written` leaves them out). Within a group, categories first, then by item id and locale. Each item has its title (the target’s, else the source’s; `null` once the Job is archived), its outcome, and its link into the Chatwoot dashboard — an article’s editor, or the locale’s categories — `null` for a translation never created. `keptFields` counts the fields the whole group kept as they were. An Output that has not delivered yet has no items. Refused with 404 `WORKFLOW_RUN_NOT_FOUND` / `WORKFLOW_OUTPUT_NOT_FOUND` (no Chatwoot Output with that id), 400 `BAD_REQUEST` for a cursor this read did not issue.
+         */
+        get: {
+            parameters: {
+                query: {
+                    group: "failed" | "categories" | "kept" | "skipped" | "written" | "current" | "links";
+                    limit?: number;
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                    outputId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @enum {string} */
+                                itemKind: "article" | "category";
+                                itemId: number;
+                                locale: string;
+                                title: string | null;
+                                url: string | null;
+                                outcome: ({
+                                    /** @enum {string} */
+                                    kind: "written";
+                                    /** @enum {string} */
+                                    result: "created_published" | "created_draft" | "created" | "updated";
+                                    kept: ({
+                                        field: string;
+                                        /** @enum {string} */
+                                        reason: "newer_run";
+                                        newerRunNumber: number;
+                                    } | {
+                                        field: string;
+                                        /** @enum {string} */
+                                        reason: "edited_in_chatwoot" | "draft_pending" | "existing_translation";
+                                    })[];
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "written";
+                                    /** @enum {string} */
+                                    result: "links_updated";
+                                    kept: ({
+                                        field: string;
+                                        /** @enum {string} */
+                                        reason: "newer_run";
+                                        newerRunNumber: number;
+                                    } | {
+                                        field: string;
+                                        /** @enum {string} */
+                                        reason: "edited_in_chatwoot" | "draft_pending" | "existing_translation";
+                                    })[];
+                                    links: number;
+                                }) | {
+                                    /** @enum {string} */
+                                    kind: "current";
+                                    kept: ({
+                                        field: string;
+                                        /** @enum {string} */
+                                        reason: "newer_run";
+                                        newerRunNumber: number;
+                                    } | {
+                                        field: string;
+                                        /** @enum {string} */
+                                        reason: "edited_in_chatwoot" | "draft_pending" | "existing_translation";
+                                    })[];
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "skipped";
+                                    /** @enum {string} */
+                                    reason: "article_gone" | "category_gone" | "ambiguous_family" | "target_archived" | "source_changed" | "untranslated";
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "failed";
+                                    /** @enum {string} */
+                                    reason: "rejected" | "unavailable" | "category_unavailable";
+                                    detail: string;
+                                    categoryId?: number;
+                                };
+                                category?: {
+                                    name: string | null;
+                                    run: {
+                                        id: string;
+                                        number: number;
+                                    } | null;
+                                };
+                            }[];
+                            pagination: {
+                                total: number;
+                                limit: number;
+                                hasMore: boolean;
+                                cursor?: string;
+                            };
+                            /** @description The fields the group’s items kept as they were, every page */
+                            keptFields: number;
                         };
                     };
                 };
@@ -29470,15 +32912,15 @@ export interface paths {
                                 attempts: {
                                     id: string;
                                     /**
-                                     * @description `pending`: a Contentful Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`)
+                                     * @description `pending`: a Contentful or Chatwoot Output’s attempt still writing. `skipped`: a Workflow run’s Output delivered nothing on purpose; `note` carries `skipped:<reason>` (`claim_released`, `newer_run`). `failed`: a Job’s or a Workflow run’s GitHub Output’s `note` carries `failed:<reason>` — for a Job, why its Project’s delivery failed (`no_file_patterns`, `branch_missing`, `access_lost`, `push_rejected`, `unavailable`, `unexpected`); for an Output, the reason its `outcome` names
                                      * @enum {string}
                                      */
                                     status: "pending" | "success" | "failed" | "skipped";
                                     /**
-                                     * @description `contentful`: a Contentful Output’s write-back into the environment its run read
+                                     * @description `contentful`: a Contentful Output’s write-back into the environment its run read. `chatwoot`: a Chatwoot Output’s write-back into the portal its run read
                                      * @enum {string}
                                      */
-                                    deliveryType: "git-push" | "git-pr" | "file-export" | "contentful";
+                                    deliveryType: "git-push" | "git-pr" | "file-export" | "contentful" | "chatwoot";
                                     urls: {
                                         /** @enum {string} */
                                         kind: "commit" | "pr" | "download";
@@ -29487,7 +32929,6 @@ export interface paths {
                                         url: string;
                                     }[];
                                     note: string | null;
-                                    error: string | null;
                                     createdAt: string;
                                 }[];
                             } | null;
@@ -32901,7 +36342,7 @@ export interface paths {
                                 pricingAmount: string | null;
                                 providerRateId: string | null;
                                 tmExactMatches: number;
-                                tmFuzzyMatches: number;
+                                tmReferenceMatches: number;
                                 qaPassCount: number;
                                 qaFailCount: number;
                                 qaAutoFixCount: number;
@@ -36889,7 +40330,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a document connection
-         * @description Admin only; open after `source_checks` lapses. Deletes the connection, then asks the provider to revoke a credential it held (best effort). Refused with 409 `DOCUMENT_CONNECTION_IN_USE` (`details.references`, each `{ id, name }`) while a fetched Reference draws from it — nothing is revoked then.
+         * @description Admin only; open after `source_checks` lapses. Deletes the connection, then asks the provider to revoke a credential it held (best effort). Refused with 409 `DOCUMENT_CONNECTION_IN_USE` (`details.references` and `details.glossaries`, each `{ id, name }`) while a fetched Reference or glossary draws from it — nothing is revoked then.
          */
         delete: {
             parameters: {
@@ -37083,6 +40524,442 @@ export interface paths {
                                 path: string[];
                             }[];
                             complete: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/document-connections/{connectionId}/databases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the databases a document connection can see
+         * @description Databases only, each with its data sources (a database’s tables), for choosing what a fetched glossary reads. `complete: false` when there was more than one listing reads. Any member; refused with 403 `FEATURE_REQUIRED` without `source_checks`, 409 `DOCUMENT_CONNECTION_NOT_CONNECTED` unless the connection is connected, and 503 `DOCUMENT_CONNECTION_UNREACHABLE` when the provider failed otherwise.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            databases: {
+                                id: string;
+                                title: string;
+                                /** @description Its ancestors’ titles, outermost first, as far as the connection sees. */
+                                path: string[];
+                                dataSources: {
+                                    id: string;
+                                    title: string;
+                                }[];
+                            }[];
+                            complete: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/document-connections/{connectionId}/data-sources/{dataSourceId}/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sample a data source for a fetched glossary’s mapping
+         * @description Its schema (property ids, names, types, and a `select`’s or `status`’s options), its first 5 rows in `created_time` order with their values by property id, and a mapping guessed from the property names, resolved to the locales of the organisation’s non-archived Workflows (`workflowLocales`). Map the rows with `@globalize/core`’s `mapRows` to preview entries. Any member; refused with 403 `FEATURE_REQUIRED` without `source_checks`, 404 `DOCUMENT_DATA_SOURCE_NOT_VISIBLE` for a data source the connection can’t see, 400 `BAD_REQUEST` for one with more rows than can be fetched, 409 `DOCUMENT_CONNECTION_NOT_CONNECTED` unless the connection is connected, and 503 `DOCUMENT_CONNECTION_UNREACHABLE` when the provider failed otherwise.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                    dataSourceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            dataSource: {
+                                id: string;
+                                databaseId: string;
+                                title: string;
+                                readonly schema: ({
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "select" | "status";
+                                    readonly options: {
+                                        id: string;
+                                        name: string;
+                                    }[];
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "title" | "rich_text" | "multi_select" | "checkbox";
+                                } | {
+                                    id: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "other";
+                                    /** @description The provider’s name for a type no entry field reads */
+                                    providerType: string;
+                                })[];
+                            };
+                            rows: {
+                                /** @description The row’s page id */
+                                id: string;
+                                /** @description Where the provider opens the row */
+                                url: string | null;
+                                createdTime: string;
+                                /** @description By property id; a type no field reads is left out */
+                                properties: {
+                                    [key: string]: {
+                                        /** @enum {string} */
+                                        type: "title" | "rich_text";
+                                        readonly pieces: {
+                                            plainText: string;
+                                            mention: boolean;
+                                        }[];
+                                    } | {
+                                        /** @enum {string} */
+                                        type: "select" | "status";
+                                        option: {
+                                            id: string;
+                                            name: string;
+                                        } | null;
+                                    } | {
+                                        /** @enum {string} */
+                                        type: "multi_select";
+                                        readonly options: {
+                                            id: string;
+                                            name: string;
+                                        }[];
+                                    } | {
+                                        /** @enum {string} */
+                                        type: "checkbox";
+                                        checked: boolean;
+                                    };
+                                };
+                            }[];
+                            guess: {
+                                /** @description Set only when every non-archived Workflow translates from the same locale */
+                                sourceLocale: string | null;
+                                description: string | null;
+                                forbiddenVariants: string | null;
+                                doNotTranslate: ({
+                                    /** @enum {string} */
+                                    kind: "checkbox";
+                                    property: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "options";
+                                    property: string;
+                                    /** @description Possibly none: choose at least one to create */
+                                    readonly optionIds: string[];
+                                }) | null;
+                                readonly targets: {
+                                    locale: string;
+                                    property: string;
+                                }[];
+                            };
+                            workflowLocales: {
+                                readonly sourceLocales: string[];
+                                readonly targetLocales: string[];
+                            };
                         };
                     };
                 };
@@ -37418,6 +41295,2166 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chatwoot-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the organisation’s Chatwoot connections */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            connections: {
+                                id: string;
+                                /** @description The instance’s address, without a trailing slash. */
+                                baseUrl: string;
+                                /** @description The Chatwoot account it reads, fixed for its life. */
+                                accountId: number;
+                                /** @description The Chatwoot user whose token it holds: who Globalize acts as. */
+                                chatwootUser: {
+                                    id: number;
+                                    name: string;
+                                };
+                                /** @description How many other Chatwoot accounts the token’s user belongs to, as of the last check; the token reaches each with the user’s full role there. Never their names. */
+                                otherAccounts: number;
+                                /**
+                                 * @description `needs_new_token`: Chatwoot stopped accepting the token. `disconnected`: an admin cut it, and Globalize holds no token.
+                                 * @enum {string}
+                                 */
+                                status: "connected" | "needs_new_token" | "disconnected";
+                                /** @description Since when the connection has had its `status`. */
+                                statusChangedAt: string;
+                                /** @description Name and email are null once they deleted their account. */
+                                connectedBy: {
+                                    userId: string;
+                                    name: string | null;
+                                    email: string | null;
+                                };
+                                /** @description Who disconnected it, while it stays `disconnected`; otherwise null. */
+                                disconnectedBy: {
+                                    userId: string;
+                                    name: string | null;
+                                    email: string | null;
+                                } | null;
+                                connectedAt: string;
+                                /** @description The non-archived Workflows whose current version reads it: Inactive (paused) while it isn’t `connected`. */
+                                workflowCount: number;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Connect a Chatwoot account
+         * @description Admins only. Checks, before saving anything and in this order, that the address is a public `https://` one that answers without redirecting, that it runs Chatwoot 4.20.0 or later, that the token’s user is in the account with `administrator` or `knowledge_base_manage` and API access, and that it can list the account’s portals. A refusal answers 422 `CHATWOOT_CONNECT_REFUSED` with `details.reason`, including `already_connected` when the organisation already holds that instance and account. The token is stored encrypted and never returned.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Where the user signs in to Chatwoot. */
+                        baseUrl: string;
+                        accountId: number;
+                        /** @description The dedicated user’s access token, from Profile settings. */
+                        accessToken: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            /** @description The instance’s address, without a trailing slash. */
+                            baseUrl: string;
+                            /** @description The Chatwoot account it reads, fixed for its life. */
+                            accountId: number;
+                            /** @description The Chatwoot user whose token it holds: who Globalize acts as. */
+                            chatwootUser: {
+                                id: number;
+                                name: string;
+                            };
+                            /** @description How many other Chatwoot accounts the token’s user belongs to, as of the last check; the token reaches each with the user’s full role there. Never their names. */
+                            otherAccounts: number;
+                            /**
+                             * @description `needs_new_token`: Chatwoot stopped accepting the token. `disconnected`: an admin cut it, and Globalize holds no token.
+                             * @enum {string}
+                             */
+                            status: "connected" | "needs_new_token" | "disconnected";
+                            /** @description Since when the connection has had its `status`. */
+                            statusChangedAt: string;
+                            /** @description Name and email are null once they deleted their account. */
+                            connectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            };
+                            /** @description Who disconnected it, while it stays `disconnected`; otherwise null. */
+                            disconnectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            } | null;
+                            connectedAt: string;
+                            /** @description The non-archived Workflows whose current version reads it: Inactive (paused) while it isn’t `connected`. */
+                            workflowCount: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chatwoot-connections/{connectionId}/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace a Chatwoot connection’s token, or connect it again
+         * @description Admins only, in any state: rotating a working token, repairing one Chatwoot stopped accepting (`needs_new_token`), or connecting a `disconnected` connection again. Checks, before saving anything and at the connection’s address, that the address is a public `https://` one that answers without redirecting, that it runs Chatwoot 4.20.0 or later, that the token’s user is in the account with `administrator` or `knowledge_base_manage` and API access, and that it can list the account’s portals. A token whose user isn’t in the connection’s account is refused with 422 `CHATWOOT_CONNECT_REFUSED` `different_account`, keeping the old token. The connection is then `connected`, acting as the new token’s user, and the Workflows reading it are active again.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The dedicated user’s access token, from Profile settings. */
+                        accessToken: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            /** @description The instance’s address, without a trailing slash. */
+                            baseUrl: string;
+                            /** @description The Chatwoot account it reads, fixed for its life. */
+                            accountId: number;
+                            /** @description The Chatwoot user whose token it holds: who Globalize acts as. */
+                            chatwootUser: {
+                                id: number;
+                                name: string;
+                            };
+                            /** @description How many other Chatwoot accounts the token’s user belongs to, as of the last check; the token reaches each with the user’s full role there. Never their names. */
+                            otherAccounts: number;
+                            /**
+                             * @description `needs_new_token`: Chatwoot stopped accepting the token. `disconnected`: an admin cut it, and Globalize holds no token.
+                             * @enum {string}
+                             */
+                            status: "connected" | "needs_new_token" | "disconnected";
+                            /** @description Since when the connection has had its `status`. */
+                            statusChangedAt: string;
+                            /** @description Name and email are null once they deleted their account. */
+                            connectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            };
+                            /** @description Who disconnected it, while it stays `disconnected`; otherwise null. */
+                            disconnectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            } | null;
+                            connectedAt: string;
+                            /** @description The non-archived Workflows whose current version reads it: Inactive (paused) while it isn’t `connected`. */
+                            workflowCount: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chatwoot-connections/{connectionId}/base-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change a Chatwoot connection’s address
+         * @description Admins only, for a self-hosted instance that moved, while the connection is `connected` (409 `CHATWOOT_CONNECTION_NOT_CONNECTED` otherwise: replace its token first). Checks the stored token, before saving anything and at the new address, that the address is a public `https://` one that answers without redirecting, that it runs Chatwoot 4.20.0 or later, that the token’s user is in the account with `administrator` or `knowledge_base_manage` and API access, and that it can list the account’s portals. A refusal answers 422 `CHATWOOT_CONNECT_REFUSED`, including `already_connected` when the organisation already connects that account at the new address. The account never changes.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The same Chatwoot at its new address. */
+                        baseUrl: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            /** @description The instance’s address, without a trailing slash. */
+                            baseUrl: string;
+                            /** @description The Chatwoot account it reads, fixed for its life. */
+                            accountId: number;
+                            /** @description The Chatwoot user whose token it holds: who Globalize acts as. */
+                            chatwootUser: {
+                                id: number;
+                                name: string;
+                            };
+                            /** @description How many other Chatwoot accounts the token’s user belongs to, as of the last check; the token reaches each with the user’s full role there. Never their names. */
+                            otherAccounts: number;
+                            /**
+                             * @description `needs_new_token`: Chatwoot stopped accepting the token. `disconnected`: an admin cut it, and Globalize holds no token.
+                             * @enum {string}
+                             */
+                            status: "connected" | "needs_new_token" | "disconnected";
+                            /** @description Since when the connection has had its `status`. */
+                            statusChangedAt: string;
+                            /** @description Name and email are null once they deleted their account. */
+                            connectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            };
+                            /** @description Who disconnected it, while it stays `disconnected`; otherwise null. */
+                            disconnectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            } | null;
+                            connectedAt: string;
+                            /** @description The non-archived Workflows whose current version reads it: Inactive (paused) while it isn’t `connected`. */
+                            workflowCount: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chatwoot-connections/{connectionId}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disconnect a Chatwoot connection
+         * @description Admins only. Deletes Globalize’s copy of the token and marks the connection `disconnected`; Chatwoot is not called, so the token keeps working there until you reset it (Profile settings › Access token). The Workflows reading it become Inactive. A connection already disconnected is left as it is.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            /** @description The instance’s address, without a trailing slash. */
+                            baseUrl: string;
+                            /** @description The Chatwoot account it reads, fixed for its life. */
+                            accountId: number;
+                            /** @description The Chatwoot user whose token it holds: who Globalize acts as. */
+                            chatwootUser: {
+                                id: number;
+                                name: string;
+                            };
+                            /** @description How many other Chatwoot accounts the token’s user belongs to, as of the last check; the token reaches each with the user’s full role there. Never their names. */
+                            otherAccounts: number;
+                            /**
+                             * @description `needs_new_token`: Chatwoot stopped accepting the token. `disconnected`: an admin cut it, and Globalize holds no token.
+                             * @enum {string}
+                             */
+                            status: "connected" | "needs_new_token" | "disconnected";
+                            /** @description Since when the connection has had its `status`. */
+                            statusChangedAt: string;
+                            /** @description Name and email are null once they deleted their account. */
+                            connectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            };
+                            /** @description Who disconnected it, while it stays `disconnected`; otherwise null. */
+                            disconnectedBy: {
+                                userId: string;
+                                name: string | null;
+                                email: string | null;
+                            } | null;
+                            connectedAt: string;
+                            /** @description The non-archived Workflows whose current version reads it: Inactive (paused) while it isn’t `connected`. */
+                            workflowCount: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chatwoot-connections/{connectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a Chatwoot connection
+         * @description Admins only. Deletes the connection and any token it held; Chatwoot is not called. Refused with 409 `CHATWOOT_CONNECTION_IN_USE` (`details.workflows`, each `{ id, name }`) while a non-archived Workflow’s current version names it.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chatwoot-connections/{connectionId}/portals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a Chatwoot connection’s portals
+         * @description The account’s Help Center portals, each with its default locale and every locale it allows (a draft locale is hidden from the portal’s switcher, and still a target). Refused with 404 `CHATWOOT_CONNECTION_NOT_FOUND`, 409 `CHATWOOT_CONNECTION_NOT_CONNECTED` (it needs a new token, or was disconnected), 503 `CHATWOOT_UNREACHABLE` (Chatwoot didn’t answer, or limited the rate: try again) and 502 `CHATWOOT_REFUSED` (`details.reason`: what Chatwoot refused).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description A Workflow being edited: its own claim isn’t reported as `claimedBy` */
+                    workflowId?: string;
+                };
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            portals: {
+                                /** @description What a Chatwoot Input names as `portalId` */
+                                id: number;
+                                name: string;
+                                slug: string;
+                                /** @description The source language a Workflow reads */
+                                defaultLocale: string;
+                                locales: {
+                                    code: string;
+                                    draft: boolean;
+                                }[];
+                                /** @description The Workflow of the organisation holding the portal: another can’t be published on it (`WORKFLOW_PORTAL_CLAIMED`) */
+                                claimedBy: {
+                                    workflowId: string;
+                                    workflowName: string;
+                                } | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chatwoot-connections/{connectionId}/portals/{portalId}/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a Chatwoot portal’s categories
+         * @description The portal’s categories in its default locale, in its order: what a Chatwoot Input’s `categories` selection names. `articlesCount` counts each one’s articles in that locale, whatever their status. Also refused with 404 `CHATWOOT_PORTAL_NOT_FOUND`. Refused with 404 `CHATWOOT_CONNECTION_NOT_FOUND`, 409 `CHATWOOT_CONNECTION_NOT_CONNECTED` (it needs a new token, or was disconnected), 503 `CHATWOOT_UNREACHABLE` (Chatwoot didn’t answer, or limited the rate: try again) and 502 `CHATWOOT_REFUSED` (`details.reason`: what Chatwoot refused).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                    portalId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sourceLocale: string;
+                            categories: {
+                                id: number;
+                                name: string;
+                                articlesCount: number;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{id}/chatwoot-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check a Workflow’s Chatwoot connection and portal
+         * @description The Connection verdict of the Chatwoot Input of the Workflow’s current version, computed now and never stored. From Globalize’s records, asking Chatwoot nothing: `connection_disconnected`, and `connection_token_invalid` while the connection needs a new token. Then from Chatwoot, stopping at the first that fails: `base_url_refused`, `instance_version_unsupported`, `instance_unrecognised`, `connection_token_invalid` (the profile answered 401: the connection moves to `needs_new_token`, its Workflows become Inactive, and the admins are emailed), `account_membership_missing`, `role_insufficient`, `api_access_disabled`, `mfa_required`, `portal_missing`, `unexpected_response`. Each of those is `blocking`. `token_reaches_other_accounts` is `degraded`, with a count only. `status: unknown` with `provider_unavailable` or `provider_rate_limited` (`severity: unknown`) when Chatwoot couldn’t be asked: that says nothing about the connection, so retry. 400 `BAD_REQUEST` for a Workflow that reads no Chatwoot portal; 404 `CHATWOOT_CONNECTION_NOT_FOUND` for an archived one whose connection was deleted.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "ok" | "action_needed" | "unknown";
+                            findings: ({
+                                /** @enum {string} */
+                                reason: "connection_disconnected";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "connection_token_invalid";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "base_url_refused";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "instance_version_unsupported";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                observedVersion: string;
+                                requiredVersion: string;
+                            } | {
+                                /** @enum {string} */
+                                reason: "instance_unrecognised";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "account_membership_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "role_insufficient";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "api_access_disabled";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "mfa_required";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "portal_missing";
+                                /** @enum {string} */
+                                severity: "blocking";
+                            } | {
+                                /** @enum {string} */
+                                reason: "unexpected_response";
+                                /** @enum {string} */
+                                severity: "blocking";
+                                version: string;
+                            } | {
+                                /** @enum {string} */
+                                reason: "token_reaches_other_accounts";
+                                /** @enum {string} */
+                                severity: "degraded";
+                                otherAccounts: number;
+                            } | {
+                                /** @enum {string} */
+                                reason: "provider_unavailable";
+                                /** @enum {string} */
+                                severity: "unknown";
+                            } | {
+                                /** @enum {string} */
+                                reason: "provider_rate_limited";
+                                /** @enum {string} */
+                                severity: "unknown";
+                            })[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{id}/portal-poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How a Chatwoot Workflow’s Portal poll is going
+         * @description From Globalize’s records, asking Chatwoot nothing. `off` while the current version’s “Translate changes automatically” is off; `paused` while the Workflow is inactive or archived, and not polled; `never_checked` until the first poll since it was published finishes; `ok` with when the last poll succeeded; `failing` since `failingSince`, with the last poll’s `reason` — `unreachable` (Chatwoot didn’t answer: the next successful poll catches up), `unexpected_response` (an answer Globalize doesn’t read), `base_url_refused` (the connection’s address now resolves privately or redirects), `api_access_disabled`, `mfa_required`, `portal_gone` or `default_locale` (no longer the source language) — and when one last succeeded (`null`: never). A failing poll starts no run. 400 `BAD_REQUEST` for a Workflow that reads no Chatwoot portal.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            state: "never_checked";
+                        } | {
+                            /** @enum {string} */
+                            state: "ok";
+                            /** Format: date-time */
+                            lastCheckedAt: string;
+                        } | {
+                            /** @enum {string} */
+                            state: "failing";
+                            /** Format: date-time */
+                            lastCheckedAt: string;
+                            lastSucceededAt: string | null;
+                            /** Format: date-time */
+                            failingSince: string;
+                            /** @enum {string} */
+                            reason: "unreachable" | "unexpected_response" | "base_url_refused" | "api_access_disabled" | "mfa_required" | "portal_gone" | "default_locale";
+                        } | {
+                            /** @enum {string} */
+                            state: "off";
+                        } | {
+                            /** @enum {string} */
+                            state: "paused";
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{id}/run-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether a Chatwoot Workflow needs a manual run
+         * @description From Globalize’s records, asking Chatwoot nothing. A Portal poll never translates what the portal held before, nor fills a locale it newly allows, so: `backlog` until a manual run starts after the current version was published; else `new_locales`, the target locales the portal allowed at the last successful poll but not when that manual run read it, and that no run of the Workflow has ever delivered into (each with the portal’s `code`; only with a Chatwoot Output). `null` when neither, and while “Translate changes automatically” is off or the Workflow is inactive or archived. 400 `BAD_REQUEST` for a Workflow that reads no Chatwoot portal.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            suggestion: ({
+                                /** @enum {string} */
+                                kind: "backlog";
+                            } | {
+                                /** @enum {string} */
+                                kind: "new_locales";
+                                locales: {
+                                    locale: string;
+                                    code: string;
+                                }[];
+                            }) | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            message: string;
+                            statusCode: number;
+                            details?: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
