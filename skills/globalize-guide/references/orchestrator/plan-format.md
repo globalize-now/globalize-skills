@@ -119,7 +119,7 @@ Orchestrator-owned steps (main thread; the last two delegated to `globalize-now-
 - [ ] assemble_globalize_inputs
 - [ ] push_setup   <!-- §4.2: the converted catalogs must be on the remote before Globalize can translate them. No remote or another host → this box and every open Phase 4 box below stay open, `— blocked: no GitHub remote`, so a rerun resumes here -->
 - [ ] delegate_project_setup
-  - [ ] connect GitHub
+  - [ ] connect GitHub or GitLab (whichever hosts the remote)
   - [ ] set up the Workflow (or continue on the Project that holds the repository)
 - [ ] start_first_translation   <!-- done when the project skill reports the run started, the pull request into the default branch opened, or why neither happened -->
 ```

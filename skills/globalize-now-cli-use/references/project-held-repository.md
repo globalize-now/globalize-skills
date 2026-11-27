@@ -1,12 +1,11 @@
 # A repository a Project already translates
 
-For a repository a Project already translates. A Project is the older way Globalize translates a repository; new GitHub repositories get a Workflow (SKILL.md Step 2). This file stays until Projects are removed.
+For a repository a Project already translates. A Project is the older way Globalize translates a repository; new GitHub and gitlab.com repositories get a Workflow (SKILL.md Step 2). This file stays until Projects are removed.
 
 You are here because one of these happened:
 
 - **Workflow setup refused the repository** with `REPOSITORY_HELD_BY_PROJECT`. The refusal's `details` carry `projectId`, `projectName` and `repositoryId`.
 - **The user named a Project** ("the Marketing project", a Project id).
-- **The remote is on gitlab.com.** Workflow setup reads GitHub only, so a gitlab.com repository stays on a Project. If the API refuses with its own message, report that message verbatim.
 
 Tell the user, once: the Project "<projectName>" keeps translating this repository, and migrating it to a Workflow is optional, done by an organisation admin in the web app.
 
@@ -38,7 +37,7 @@ Languages, configuration and patterns of this Project are P4–P6. Its glossary 
 
 ## P2. Create a Project and connect a repository
 
-For a gitlab.com repository, or when the user asks for a new Project by name. A GitHub repository with no Project gets a Workflow instead (SKILL.md Step 2).
+Only when the user asks for a new Project by name. A GitHub or gitlab.com repository with no Project gets a Workflow instead (SKILL.md Step 2). If the API refuses to create a Project, report its message verbatim.
 
 ### P2a. Fetch and match available languages
 
@@ -70,7 +69,7 @@ npx @globalize-now/cli-client projects create \
 
 `--target-languages` accepts space-separated or comma-separated values.
 
-Parse the returned JSON to extract the **project ID**. `projects create` always prints a notice on stderr steering a GitHub repository to Workflow setup; on this path (a gitlab.com repository, or a Project the user asked for) that notice is expected, so carry on with the Project and leave the skills as they are.
+Parse the returned JSON to extract the **project ID**. `projects create` always prints a notice on stderr steering a GitHub repository to Workflow setup; on this path (a Project the user asked for) that notice is expected, so carry on with the Project and leave the skills as they are.
 
 ### P2c. Connect the repository
 

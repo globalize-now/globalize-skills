@@ -5,9 +5,13 @@
 
 # The commands and flags a command group's source file ($1, e.g.
 # api-client/src/commands/workflows.ts) registers, one "command<TAB>" line per command and
-# one "command<TAB>--flag" line per flag. In workflows.ts, commands under `runs` are
-# "runs start", "runs list", …, and preview-setup and setup also take every option
-# withSetupOptions adds. A flag is the first argument of `.option(`, `.requiredOption(` or
+# one "command<TAB>--flag" line per flag. A nested group's commands carry its name:
+# workflows.ts's `runs` gives "runs start", "runs list", …, and gitlab.ts's `connections`
+# gives "connections list" beside "connections" itself. A nested group is a
+# `const <var> = group…` whose first `.command("<name>"` names it; a chain that starts on a
+# bare `<var>` line registers under it, and one that starts on a bare `group` line at the
+# top. In workflows.ts, preview-setup and setup also take every option withSetupOptions
+# adds. A flag is the first argument of `.option(`, `.requiredOption(` or
 # `new Option(`, on its line or the next: a "--flag" inside a description or an error
 # message is not one.
 workflows_cli_table() {
@@ -23,11 +27,19 @@ workflows_cli_table() {
     /^function withSetupOptions/ { insetup = 1 }
     insetup && /^}/ { insetup = 0 }
     insetup { f = flag($0); if (f != "") setup[f] = 1; next }
-    /const runs = / { inruns = 1 }
-    match($0, /\.command\("[a-z-]+"\)/) {
+    match($0, /^[[:space:]]*const [A-Za-z]+ = group/) {
+      v = $0; sub(/^[[:space:]]*const /, "", v); sub(/ .*/, "", v)
+      newgroup = v; prefix = ""
+    }
+    match($0, /^[[:space:]]+[A-Za-z]+[[:space:]]*$/) {
+      v = $0; gsub(/[[:space:]]/, "", v)
+      if (v == "group") prefix = ""
+      else if (v in groupname) prefix = groupname[v] " "
+    }
+    match($0, /\.command\("[a-z-]+"[,)]/) {
       name = substr($0, RSTART + 10, RLENGTH - 12)
-      if (name == "runs") { cmd = ""; next }
-      cmd = inruns ? "runs " name : name
+      cmd = prefix name
+      if (newgroup != "") { groupname[newgroup] = name; newgroup = "" }
       print cmd "\t"
       if (cmd == "preview-setup" || cmd == "setup") for (f in setup) print cmd "\t" f
     }
@@ -96,7 +108,10 @@ check_cli_group() {
   while IFS=$'\t' read -r where inv; do
     [ -z "$inv" ] && continue
     found=1
-    sub="$(printf '%s' "$inv" | awk '{ if ($2 == "runs") print $2 " " $3; else print $2 }')"
+    # A nested group's command ("runs start", "connections list") when the CLI registers
+    # one, else the top-level command.
+    sub="$(printf '%s' "$inv" | awk '{ print $2 " " $3 }')"
+    printf '%s\n' "$table" | grep -qxF -- "$sub	" || sub="$(printf '%s' "$inv" | awk '{ print $2 }')"
     if ! printf '%s\n' "$table" | grep -qxF -- "$sub	"; then
       fail "$where names '$group $sub', which the CLI does not register: $inv"
       continue
