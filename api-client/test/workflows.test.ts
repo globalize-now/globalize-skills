@@ -8,7 +8,7 @@ const TM = "33333333-3333-4333-8333-333333333333";
 
 const workflows = (...args: string[]) => runCli(register, "workflows", args);
 
-function definition(inputType: "github" | "contentful", declared: string[]) {
+function definition(inputType: "github" | "gitlab" | "contentful", declared: string[]) {
   return {
     input: { id: "in-1", type: inputType, config: {} },
     targetLanguages: { declared, discovery: false },
@@ -18,7 +18,7 @@ function definition(inputType: "github" | "contentful", declared: string[]) {
   };
 }
 
-function workflowDetail(inputType: "github" | "contentful", number: number, declared: string[]) {
+function workflowDetail(inputType: "github" | "gitlab" | "contentful", number: number, declared: string[]) {
   return {
     id: WF,
     name: "acme/web",
@@ -152,6 +152,109 @@ describe("workflows preview-setup", () => {
       code: "REPOSITORY_HELD_BY_PROJECT",
       details: refusal.details,
     });
+  });
+});
+
+describe("workflows preview-setup on GitLab", () => {
+  const CONNECTION = "44444444-4444-4444-8444-444444444444";
+
+  it("posts provider gitlab, the connection and a nested path, with the overrides", async () => {
+    const requests = mockApi([
+      { method: "POST", path: "/api/workflows/setup/preview", body: { ready: true, previewHash: "h1" } },
+    ]);
+    const { exitCode } = await workflows(
+      "preview-setup",
+      "--gitlab-connection",
+      CONNECTION,
+      "--repository",
+      "acme/platform/web",
+      "--branches",
+      "main",
+      "--target-languages",
+      "fr,de",
+    );
+    expect(exitCode).toBe(0);
+    expect(requests[0].body).toEqual({
+      provider: "gitlab",
+      connectionId: CONNECTION,
+      repository: "acme/platform/web",
+      branches: ["main"],
+      targetLanguages: ["fr", "de"],
+    });
+  });
+
+  it("sends a numeric --repository as the project id", async () => {
+    const requests = mockApi([
+      { method: "POST", path: "/api/workflows/setup/preview", body: { ready: false, needs: [] } },
+    ]);
+    await workflows("preview-setup", "--gitlab-connection", CONNECTION, "--repository", "1234");
+    expect(requests[0].body).toEqual({ provider: "gitlab", connectionId: CONNECTION, repository: 1234 });
+  });
+
+  it("setup posts the GitLab body plus the previewHash", async () => {
+    const requests = mockApi([{ method: "POST", path: "/api/workflows/setup", status: 201, body: { id: WF } }]);
+    const { exitCode } = await workflows(
+      "setup",
+      "--gitlab-connection",
+      CONNECTION,
+      "--repository",
+      "acme/web",
+      "--preview-hash",
+      "h1",
+    );
+    expect(exitCode).toBe(0);
+    expect(requests[0].body).toEqual({
+      provider: "gitlab",
+      connectionId: CONNECTION,
+      repository: "acme/web",
+      previewHash: "h1",
+    });
+  });
+
+  it("prints gitlab_hook_registration_failed with its code and details", async () => {
+    const refusal = {
+      code: "WORKFLOW_DEFINITION_INVALID",
+      message: "The GitLab project hook could not be registered: the connection's user must be a Maintainer",
+      statusCode: 400,
+      details: { issues: [{ code: "gitlab_hook_registration_failed" }] },
+    };
+    mockApi([{ method: "POST", path: "/api/workflows/setup", status: 400, body: refusal }]);
+    const { json, exitCode } = await workflows(
+      "setup",
+      "--gitlab-connection",
+      CONNECTION,
+      "--repository",
+      "acme/web",
+      "--preview-hash",
+      "h1",
+    );
+    expect(exitCode).toBe(1);
+    expect(json.code).toBe("WORKFLOW_DEFINITION_INVALID");
+    expect(json.details).toEqual(refusal.details);
+  });
+
+  it("refuses both --installation-id and --gitlab-connection, sending nothing", async () => {
+    const requests = mockApi([]);
+    const { json, exitCode } = await workflows(
+      "preview-setup",
+      "--installation-id",
+      "42",
+      "--gitlab-connection",
+      CONNECTION,
+      "--repository",
+      "acme/web",
+    );
+    expect(exitCode).toBe(1);
+    expect(json.error).toMatch(/not both/);
+    expect(requests).toHaveLength(0);
+  });
+
+  it("refuses neither, sending nothing", async () => {
+    const requests = mockApi([]);
+    const { json, exitCode } = await workflows("preview-setup", "--repository", "acme/web");
+    expect(exitCode).toBe(1);
+    expect(json.error).toMatch(/--installation-id .* or --gitlab-connection/);
+    expect(requests).toHaveLength(0);
   });
 });
 
@@ -289,6 +392,15 @@ describe("workflows runs", () => {
     expect(json.data.id).toBe(RUN);
   });
 
+  it("start delivers a GitLab Workflow by merge request unless told otherwise", async () => {
+    const requests = mockApi([
+      { method: "GET", path: `/api/workflows/${WF}`, body: workflowDetail("gitlab", 1, ["fr"]) },
+      { method: "POST", path: `/api/workflows/${WF}/runs`, status: 201, body: completedUndeliveredRun },
+    ]);
+    await workflows("runs", "start", "--workflow-id", WF);
+    expect(requests[1].body).toEqual({ delivery: "pr" });
+  });
+
   it("start passes --delivery push and --branch without reading the Workflow", async () => {
     const requests = mockApi([
       { method: "POST", path: `/api/workflows/${WF}/runs`, status: 201, body: completedUndeliveredRun },
@@ -362,6 +474,30 @@ describe("workflows runs", () => {
     mockApi([{ method: "GET", path: `/api/workflow-runs/${RUN}`, body: delivered }]);
     const { json } = await workflows("runs", "get", "--id", RUN);
     expect(json.data.pullRequestUrl).toBe("https://github.com/acme/web/pull/7");
+  });
+
+  it("get reports the merge request a delivered GitLab Output opened", async () => {
+    const delivered = {
+      ...completedUndeliveredRun,
+      outputs: [
+        {
+          id: "o-1",
+          type: "gitlab",
+          attempts: 1,
+          outcome: {
+            status: "delivered",
+            trigger: "initial",
+            branch: "main",
+            method: "pr",
+            noChanges: false,
+            pullRequest: { number: 3, url: "https://gitlab.com/acme/web/-/merge_requests/3", outcome: "created" },
+          },
+        },
+      ],
+    };
+    mockApi([{ method: "GET", path: `/api/workflow-runs/${RUN}`, body: delivered }]);
+    const { json } = await workflows("runs", "get", "--id", RUN);
+    expect(json.data.pullRequestUrl).toBe("https://gitlab.com/acme/web/-/merge_requests/3");
   });
 
   it("get --full prints the run as the API answered", async () => {

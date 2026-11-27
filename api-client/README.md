@@ -56,7 +56,9 @@ Global options:
 | **style-guides** | `list`, `upsert`, `delete`, `generate`, `apply`, `quota` | (deprecated: use `assets`) Project-scoped style guides |
 | **api-keys** | `list`, `create`, `revoke` | Manage API keys |
 | **members** | `list`, `invite`, `remove` | Manage organisation members |
-| **workflows** | `preview-setup`, `setup`, `list`, `get`, `languages` | Set up a GitHub Workflow and change its target languages |
+| **gitlab connections** | `list` (default), `connect` | List the organisation's GitLab connections, or connect another via OAuth |
+| **gitlab repositories** | `list` | The GitLab repositories a connection can reach, with `--search` |
+| **workflows** | `preview-setup`, `setup`, `list`, `get`, `languages` | Set up a GitHub or GitLab Workflow and change its target languages |
 | **workflows runs** | `start`, `list`, `get` | Start a Workflow run and follow it |
 
 ### Examples
@@ -88,13 +90,13 @@ Glossaries, style guides and contexts belong to the organisation; a Project or a
 
 ### Workflows
 
-Setting up a Workflow for a GitHub repository takes two calls. `preview-setup` writes nothing: it detects the repository's locale files and answers one of
+Setting up a Workflow for a GitHub or GitLab repository takes two calls. `preview-setup` writes nothing: it detects the repository's locale files and answers one of
 
 - `ready: true` with the definition it would publish, the file groups it left out as unlikely (`excludedGroups`) and a `previewHash`;
 - `ready: false` with `needs`, each naming what was found and the option to pass (a language is never guessed);
 - `ready: false` with `alreadySetUp`, naming the Workflow that holds the repository.
 
-`setup` takes the same options plus `--preview-hash` and publishes version 1. It is refused with `WORKFLOW_PREVIEW_STALE` when anything changed since the preview, and with `WORKFLOW_REPOSITORY_CLAIMED` when a Workflow already holds the repository, so a retry never creates a second one. Neither call starts a run.
+`setup` takes the same options plus `--preview-hash` and publishes version 1. It is refused with `WORKFLOW_PREVIEW_STALE` when anything changed since the preview, and with `WORKFLOW_REPOSITORY_CLAIMED` when a Workflow already holds the repository, so a retry never creates a second one. Neither call starts a run. A GitLab `setup` also registers the repository's webhook through the connection, which takes a Maintainer: GitLab refusing it answers `WORKFLOW_DEFINITION_INVALID` with the issue `gitlab_hook_registration_failed`.
 
 ```bash
 # Installation id from `github installations`
@@ -110,10 +112,19 @@ globalise-now-cli workflows preview-setup --installation-id 12345 --repository a
 globalise-now-cli workflows setup --installation-id 12345 --repository acme/web \
   --source-language en --target-languages fr,de --patterns '[...]' --preview-hash <hash>
 
+# GitLab (gitlab.com): a connection in place of the installation, and the project's
+# numeric id or its path (nested groups allowed) as --repository
+globalise-now-cli gitlab connections list
+globalise-now-cli gitlab connections connect --no-wait     # URL for the user to authorise, and a nonce
+globalise-now-cli gitlab install-status --nonce <nonce>    # poll until "completed"
+globalise-now-cli gitlab repositories list --connection-id <connection-id> --search web
+globalise-now-cli workflows preview-setup --gitlab-connection <connection-id> --repository acme/platform/web
+globalise-now-cli workflows setup --gitlab-connection <connection-id> --repository acme/platform/web --preview-hash <hash>
+
 # Replace the target languages (refused with WORKFLOW_BASE_VERSION_STALE if another version was published since)
 globalise-now-cli workflows languages --id <workflow-id> --target-languages fr,de,ja
 
-# Start a run (spends credits). A GitHub Workflow delivers by pull request unless --delivery push
+# Start a run (spends credits). A GitHub or GitLab Workflow delivers by pull (merge) request unless --delivery push
 globalise-now-cli workflows runs start --workflow-id <workflow-id>
 
 # Poll it: status, failure, per-language progress, each Output's outcome and the pull request
@@ -169,6 +180,7 @@ const project = await createProject(client, "My App", "en", ["fr", "de"]);
 | Style Guides (deprecated) | `listStyleGuides`, `upsertStyleGuide`, `deleteStyleGuide` |
 | API Keys | `listApiKeys`, `createApiKey`, `revokeApiKey` |
 | Members | `listMembers`, `inviteMember`, `removeMember` |
+| GitLab | `startGitlabInstall`, `pollGitlabInstallStatus`, `listGitlabConnections`, `deleteGitlabConnection`, `listGitlabProjects`, `listGitlabProjectBranches`, `detectGitlabProject` |
 | Workflows | `previewWorkflowSetup`, `setUpWorkflow`, `listWorkflows`, `getWorkflow`, `getWorkflowVersion`, `setWorkflowLanguages`, `startWorkflowRun`, `getWorkflowRun`, `listWorkflowRuns`, `summariseWorkflowRun` |
 
 ## Development
