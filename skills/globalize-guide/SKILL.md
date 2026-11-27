@@ -32,7 +32,7 @@ This file is the map. The detailed instructions for every step live in `referenc
 | 1.5 — Globalize account | Sign in (GitHub or GitLab remote only), via the `globalize-now-account-setup` skill | — |
 | 2 — Setup | Install + configure the library | `references/orchestrator/setup-subagent.md` + every `references.setup` and `references.rulesTemplate` path |
 | 3 — Convert | Wrap strings, convert formatting, extract + compile | `references/orchestrator/wrap-subagent.md`, `verify-subagent.md`, `cleanup-loop.md` + every `references.convert` path |
-| 4 — Globalize Workflow | Push the setup, set up the Workflow (or continue on the Project that holds the repo), start the first translation — via `globalize-now-project-setup` | `references/orchestrator/globalize-inputs.md` |
+| 4 — Globalize Workflow | Push the setup, set up the Workflow, start the first translation — via `globalize-now-project-setup` | `references/orchestrator/globalize-inputs.md` |
 
 Stages 1.5 and 4 run only when Globalize stays in scope (default-on; §1.6). Account sign-in needs no catalog data, so it runs **upfront**; Workflow setup needs the converted catalog paths, so it runs at the **end** — and ends by starting the first translation. With no remote, or one on another host, Phase 4 owns the stop.
 
@@ -302,7 +302,7 @@ Delegate a quick `auth status` check; not authenticated → invoke `globalize-no
 
 ### 4.4 Delegate to `globalize-now-project-setup` (main thread)
 
-Invoke it via the Skill tool (from disk if the Skill tool can't load it — Execution mode): "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect GitHub or GitLab, whichever hosts the remote (one browser approval if the GitHub App isn't installed or no GitLab connection reaches the repository yet), then preview and set up the Workflow with the supplied patterns, languages, name and import mode — or, when Workflow setup says a Project already holds the repository, continue on that Project. Then start the first translation of `firstTranslationBranch`: on the default branch, a run delivered as a pull request; on any other branch, a pull request into the default branch, opened only once the user confirms. On GitLab, a pull request is a merge request." The skill owns the whole CLI surface. Mark `delegate_project_setup` done, and `start_first_translation` once its summary reports the run started, the pull request opened, or why neither happened.
+Invoke it via the Skill tool (from disk if the Skill tool can't load it — Execution mode): "Orchestrated mode. Read `.globalize/globalize-inputs.json` for all inputs; skip detection and the Setup Mode prompt; run unguided. Connect GitHub or GitLab, whichever hosts the remote (one browser approval if the GitHub App isn't installed or no GitLab connection reaches the repository yet), then preview and set up the Workflow with the supplied patterns, languages, name and import mode. When Workflow setup says a Project already holds the repository, stop there and report it. Then start the first translation of `firstTranslationBranch`: on the default branch, a run delivered as a pull request; on any other branch, a pull request into the default branch, opened only once the user confirms. On GitLab, a pull request is a merge request." The skill owns the whole CLI surface. Mark `delegate_project_setup` done, and `start_first_translation` once its summary reports the run started, the pull request opened, or why neither happened.
 
 ### 4.5 Finish
 
@@ -312,7 +312,7 @@ Run started → "All set. Workflow: **{workflowName}** ({workflow page}). Global
 
 Pull request into the default branch → "All set. Workflow: **{workflowName}** ({workflow page}). Pull request {url} brings this setup into `{default branch}`; Globalize translates it and adds the translations to it, so you review and merge them together." The user opens it themselves → the same, naming the branch to open it from.
 
-Continued on a Project → "All set. Project **{projectName}** already translates this repository, so I continued on it, and its first translation of `{branch}` arrives as a pull request. Moving it to a Workflow is optional: an organisation admin does it in the web app."
+Held by a Project → "Your i18n setup is done. Globalize didn't set up a Workflow: Project **{projectName}** already translates this repository, and Projects are deprecated. An organisation admin can move it to a Workflow in the Globalize web app, and it keeps its translations. After that, the `globalize-now-cli-use` skill can start its first translation." In `plan.md` this is `[x] start_first_translation — skipped: Project {projectName} holds the repository`, with the `set up the Workflow` item ticked the same way.
 
 Not started → the same, but say plainly why ("Skipped — not pushed", or the refusal the project skill reported) and that the `globalize-now-cli-use` skill can start it once that is fixed.
 

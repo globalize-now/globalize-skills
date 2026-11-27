@@ -2,8 +2,7 @@
 name: globalize-now-project-setup
 description: >-
   Set up Globalize translation for a repository: publish a Workflow that translates a
-  GitHub or gitlab.com repository's catalogs and start its first translation, or continue
-  on the Project that already translates it. Use this skill when the user asks to connect their
+  GitHub or gitlab.com repository's catalogs and start its first translation. Use this skill when the user asks to connect their
   repo to Globalize, set up a Globalize Workflow, or wire their translation catalogs to
   the Globalize platform. Assumes the Globalize CLI is already installed and
   authenticated — if not, run globalize-now-account-setup first. For managing existing
@@ -108,7 +107,7 @@ After Step 1 completes without blockers, ask:
 ### What was done
 - [x] Step 1: Detect Environment — {signals}
 - [x] Step 2: Connect {GitHub | GitLab} — {owner/repo}, {installation {accountLogin} | connection {username}}
-- [x] Step 3: Preview — {ready | already set up as "{workflowName}" | held by Project "{projectName}", continued there}
+- [x] Step 3: Preview — {ready | already set up as "{workflowName}" | held by Project "{projectName}", stopped — migrate it to a Workflow first}
 - [x] Step 4: Set up the Workflow — "{name}" (source: {source}, targets: {targets}, patterns: {patterns}, import: {mode}) — {workflow page}
 - [x] Step 5: First translation — {run #{number} started, pull request delivery | pull request {url} into {default branch} | skipped — {reason}}
 
@@ -226,7 +225,7 @@ npx @globalize-now/cli-client workflows preview-setup \
 Orchestrated mode passes every flag the inputs supply. Standalone mode starts with only the repository's two flags, then adds the flags that answer `needs`. Never pass `--branches`: the Workflow watches the repository's default branch. The preview writes nothing and starts nothing. Handle its answer:
 
 - **`alreadySetUp: {workflowId, workflowName}`** — a Workflow already holds this repository (an earlier run, or someone else's setup). Use it: skip Step 4, tell the user "Already set up as **{workflowName}**", and go to Step 5. This is how a rerun resumes.
-- **409 `REPOSITORY_HELD_BY_PROJECT`** — a Project already translates this repository; `details` carry its `projectId`, `projectName` and `repositoryId`. Read `references/project-path.md` in full and follow "Continue on the Project that holds the repository" in place of Steps 4–5. Tell the user migrating it to a Workflow is optional, done by an organisation admin in the web app.
+- **409 `REPOSITORY_HELD_BY_PROJECT`** — a Project (the older setup) already translates this repository; `details` name it in `projectName`. Projects are deprecated, so the skill never continues on one. **Stop** in every mode, skipping Steps 4–5: "Project **{projectName}** already translates `{owner}/{repo}`, so Globalize won't set up a Workflow for it. An organisation admin can move the Project to a Workflow in the Globalize web app; it keeps its translations. Run this skill again after that, and it picks up the Workflow." A rerun after the move answers `alreadySetUp`.
 - **`ready: false` with `needs`** — each need has a `code`, the `override` that answers it, what it `found`, and a `message`. Answer every need, then preview again with the answers added:
   - `no_source_language`, `unsupported_source_language` → ask the user for the source language (`--source-language`).
   - `no_target_languages` → ask the user for the target languages (`--target-languages`); `found` lists codes the catalog doesn't know.
