@@ -19,7 +19,7 @@ Skills currently in this repo:
 
 - `skills/globalize-guide/` — orchestrator for the full i18n journey (detect → setup → convert → connect Globalize: account sign-in upfront, Workflow + first translation at the end)
 - `skills/globalize-now-account-setup/` — install + authenticate the Globalize CLI (account sign-in)
-- `skills/globalize-now-project-setup/` — set up a Globalize Workflow for a GitHub or `gitlab.com` repo (preview → confirm), start the first translation when orchestrated; a Project-held repo stays on its Project (`references/project-path.md`); stops without sign-in when there's no GitHub or gitlab.com remote (assumes account-setup is done)
+- `skills/globalize-now-project-setup/` — set up a Globalize Workflow for a GitHub or `gitlab.com` repo (preview → confirm), start the first translation when orchestrated; a repo a (deprecated) Project already holds stops with a pointer to move it to a Workflow; stops without sign-in when there's no GitHub or gitlab.com remote (assumes account-setup is done)
 - `skills/globalize-now-cli-use/` — manage existing Globalize translation resources
 - `skills/css-i18n/` — audit and convert CSS to logical properties for RTL support
 - `skills/lovable-i18n/` — single-file i18n skill for the Lovable.dev agent (Lingui + PO, both Lovable stacks, AGENTS.md coding rules, CI extraction, Globalize connect) — experimental

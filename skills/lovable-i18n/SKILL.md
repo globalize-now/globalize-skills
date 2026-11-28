@@ -1510,7 +1510,7 @@ Lovable can talk to Globalize through a hosted MCP server, so you can set up the
    - `ready: true` → note its `previewHash` and go to step 5.
    - `ready: false` with `alreadySetUp` → a Workflow already translates this repo (a re-run of this phase lands here). Use its `workflowId` and go to step 6.
    - `ready: false` with `needs` → each need names what Globalize found and the argument to pass. Ask the user for each language it names (never guess one), then preview again with their answer.
-   - Refused with `REPOSITORY_HELD_BY_PROJECT` → a Globalize project already translates this repo. Continue on it as **A repository a Globalize project translates** (below) says.
+   - Refused with `REPOSITORY_HELD_BY_PROJECT` → a Globalize project (the older, deprecated setup) already translates this repo. Stop as **A repository a Globalize project translates** (below) says.
    - Refused with `NOT_FOUND` naming the repository → the GitHub App can't see it. Have the user give the Globalize GitHub App access to this repository on GitHub, then preview again.
 5. **Set up the Workflow** with `set_up_workflow`: the same arguments plus the `previewHash`. It publishes the Workflow and starts nothing. Note the Workflow's `id`. Refused with `WORKFLOW_PREVIEW_STALE` → its `details.preview` is a fresh preview; set up once more with that `previewHash`. Refused with `WORKFLOW_REPOSITORY_CLAIMED` → preview again; it answers `alreadySetUp`, so go to step 6 with that `workflowId`.
 6. **Start the first translation** — don't finish Phase 6 without a run. First call `list_workflow_runs` with the `workflowId`. If it lists a run, that run is the first translation: go to step 7 with the newest one and start nothing. With no run, call `start_workflow_run` with the `workflowId` and `delivery: "pr"` — the user agreed to the first translation and its credits when they kept Globalize on in the Ask phase. Leave `branch` out — the run translates the primary branch, the default branch Lovable syncs your catalogs to. It returns the run at once. If it's refused, say why and how to fix it, then stop:
@@ -1520,7 +1520,7 @@ Lovable can talk to Globalize through a hosted MCP server, so you can set up the
 
    Then jump to **Close the loop** below.
 
-**A repository a Globalize project translates.** The `REPOSITORY_HELD_BY_PROJECT` refusal's `details` carry `projectId`, `projectName` and `repositoryId`. Tell the user: "Your Globalize project <projectName> already translates this repository, so I'll continue on it. Moving it to a Workflow is optional — an organisation admin does it in the Globalize web app." Then call `translate_repository` with `id: <repositoryId>`, `deliveryMode: "pr"` and `idempotencyKey: "first-translation-<repositoryId>"`, so a retry never starts a second translation. It returns `{ accepted, branch }` once the translation is queued; tell the user Globalize will open a pull request on GitHub with the translated catalogs. Refused for credits → the user adds credits on the Globalize dashboard, then asks you to retry with the same `idempotencyKey`. Then jump to **Close the loop**.
+**A repository a Globalize project translates.** The `REPOSITORY_HELD_BY_PROJECT` refusal's `details` name the project in `projectName`. Projects are deprecated, so don't continue on it. Tell the user: "Your Globalize project <projectName> already translates this repository, so Globalize won't set up a Workflow for it. An organisation admin can move the project to a Workflow in the Globalize web app, and it keeps its translations. Tell me when that's done and I'll start the first translation." Then end Phase 6. When the user comes back, start again from step 4: the preview answers `alreadySetUp`.
 
 ### Fallback path — no MCP (dashboard or local CLI)
 
@@ -1575,7 +1575,7 @@ npx @globalize-now/cli-client workflows runs start \
   --json
 ```
 
-If step 3 is refused with `REPOSITORY_HELD_BY_PROJECT`, a Globalize project already translates the repository: its `details.repositoryId` goes to `npx @globalize-now/cli-client repositories translate --id <REPOSITORY_ID> --delivery-mode pr --json` instead of steps 4–6.
+If step 3 is refused with `REPOSITORY_HELD_BY_PROJECT`, a Globalize project (the older, deprecated setup) already translates the repository. An organisation admin moves it to a Workflow in the Globalize web app; after that, step 3 answers `alreadySetUp` with the Workflow's id, and steps 5–6 start the first translation.
 
 `@globalize-now/cli-client` is deliberately unpinned — the platform manages its release cadence. If the user works with a local coding agent (Claude Code etc.), point them at the `globalize-now-account-setup` skill (sign in) followed by `globalize-now-project-setup` (set up the Workflow and start the first translation) instead — together they walk the same flow with full auto-detection.
 

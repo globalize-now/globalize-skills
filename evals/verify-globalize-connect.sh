@@ -20,13 +20,13 @@ shopt -s nullglob   # a skill with no references/ globs to nothing
 #      command the project skill names is one the CLI registers, with flags it defines.
 #   3. lovable-i18n's Phase 6 sets up a Workflow and ends by starting its first run as a
 #      pull request (`start_workflow_run`, only after `list_workflow_runs` finds none), reports
-#      the pull request only once `get_workflow_run` says it was delivered, continues a
-#      Project-held repository with `translate_repository`, creates no Project, and its no-MCP
-#      fallback opens the Workflow builder or runs `workflows runs start --delivery pr`.
-#   4. globalize-now-project-setup never picks up a Project it wasn't pointed at: no "exactly
-#      one … reuse it" rule is left, a Project-held repository (REPOSITORY_HELD_BY_PROJECT)
-#      routes to references/project-path.md, which translates that Project's repository with
-#      flags the CLI has, every preview answer is handled, and with no remote (or another
+#      the pull request only once `get_workflow_run` says it was delivered, stops on a
+#      Project-held repository with a pointer to move it to a Workflow, never creates or
+#      translates through a Project, and its no-MCP fallback opens the Workflow builder or runs `workflows runs start --delivery pr`.
+#   4. globalize-now-project-setup never works through a Project: no "exactly one … reuse it"
+#      rule is left, references/project-path.md is gone, a Project-held repository
+#      (REPOSITORY_HELD_BY_PROJECT) stops with a pointer to move it to a Workflow, neither it
+#      nor globalize-guide runs `repositories translate`, every preview answer is handled, and with no remote (or another
 #      host) it stops naming GitHub, running `gh repo create` only after the user confirms.
 #   5. A gitlab.com remote ends at a set-up Workflow, not a Project: project-setup routes it to
 #      the Workflow path, connects GitLab (`gitlab connections list|connect`, `gitlab
@@ -43,7 +43,6 @@ ORCH="$REPO_ROOT/skills/globalize-guide/references/orchestrator"
 PROJECT="$REPO_ROOT/skills/globalize-now-project-setup/SKILL.md"
 LOVABLE="$REPO_ROOT/skills/lovable-i18n/SKILL.md"
 PROJECT_PATH="$REPO_ROOT/skills/globalize-now-project-setup/references/project-path.md"
-CLI_REPOS="$REPO_ROOT/api-client/src/commands/repositories.ts"
 CLI_WORKFLOWS="$REPO_ROOT/api-client/src/commands/workflows.ts"
 CLI_GITLAB="$REPO_ROOT/api-client/src/commands/gitlab.ts"
 CLI_USE="$REPO_ROOT/skills/globalize-now-cli-use/SKILL.md"
@@ -72,32 +71,14 @@ line_of() { printf '%s\n' "$1" | grep -nF -- "$2" | head -n 1 | cut -d: -f1; }
 # shellcheck source=lib/workflows-cli.sh
 . "$SCRIPT_DIR/lib/workflows-cli.sh"
 
-# Each `repositories translate` invocation in the files given passes only flags the CLI's
-# `repositories translate` command defines, and at least one passes --delivery-mode pr.
-check_translate_cli() {
-  local translate_cmd where inv flag found=0
-  translate_cmd="$(awk '/\.command\("translate"\)/ { f = 1 } f { print } f && /^    }\);/ { exit }' "$CLI_REPOS")"
-  if [ -z "$translate_cmd" ]; then
-    fail "api-client has no 'repositories translate' command in $CLI_REPOS"
-    return
-  fi
-  while IFS=$'\t' read -r where inv; do
-    [ -z "$inv" ] && continue
-    has "$inv" '--delivery-mode pr' && found=1
-    while IFS= read -r flag; do
-      [ "$flag" = "--json" ] && continue   # global output option
-      if has "$translate_cmd" "\"$flag " || has "$translate_cmd" "\"$flag <"; then
-        pass "CLI 'repositories translate' accepts $flag"
-      else
-        fail "$where passes $flag to 'repositories translate', which the CLI does not define: $inv"
-      fi
-    done < <(printf '%s' "$inv" | grep -oE -- '--[a-z][a-z-]+' | sort -u)
-  done < <(cli_invocations 'repositories translate' "$@")
-  if [ "$found" -eq 1 ]; then
-    pass "'repositories translate' runs with --delivery-mode pr"
-  else
-    fail "no 'repositories translate --delivery-mode pr' invocation"
-  fi
+# True when the REPOSITORY_HELD_BY_PROJECT lines of $1 stop and point at a Workflow, and
+# none continues on the Project (the phrasings the Project path used; "don't continue on
+# it" is the stop itself).
+held_stops() {
+  local held
+  held="$(printf '%s\n' "$1" | grep -F 'REPOSITORY_HELD_BY_PROJECT' || true)"
+  [ -n "$held" ] && printf '%s' "$held" | grep -qiE 'stop' && has "$held" 'Workflow' \
+    && ! printf '%s' "$held" | grep -qE "I'll continue|I continued|Continue on it|and continue on that Project"
 }
 
 echo "--- 1. globalize-guide: a sibling skill the Skill tool can't load is read from disk ---"
@@ -235,7 +216,7 @@ listed_before_start() {
 if [ -z "$PHASE6" ] || [ -z "$PRIMARY" ] || [ -z "$FALLBACK" ]; then
   fail "lovable-i18n Phase 6, its primary path or its fallback path heading is missing"
 else
-  for marker in 'preview_workflow_setup' 'set_up_workflow' 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"' 'get_workflow_run' 'delivered' 'REPOSITORY_HELD_BY_PROJECT' 'translate_repository'; do
+  for marker in 'preview_workflow_setup' 'set_up_workflow' 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"' 'get_workflow_run' 'delivered' 'REPOSITORY_HELD_BY_PROJECT'; do
     if has "$PRIMARY" "$marker"; then pass "MCP path names '$marker'"; else fail "MCP path does not name '$marker'"; fi
   done
   if listed_before_start "$PRIMARY" 'list_workflow_runs' 'start_workflow_run' 'delivery: "pr"'; then
@@ -264,9 +245,14 @@ else
   else
     fail "the Ask phase does not say connecting starts the first translation and spends credits"
   fi
-  for gone in 'create_project' 'connect_repository' 'projects create' 'repositories create'; do
-    if has "$PHASE6" "$gone"; then fail "Phase 6 still creates a Project ('$gone')"; else pass "Phase 6 does not name '$gone'"; fi
+  for gone in 'create_project' 'connect_repository' 'translate_repository' 'projects create' 'repositories create' 'repositories translate'; do
+    if has "$PHASE6" "$gone"; then fail "Phase 6 still works through a Project ('$gone')"; else pass "Phase 6 does not name '$gone'"; fi
   done
+  if held_stops "$PHASE6"; then
+    pass "Phase 6 stops on a Project-held repository and points at moving it to a Workflow"
+  else
+    fail "Phase 6 does not stop on REPOSITORY_HELD_BY_PROJECT with a pointer to a Workflow"
+  fi
   if has "$FALLBACK" '/workflows/new'; then
     pass "dashboard fallback opens the Workflow builder"
   else
@@ -285,10 +271,10 @@ else
 fi
 
 echo ""
-echo "--- 4. globalize-now-project-setup: a Workflow, or the Project the refusal names ---"
+echo "--- 4. globalize-now-project-setup: a Workflow, never a Project ---"
 # An Idle Project is never picked up: no rule reuses a Project because it is the only one.
 # The scan proves nothing about a file it can't read, so every file it names must exist.
-REUSE_FILES=("$PROJECT" "$PROJECT_PATH" "$GUIDE" "$ORCH/plan-format.md" "$(dirname "$PROJECT")"/references/*.md)
+REUSE_FILES=("$PROJECT" "$GUIDE" "$ORCH/plan-format.md" "$(dirname "$PROJECT")"/references/*.md)
 REUSE_MISSING=""
 for f in "${REUSE_FILES[@]}"; do
   [ -f "$f" ] || REUSE_MISSING="$REUSE_MISSING ${f#"$REPO_ROOT"/}"
@@ -309,27 +295,21 @@ for marker in 'workflows preview-setup' 'workflows setup' '--preview-hash' 'alre
   if grep -qF -- "$marker" "$PROJECT"; then pass "Workflow path handles '$marker'"; else fail "Workflow path does not handle '$marker'"; fi
 done
 
-HELD="$(grep -F 'REPOSITORY_HELD_BY_PROJECT' "$PROJECT" || true)"
-if [ -n "$HELD" ] && has "$HELD" 'references/project-path.md'; then
-  pass "a Project-held repository (REPOSITORY_HELD_BY_PROJECT) routes to references/project-path.md"
+if held_stops "$(cat "$PROJECT")"; then
+  pass "a Project-held repository (REPOSITORY_HELD_BY_PROJECT) stops with a pointer to a Workflow"
 else
-  fail "REPOSITORY_HELD_BY_PROJECT does not route to references/project-path.md"
+  fail "REPOSITORY_HELD_BY_PROJECT does not stop with a pointer to move the Project to a Workflow"
 fi
-if [ ! -f "$PROJECT_PATH" ]; then
-  fail "globalize-now-project-setup has no references/project-path.md"
+if [ -e "$PROJECT_PATH" ]; then
+  fail "references/project-path.md is back — Projects are deprecated"
 else
-  for marker in 'projectId' 'repositoryId' 'repositories list --project-id' 'gitlab.com'; do
-    if grep -qF -- "$marker" "$PROJECT_PATH"; then pass "project-path.md names '$marker'"; else fail "project-path.md does not name '$marker'"; fi
-  done
-  check_translate_cli "$PROJECT_PATH"
-  # It only continues the Project a refusal names: a gitlab.com repository gets a Workflow.
-  for gone in 'projects create' 'repositories create' '## gitlab.com'; do
-    if grep -qF -- "$gone" "$PROJECT_PATH"; then
-      fail "project-path.md still creates a Project or connects a repository ('$gone')"
-    else
-      pass "project-path.md does not name '$gone'"
-    fi
-  done
+  pass "references/project-path.md is gone"
+fi
+TRANSLATE="$(grep -nF 'repositories translate' "$PROJECT" "$(dirname "$PROJECT")"/references/*.md "$GUIDE" "$ORCH"/*.md || true)"
+if [ -z "$TRANSLATE" ] && ! grep -qF 'project-path.md' "$PROJECT" "$GUIDE"; then
+  pass "project-setup and globalize-guide never translate through a Project"
+else
+  fail "a Project path is left: $(printf '%s' "$TRANSLATE" | sed "s|$REPO_ROOT/||" | cut -c1-120 | tr '\n' ';')"
 fi
 
 STOPS="$(section "$PROJECT" '## No-remote and unsupported host stops')"
@@ -389,7 +369,7 @@ fi
 check_cli_group gitlab "$CLI_GITLAB" "$PROJECT" "$(dirname "$PROJECT")"/references/*.md "$CLI_USE"
 # No skill routes a gitlab.com repository to a Project.
 STALE="$(grep -nE 'Project path[^.]*gitlab|gitlab[^.]*Project path|reads GitHub only|Workflows read GitHub only' \
-  "$PROJECT" "$PROJECT_PATH" "$GUIDE" "$CLI_USE" "$ORCH"/*.md "$(dirname "$CLI_USE")"/references/*.md || true)"
+  "$PROJECT" "$GUIDE" "$CLI_USE" "$ORCH"/*.md "$(dirname "$CLI_USE")"/references/*.md || true)"
 if [ -z "$STALE" ]; then
   pass "no skill sends a gitlab.com repository to a Project"
 else

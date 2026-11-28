@@ -4,16 +4,15 @@ description: >-
   Set up and manage Globalize translation for a repository using the CLI. Use this skill when
   the user asks to set up translations for a GitHub or gitlab.com repository, start or check a translation run,
   manage Workflows or their languages, manage glossaries, style guides or translation memories,
-  invite team members, manage API keys, or perform any Globalize platform operation. Also covers
-  a repository a Globalize Project already translates. This skill assumes the CLI is already
-  installed and authenticated — run globalize-now-account-setup first if not.
+  invite team members, manage API keys, or perform any Globalize platform operation. This skill
+  assumes the CLI is already installed and authenticated — run globalize-now-account-setup first if not.
 ---
 
 # Globalize CLI Usage
 
 This skill guides you through managing translation on the [Globalize](https://globalize.now) platform using the CLI (`globalise-now-cli`). A GitHub or `gitlab.com` repository is translated by a **Workflow**: Step 2 sets one up and starts its first translation.
 
-**A repository a Project already translates** (the older setup) follows `references/project-held-repository.md` instead of Step 2. Read it when Workflow setup refuses with `REPOSITORY_HELD_BY_PROJECT`, or when the user names a Project.
+**Projects are deprecated, and this skill doesn't manage them.** A repository a Project already translates (the older setup) is refused by Workflow setup with `REPOSITORY_HELD_BY_PROJECT`; when that happens, or when the user asks to work on a Project, tell them: "Project **{projectName}** translates this repository, and Projects are deprecated. An organisation admin can move it to a Workflow in the Globalize web app, and it keeps its translations. After that, I can manage it as a Workflow." Then stop that task.
 
 **Always use `--json`** when running commands programmatically. A success prints `{"data": …}` on stdout. A failure exits 1 and prints `{"error": …, "status": …, "code": …, "details": …}` on stdout: branch on `code`, and read `details` for the ids it carries.
 
@@ -152,7 +151,7 @@ Refusals (`code` in the failure JSON):
 
 | `code` | Meaning and next step |
 |--------|-----------------------|
-| `REPOSITORY_HELD_BY_PROJECT` | A Project already translates this repository. `details` carry `projectId`, `projectName`, `repositoryId`. Read `references/project-held-repository.md` and continue on that Project. |
+| `REPOSITORY_HELD_BY_PROJECT` | A Project already translates this repository; `details.projectName` names it. Don't continue on it: tell the user an organisation admin moves it to a Workflow in the web app (top of this skill), then stop. After the move, a preview answers `alreadySetUp`. |
 | `NOT_FOUND` (404) | The installation or GitLab connection isn't this organisation's, or it can't see the repository or branch. Recheck 2b. |
 | `WORKFLOW_NO_GITLAB_CONNECTION` | The GitLab connection needs authorising again. The user runs `gitlab connections connect` as the same GitLab user (2b-GitLab), then you preview again. |
 | `GITLAB_UNREACHABLE` (503) | GitLab could not be asked. Retry once; then report it. |
@@ -177,7 +176,7 @@ npx @globalize-now/cli-client workflows setup \
 |--------|-----------|
 | `WORKFLOW_PREVIEW_STALE` | The repository changed since the preview. `details.preview` is a fresh one: show the user what changed, and on confirmation run `workflows setup` again with its `previewHash`. |
 | `WORKFLOW_REPOSITORY_CLAIMED` | A Workflow already holds the repository: `details.workflowId`, `details.workflowName`. Continue with that id. |
-| `REPOSITORY_HELD_BY_PROJECT` | As in 2c: read `references/project-held-repository.md`. |
+| `REPOSITORY_HELD_BY_PROJECT` | As in 2c: stop and point the user at the move to a Workflow. |
 | `WORKFLOW_DEFINITION_INVALID` with issue `gitlab_hook_registration_failed` | GitLab refused the repository's webhook: the connection's user isn't a Maintainer. Nothing was published. The user gives that account the Maintainer role, or connects a Maintainer's account (2b-GitLab); then preview and set up again. |
 
 ### 2e. Start the first translation
@@ -313,8 +312,6 @@ npx @globalize-now/cli-client assets delete-text --id <ASSET_ID> --locale fr --j
 
 `assets create --name --type style_guide|context --scope global|per_locale` creates an Asset (the scope is fixed); `rename` and `delete` manage it, and `delete` is admin-only and refused while a Project or an active Workflow uses it. An Asset with `repositoryManaged` set refuses writes with `PROJECT_ASSETS_REPOSITORY_MANAGED`: edit the file on the `branch` of the `gitUrl` it names.
 
-**A Project's glossary and style guides** (in a Legacy organisation, one with Projects in `projects list`) are these same glossaries and Assets: `projects get --id <PROJECT_ID> --json` names them in `glossary.id`, `styleGuideAsset.id` and `contextAsset.id`, and Steps 3 and 4 edit them. For a Legacy organisation, or when the user names a Project, read `references/project-held-repository.md` (P8): the deprecated Project-keyed `glossary` and `style-guides` commands, bulk glossary import and style guide drafting.
-
 ---
 
 ## Step 5: Organisation and Team Management
@@ -352,7 +349,7 @@ npx @globalize-now/cli-client api-keys revoke --org-id <ORG_ID> --key-id <KEY_ID
 
 ## Command Reference
 
-Project, repository, pattern, job and namespace commands, and the GitLab commands a Project uses, are in `references/project-held-repository.md`, and so are `glossary` and `style-guides`: those Project-keyed commands are deprecated, so use `glossaries` and `assets`.
+The CLI's Project-keyed commands (`projects`, `project-languages`, `repositories`, `patterns`, `namespaces`, `glossary`, `style-guides`) are deprecated and left out: use `workflows`, `glossaries` and `assets`.
 
 | Command | Required flags | Optional flags |
 |---------|---------------|----------------|
@@ -370,8 +367,6 @@ Project, repository, pattern, job and namespace commands, and the GitLab command
 | `workflows runs start` | `--workflow-id` | `--branch`, `--delivery` (`pr`\|`push`) |
 | `workflows runs list` | `--workflow-id` | `--limit`, `--cursor` |
 | `workflows runs get` | `--id` | `--full` |
-| `projects list` | | |
-| `project-languages list` | `--project-id` | |
 | `languages list` | | |
 | `languages get` | `--id` | |
 | `github install` | | `--no-wait` |
@@ -470,7 +465,7 @@ npx @globalize-now/cli-client billing ledger --json
 - **Always use `--json`**: The CLI auto-detects non-TTY and outputs JSON, but always pass `--json` explicitly when running programmatically for reliability. Failures print their JSON on stdout too, with exit code 1.
 - **A GitLab `--repository` is the numeric project id** from `gitlab repositories list` (its `pathWithNamespace` works too); `--gitlab-connection` takes the connection's UUID `id`.
 - **`--installation-id` is GitHub's numeric id**: `workflows preview-setup`, `workflows setup` and the `github repos/branches/detect` commands take the `installationId` field from `github installations --json` (e.g. `122432012`), not its UUID `id`. Every other id is a UUID from a prior command.
-- **Workflows take locale codes**: `--source-language` and `--target-languages` on `workflows` commands are locales (`en`, `pt-BR`). `glossaries`, `assets` and `translation-memories` commands take plain locales too (`--source-locale`, `--target-locale`, `--locale`, `--target <locale>=<term>`); only the deprecated Project-keyed commands take _project language_ UUIDs.
+- **Workflows take locale codes**: `--source-language` and `--target-languages` on `workflows` commands are locales (`en`, `pt-BR`). `glossaries`, `assets` and `translation-memories` commands take plain locales too (`--source-locale`, `--target-locale`, `--locale`, `--target <locale>=<term>`).
 - **Repository assets are edited in the repository**: a Workflow whose `definition.assets.source` is `repository` reads its glossary, style guides and context from `docs/` files at the triggering commit (Steps 3 and 4), so a stored glossary or Asset it doesn't name or attach changes nothing for it.
 - **A completed run is not a delivered run**: check each Output's `outcome.status` for `delivered` before reporting the pull request.
 - **Auth in non-interactive contexts**: The CLI does not fall back to interactive login when there's no TTY. Ensure `GLOBALIZE_API_KEY` is set or `~/.globalize/config.json` exists.

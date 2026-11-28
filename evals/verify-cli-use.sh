@@ -4,7 +4,7 @@ set -uo pipefail
 # Usage: ./evals/verify-cli-use.sh
 #
 # Static check (no model, no network) that globalize-now-cli-use leads with Workflow setup
-# and keeps its Project path behind a pointer. Each check is a tripwire for one behaviour,
+# and has no Project path: Projects are deprecated. Each check is a tripwire for one behaviour,
 # named in its message.
 #
 # Checks:
@@ -14,26 +14,24 @@ set -uo pipefail
 #      command it needs; the Command Reference has a row for each.
 #   3. Every `workflows` command and `--flag` the skill names (SKILL.md and references/)
 #      exists in the CLI's api-client/src/commands/workflows.ts.
-#   4. The Project steps live in a references/ file, introduced as "for a repository a
-#      Project already translates", and SKILL.md loads it on a REPOSITORY_HELD_BY_PROJECT
-#      refusal or when the user names a Project.
+#   4. No Project path is left: the skill (SKILL.md and references/) runs no Project-keyed
+#      command, the old Project reference is gone, and a REPOSITORY_HELD_BY_PROJECT
+#      refusal stops with a pointer to move the Project to a Workflow.
 #   5. The CLI bin keeps its real name, `globalise-now-cli`, and every references/ path
 #      SKILL.md names exists.
 #   6. Glossaries and style guides lead with the org groups, `glossaries` and `assets`, and
 #      need no Project: Steps 3 and 4 name their commands, take locales, and say which
 #      repository file a Workflow with repository assets reads instead. The Command
 #      Reference has a row for every command of both groups and marks `glossary` and
-#      `style-guides` deprecated; their Project-keyed steps live in the Project reference,
-#      which SKILL.md loads for a Legacy organisation. Every `glossaries`, `assets`,
-#      `glossary` and `style-guides` command and flag the skill names exists in the CLI.
+#      `style-guides` deprecated, and the skill runs neither. Every `glossaries` and
+#      `assets` command and flag the skill names exists in the CLI.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SKILL_DIR="$REPO_ROOT/skills/globalize-now-cli-use"
 SKILL="$SKILL_DIR/SKILL.md"
-PROJECT_REF_NAME="references/project-held-repository.md"
-PROJECT_REF="$SKILL_DIR/$PROJECT_REF_NAME"
+OLD_PROJECT_REF="references/project-held-repository.md"
 CLI_WORKFLOWS="$REPO_ROOT/api-client/src/commands/workflows.ts"
 CLI_COMMANDS="$REPO_ROOT/api-client/src/commands"
 
@@ -114,43 +112,41 @@ echo "--- 3. every workflows command and flag the skill names exists in the CLI 
 check_workflows_cli "$CLI_WORKFLOWS" "$SKILL" "$SKILL_DIR"/references/*.md
 
 echo ""
-echo "--- 4. the Project steps live behind a pointer ---"
-if [ -f "$PROJECT_REF" ]; then
-  pass "$PROJECT_REF_NAME exists"
-  if head -n 8 "$PROJECT_REF" | grep -qF 'a Project already translates'; then
-    pass "$PROJECT_REF_NAME is introduced as 'for a repository a Project already translates'"
-  else
-    fail "$PROJECT_REF_NAME's opening does not say it is for a repository a Project already translates"
-  fi
-  for marker in 'projects create' 'repositories create' 'project-languages add' 'patterns create' 'projects update' 'repositories translate' 'gitlab connections'; do
-    if grep -qF -- "$marker" "$PROJECT_REF"; then pass "$PROJECT_REF_NAME covers '$marker'"; else fail "$PROJECT_REF_NAME does not cover '$marker'"; fi
-  done
-  # `projects create` always prints a Workflow-setup notice, here too; the agent carries on.
-  if grep -F 'projects create' "$PROJECT_REF" | grep -i 'notice' | grep -qi 'expected'; then
-    pass "$PROJECT_REF_NAME says the 'projects create' notice is expected here"
-  else
-    fail "$PROJECT_REF_NAME does not say the 'projects create' notice is expected on this path"
-  fi
+echo "--- 4. no Project path ---"
+if [ -e "$SKILL_DIR/$OLD_PROJECT_REF" ]; then
+  fail "$OLD_PROJECT_REF is back — Projects are deprecated"
 else
-  fail "$PROJECT_REF_NAME does not exist"
+  pass "$OLD_PROJECT_REF is gone"
 fi
-for marker in 'projects create' 'repositories create' 'project-languages add' 'patterns create' 'Create a Project'; do
-  if grep -qF -- "$marker" "$SKILL"; then
-    fail "SKILL.md still carries the Project step '$marker' — it belongs in $PROJECT_REF_NAME"
+if grep -qF -- "$OLD_PROJECT_REF" "$SKILL"; then
+  fail "SKILL.md still points at $OLD_PROJECT_REF"
+else
+  pass "SKILL.md no longer points at $OLD_PROJECT_REF"
+fi
+# The CLI's Project-keyed groups, run through the CLI or named as a command in inline code.
+# Naming a bare group in prose (to call it deprecated) is fine, and so is
+# `gitlab repositories list`, which is a different command.
+for group in projects project-languages repositories patterns namespaces; do
+  invs="$(grep -nE "(cli-client|globalise-now-cli) $group [a-z]|\`$group [a-z]|^\| \`$group " "$SKILL" "$SKILL_DIR"/references/*.md 2>/dev/null || true)"
+  if [ -z "$invs" ]; then
+    pass "the skill runs no '$group' command"
   else
-    pass "SKILL.md no longer carries '$marker'"
+    fail "the skill still runs '$group': $(printf '%s' "$invs" | sed "s|$SKILL_DIR/||" | cut -c1-120 | tr '\n' ';')"
   fi
 done
-POINTERS="$(grep -F -- "$PROJECT_REF_NAME" "$SKILL" || true)"
-if printf '%s' "$POINTERS" | grep -qF 'REPOSITORY_HELD_BY_PROJECT'; then
-  pass "SKILL.md loads $PROJECT_REF_NAME on a REPOSITORY_HELD_BY_PROJECT refusal"
+ROWS="$(grep -E '^\| `(projects|project-languages|repositories|patterns|namespaces) ' "$SKILL" || true)"
+if [ -z "$ROWS" ]; then
+  pass "the Command Reference has no Project-keyed rows"
 else
-  fail "no line of SKILL.md loads $PROJECT_REF_NAME on a REPOSITORY_HELD_BY_PROJECT refusal"
+  fail "the Command Reference still has Project-keyed rows: $(printf '%s' "$ROWS" | cut -c1-60 | tr '\n' ';')"
 fi
-if printf '%s' "$POINTERS" | grep -qiE 'names a Project'; then
-  pass "SKILL.md loads $PROJECT_REF_NAME when the user names a Project"
+HELD="$(grep -F 'REPOSITORY_HELD_BY_PROJECT' "$SKILL" || true)"
+if [ -z "$HELD" ]; then
+  fail "SKILL.md no longer handles a REPOSITORY_HELD_BY_PROJECT refusal"
+elif has "$HELD" 'stop' && has "$HELD" 'Workflow' && ! printf '%s' "$HELD" | grep -qiE 'continue on (that|the) Project'; then
+  pass "a REPOSITORY_HELD_BY_PROJECT refusal stops and points at moving the Project to a Workflow"
 else
-  fail "no line of SKILL.md loads $PROJECT_REF_NAME when the user names a Project"
+  fail "a REPOSITORY_HELD_BY_PROJECT refusal doesn't stop with a pointer to a Workflow: $(printf '%s' "$HELD" | cut -c1-160 | tr '\n' ';')"
 fi
 
 echo ""
@@ -243,30 +239,21 @@ for group in glossary style-guides; do
     fail "Command Reference does not mark '$group' deprecated"
   fi
 done
-# The Project-keyed commands: only in the Project reference, every row marked deprecated.
+# The deprecated Project-keyed glossary and style guide commands: never run.
 for group in glossary style-guides; do
-  in_skill="$(cli_invocations "$group [a-z]" "$SKILL")"
-  if [ -z "$in_skill" ]; then
-    pass "SKILL.md runs no '$group' command"
+  invs="$(cli_invocations "$group [a-z]" "$SKILL" "$SKILL_DIR"/references/*.md)"
+  if [ -z "$invs" ]; then
+    pass "the skill runs no '$group' command"
   else
-    fail "SKILL.md still runs '$group' — it belongs in $PROJECT_REF_NAME: $(printf '%s' "$in_skill" | cut -f2 | tr '\n' ';')"
+    fail "the skill still runs the deprecated '$group': $(printf '%s' "$invs" | cut -f2 | tr '\n' ';')"
   fi
 done
-for marker in 'glossary create' 'glossary bulk' 'style-guides upsert' 'style-guides generate'; do
-  if grep -qF -- "$marker" "$PROJECT_REF"; then pass "$PROJECT_REF_NAME covers '$marker'"; else fail "$PROJECT_REF_NAME does not cover '$marker'"; fi
-done
-UNMARKED="$(grep -E '^\| `(glossary|style-guides) ' "$PROJECT_REF" | grep -v '_(deprecated)_' || true)"
-if [ -z "$UNMARKED" ] && grep -qE '^\| `(glossary|style-guides) ' "$PROJECT_REF"; then
-  pass "$PROJECT_REF_NAME marks every glossary and style-guides row deprecated"
+if grep -qF 'Legacy organisation' "$SKILL"; then
+  fail "SKILL.md still has a Legacy-organisation Project path"
 else
-  fail "$PROJECT_REF_NAME has no glossary/style-guides rows, or rows not marked _(deprecated)_: $UNMARKED"
+  pass "SKILL.md has no Legacy-organisation Project path"
 fi
-if printf '%s' "$POINTERS" | grep -qF 'Legacy organisation'; then
-  pass "SKILL.md loads $PROJECT_REF_NAME for a Legacy organisation"
-else
-  fail "no line of SKILL.md loads $PROJECT_REF_NAME for a Legacy organisation"
-fi
-for group in glossaries assets glossary style-guides; do
+for group in glossaries assets; do
   check_cli_group "$group" "$CLI_COMMANDS/$group.ts" "$SKILL" "$SKILL_DIR"/references/*.md
 done
 
